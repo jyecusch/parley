@@ -19,17 +19,40 @@ const columns = {
   connection: schema.connections,
   actsAsName: actsAs.name,
   actsAsKind: actsAs.kind,
+  clientUri: schema.oauthClient.uri,
+  redirectUris: schema.oauthClient.redirectUris,
 }
 
 type Row = {
   readonly connection: typeof schema.connections.$inferSelect
   readonly actsAsName: string
   readonly actsAsKind: string | null
+  readonly clientUri: string | null
+  readonly redirectUris: Array<string> | null
 }
 
-const summarize = ({ connection, actsAsName, actsAsKind }: Row): Connection => ({
+const LOOPBACK = new Set(["localhost", "127.0.0.1", "[::1]"])
+
+/** "claude.ai" from the agent's website, or "Local app" when it only redirects to this computer. */
+const originOf = (clientUri: string | null, redirectUris: ReadonlyArray<string> | null): string | null => {
+  const hostOf = (url: string | null | undefined) => {
+    try {
+      return url ? new URL(url).hostname : undefined
+    } catch {
+      return undefined
+    }
+  }
+  const site = hostOf(clientUri)
+  if (site && !LOOPBACK.has(site)) return site
+  const redirect = hostOf(redirectUris?.[0])
+  if (!redirect) return null
+  return LOOPBACK.has(redirect) ? "Local app" : redirect
+}
+
+const summarize = ({ connection, actsAsName, actsAsKind, clientUri, redirectUris }: Row): Connection => ({
   id: connection.id as ConnectionId,
   name: connection.name,
+  origin: originOf(clientUri, redirectUris),
   actsAs: {
     userId: connection.actsAsUserId as UserId,
     name: actsAsName,
@@ -99,6 +122,7 @@ export class Connections extends Context.Service<
               .select(columns)
               .from(schema.connections)
               .innerJoin(actsAs, eq(actsAs.id, schema.connections.actsAsUserId))
+              .leftJoin(schema.oauthClient, eq(schema.oauthClient.clientId, schema.connections.clientId))
               .where(where)
               .orderBy(desc(schema.connections.createdAt)),
           )

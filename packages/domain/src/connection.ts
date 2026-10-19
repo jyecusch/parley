@@ -9,6 +9,8 @@ export const Connection = Schema.Struct({
   id: ConnectionId,
   /** The agent's own name, from its registration ("Claude", "Cursor"). */
   name: Schema.String,
+  /** Where the agent runs: its website's host ("claude.ai"), or "Local app" for one on your computer. */
+  origin: Schema.NullOr(Schema.String),
   /** Who the agent acts as: the person who connected it, or a service account. */
   actsAs: Schema.Struct({
     userId: UserId,

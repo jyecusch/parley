@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ConnectRouteImport } from './routes/connect'
 import { Route as McpRouteImport } from './routes/mcp'
 import { Route as NewTeamRouteImport } from './routes/new-team'
 import { Route as SignInRouteImport } from './routes/sign-in'
@@ -18,10 +19,20 @@ import { Route as DotwellKnownSplatRouteImport } from './routes/[.]well-known.$'
 import { Route as ApiSplatRouteImport } from './routes/api/$'
 import { Route as TTeamIdRouteImport } from './routes/t.$teamId'
 import { Route as TTeamIdContactsRouteImport } from './routes/t.$teamId.contacts'
+import { Route as TTeamIdSettingsRouteImport } from './routes/t.$teamId.settings'
+import { Route as TTeamIdSettingsIndexRouteImport } from './routes/t.$teamId.settings.index'
+import { Route as TTeamIdSettingsApiKeysRouteImport } from './routes/t.$teamId.settings.api-keys'
+import { Route as TTeamIdSettingsConnectionsRouteImport } from './routes/t.$teamId.settings.connections'
+import { Route as TTeamIdSettingsServiceAccountsRouteImport } from './routes/t.$teamId.settings.service-accounts'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ConnectRoute = ConnectRouteImport.update({
+  id: '/connect',
+  path: '/connect',
   getParentRoute: () => rootRouteImport,
 } as any)
 const McpRoute = McpRouteImport.update({
@@ -64,9 +75,37 @@ const TTeamIdContactsRoute = TTeamIdContactsRouteImport.update({
   path: '/contacts',
   getParentRoute: () => TTeamIdRoute,
 } as any)
+const TTeamIdSettingsRoute = TTeamIdSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => TTeamIdRoute,
+} as any)
+const TTeamIdSettingsIndexRoute = TTeamIdSettingsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => TTeamIdSettingsRoute,
+} as any)
+const TTeamIdSettingsApiKeysRoute = TTeamIdSettingsApiKeysRouteImport.update({
+  id: '/api-keys',
+  path: '/api-keys',
+  getParentRoute: () => TTeamIdSettingsRoute,
+} as any)
+const TTeamIdSettingsConnectionsRoute =
+  TTeamIdSettingsConnectionsRouteImport.update({
+    id: '/connections',
+    path: '/connections',
+    getParentRoute: () => TTeamIdSettingsRoute,
+  } as any)
+const TTeamIdSettingsServiceAccountsRoute =
+  TTeamIdSettingsServiceAccountsRouteImport.update({
+    id: '/service-accounts',
+    path: '/service-accounts',
+    getParentRoute: () => TTeamIdSettingsRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/connect': typeof ConnectRoute
   '/mcp': typeof McpRoute
   '/new-team': typeof NewTeamRoute
   '/sign-in': typeof SignInRoute
@@ -75,9 +114,15 @@ export interface FileRoutesByFullPath {
   '/api/$': typeof ApiSplatRoute
   '/t/$teamId': typeof TTeamIdRouteWithChildren
   '/t/$teamId/contacts': typeof TTeamIdContactsRoute
+  '/t/$teamId/settings': typeof TTeamIdSettingsRouteWithChildren
+  '/t/$teamId/settings/api-keys': typeof TTeamIdSettingsApiKeysRoute
+  '/t/$teamId/settings/connections': typeof TTeamIdSettingsConnectionsRoute
+  '/t/$teamId/settings/service-accounts': typeof TTeamIdSettingsServiceAccountsRoute
+  '/t/$teamId/settings/': typeof TTeamIdSettingsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/connect': typeof ConnectRoute
   '/mcp': typeof McpRoute
   '/new-team': typeof NewTeamRoute
   '/sign-in': typeof SignInRoute
@@ -86,10 +131,15 @@ export interface FileRoutesByTo {
   '/api/$': typeof ApiSplatRoute
   '/t/$teamId': typeof TTeamIdRouteWithChildren
   '/t/$teamId/contacts': typeof TTeamIdContactsRoute
+  '/t/$teamId/settings/api-keys': typeof TTeamIdSettingsApiKeysRoute
+  '/t/$teamId/settings/connections': typeof TTeamIdSettingsConnectionsRoute
+  '/t/$teamId/settings/service-accounts': typeof TTeamIdSettingsServiceAccountsRoute
+  '/t/$teamId/settings': typeof TTeamIdSettingsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/connect': typeof ConnectRoute
   '/mcp': typeof McpRoute
   '/new-team': typeof NewTeamRoute
   '/sign-in': typeof SignInRoute
@@ -98,11 +148,17 @@ export interface FileRoutesById {
   '/api/$': typeof ApiSplatRoute
   '/t/$teamId': typeof TTeamIdRouteWithChildren
   '/t/$teamId/contacts': typeof TTeamIdContactsRoute
+  '/t/$teamId/settings': typeof TTeamIdSettingsRouteWithChildren
+  '/t/$teamId/settings/api-keys': typeof TTeamIdSettingsApiKeysRoute
+  '/t/$teamId/settings/connections': typeof TTeamIdSettingsConnectionsRoute
+  '/t/$teamId/settings/service-accounts': typeof TTeamIdSettingsServiceAccountsRoute
+  '/t/$teamId/settings/': typeof TTeamIdSettingsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/connect'
     | '/mcp'
     | '/new-team'
     | '/sign-in'
@@ -111,9 +167,15 @@ export interface FileRouteTypes {
     | '/api/$'
     | '/t/$teamId'
     | '/t/$teamId/contacts'
+    | '/t/$teamId/settings'
+    | '/t/$teamId/settings/api-keys'
+    | '/t/$teamId/settings/connections'
+    | '/t/$teamId/settings/service-accounts'
+    | '/t/$teamId/settings/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/connect'
     | '/mcp'
     | '/new-team'
     | '/sign-in'
@@ -122,9 +184,14 @@ export interface FileRouteTypes {
     | '/api/$'
     | '/t/$teamId'
     | '/t/$teamId/contacts'
+    | '/t/$teamId/settings/api-keys'
+    | '/t/$teamId/settings/connections'
+    | '/t/$teamId/settings/service-accounts'
+    | '/t/$teamId/settings'
   id:
     | '__root__'
     | '/'
+    | '/connect'
     | '/mcp'
     | '/new-team'
     | '/sign-in'
@@ -133,10 +200,16 @@ export interface FileRouteTypes {
     | '/api/$'
     | '/t/$teamId'
     | '/t/$teamId/contacts'
+    | '/t/$teamId/settings'
+    | '/t/$teamId/settings/api-keys'
+    | '/t/$teamId/settings/connections'
+    | '/t/$teamId/settings/service-accounts'
+    | '/t/$teamId/settings/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ConnectRoute: typeof ConnectRoute
   McpRoute: typeof McpRoute
   NewTeamRoute: typeof NewTeamRoute
   SignInRoute: typeof SignInRoute
@@ -153,6 +226,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/connect': {
+      id: '/connect'
+      path: '/connect'
+      fullPath: '/connect'
+      preLoaderRoute: typeof ConnectRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/mcp': {
@@ -211,15 +291,70 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TTeamIdContactsRouteImport
       parentRoute: typeof TTeamIdRoute
     }
+    '/t/$teamId/settings': {
+      id: '/t/$teamId/settings'
+      path: '/settings'
+      fullPath: '/t/$teamId/settings'
+      preLoaderRoute: typeof TTeamIdSettingsRouteImport
+      parentRoute: typeof TTeamIdRoute
+    }
+    '/t/$teamId/settings/': {
+      id: '/t/$teamId/settings/'
+      path: '/'
+      fullPath: '/t/$teamId/settings/'
+      preLoaderRoute: typeof TTeamIdSettingsIndexRouteImport
+      parentRoute: typeof TTeamIdSettingsRoute
+    }
+    '/t/$teamId/settings/api-keys': {
+      id: '/t/$teamId/settings/api-keys'
+      path: '/api-keys'
+      fullPath: '/t/$teamId/settings/api-keys'
+      preLoaderRoute: typeof TTeamIdSettingsApiKeysRouteImport
+      parentRoute: typeof TTeamIdSettingsRoute
+    }
+    '/t/$teamId/settings/connections': {
+      id: '/t/$teamId/settings/connections'
+      path: '/connections'
+      fullPath: '/t/$teamId/settings/connections'
+      preLoaderRoute: typeof TTeamIdSettingsConnectionsRouteImport
+      parentRoute: typeof TTeamIdSettingsRoute
+    }
+    '/t/$teamId/settings/service-accounts': {
+      id: '/t/$teamId/settings/service-accounts'
+      path: '/service-accounts'
+      fullPath: '/t/$teamId/settings/service-accounts'
+      preLoaderRoute: typeof TTeamIdSettingsServiceAccountsRouteImport
+      parentRoute: typeof TTeamIdSettingsRoute
+    }
   }
 }
 
+interface TTeamIdSettingsRouteChildren {
+  TTeamIdSettingsApiKeysRoute: typeof TTeamIdSettingsApiKeysRoute
+  TTeamIdSettingsConnectionsRoute: typeof TTeamIdSettingsConnectionsRoute
+  TTeamIdSettingsServiceAccountsRoute: typeof TTeamIdSettingsServiceAccountsRoute
+  TTeamIdSettingsIndexRoute: typeof TTeamIdSettingsIndexRoute
+}
+
+const TTeamIdSettingsRouteChildren: TTeamIdSettingsRouteChildren = {
+  TTeamIdSettingsApiKeysRoute: TTeamIdSettingsApiKeysRoute,
+  TTeamIdSettingsConnectionsRoute: TTeamIdSettingsConnectionsRoute,
+  TTeamIdSettingsServiceAccountsRoute: TTeamIdSettingsServiceAccountsRoute,
+  TTeamIdSettingsIndexRoute: TTeamIdSettingsIndexRoute,
+}
+
+const TTeamIdSettingsRouteWithChildren = TTeamIdSettingsRoute._addFileChildren(
+  TTeamIdSettingsRouteChildren,
+)
+
 interface TTeamIdRouteChildren {
   TTeamIdContactsRoute: typeof TTeamIdContactsRoute
+  TTeamIdSettingsRoute: typeof TTeamIdSettingsRouteWithChildren
 }
 
 const TTeamIdRouteChildren: TTeamIdRouteChildren = {
   TTeamIdContactsRoute: TTeamIdContactsRoute,
+  TTeamIdSettingsRoute: TTeamIdSettingsRouteWithChildren,
 }
 
 const TTeamIdRouteWithChildren =
@@ -227,6 +362,7 @@ const TTeamIdRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ConnectRoute: ConnectRoute,
   McpRoute: McpRoute,
   NewTeamRoute: NewTeamRoute,
   SignInRoute: SignInRoute,

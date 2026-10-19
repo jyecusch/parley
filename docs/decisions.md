@@ -102,6 +102,11 @@ What we decided, who decided it, and what's still open. Nothing becomes "decided
 | D94 | Service accounts | Creating one needs `service-accounts:manage` (admin, owner). Any member may connect an agent as an existing service account, limited to the lower of the service account's role and their own, intersected with the connection's scopes | Owner | 2026-10-20 |
 | D95 | Term | "Connection": an agent someone authorized over OAuth. Listed and revoked in Settings | Owner | 2026-10-20 |
 | D96 | Key and connection activity | Show "last used", and changes are attributed in record activity ("via …"). No separate per-key log yet | Owner | 2026-10-20 |
+| D97 | Settings and consent design | Approved as drawn on the canvas, with one change: copy is an icon button inside the field, not a separate "Copy" button | Owner | 2026-10-20 |
+| D98 | `records:read` | Always on for API keys and connections; it can't be unticked, so nothing is ever created that can do nothing | Owner (approved with D97) | 2026-10-20 |
+| D99 | API key scopes for admins | The dialog offers `records:*` to everyone and `fields:manage` to admins and owners only; manage scopes for members and service accounts stay off API keys for now | Owner (approved with D97) | 2026-10-20 |
+| D100 | Consent defaults | Admins default to "New service account…" (created as a member when they allow), members default to "You" | Owner (approved with D97) | 2026-10-20 |
+| D101 | Settings sidebar | General and Members are shown, disabled and marked "Later", until they're built. Rename, change role and delete for service accounts come later | Owner (approved with D97) | 2026-10-20 |
 
 ## Implementation choices made during milestones 1 and 2 (Claude; low-stakes, open to veto)
 
@@ -136,7 +141,7 @@ Not yet: companies and affiliations, custom fields, saved views, notes, CSV impo
 | P2 | Permission set and role mapping (`records:read/write/delete`, `fields:manage`, `members:manage`, `service-accounts:manage`, `team:manage`) | [00](./00-architecture.md), [04](./04-authorization-proofs.md) |
 | ~~P4~~ (now D50) | "Default" implies pluggable: a process-tier `Mailer` service interface in core, with `Resend` as the first (default) implementation. Resend errors are classified into our own error classes, and Resend's text never reaches a user | [01](./01-errors-are-data.md), [03](./03-tiers.md) |
 | P3 | Effective permissions = role permissions ∩ scopes, computed in one function | [00](./00-architecture.md), [04](./04-authorization-proofs.md) |
-| P5 | Term: **access token** = the OAuth token an agent gets for a connection (code: `AccessTokenUnrecognized`, `AccessTokenExpired`). It is currently banned as a synonym for API key, so it needs the owner's call. User-facing text says "the agent's sign-in" instead | [terminology](./terminology.md) |
+| ~~P5~~ (approved with D97) | Term: **access token** = the OAuth token an agent gets for a connection (code: `AccessTokenUnrecognized`, `AccessTokenExpired`). It is currently banned as a synonym for API key, so it needs the owner's call. User-facing text says "the agent's sign-in" instead | [terminology](./terminology.md) |
 
 Each post ends with its own **Open questions**, and those are collected below once reviewed.
 

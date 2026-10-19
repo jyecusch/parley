@@ -2,6 +2,7 @@ import { type QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { createRootRouteWithContext, HeadContent, Outlet, Scripts } from "@tanstack/react-router"
 import type { ReactNode } from "react"
 import appCss from "../styles/app.css?url"
+import settingsCss from "../styles/settings.css?url"
 
 /** Applies the saved theme and CRT mode before first paint, so there's no flash. */
 const THEME_SCRIPT = `try{var t=localStorage.getItem("parley.theme")||"system";var d=t==="dark"||(t==="system"&&matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.dataset.theme=d?"dark":"light";var c=localStorage.getItem("parley.crt");if(c==="amber")document.documentElement.dataset.crt="amber"}catch(e){}`
@@ -21,6 +22,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         href: "https://fonts.googleapis.com/css2?family=Host+Grotesk:wght@300..800&family=DM+Mono:wght@400;500&display=swap",
       },
       { rel: "stylesheet", href: appCss },
+      { rel: "stylesheet", href: settingsCss },
     ],
   }),
   shellComponent: RootDocument,

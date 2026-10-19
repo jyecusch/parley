@@ -185,6 +185,8 @@ export const makeAuth = (config: AuthConfig): Auth =>
         defaultPrefix: "parley_",
         enableMetadata: true,
         requireName: true,
+        // "parley_" plus four characters, so people can tell their keys apart (D97).
+        startingCharactersConfig: { charactersLength: 11 },
         rateLimit: { enabled: true, timeWindow: 60_000, maxRequests: 600 },
       }),
       jwt(),

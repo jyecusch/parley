@@ -209,6 +209,7 @@ describe("connecting an agent over OAuth", () => {
     expect(created.status).toBe(200)
     expect(created.body).toMatchObject({
       name: "Claude",
+      origin: "Local app",
       actsAs: { name: "Jane Doe", kind: "user" },
       scopes: ["records:read"],
       authorizedAt: null,
@@ -243,7 +244,12 @@ describe("connecting an agent over OAuth", () => {
       json: { name: "Sync bot" },
     })
     expect(serviceAccount.status).toBe(200)
-    expect(serviceAccount.body).toMatchObject({ name: "Sync bot", role: "member" })
+    expect(serviceAccount.body).toMatchObject({
+      name: "Sync bot",
+      role: "member",
+      createdBy: { name: "Jane Doe" },
+      connectionCount: 0,
+    })
 
     const { request, verifier } = await startSignIn()
     const beyondRole = await send("POST", `/api/v1/teams/${teamId}/connections`, {
@@ -258,6 +264,8 @@ describe("connecting an agent over OAuth", () => {
     expect(created.status).toBe(200)
     expect(created.body.actsAs).toMatchObject({ name: "Sync bot", kind: "service-account" })
     const tokens = await finishSignIn(request, verifier)
+    const listed = await send("GET", `/api/v1/teams/${teamId}/service-accounts`)
+    expect(listed.body[0].connectionCount).toBe(1)
 
     const contact = await callTool(tokens.access_token, "contacts_create", { teamId, firstName: "Ana" })
     expect(contact.isError).toBe(false)

@@ -108,3 +108,67 @@ export const AgentIcon = ({ size = 8 }: P) => (
     <path d="M12 2l2.4 7.6L22 12l-7.6 2.4L12 22l-2.4-7.6L2 12l7.6-2.4z" />
   </svg>
 )
+export const BackIcon = ({ size }: P) => (
+  <Icon size={size}>
+    <path d="M19 12H5M11 6l-6 6 6 6" />
+  </Icon>
+)
+export const SettingsIcon = ({ size }: P) => (
+  <Icon size={size}>
+    <circle cx="12" cy="12" r="3" />
+    <path d="M12 3.5v2M12 18.5v2M3.5 12h2M18.5 12h2M6 6l1.4 1.4M16.6 16.6 18 18M6 18l1.4-1.4M16.6 7.4 18 6" />
+  </Icon>
+)
+export const MembersIcon = ({ size }: P) => (
+  <Icon size={size}>
+    <circle cx="9" cy="8.5" r="3.2" />
+    <path d="M3.5 19.5c.6-3 2.8-4.6 5.5-4.6s4.9 1.6 5.5 4.6" />
+    <path d="M15.5 5.6a3.2 3.2 0 0 1 0 5.8M17.5 15.2c1.6.6 2.6 2 3 4.3" />
+  </Icon>
+)
+export const ServiceAccountIcon = ({ size }: P) => (
+  <Icon size={size}>
+    <rect x="4.5" y="7.5" width="15" height="11" rx="3" />
+    <path d="M12 4v3.5M9.5 12.5v1M14.5 12.5v1" />
+  </Icon>
+)
+export const ConnectionIcon = ({ size }: P) => (
+  <Icon size={size}>
+    <path d="M9 7V3.5M15 7V3.5M6.5 7h11v4a5.5 5.5 0 0 1-11 0zM12 16.5v4" />
+  </Icon>
+)
+export const KeyIcon = ({ size }: P) => (
+  <Icon size={size}>
+    <circle cx="8" cy="15" r="4" />
+    <path d="m11 12 8.5-8.5M16.5 6.5l2.5 2.5M14.5 8.5l2 2" />
+  </Icon>
+)
+export const InfoIcon = ({ size }: P) => (
+  <Icon size={size}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 11v5.5M12 7.5h.01" />
+  </Icon>
+)
+export const WarnIcon = ({ size }: P) => (
+  <Icon size={size}>
+    <path d="M12 3.5 21 19.5H3z" />
+    <path d="M12 10v4M12 16.8h.01" />
+  </Icon>
+)
+export const CopyIcon = ({ size = 14 }: P) => (
+  <Icon size={size}>
+    <rect x="8.5" y="8.5" width="11" height="11" rx="2" />
+    <path d="M15.5 8.5V6a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5" />
+  </Icon>
+)
+export const CheckIcon = ({ size = 14 }: P) => (
+  <Icon size={size} width={1.75}>
+    <path d="m5 12.5 4.5 4.5L19 7.5" />
+  </Icon>
+)
+export const LockIcon = ({ size = 12 }: P) => (
+  <Icon size={size} width={1.75}>
+    <rect x="5" y="11" width="14" height="10" rx="2" />
+    <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+  </Icon>
+)

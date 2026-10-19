@@ -21,20 +21,43 @@ const messageForCode = (code: string | undefined): UserText => {
   }
 }
 
-const post = async (path: string, body: unknown): Promise<UserText | undefined> => {
+/** Signed in, and where to go next when an agent's sign-in request is waiting (D89). */
+export interface AuthOutcome {
+  readonly failure?: UserText
+  readonly next?: string
+}
+
+const post = async (path: string, body: Record<string, unknown>): Promise<AuthOutcome> => {
+  const request = agentRequest()
   try {
     const response = await fetch(`/api/auth${path}`, {
       method: "POST",
       credentials: "same-origin",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
+      body: JSON.stringify(request ? { ...body, oauth_query: request } : body),
     })
-    if (response.ok) return undefined
-    const json = (await response.json().catch(() => ({}))) as { code?: string }
-    return messageForCode(json.code)
+    const json = (await response.json().catch(() => ({}))) as { code?: string; redirect?: boolean; url?: string }
+    if (!response.ok) return { failure: messageForCode(json.code) }
+    return json.redirect && json.url ? { next: json.url } : {}
   } catch {
-    return userText`Parley couldn't be reached. Check your connection and try again.`
+    return { failure: userText`Parley couldn't be reached. Check your connection and try again.` }
   }
+}
+
+/**
+ * An agent's sign-in request (D89): the signed query Parley's sign-in and consent pages are
+ * opened with. Read from the address bar exactly as sent, because it is signed.
+ */
+export const agentRequest = (): string | undefined => {
+  if (typeof window === "undefined") return undefined
+  const params = new URLSearchParams(window.location.search)
+  return params.has("sig") && params.has("client_id") ? window.location.search.slice(1) : undefined
+}
+
+/** Carries an agent's sign-in request on to another page. */
+export const withAgentRequest = (path: string) => {
+  const request = agentRequest()
+  return request ? `${path}?${request}` : path
 }
 
 export const signIn = (email: string, password: string) => post("/sign-in/email", { email, password })

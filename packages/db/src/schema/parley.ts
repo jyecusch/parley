@@ -142,3 +142,12 @@ export const connections = pgTable(
     index("connections_session_id_idx").on(t.sessionId).where(sql`authorized_at is null`),
   ],
 )
+
+/** Parley's own facts about a service account (the account itself is a Better-Auth user of kind "service-account"). */
+export const serviceAccounts = pgTable("service_accounts", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  teamId: teamId(),
+  createdByUserId: text("created_by_user_id").references(() => user.id, { onDelete: "set null" }),
+})

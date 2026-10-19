@@ -14,6 +14,7 @@ import {
 } from "../lib/appearance.ts"
 import { signOut } from "../lib/auth.ts"
 import { contactsCollection, initialsOf } from "../lib/contacts.ts"
+import { useCrt } from "./crt.tsx"
 import {
   ChevronDown,
   CloseIcon,
@@ -21,6 +22,7 @@ import {
   PlusIcon,
   RestoreIcon,
   SearchIcon,
+  SettingsIcon,
   SidebarIcon,
   SwitchIcon,
 } from "./icons.tsx"
@@ -77,6 +79,7 @@ export function AppShell(props: {
   const [commandOpen, setCommandOpen] = useState(false)
   const [teamMenu, setTeamMenu] = useState(false)
   const [accountMenu, setAccountMenu] = useState(false)
+  const crt = useCrt()
   const closeTeamMenu = useCallback(() => setTeamMenu(false), [])
   const closeAccountMenu = useCallback(() => setAccountMenu(false), [])
   const teamMenuRef = useDismiss(teamMenu, closeTeamMenu)
@@ -130,7 +133,7 @@ export function AppShell(props: {
 
   return (
     <ShellContext.Provider value={shell}>
-      <div className={`app ${collapsed ? "sb-collapsed" : ""}`}>
+      <div ref={crt.screenRef} className={`app ${collapsed ? "sb-collapsed" : ""}`}>
         <nav className="side" aria-label="Main">
           <div className="sb-top">
             <div style={{ position: "relative", flex: 1, minWidth: 0, display: "flex" }} ref={teamMenuRef}>
@@ -219,6 +222,20 @@ export function AppShell(props: {
 
           <div className="spacer" />
 
+          <div className="group">
+            <Link
+              className="nav tip tip-r"
+              to="/t/$teamId/settings/connections"
+              params={{ teamId: props.team.id }}
+              data-tip="Settings"
+            >
+              <span className="ic">
+                <SettingsIcon />
+              </span>
+              <span className="lbl">Settings</span>
+            </Link>
+          </div>
+
           <div className="group" ref={accountMenuRef} style={{ position: "relative" }}>
             {accountMenu ? (
               <AccountMenu
@@ -249,7 +266,7 @@ export function AppShell(props: {
 
         {commandOpen ? <CommandMenu onClose={() => setCommandOpen(false)} /> : null}
       </div>
-      <CrtOverlay />
+      {crt.overlay}
     </ShellContext.Provider>
   )
 }
@@ -297,27 +314,6 @@ function AccountMenu(props: { readonly onClose: () => void; readonly onSignOut: 
       >
         Sign out
       </button>
-    </div>
-  )
-}
-
-/** The CRT layer: pointer-transparent, over the real UI, so everything still works (D81). */
-function CrtOverlay() {
-  const [on, setOn] = useState(false)
-  useEffect(() => {
-    const update = () => setOn(document.documentElement.dataset.crt === "amber")
-    update()
-    const observer = new MutationObserver(update)
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-crt"] })
-    return () => observer.disconnect()
-  }, [])
-  if (!on) return null
-  return (
-    <div className="crt-fx" aria-hidden="true">
-      <div className="crt-mask" />
-      <div className="crt-scan" />
-      <div className="crt-flicker" />
-      <div className="crt-vig" />
     </div>
   )
 }
@@ -380,6 +376,30 @@ function CommandMenu(props: { readonly onClose: () => void }) {
         label: "Show deleted contacts",
         icon: <RestoreIcon />,
         run: go(() => navigate({ to: "/t/$teamId/contacts", params: { teamId: team.id }, search: { deleted: true } })),
+      },
+      {
+        id: "go:connections",
+        group: "Go to" as const,
+        label: "Connections",
+        hint: <span className="sm-t">Settings</span>,
+        icon: <SettingsIcon />,
+        run: go(() => navigate({ to: "/t/$teamId/settings/connections", params: { teamId: team.id } })),
+      },
+      {
+        id: "go:api-keys",
+        group: "Go to" as const,
+        label: "API keys",
+        hint: <span className="sm-t">Settings</span>,
+        icon: <SettingsIcon />,
+        run: go(() => navigate({ to: "/t/$teamId/settings/api-keys", params: { teamId: team.id } })),
+      },
+      {
+        id: "go:service-accounts",
+        group: "Go to" as const,
+        label: "Service accounts",
+        hint: <span className="sm-t">Settings</span>,
+        icon: <SettingsIcon />,
+        run: go(() => navigate({ to: "/t/$teamId/settings/service-accounts", params: { teamId: team.id } })),
       },
       ...teams
         .filter((other) => other.id !== team.id)

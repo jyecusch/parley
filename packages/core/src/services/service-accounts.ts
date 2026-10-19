@@ -1,6 +1,7 @@
 import { Database, schema } from "@parley/db"
 import type { DatabaseUnavailable, Role, ServiceAccount, TeamId, UserId } from "@parley/domain"
-import { and, asc, eq } from "drizzle-orm"
+import { and, asc, eq, isNotNull, isNull, sql } from "drizzle-orm"
+import { alias } from "drizzle-orm/pg-core"
 import { Context, Effect, Layer } from "effect"
 import type { MemberOf } from "../proofs/member-of.ts"
 import type { CanManageServiceAccounts } from "../proofs/permissions.ts"
@@ -8,6 +9,8 @@ import type { Named } from "../proofs/proof.ts"
 import { classifySqlError } from "./sql-errors.ts"
 
 const isRole = (role: string): role is Role => role === "owner" || role === "admin" || role === "member"
+
+const creator = alias(schema.user, "creator")
 
 /**
  * Service accounts: users of kind "service-account" that can never sign in, each a member
@@ -43,9 +46,20 @@ export class ServiceAccounts extends Context.Service<
                 name: schema.user.name,
                 role: schema.member.role,
                 createdAt: schema.member.createdAt,
+                creatorId: creator.id,
+                creatorName: creator.name,
+                connectionCount: sql<number>`(
+                  select count(*)::int from ${schema.connections}
+                  where ${schema.connections.actsAsUserId} = ${schema.user.id}
+                    and ${schema.connections.teamId} = ${schema.member.organizationId}
+                    and ${isNotNull(schema.connections.authorizedAt)}
+                    and ${isNull(schema.connections.revokedAt)}
+                )`,
               })
               .from(schema.member)
               .innerJoin(schema.user, eq(schema.user.id, schema.member.userId))
+              .leftJoin(schema.serviceAccounts, eq(schema.serviceAccounts.userId, schema.user.id))
+              .leftJoin(creator, eq(creator.id, schema.serviceAccounts.createdByUserId))
               .where(
                 and(
                   eq(schema.member.organizationId, teamId),
@@ -61,7 +75,19 @@ export class ServiceAccounts extends Context.Service<
               rows.flatMap(
                 (row): Array<ServiceAccount> =>
                   isRole(row.role)
-                    ? [{ id: row.id as UserId, name: row.name, role: row.role, createdAt: row.createdAt.toISOString() }]
+                    ? [
+                        {
+                          id: row.id as UserId,
+                          name: row.name,
+                          role: row.role,
+                          createdBy:
+                            row.creatorId && row.creatorName
+                              ? { userId: row.creatorId as UserId, name: row.creatorName }
+                              : null,
+                          connectionCount: row.connectionCount,
+                          createdAt: row.createdAt.toISOString(),
+                        },
+                      ]
                     : [],
               ),
             ),
@@ -79,9 +105,10 @@ export class ServiceAccounts extends Context.Service<
       const create = <P, T>(
         team: Named<T, TeamId>,
         input: { readonly name: string; readonly role: Role },
-        _access: CanManageServiceAccounts<P, T>,
+        access: CanManageServiceAccounts<P, T>,
       ) =>
         Effect.gen(function* () {
+          const creatorId = access.member.principal.value.userId
           const id = crypto.randomUUID()
           const now = new Date()
           yield* db
@@ -108,15 +135,17 @@ export class ServiceAccounts extends Context.Service<
                     createdAt: now,
                   }),
                 )
+                yield* db.query((d) =>
+                  d
+                    .insert(schema.serviceAccounts)
+                    .values({ userId: id, teamId: team.value, createdByUserId: creatorId }),
+                )
               }),
             )
             .pipe(Effect.catchTag("SqlError", classifySqlError))
-          return {
-            id: id as UserId,
-            name: input.name,
-            role: input.role,
-            createdAt: now.toISOString(),
-          } satisfies ServiceAccount
+          const [created] = yield* select(team.value, id as UserId)
+          if (!created) return yield* Effect.die(`service account ${id} vanished after creation`)
+          return created
         }).pipe(Effect.withSpan("ServiceAccounts.create"))
 
       return { list, locate, create }
