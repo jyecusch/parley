@@ -101,7 +101,7 @@ export function AppShell(props: {
 
   // "New" means a record of the type on screen: a company on Companies, otherwise a contact.
   const matchRoute = useMatchRoute()
-  const onCompanies = Boolean(matchRoute({ to: "/t/$teamId/companies" }))
+  const onCompanies = Boolean(matchRoute({ to: "/t/$teamId/companies", fuzzy: true }))
   const newRecord = useCallback(
     () =>
       onCompanies
@@ -517,6 +517,44 @@ function CommandMenu(props: { readonly onClose: () => void }) {
         icon: <RestoreIcon />,
         run: go(() => navigate({ to: "/t/$teamId/contacts", params: { teamId: team.id }, search: { deleted: true } })),
       },
+      {
+        id: "go:campaigns",
+        group: "Go to" as const,
+        label: "Campaigns",
+        icon: <SendIcon />,
+        run: go(() => navigate({ to: "/t/$teamId/campaigns", params: { teamId: team.id } })),
+      },
+      {
+        id: "go:templates",
+        group: "Go to" as const,
+        label: "Templates",
+        icon: <TemplateIcon />,
+        run: go(() => navigate({ to: "/t/$teamId/templates", params: { teamId: team.id } })),
+      },
+      {
+        id: "go:segments",
+        group: "Go to" as const,
+        label: "Segments",
+        icon: <SegmentIcon />,
+        run: go(() => navigate({ to: "/t/$teamId/segments", params: { teamId: team.id } })),
+      },
+      ...(
+        [
+          ["general", "General"],
+          ["members", "Members"],
+          ["fields", "Fields"],
+          ["email", "Email settings"],
+        ] as const
+      ).map(
+        ([page, label]): CommandItem => ({
+          id: `go:settings-${page}`,
+          group: "Go to" as const,
+          label,
+          hint: <span className="sm-t">Settings</span>,
+          icon: <SettingsIcon />,
+          run: go(() => navigate({ to: `/t/$teamId/settings/${page}`, params: { teamId: team.id } })),
+        }),
+      ),
       {
         id: "go:connections",
         group: "Go to" as const,

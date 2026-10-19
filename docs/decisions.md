@@ -158,7 +158,9 @@ v2, milestones 9–12 (marketing email; choices in `docs/review.md` R36–R60):
 - Templates and campaigns: `templates.*` and `campaigns.*`. Content is Markdown with merge tags, rendered to HTML and plain text with the footer. The composer has a live server-rendered preview and autosave. There are test sends to members, and a send dialog with a consent reminder.
 - Sending: a background `CampaignSender` using Postgres as the queue (batches of 100, teams take turns, paced, with retries). Campaigns can be cancelled, and the report shows counts and recipients. Activity covers "sent this contact", unsubscribes, bounces and spam reports. Resend's webhook (`/api/webhooks/resend`, Svix-signed) records deliveries, bounces and complaints.
 
-Not yet: a full record view (D55), paging in the contacts table beyond loading everything, scheduling, and open or click tracking (R47, R48).
+Also: the full record view for contacts and companies at their own URLs (D55), opened from the panel's expand button. The command menu reaches the email screens and every Settings page.
+
+Not yet: paging in the contacts table beyond loading everything, scheduling, and open or click tracking (R47, R48).
 
 ## Proposed (awaiting the owner)
 

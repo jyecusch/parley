@@ -15,36 +15,19 @@ import { useLiveQuery } from "@tanstack/react-db"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { createFileRoute, getRouteApi, useNavigate } from "@tanstack/react-router"
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { AffiliateDialog, AffiliationChips, AffiliationTags, ContactCompanies } from "../components/affiliations.tsx"
-import { CustomCell, CustomFieldsSection } from "../components/custom-fields.tsx"
+import { AffiliateDialog, AffiliationChips } from "../components/affiliations.tsx"
+import { ContactPanel, type Toast } from "../components/contact-panel.tsx"
+import { CustomCell } from "../components/custom-fields.tsx"
 import { FilterBar } from "../components/filters.tsx"
-import {
-  ChevronDown,
-  ChevronUp,
-  CloseIcon,
-  ContactsIcon,
-  MoreIcon,
-  RestoreIcon,
-  TrashIcon,
-} from "../components/icons.tsx"
-import { ContactAvatar, ImageEditor } from "../components/images.tsx"
+import { CloseIcon, ContactsIcon, RestoreIcon, TrashIcon } from "../components/icons.tsx"
+import { ContactAvatar } from "../components/images.tsx"
 import { DisplayMenu, ImportDialog, SaveViewDialog, SetFieldDialog, ViewActions } from "../components/index-view.tsx"
-import {
-  EditableList,
-  EditableText,
-  LoadFailed,
-  problemFor,
-  problemsOf,
-  toE164,
-  toggle,
-} from "../components/record.tsx"
+import { LoadFailed, problemFor, problemsOf, toE164, toggle } from "../components/record.tsx"
 import { AddToSegmentDialog } from "../components/segments.tsx"
 import { isTyping, useShell } from "../components/shell.tsx"
-import { SubscriptionSection } from "../components/subscriptions.tsx"
-import { Timeline } from "../components/timeline.tsx"
 import { call, isApiFailure, messageOf } from "../lib/client.ts"
 import { companiesCollection } from "../lib/companies.ts"
-import { contactsCollection, displayNameOf } from "../lib/contacts.ts"
+import { contactsCollection } from "../lib/contacts.ts"
 import { useFields } from "../lib/custom-fields.ts"
 import { compareBy, download, useIndexView } from "../lib/index-view.ts"
 import { absolute, relative } from "../lib/time.ts"
@@ -59,7 +42,7 @@ export interface Search {
   readonly view?: string
 }
 
-export const Route = createFileRoute("/t/$teamId/contacts")({
+export const Route = createFileRoute("/t/$teamId/contacts/")({
   ssr: false,
   validateSearch: (search: Record<string, unknown>): Search => ({
     ...(typeof search.contact === "string" ? { contact: search.contact } : {}),
@@ -69,11 +52,6 @@ export const Route = createFileRoute("/t/$teamId/contacts")({
   }),
   component: ContactsScreen,
 })
-
-interface Toast {
-  readonly text: string
-  readonly undo?: () => void
-}
 
 function ContactsScreen() {
   const { team, openCommand } = useShell()
@@ -576,6 +554,10 @@ function ContactsScreen() {
           onToast={showToast}
           collection={collection}
           canWrite={canWrite}
+          layout="panel"
+          onToggleLayout={() =>
+            void navigate({ to: "/t/$teamId/contacts/$contactId", params: { teamId, contactId: open.id } })
+          }
         />
       ) : null}
     </>
@@ -583,7 +565,6 @@ function ContactsScreen() {
 }
 
 /** The shape TanStack DB hands to an update: the contact, writable. */
-type Draft = { -readonly [K in keyof Contact]: Contact[K] }
 
 function ContactRow(props: {
   readonly contact: Contact
@@ -927,229 +908,6 @@ function CreatePanel(props: {
         <button className="btn ghost" type="button" onClick={props.onClose}>
           Cancel
         </button>
-      </div>
-    </aside>
-  )
-}
-
-function ContactPanel(props: {
-  readonly contact: Contact
-  readonly teamId: TeamId
-  readonly position: { readonly index: number; readonly total: number }
-  readonly onMove: (delta: number) => void
-  readonly onClose: () => void
-  readonly onDelete: () => void
-  readonly onError: (text: UserText) => void
-  readonly onToast: (toast: Toast) => void
-  readonly collection: ReturnType<typeof contactsCollection>
-  readonly canWrite: boolean
-}) {
-  const { contact, collection } = props
-  const queryClient = useQueryClient()
-  const { fields } = useFields(props.teamId, "contact")
-  const [moreMenu, setMoreMenu] = useState(false)
-  const activity = useQuery({
-    queryKey: ["contact-activity", props.teamId, contact.id, contact.updatedAt, contact.affiliations.length],
-    queryFn: () => call("contacts.activity", { teamId: props.teamId, contactId: contact.id }),
-  })
-
-  const save = (change: (draft: Draft) => void) => {
-    const transaction = collection.update(contact.id, (draft) => {
-      change(draft as Draft)
-      const primary = draft.emails.find((email) => email.isPrimary)?.address ?? draft.emails[0]?.address
-      draft.displayName = displayNameOf(draft.firstName, draft.lastName, primary)
-    })
-    transaction.isPersisted.promise
-      .then(() => queryClient.invalidateQueries({ queryKey: ["contact-activity", props.teamId, contact.id] }))
-      .catch((failure: unknown) => props.onError(messageOf(failure)))
-  }
-
-  /** Uploads or removes the avatar, then shows what the server stored. */
-  const setAvatar = async (image: string | null) => {
-    try {
-      const updated =
-        image === null
-          ? await call("contacts.removeAvatar", { teamId: props.teamId, contactId: contact.id })
-          : await call("contacts.setAvatar", { teamId: props.teamId, contactId: contact.id, image })
-      collection.utils.writeUpsert(updated)
-      await queryClient.invalidateQueries({ queryKey: ["contact-activity", props.teamId, contact.id] })
-    } catch (failure) {
-      props.onError(messageOf(failure))
-    }
-  }
-
-  return (
-    <aside className="card panel" aria-label={`Contact ${contact.displayName}`}>
-      <div className="ph">
-        <div className="ph-bar">
-          <button
-            className="ibtn tip tip-b"
-            type="button"
-            aria-label="Previous contact"
-            data-tip="Previous  K"
-            onClick={() => props.onMove(-1)}
-          >
-            <ChevronUp />
-          </button>
-          <button
-            className="ibtn tip tip-b"
-            type="button"
-            aria-label="Next contact"
-            data-tip="Next  J"
-            onClick={() => props.onMove(1)}
-          >
-            <ChevronDown size={16} />
-          </button>
-          <span className="pos sm-t tab">
-            {props.position.index + 1} of {props.position.total}
-          </span>
-          <div className="spacer" />
-          <div style={{ position: "relative" }}>
-            <button
-              className="ibtn tip tip-b"
-              type="button"
-              aria-label="More actions"
-              data-tip="More"
-              onClick={() => setMoreMenu((v) => !v)}
-            >
-              <MoreIcon />
-            </button>
-            {moreMenu ? (
-              <div className="menu" style={{ right: 0, top: 30 }}>
-                <button
-                  className="menu-i"
-                  type="button"
-                  onClick={() => {
-                    const email = contact.emails[0]?.address
-                    if (email) void navigator.clipboard?.writeText(email)
-                    setMoreMenu(false)
-                  }}
-                >
-                  Copy email
-                </button>
-                <div className="menu-sep" />
-                <button className="menu-i" type="button" style={{ color: "var(--danger)" }} onClick={props.onDelete}>
-                  <TrashIcon size={14} />
-                  Delete contact
-                </button>
-              </div>
-            ) : null}
-          </div>
-          <button
-            className="ibtn tip tip-b"
-            type="button"
-            aria-label="Close panel"
-            data-tip="Close  Esc"
-            onClick={props.onClose}
-          >
-            <CloseIcon />
-          </button>
-        </div>
-        <div className="ph-id">
-          <ImageEditor
-            label="avatar"
-            hasUpload={contact.avatarUrl !== null}
-            canEdit={props.canWrite}
-            onUpload={(image) => setAvatar(image)}
-            onRemove={() => setAvatar(null)}
-          >
-            <ContactAvatar contact={contact} size="lg" />
-          </ImageEditor>
-          <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 6 }}>
-            <h2 className="pname">{contact.displayName}</h2>
-            {contact.affiliations.length > 0 ? (
-              <AffiliationTags affiliations={contact.affiliations} />
-            ) : (
-              <p className="paff sm-t">{contact.emails[0]?.address ?? "No email"}</p>
-            )}
-          </div>
-        </div>
-      </div>
-      <div className="pbody">
-        <section className="sec">
-          <EditableText
-            label="First name"
-            value={contact.firstName}
-            onSave={(value) =>
-              save((draft) => {
-                draft.firstName = value
-              })
-            }
-          />
-          <EditableText
-            label="Last name"
-            value={contact.lastName}
-            onSave={(value) =>
-              save((draft) => {
-                draft.lastName = value
-              })
-            }
-          />
-          <EditableList
-            label="Emails"
-            empty="Add email"
-            items={contact.emails.map((email) => ({
-              value: email.address,
-              tag: email.isPrimary && contact.emails.length > 1 ? "Primary" : undefined,
-            }))}
-            type="email"
-            onSave={(values) =>
-              save((draft) => {
-                draft.emails = values.map((address, index) => ({
-                  address: address.toLowerCase() as Contact["emails"][number]["address"],
-                  isPrimary: index === 0,
-                }))
-              })
-            }
-          />
-          <EditableList
-            label="Phones"
-            empty="Add phone"
-            items={contact.phones.map((phone) => ({ value: phone.number, tag: phone.label ?? undefined }))}
-            type="tel"
-            onSave={(values) =>
-              save((draft) => {
-                draft.phones = values.map((value, index) => ({
-                  number: toE164(value) as Contact["phones"][number]["number"],
-                  label: contact.phones[index]?.label ?? null,
-                }))
-              })
-            }
-          />
-        </section>
-        <CustomFieldsSection
-          fields={fields}
-          values={contact.custom}
-          onSave={(field, value) =>
-            save((draft) => {
-              const next = { ...draft.custom }
-              if (value === null) delete next[field.id]
-              else next[field.id] = value
-              draft.custom = next
-            })
-          }
-        />
-        <ContactCompanies contact={contact} teamId={props.teamId} onToast={props.onToast} />
-        <SubscriptionSection
-          contact={contact}
-          teamId={props.teamId}
-          canWrite={props.canWrite}
-          onError={props.onError}
-          onStatus={(status) =>
-            save((draft) => {
-              draft.subscriptionStatus = status
-            })
-          }
-        />
-        <Timeline
-          teamId={props.teamId}
-          recordType="contact"
-          recordId={contact.id}
-          activity={activity.data}
-          activityLoading={activity.isLoading}
-          activityError={activity.isError ? messageOf(activity.error) : undefined}
-          onError={(text) => props.onError(text)}
-        />
       </div>
     </aside>
   )

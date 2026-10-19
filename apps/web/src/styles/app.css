@@ -2204,3 +2204,20 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+/* The full record view (D55): the panel at full width, its content in a readable column. */
+.panel.record {
+  width: auto;
+  flex: 1 1 auto;
+}
+.panel.record .ph,
+.panel.record .pbody {
+  padding-inline: max(14px, calc((100% - 720px) / 2));
+}
+@container content (max-width: 920px) {
+  .panel.record {
+    position: static;
+    width: auto;
+    box-shadow: var(--card);
+  }
+}

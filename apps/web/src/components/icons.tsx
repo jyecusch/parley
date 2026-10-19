@@ -201,3 +201,13 @@ export const SendIcon = ({ size }: P) => (
     <path d="M20.5 3.5 10 14M20.5 3.5l-6.5 17-4-6.5-6.5-4 17-6.5Z" />
   </Icon>
 )
+export const ExpandIcon = ({ size }: P) => (
+  <Icon size={size}>
+    <path d="M14 4.5h5.5V10M10 19.5H4.5V14M19.5 4.5 13.5 10.5M4.5 19.5l6-6" />
+  </Icon>
+)
+export const CollapseIcon = ({ size }: P) => (
+  <Icon size={size}>
+    <path d="M19.5 10H14V4.5M4.5 14H10v5.5M14 10l5.5-5.5M10 14l-5.5 5.5" />
+  </Icon>
+)
