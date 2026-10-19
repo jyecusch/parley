@@ -19,6 +19,7 @@ import {
   restoreContact,
   updateContact,
 } from "./contacts.ts"
+import { exportCompanies, exportContacts, importCompanies, importContacts } from "./csv.ts"
 import { createField, deleteField, listFields, updateField } from "./custom-fields.ts"
 import {
   acceptInvitation,
@@ -45,6 +46,7 @@ export * from "./api-keys.ts"
 export * from "./companies.ts"
 export * from "./connections.ts"
 export * from "./contacts.ts"
+export * from "./csv.ts"
 export * from "./custom-fields.ts"
 export * from "./members.ts"
 export * from "./notes.ts"
@@ -72,6 +74,8 @@ export const operations = {
   "contacts.delete": deleteContact,
   "contacts.restore": restoreContact,
   "contacts.activity": contactActivity,
+  "contacts.export": exportContacts,
+  "contacts.import": importContacts,
   "companies.list": listCompanies,
   "companies.get": getCompany,
   "companies.create": createCompany,
@@ -79,6 +83,8 @@ export const operations = {
   "companies.delete": deleteCompany,
   "companies.restore": restoreCompany,
   "companies.activity": companyActivity,
+  "companies.export": exportCompanies,
+  "companies.import": importCompanies,
   "affiliations.list": listAffiliations,
   "affiliations.create": createAffiliation,
   "affiliations.update": updateAffiliation,

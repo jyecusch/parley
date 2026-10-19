@@ -19,6 +19,7 @@ import * as apiKeys from "./api-keys.ts"
 import * as companies from "./companies.ts"
 import * as connections from "./connections.ts"
 import * as contacts from "./contacts.ts"
+import * as csv from "./csv.ts"
 import * as customFields from "./custom-fields.ts"
 import * as members from "./members.ts"
 import * as notes from "./notes.ts"
@@ -70,6 +71,8 @@ export const implementations: { readonly [Name in OperationName]: Implementation
   "contacts.delete": contacts.remove,
   "contacts.restore": contacts.restore,
   "contacts.activity": contacts.activity,
+  "contacts.export": csv.exportContactsCsv,
+  "contacts.import": csv.importContactsCsv,
   "companies.list": companies.list,
   "companies.get": companies.get,
   "companies.create": companies.create,
@@ -77,6 +80,8 @@ export const implementations: { readonly [Name in OperationName]: Implementation
   "companies.delete": companies.remove,
   "companies.restore": companies.restore,
   "companies.activity": companies.activity,
+  "companies.export": csv.exportCompaniesCsv,
+  "companies.import": csv.importCompaniesCsv,
   "affiliations.list": affiliations.list,
   "affiliations.create": affiliations.create,
   "affiliations.update": affiliations.update,
