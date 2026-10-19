@@ -154,6 +154,7 @@ export class Affiliations extends Context.Service<
           readonly kind: "affiliated" | "unaffiliated" | "updated"
           readonly changedFields?: ReadonlyArray<string>
           readonly reason?: "domain-matching"
+          readonly matchedDomain?: string
         },
       ) =>
         db.query((d) =>
@@ -325,11 +326,11 @@ export class Affiliations extends Context.Service<
       const affiliateMatches = (
         principal: Principal,
         teamId: TeamId,
-        pairs: ReadonlyArray<{ readonly contact: RecordRef; readonly company: RecordRef }>,
+        pairs: ReadonlyArray<{ readonly contact: RecordRef; readonly company: RecordRef; readonly domain: string }>,
       ) =>
         Effect.forEach(
           pairs,
-          ({ contact, company }) =>
+          ({ contact, company, domain }) =>
             Effect.gen(function* () {
               const inserted = yield* db.query((d) =>
                 d
@@ -339,7 +340,11 @@ export class Affiliations extends Context.Service<
                   .returning({ id: schema.affiliations.id }),
               )
               if (inserted.length === 0) return
-              yield* recordBoth(principal, teamId, contact, company, { kind: "affiliated", reason: "domain-matching" })
+              yield* recordBoth(principal, teamId, contact, company, {
+                kind: "affiliated",
+                reason: "domain-matching",
+                matchedDomain: domain,
+              })
             }),
           { discard: true },
         )
@@ -359,7 +364,7 @@ export class Affiliations extends Context.Service<
           if (domains.length === 0) return
           const companies = yield* db.query((d) =>
             d
-              .selectDistinct({ id: schema.companies.id, name: schema.companies.name })
+              .select({ id: schema.companies.id, name: schema.companies.name, domain: schema.companyDomains.domain })
               .from(schema.companyDomains)
               .innerJoin(schema.companies, eq(schema.companies.id, schema.companyDomains.companyId))
               .where(
@@ -374,7 +379,12 @@ export class Affiliations extends Context.Service<
           yield* affiliateMatches(
             principal,
             teamId,
-            companies.map((company) => ({ contact, company })),
+            // A company matched through two domains is affiliated once, naming the first.
+            [...new Map(companies.map((row) => [row.id, row])).values()].map((row) => ({
+              contact,
+              company: { id: row.id, name: row.name },
+              domain: row.domain,
+            })),
           )
         })
 
@@ -389,7 +399,11 @@ export class Affiliations extends Context.Service<
           if (domains.length === 0) return
           const contacts = yield* db.query((d) =>
             d
-              .selectDistinct({ id: schema.contacts.id, name: contactNameSql })
+              .select({
+                id: schema.contacts.id,
+                name: contactNameSql,
+                domain: sql<string>`split_part(${schema.contactEmails.address}, '@', 2)`,
+              })
               .from(schema.contactEmails)
               .innerJoin(schema.contacts, eq(schema.contacts.id, schema.contactEmails.contactId))
               .where(
@@ -404,7 +418,11 @@ export class Affiliations extends Context.Service<
           yield* affiliateMatches(
             principal,
             teamId,
-            contacts.map((contact) => ({ contact, company })),
+            [...new Map(contacts.map((row) => [row.id, row])).values()].map((row) => ({
+              contact: { id: row.id, name: row.name },
+              company,
+              domain: row.domain,
+            })),
           )
         })
 

@@ -115,6 +115,10 @@ What we decided, who decided it, and what's still open. Nothing becomes "decided
 | D107 | Removed affiliations | Domain matching runs only when an email or domain is added. Removing an affiliation is never undone by Parley | Owner | 2026-10-20 |
 | D108 | Companies table default columns | Logo and name with the primary domain under it, number of affiliated contacts, created, updated | Owner | 2026-10-20 |
 | D109 | Deleting a company | Its affiliations are hidden while it's deleted and come back if it's restored; they're purged with it after 30 days | Owner | 2026-10-20 |
+| D110 | Companies design | Approved as drawn on the canvas (Milestone 3 row): Companies table and panel, new company with domain validation, affiliations in the contact panel, companies column in the contacts table | Owner | 2026-10-20 |
+| D111 | Domain matching credit | Credited to whoever made the change that triggered it, naming the domain: "Jane Doe via Claude added Sam to Acme by domain matching on acme.com" | Owner | 2026-10-20 |
+| D112 | Removing an affiliation | Immediate, with an undo toast; no confirmation | Owner | 2026-10-20 |
+| D113 | Affiliation chips in the contacts table | Company only, title in the chip's tooltip; up to two chips, then "+N" | Owner | 2026-10-20 |
 
 ## Implementation choices made during milestones 1 and 2 (Claude; low-stakes, open to veto)
 

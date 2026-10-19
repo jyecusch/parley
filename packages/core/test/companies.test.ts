@@ -105,6 +105,7 @@ describe("companies operations", () => {
       expect(activity.at(-1)).toMatchObject({
         kind: "affiliated",
         reason: "domain-matching",
+        matchedDomain: "northwind.io",
         related: { recordType: "company", id: northwind.id, name: "Northwind" },
         actorName: "Jane",
       })

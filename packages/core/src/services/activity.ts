@@ -20,6 +20,7 @@ export const activityRow = (
     readonly changedFields?: ReadonlyArray<string>
     readonly related?: RelatedRecord
     readonly reason?: "domain-matching"
+    readonly matchedDomain?: string
   },
 ): typeof schema.activity.$inferInsert => ({
   id: crypto.randomUUID(),
@@ -32,6 +33,7 @@ export const activityRow = (
   relatedRecordId: entry.related?.id ?? null,
   relatedName: entry.related?.name ?? null,
   reason: entry.reason ?? null,
+  matchedDomain: entry.matchedDomain ?? null,
   ...attribution(principal),
 })
 
@@ -46,5 +48,6 @@ export const toActivityEntry = (row: typeof schema.activity.$inferSelect): Activ
       ? { recordType: row.relatedRecordType, id: row.relatedRecordId, name: row.relatedName }
       : null,
   reason: row.reason,
+  matchedDomain: row.matchedDomain,
   at: row.at.toISOString(),
 })

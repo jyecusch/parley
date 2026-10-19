@@ -110,6 +110,8 @@ export const activity = pgTable(
     relatedName: text("related_name"),
     /** Set when Parley made the change itself (D105). */
     reason: text("reason", { enum: ["domain-matching"] }),
+    /** For domain matching, the domain that matched (D111). */
+    matchedDomain: text("matched_domain"),
     at: timestamp("at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [index("activity_record_idx").on(t.teamId, t.recordId, t.at)],

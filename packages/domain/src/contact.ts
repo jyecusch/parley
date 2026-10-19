@@ -99,6 +99,8 @@ export const ActivityEntry = Schema.Struct({
   related: Schema.NullOr(Schema.Struct({ recordType: RecordType, id: Schema.String, name: Schema.String })),
   /** Set when Parley made the change itself, rather than the actor asking for it directly (D105). */
   reason: Schema.NullOr(Schema.Literals(["domain-matching"])),
+  /** For domain matching, the domain that matched ("acme.com") (D111). */
+  matchedDomain: Schema.NullOr(Schema.String),
   at: Timestamp,
 })
 export type ActivityEntry = typeof ActivityEntry.Type
