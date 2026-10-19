@@ -16,7 +16,6 @@ import {
   TrashIcon,
 } from "../components/icons.tsx"
 import {
-  ActivityRow,
   EditableList,
   EditableText,
   LoadFailed,
@@ -26,6 +25,7 @@ import {
   toggle,
 } from "../components/record.tsx"
 import { isTyping, useShell } from "../components/shell.tsx"
+import { Timeline } from "../components/timeline.tsx"
 import { call, isApiFailure, messageOf } from "../lib/client.ts"
 import { contactsCollection, displayNameOf, initialsOf } from "../lib/contacts.ts"
 import { absolute, relative } from "../lib/time.ts"
@@ -905,14 +905,15 @@ function ContactPanel(props: {
           />
         </section>
         <ContactCompanies contact={contact} teamId={props.teamId} onToast={props.onToast} />
-        <section className="sec">
-          <h3 className="sec-h sm-t">Activity</h3>
-          {activity.isLoading ? <div className="sk" style={{ width: "60%", margin: "8px 0" }} /> : null}
-          {activity.isError ? <p className="ferr sm-t">{messageOf(activity.error)}</p> : null}
-          {(activity.data ?? []).map((entry, index) => (
-            <ActivityRow key={entry.id} entry={entry} recordType="contact" first={index === 0} />
-          ))}
-        </section>
+        <Timeline
+          teamId={props.teamId}
+          recordType="contact"
+          recordId={contact.id}
+          activity={activity.data}
+          activityLoading={activity.isLoading}
+          activityError={activity.isError ? messageOf(activity.error) : undefined}
+          onError={(text) => props.onError(text)}
+        />
       </div>
     </aside>
   )

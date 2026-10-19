@@ -237,3 +237,23 @@ export const affiliations = pgTable(
     index("affiliations_company_id_idx").on(t.companyId),
   ],
 )
+
+/** A note on a contact or company, shown in its activity (D74). */
+export const notes = pgTable(
+  "notes",
+  {
+    id: uuid("id").primaryKey(),
+    teamId: teamId(),
+    recordType: text("record_type", { enum: ["contact", "company"] }).notNull(),
+    recordId: uuid("record_id").notNull(),
+    body: text("body").notNull(),
+    authorUserId: text("author_user_id").references(() => user.id, { onDelete: "set null" }),
+    /** The name shown at the time, kept if the author is later removed. */
+    authorName: text("author_name").notNull(),
+    viaApiKeyId: text("via_api_key_id"),
+    viaConnectionId: uuid("via_connection_id"),
+    viaName: text("via_name"),
+    ...timestamps,
+  },
+  (t) => [index("notes_record_idx").on(t.teamId, t.recordId, t.createdAt)],
+)

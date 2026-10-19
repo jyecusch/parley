@@ -25,7 +25,6 @@ import {
   TrashIcon,
 } from "../components/icons.tsx"
 import {
-  ActivityRow,
   EditableList,
   EditableText,
   initialsOfName,
@@ -36,6 +35,7 @@ import {
   toggle,
 } from "../components/record.tsx"
 import { isTyping, useShell } from "../components/shell.tsx"
+import { Timeline } from "../components/timeline.tsx"
 import { call, isApiFailure, messageOf } from "../lib/client.ts"
 import { companiesCollection, primaryDomainOf } from "../lib/companies.ts"
 import { COUNTRIES, countryName } from "../lib/countries.ts"
@@ -1038,14 +1038,15 @@ function CompanyPanel(props: {
           />
         </section>
         <CompanyContacts company={company} teamId={props.teamId} onToast={props.onToast} />
-        <section className="sec">
-          <h3 className="sec-h sm-t">Activity</h3>
-          {activity.isLoading ? <div className="sk" style={{ width: "60%", margin: "8px 0" }} /> : null}
-          {activity.isError ? <p className="ferr sm-t">{messageOf(activity.error)}</p> : null}
-          {(activity.data ?? []).map((entry, index) => (
-            <ActivityRow key={entry.id} entry={entry} recordType="company" first={index === 0} />
-          ))}
-        </section>
+        <Timeline
+          teamId={props.teamId}
+          recordType="company"
+          recordId={company.id}
+          activity={activity.data}
+          activityLoading={activity.isLoading}
+          activityError={activity.isError ? messageOf(activity.error) : undefined}
+          onError={(text) => props.onToast({ text })}
+        />
       </div>
     </aside>
   )

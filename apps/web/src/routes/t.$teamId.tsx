@@ -10,7 +10,7 @@ export const Route = createFileRoute("/t/$teamId")({
   beforeLoad: async () => {
     const session = await getSession()
     if (!session) throw redirect({ to: "/sign-in" })
-    return { userName: session.user.name }
+    return { userName: session.user.name, userId: session.user.id }
   },
   loader: async ({ params }) => {
     const teams = await call("teams.list", {})

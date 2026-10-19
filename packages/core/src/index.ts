@@ -7,6 +7,7 @@ import { Companies } from "./services/companies.ts"
 import { Connections } from "./services/connections.ts"
 import { Contacts } from "./services/contacts.ts"
 import { Members } from "./services/members.ts"
+import { Notes } from "./services/notes.ts"
 import { ServiceAccounts } from "./services/service-accounts.ts"
 import { Teams } from "./services/teams.ts"
 import { Users } from "./services/users.ts"
@@ -23,6 +24,7 @@ const Records = Layer.mergeAll(Contacts.layer, Companies.layer).pipe(Layer.provi
 const Services = Layer.mergeAll(
   Records,
   Members.layer,
+  Notes.layer,
   Users.layer,
   Teams.layer,
   ApiKeys.layer,

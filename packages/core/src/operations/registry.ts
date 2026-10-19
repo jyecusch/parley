@@ -7,6 +7,7 @@ import type { Companies } from "../services/companies.ts"
 import type { Connections } from "../services/connections.ts"
 import type { Contacts } from "../services/contacts.ts"
 import type { Members } from "../services/members.ts"
+import type { Notes } from "../services/notes.ts"
 import type { ServiceAccounts } from "../services/service-accounts.ts"
 import type { Teams } from "../services/teams.ts"
 import * as affiliations from "./affiliations.ts"
@@ -14,6 +15,7 @@ import * as apiKeys from "./api-keys.ts"
 import * as companies from "./companies.ts"
 import * as connections from "./connections.ts"
 import * as contacts from "./contacts.ts"
+import * as notes from "./notes.ts"
 import * as serviceAccounts from "./service-accounts.ts"
 import * as teams from "./teams.ts"
 
@@ -23,6 +25,7 @@ export type OperationServices =
   | Companies
   | Affiliations
   | Members
+  | Notes
   | Teams
   | ApiKeys
   | Connections
@@ -58,6 +61,10 @@ export const implementations: { readonly [Name in OperationName]: Implementation
   "affiliations.create": affiliations.create,
   "affiliations.update": affiliations.update,
   "affiliations.delete": affiliations.remove,
+  "notes.list": notes.list,
+  "notes.create": notes.create,
+  "notes.update": notes.update,
+  "notes.delete": notes.remove,
   "apiKeys.list": apiKeys.list,
   "apiKeys.create": apiKeys.create,
   "apiKeys.revoke": apiKeys.revoke,

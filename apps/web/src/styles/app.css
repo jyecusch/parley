@@ -1707,3 +1707,45 @@ body {
   color: var(--fg-subtle);
   margin: 4px 0;
 }
+
+/* Notes in a record's activity (D74). */
+.note-body {
+  margin: 4px 0 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--fill);
+  color: var(--fg);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 19px;
+}
+.composer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+.note-inp {
+  width: 100%;
+  resize: vertical;
+  min-height: 40px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  padding: 7px 10px;
+  box-shadow: inset 0 0 0 1px var(--control);
+  line-height: 19px;
+}
+.note-inp:focus {
+  outline: none;
+  box-shadow: inset 0 0 0 1px var(--fg-muted);
+}
+.note-inp::placeholder {
+  color: var(--fg-subtle);
+}
+.composer-f {
+  display: flex;
+  gap: 6px;
+}

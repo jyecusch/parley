@@ -23,3 +23,6 @@ export type CompanyId = typeof CompanyId.Type
 
 export const AffiliationId = Schema.String.pipe(Schema.brand("AffiliationId"))
 export type AffiliationId = typeof AffiliationId.Type
+
+export const NoteId = Schema.String.pipe(Schema.brand("NoteId"))
+export type NoteId = typeof NoteId.Type

@@ -37,6 +37,9 @@ export const ERROR_STATUS: { readonly [Tag in ErrorTag]: Status } = {
   CompanyDomainTaken: 409,
   FreeEmailDomain: 422,
   AffiliationNotFound: 404,
+  NoteNotFound: 404,
+  NotNoteAuthor: 403,
+  CannotDeleteOthersNote: 403,
   RequestsTooFrequent: 429,
   DatabaseUnavailable: 503,
 }
