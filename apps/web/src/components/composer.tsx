@@ -1,5 +1,6 @@
 import type { RenderedEmail } from "@parley/domain"
 import { type ReactNode, useEffect, useRef, useState } from "react"
+import { EmailPreview } from "./email-preview.tsx"
 
 /** Subject, preview text and body: what a template and a campaign both hold (R41). */
 export interface Content {
@@ -197,11 +198,7 @@ export function Composer(props: {
             {previewError}
           </p>
         ) : null}
-        {rendered ? (
-          <iframe className="cmp-frame" title="Email preview" sandbox="" srcDoc={rendered.html} />
-        ) : (
-          <div className="cmp-frame" />
-        )}
+        {rendered ? <EmailPreview html={rendered.html} label="Email preview" /> : <div className="cmp-frame" />}
       </div>
     </div>
   )

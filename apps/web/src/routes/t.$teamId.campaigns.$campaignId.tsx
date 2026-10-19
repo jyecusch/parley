@@ -15,6 +15,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { createFileRoute, getRouteApi, Link, useNavigate } from "@tanstack/react-router"
 import { useMemo, useState } from "react"
 import { Composer, type Content, SaveState, useAutosave } from "../components/composer.tsx"
+import { EmailPreview } from "../components/email-preview.tsx"
 import { LoadFailed } from "../components/record.tsx"
 import { Dialog } from "../components/settings.tsx"
 import { CAMPAIGN_STATUS_LABELS } from "../lib/campaigns.ts"
@@ -704,7 +705,7 @@ function Report(props: { readonly teamId: TeamId; readonly campaign: Campaign; r
                 <div className="cmp-subject">{preview.data.subject}</div>
                 {preview.data.previewText ? <div className="sm-t c-muted">{preview.data.previewText}</div> : null}
               </div>
-              <iframe className="cmp-frame" title="Email as sent" sandbox="" srcDoc={preview.data.html} />
+              <EmailPreview html={preview.data.html} label="Email as sent" />
             </>
           ) : (
             <div className="cmp-frame" />
