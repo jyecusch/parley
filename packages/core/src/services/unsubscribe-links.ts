@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto"
 import type { CampaignId, ContactId, TeamId, TopicId } from "@parley/domain"
 import { Config, Context, Effect, Layer, Option, Redacted } from "effect"
+import { PublicUrl } from "../config/public-url.ts"
 
 /** What an unsubscribe link is about. A test send's link changes nothing (R45). */
 export interface UnsubscribeLinkFacts {
@@ -41,7 +42,7 @@ export class UnsubscribeLinks extends Context.Service<
     Effect.gen(function* () {
       const own = yield* Config.option(Config.Redacted("UNSUBSCRIBE_SECRET")).pipe(Effect.orDie)
       const auth = yield* Config.Redacted("BETTER_AUTH_SECRET").pipe(Effect.orDie)
-      const base = yield* Config.String("BETTER_AUTH_URL").pipe(Effect.orDie)
+      const base = yield* PublicUrl.pipe(Effect.orDie)
       const secret = Redacted.value(Option.getOrElse(own, () => auth))
       const mac = (body: string) =>
         createHmac("sha256", secret).update(`parley-unsubscribe:${body}`).digest().subarray(0, 16)

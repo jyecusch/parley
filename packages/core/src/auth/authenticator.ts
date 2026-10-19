@@ -21,6 +21,7 @@ import { drizzle } from "drizzle-orm/node-postgres"
 import { Config, Context, Duration, Effect, Layer, Redacted } from "effect"
 import { createLocalJWKSet, type JWTPayload, jwtVerify } from "jose"
 import { Pool } from "pg"
+import { PublicUrl } from "../config/public-url.ts"
 import type { Principal } from "../principal.ts"
 import { Connections } from "../services/connections.ts"
 import { Users } from "../services/users.ts"
@@ -36,7 +37,7 @@ export class BetterAuth extends Context.Service<BetterAuth, Auth>()("@parley/cor
     Effect.gen(function* () {
       const url = yield* Config.Redacted("DATABASE_URL")
       const secret = yield* Config.Redacted("BETTER_AUTH_SECRET")
-      const baseURL = yield* Config.String("BETTER_AUTH_URL")
+      const baseURL = yield* PublicUrl
       const pool = yield* Effect.acquireRelease(
         Effect.sync(() => new Pool({ connectionString: Redacted.value(url), max: 5 })),
         (pool) =>
@@ -190,7 +191,7 @@ export class Authenticator extends Context.Service<
       const auth = yield* BetterAuth
       const users = yield* Users
       const connections = yield* Connections
-      const baseURL = yield* Config.String("BETTER_AUTH_URL")
+      const baseURL = yield* PublicUrl
 
       // Better-Auth's signing keys, fetched in-process and refetched when a token names a new one.
       let keys: ReturnType<typeof createLocalJWKSet> | undefined

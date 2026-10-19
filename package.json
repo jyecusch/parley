@@ -15,13 +15,15 @@
     "db:generate": "cd packages/db && bun x drizzle-kit generate",
     "db:migrate": "cd packages/db && bun --env-file=../../.env x drizzle-kit migrate",
     "dev": "bun run --cwd apps/web dev",
-    "prepare": "effect-language-service patch"
+    "prepare": "effect-language-service patch",
+    "dev:app": "bun run --cwd apps/web dev:app"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",
     "@effect/language-service": "0.87.5",
     "@effect/vitest": "4.0.5",
     "@types/bun": "1.4.3",
+    "portless": "0.15.7",
     "typescript": "6.0.3",
     "vitest": "5.0.5"
   }

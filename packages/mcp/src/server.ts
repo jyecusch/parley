@@ -6,10 +6,11 @@ import {
   implementations,
   type OperationServices,
   type Principal,
+  PublicUrl,
 } from "@parley/core"
 import { type Operation, type OperationName, operations } from "@parley/domain"
 import { defectPublicError, type PublicError, ReferenceId, toPublicError } from "@parley/errors"
-import { Config, Context, Effect, Layer, Option, Schema } from "effect"
+import { Context, Effect, Layer, Option, Schema } from "effect"
 import { McpProtocol, McpSchema, McpServer } from "effect/ai"
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http"
 
@@ -123,7 +124,7 @@ export const protectedResourceMetadataUrl = (baseURL: string) =>
 const AuthenticateLive = HttpRouter.middleware<{ provides: CurrentPrincipal }>()(
   Effect.gen(function* () {
     const authenticator = yield* Authenticator
-    const baseURL = yield* Config.String("BETTER_AUTH_URL").pipe(Effect.orDie)
+    const baseURL = yield* PublicUrl.pipe(Effect.orDie)
     // A 401 tells the agent to start OAuth: where to sign in comes from the metadata URL.
     const challenge = `Bearer resource_metadata="${protectedResourceMetadataUrl(baseURL)}"`
     return (httpEffect) =>

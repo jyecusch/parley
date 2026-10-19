@@ -4,6 +4,12 @@ import react from "@vitejs/plugin-react"
 import { defineConfig } from "vite"
 
 export default defineConfig({
-  server: { port: 3000 },
+  // Under portless, PORT and HOST are assigned per run and the app is reached at its .localhost URL.
+  // Without it (`bun run dev:app`), the app falls back to http://localhost:3000.
+  server: {
+    port: Number(process.env.PORT) || 3000,
+    strictPort: process.env.PORT !== undefined,
+    ...(process.env.HOST ? { host: process.env.HOST } : {}),
+  },
   plugins: [tailwindcss(), tanstackStart(), react()],
 })

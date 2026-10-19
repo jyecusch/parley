@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "bun --env-file=../../.env --bun vite dev --port 3000",
+    "dev": "portless parley bun run dev:app",
+    "dev:app": "bun --env-file=../../.env --bun vite dev",
     "build": "bun --bun vite build",
     "start": "bun --env-file=../../.env .output/server/index.mjs"
   },

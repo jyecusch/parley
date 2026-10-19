@@ -29,6 +29,7 @@ import { Users } from "./services/users.ts"
 
 export { type AuthenticationFailure, Authenticator, BetterAuth, type Entrypoint } from "./auth/authenticator.ts"
 export { type Auth, issuer, mcpResource } from "./auth/better-auth.ts"
+export { PublicUrl } from "./config/public-url.ts"
 export { unsubscribeApply, unsubscribePage } from "./email/unsubscribe.ts"
 export { receiveDeliveryEvent } from "./email/webhook.ts"
 export { readFile } from "./files/serve.ts"

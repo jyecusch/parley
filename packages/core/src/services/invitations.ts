@@ -15,8 +15,9 @@ import {
 } from "@parley/domain"
 import { EchoedInput } from "@parley/errors"
 import { and, desc, eq, sql } from "drizzle-orm"
-import { Config, Context, Effect, Layer } from "effect"
+import { Context, Effect, Layer } from "effect"
 import type { SqlError } from "effect/sql"
+import { PublicUrl } from "../config/public-url.ts"
 import { Mailer } from "../mail/mailer.ts"
 import { renderInvitation } from "../mail/templates.ts"
 import type { CanManageMembers } from "../proofs/permissions.ts"
@@ -82,7 +83,7 @@ export class Invitations extends Context.Service<
     Effect.gen(function* () {
       const db = yield* Database
       const mailer = yield* Mailer
-      const baseURL = yield* Config.String("BETTER_AUTH_URL").pipe(Effect.orDie)
+      const baseURL = yield* PublicUrl.pipe(Effect.orDie)
       const run = <A>(effect: Effect.Effect<A, SqlError.SqlError>) =>
         effect.pipe(Effect.catchTag("SqlError", classifySqlError))
 

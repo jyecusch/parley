@@ -13,10 +13,12 @@ cp .env.example .env            # then set BETTER_AUTH_SECRET to 32 random bytes
 bun install
 bun run db:up                   # Postgres on localhost:5433
 bun run db:migrate
-bun run dev                     # http://localhost:3000
+bun run dev                     # https://parley.localhost, via portless
 ```
 
-- Web app: http://localhost:3000. Create an account, then a team.
+- Web app: https://parley.localhost. Create an account, then a team.
+- `bun run dev` runs through [portless](https://github.com/vercel-labs/portless), which gives the app a random port behind a stable `.localhost` URL and tells the app its address in `PORTLESS_URL`. The first run asks for sudo once, to trust a local certificate and listen on port 443. In a linked git worktree the URL gets the branch name in front, so several copies can run at once.
+- Without portless, `bun run dev:app` serves http://localhost:3000, using `BETTER_AUTH_URL` from `.env` as the app's address.
 - HTTP API: `/api/v1`, with OpenAPI at `/api/v1/openapi.json`.
 - MCP: `/mcp` (Streamable HTTP). Authenticate with an API key in `x-api-key` or `Authorization: Bearer`.
 
