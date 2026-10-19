@@ -152,10 +152,11 @@ body {
 }
 
 /* Frame */
+/* The app always fits the window, in CRT mode or not. The page itself never scrolls; lists scroll inside it. */
 .app {
   display: flex;
   height: 100vh;
-  min-height: 560px;
+  height: 100dvh;
   overflow: hidden;
   position: relative;
 }
@@ -1231,13 +1232,9 @@ body {
   /* biome-ignore lint/complexity/noImportantStyles: must beat every element's own cursor while the shader draws it */
   cursor: none !important;
 }
-/*
- * The canvas draws only the app, not the page behind it. The canvas is the window, so the app fits it
- * exactly: below the usual minimum height the page would scroll, but the overflow would sit under the bezel.
- */
+/* The canvas draws only the app, not the page behind it. */
 .crt-screen > .app {
   background: var(--bg-app);
-  min-height: 0;
 }
 .crt-fx {
   position: fixed;
