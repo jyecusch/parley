@@ -15,6 +15,7 @@ import {
 import { signOut } from "../lib/auth.ts"
 import { companiesCollection, primaryDomainOf } from "../lib/companies.ts"
 import { contactsCollection, initialsOf } from "../lib/contacts.ts"
+import { useSavedViews } from "../lib/index-view.ts"
 import { useCrt } from "./crt.tsx"
 import {
   ChevronDown,
@@ -127,6 +128,8 @@ export function AppShell(props: {
     return () => window.removeEventListener("keydown", onKey)
   }, [commandOpen, newRecord, toggleSidebar])
 
+  const savedViews = useSavedViews(props.team.id as TeamId).data ?? []
+
   const shell = useMemo<Shell>(
     () => ({ team: props.team, teams: props.teams, openCommand: () => setCommandOpen(true) }),
     [props.team, props.teams],
@@ -226,6 +229,25 @@ export function AppShell(props: {
               </span>
               <span className="lbl">Contacts</span>
             </Link>
+            {savedViews
+              .filter((view) => view.recordType === "contact")
+              .map((view) => (
+                <Link
+                  key={view.id}
+                  className="nav sub tip tip-r"
+                  activeProps={{ className: "nav sub tip tip-r on" }}
+                  activeOptions={{ includeSearch: true }}
+                  to="/t/$teamId/contacts"
+                  params={{ teamId: props.team.id }}
+                  search={{ view: view.id }}
+                  data-tip={view.name}
+                >
+                  <span className="ic" aria-hidden="true">
+                    <span className="dot" />
+                  </span>
+                  <span className="lbl">{view.name}</span>
+                </Link>
+              ))}
             <Link
               className="nav tip tip-r"
               activeProps={{ className: "nav tip tip-r on" }}
@@ -239,6 +261,25 @@ export function AppShell(props: {
               </span>
               <span className="lbl">Companies</span>
             </Link>
+            {savedViews
+              .filter((view) => view.recordType === "company")
+              .map((view) => (
+                <Link
+                  key={view.id}
+                  className="nav sub tip tip-r"
+                  activeProps={{ className: "nav sub tip tip-r on" }}
+                  activeOptions={{ includeSearch: true }}
+                  to="/t/$teamId/companies"
+                  params={{ teamId: props.team.id }}
+                  search={{ view: view.id }}
+                  data-tip={view.name}
+                >
+                  <span className="ic" aria-hidden="true">
+                    <span className="dot" />
+                  </span>
+                  <span className="lbl">{view.name}</span>
+                </Link>
+              ))}
           </div>
 
           <div className="spacer" />

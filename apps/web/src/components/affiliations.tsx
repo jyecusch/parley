@@ -8,6 +8,7 @@ import { companiesCollection, primaryDomainOf } from "../lib/companies.ts"
 import { contactsCollection } from "../lib/contacts.ts"
 import { CloseIcon, PlusIcon, SearchIcon } from "./icons.tsx"
 import { initialsOfName } from "./record.tsx"
+import { Dialog } from "./settings.tsx"
 
 /** A message for the screen's toast, optionally with an undo. */
 export interface ToastRequest {
@@ -518,3 +519,86 @@ const PencilIcon = () => (
     <path d="M4 20h4L19 9l-4-4L4 16z" />
   </svg>
 )
+
+/** Bulk "affiliate with a company" for selected contacts (D71). */
+export function AffiliateDialog(props: {
+  readonly count: number
+  readonly companies: ReadonlyArray<{ readonly id: string; readonly label: string }>
+  readonly onApply: (companyId: string, title: string | null) => Promise<void>
+  readonly onClose: () => void
+}) {
+  const [query, setQuery] = useState("")
+  const [companyId, setCompanyId] = useState<string>()
+  const [title, setTitle] = useState("")
+  const q = query.trim().toLowerCase()
+  const matches = props.companies.filter((company) => !q || company.label.toLowerCase().includes(q)).slice(0, 50)
+  return (
+    <Dialog
+      title={`Add ${props.count} ${props.count === 1 ? "contact" : "contacts"} to a company`}
+      onClose={props.onClose}
+      footer={
+        <>
+          <button className="btn ghost" type="button" onClick={props.onClose}>
+            Cancel
+          </button>
+          <button
+            className="btn primary"
+            type="button"
+            disabled={!companyId}
+            onClick={() => companyId && void props.onApply(companyId, title.trim() || null)}
+          >
+            Add to company
+          </button>
+        </>
+      }
+    >
+      <div className="fld">
+        <label className="fl" htmlFor="affiliate-search">
+          Company
+        </label>
+        <input
+          id="affiliate-search"
+          className="inp"
+          type="text"
+          placeholder="Search companies…"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+        />
+        <div className="box" style={{ maxHeight: 200, overflow: "auto", padding: 4 }}>
+          {matches.length === 0 ? (
+            <p className="hint sm-t" style={{ padding: 6 }}>
+              No companies match.
+            </p>
+          ) : null}
+          {matches.map((company) => (
+            <button
+              key={company.id}
+              className={`pop-i ${companyId === company.id ? "on" : ""}`}
+              type="button"
+              onClick={() => setCompanyId(company.id)}
+            >
+              <span className="tile" aria-hidden="true">
+                {initialsOfName(company.label)}
+              </span>
+              <span>{company.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="fld">
+        <label className="fl" htmlFor="affiliate-title">
+          Title <span className="c-muted">(optional)</span>
+        </label>
+        <input
+          id="affiliate-title"
+          className="inp"
+          type="text"
+          maxLength={100}
+          placeholder="Title, like CTO"
+          value={title}
+          onChange={(event) => setTitle(event.target.value)}
+        />
+      </div>
+    </Dialog>
+  )
+}

@@ -1,21 +1,33 @@
-import type { Contact, ContactId, CustomField, FieldProblem, TeamId } from "@parley/domain"
+import {
+  type CompanyId,
+  type Contact,
+  type ContactId,
+  type CustomField,
+  contactFieldReader,
+  type FieldProblem,
+  filterFields,
+  matchesFilter,
+  ROLE_PERMISSIONS,
+  type TeamId,
+} from "@parley/domain"
 import type { UserText } from "@parley/errors"
 import { useLiveQuery } from "@tanstack/react-db"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { createFileRoute, useNavigate } from "@tanstack/react-router"
+import { createFileRoute, getRouteApi, useNavigate } from "@tanstack/react-router"
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { AffiliationChips, AffiliationTags, ContactCompanies } from "../components/affiliations.tsx"
+import { AffiliateDialog, AffiliationChips, AffiliationTags, ContactCompanies } from "../components/affiliations.tsx"
 import { CustomCell, CustomFieldsSection } from "../components/custom-fields.tsx"
+import { FilterBar } from "../components/filters.tsx"
 import {
   ChevronDown,
   ChevronUp,
   CloseIcon,
   ContactsIcon,
-  DisplayIcon,
   MoreIcon,
   RestoreIcon,
   TrashIcon,
 } from "../components/icons.tsx"
+import { DisplayMenu, ImportDialog, SaveViewDialog, SetFieldDialog, ViewActions } from "../components/index-view.tsx"
 import {
   EditableList,
   EditableText,
@@ -28,14 +40,20 @@ import {
 import { isTyping, useShell } from "../components/shell.tsx"
 import { Timeline } from "../components/timeline.tsx"
 import { call, isApiFailure, messageOf } from "../lib/client.ts"
+import { companiesCollection } from "../lib/companies.ts"
 import { contactsCollection, displayNameOf, initialsOf } from "../lib/contacts.ts"
-import { readColumns, useFields, writeColumns } from "../lib/custom-fields.ts"
+import { useFields } from "../lib/custom-fields.ts"
+import { compareBy, download, useIndexView } from "../lib/index-view.ts"
 import { absolute, relative } from "../lib/time.ts"
+
+const teamRoute = getRouteApi("/t/$teamId")
 
 export interface Search {
   readonly contact?: string
   readonly new?: boolean
   readonly deleted?: boolean
+  /** An open saved view (D59). */
+  readonly view?: string
 }
 
 export const Route = createFileRoute("/t/$teamId/contacts")({
@@ -44,6 +62,7 @@ export const Route = createFileRoute("/t/$teamId/contacts")({
     ...(typeof search.contact === "string" ? { contact: search.contact } : {}),
     ...(search.new === true || search.new === "true" ? { new: true } : {}),
     ...(search.deleted === true || search.deleted === "true" ? { deleted: true } : {}),
+    ...(typeof search.view === "string" ? { view: search.view } : {}),
   }),
   component: ContactsScreen,
 })
@@ -65,10 +84,38 @@ function ContactsScreen() {
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
   const [cursor, setCursor] = useState<string>()
   const [toast, setToast] = useState<Toast>()
-  const [displayMenu, setDisplayMenu] = useState(false)
+  const [dialog, setDialog] = useState<"save-view" | "import" | "set-field" | "affiliate">()
   const { fields } = useFields(teamId, "contact")
-  const [columns, setColumns] = useState<ReadonlyArray<string>>(() => readColumns(teamId, "contact"))
-  const shownFields = fields.filter((field) => columns.includes(field.id))
+  const indexView = useIndexView(teamId, "contact", search.view)
+  const filterInfo = useMemo(() => filterFields("contact", fields), [fields])
+  const shownFields = fields.filter(
+    (field) => indexView.state.columns.includes(`custom:${field.id}`) || indexView.state.columns.includes(field.id),
+  )
+  const { userId } = teamRoute.useRouteContext()
+  const canWrite = ROLE_PERMISSIONS[team.role].has("records:write")
+  const companyCollection = companiesCollection(teamId, queryClient)
+  const companyLive = useLiveQuery((q) => q.from({ company: companyCollection }), [companyCollection])
+  const companyOptions = useMemo(
+    () =>
+      [...(companyLive.data ?? [])]
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map((company) => ({ id: company.id as string, label: company.name })),
+    [companyLive.data],
+  )
+
+  /** Exports what's showing (D62): the view's filter, or just the selection. */
+  const exportCsv = async (ids: ReadonlyArray<string> | undefined) => {
+    try {
+      const result = await call("contacts.export", {
+        teamId,
+        ...(ids ? { ids: [...ids] } : { filter: indexView.state.filter }),
+      })
+      download(`contacts-${new Date().toISOString().slice(0, 10)}.csv`, result.csv)
+      showToast({ text: `Exported ${result.count} ${result.count === 1 ? "contact" : "contacts"}.` })
+    } catch (failure) {
+      showToast({ text: messageOf(failure) })
+    }
+  }
   const filterRef = useRef<HTMLInputElement>(null)
 
   const contacts = useMemo(() => {
@@ -80,12 +127,20 @@ function ContactsScreen() {
           contact.displayName.toLowerCase().includes(q) ||
           contact.emails.some((email) => email.address.includes(q)),
       )
-      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || b.id.localeCompare(a.id))
-  }, [live.data, filter])
+      .filter((record) => matchesFilter(indexView.state.filter, contactFieldReader(record)))
+      .sort(
+        indexView.state.sort
+          ? compareBy(contactFieldReader, indexView.state.sort)
+          : (a, b) => b.updatedAt.localeCompare(a.updatedAt) || b.id.localeCompare(a.id),
+      )
+  }, [live.data, filter, indexView.state])
 
   const open = search.contact ? contacts.find((contact) => contact.id === search.contact) : undefined
 
-  const setSearch = useCallback((next: Search) => navigate({ search: next, replace: false }), [navigate])
+  const setSearch = useCallback(
+    (next: Search) => navigate({ search: { ...(search.view ? { view: search.view } : {}), ...next } }),
+    [navigate, search.view],
+  )
 
   const showToast = useCallback((next: Toast) => {
     setToast(next)
@@ -183,11 +238,30 @@ function ContactsScreen() {
                 <span>Deleted</span>
               </>
             ) : (
-              <span>Contacts</span>
+              <span>{indexView.view?.name ?? "Contacts"}</span>
             )}
           </h1>
           {!search.deleted && !isLoading && !isEmpty ? <span className="count">{contacts.length}</span> : null}
           <div className="spacer" />
+          {search.deleted ? null : (
+            <ViewActions
+              viewName={indexView.view?.name}
+              canDelete={
+                indexView.view !== undefined &&
+                (!indexView.view.shared || indexView.view.ownerUserId === userId || canWrite)
+              }
+              dirty={indexView.dirty}
+              onReset={indexView.reset}
+              onSave={() => void indexView.save().then(() => showToast({ text: "View saved." }))}
+              onSaveAs={() => setDialog("save-view")}
+              onDelete={() =>
+                void indexView.remove().then(() => {
+                  showToast({ text: "View deleted." })
+                  void navigate({ search: {} })
+                })
+              }
+            />
+          )}
           {isEmpty && !search.deleted ? null : (
             <button className="btn primary" type="button" onClick={() => void setSearch({ new: true })}>
               New contact <span className="kbd on-primary">C</span>
@@ -222,51 +296,28 @@ function ContactsScreen() {
                 />
               </>
             )}
+            {search.deleted ? null : (
+              <FilterBar
+                fields={filterInfo}
+                filter={indexView.state.filter}
+                onChange={indexView.setFilter}
+                companies={companyOptions}
+              />
+            )}
             <div className="spacer" />
-            <div style={{ position: "relative" }}>
-              <button className="btn ghost sm trail-btn" type="button" onClick={() => setDisplayMenu((v) => !v)}>
-                <DisplayIcon />
-                Display
-              </button>
-              {displayMenu ? (
-                <div className="menu" style={{ right: 0, top: 30 }}>
-                  <button
-                    className="menu-i"
-                    type="button"
-                    onClick={() => {
-                      setDisplayMenu(false)
-                      void setSearch(search.deleted ? {} : { deleted: true })
-                    }}
-                  >
-                    Show deleted contacts
-                    {search.deleted ? <span className="hint">✓</span> : null}
-                  </button>
-                  {fields.length > 0 ? (
-                    <>
-                      <div className="menu-sep" />
-                      <p className="menu-h sm-t">Columns</p>
-                      {fields.map((field) => (
-                        <button
-                          key={field.id}
-                          className="menu-i"
-                          type="button"
-                          onClick={() => {
-                            const next = columns.includes(field.id)
-                              ? columns.filter((id) => id !== field.id)
-                              : [...columns, field.id]
-                            setColumns(next)
-                            writeColumns(teamId, "contact", next)
-                          }}
-                        >
-                          {field.name}
-                          {columns.includes(field.id) ? <span className="hint">✓</span> : null}
-                        </button>
-                      ))}
-                    </>
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
+            <DisplayMenu
+              plural="contacts"
+              fields={filterInfo}
+              customFields={fields}
+              sort={indexView.state.sort}
+              onSort={indexView.setSort}
+              columns={indexView.state.columns}
+              onColumns={(columns) => void indexView.setColumns(columns)}
+              showingDeleted={search.deleted === true}
+              onToggleDeleted={() => void setSearch(search.deleted ? {} : { deleted: true })}
+              onExport={() => void exportCsv(undefined)}
+              onImport={() => setDialog("import")}
+            />
           </div>
         )}
 
@@ -352,6 +403,15 @@ function ContactsScreen() {
               <b>{selected.size}</b> selected
             </span>
             <span className="div" />
+            <button className="btn ghost sm" type="button" onClick={() => setDialog("set-field")}>
+              Set field
+            </button>
+            <button className="btn ghost sm" type="button" onClick={() => setDialog("affiliate")}>
+              Add to company
+            </button>
+            <button className="btn ghost sm" type="button" onClick={() => void exportCsv([...selected])}>
+              Export
+            </button>
             <button
               className="btn ghost sm danger tip tip-b"
               type="button"
@@ -396,6 +456,80 @@ function ContactsScreen() {
         ) : null}
       </main>
 
+      {dialog === "save-view" ? (
+        <SaveViewDialog
+          canShare={canWrite}
+          onClose={() => setDialog(undefined)}
+          onSave={async (name, shared) => {
+            const saved = await indexView.saveAs(name, shared)
+            setDialog(undefined)
+            void navigate({ search: { view: saved.id } })
+          }}
+        />
+      ) : dialog === "import" ? (
+        <ImportDialog
+          recordType="contact"
+          plural="contacts"
+          customFields={fields}
+          onClose={() => setDialog(undefined)}
+          onImport={async (csv, mapping) => {
+            const result = await call("contacts.import", { teamId, csv, mapping })
+            await collection.utils.refetch()
+            return result
+          }}
+        />
+      ) : dialog === "set-field" ? (
+        <SetFieldDialog
+          count={selected.size}
+          noun={selected.size === 1 ? "contact" : "contacts"}
+          fields={fields}
+          onClose={() => setDialog(undefined)}
+          onApply={async (field, value) => {
+            const ids = [...selected]
+            const transaction = collection.update(
+              ids.map((id) => id as ContactId),
+              (drafts) => {
+                for (const draft of drafts) {
+                  const next = { ...draft.custom }
+                  if (value === null) delete next[field.id]
+                  else next[field.id] = value as (typeof next)[string]
+                  draft.custom = next
+                }
+              },
+            )
+            setDialog(undefined)
+            setSelected(new Set())
+            showToast({ text: `${field.name} is set on ${ids.length} ${ids.length === 1 ? "contact" : "contacts"}.` })
+            transaction.isPersisted.promise.catch((failure: unknown) => showToast({ text: messageOf(failure) }))
+          }}
+        />
+      ) : dialog === "affiliate" ? (
+        <AffiliateDialog
+          count={selected.size}
+          companies={companyOptions}
+          onClose={() => setDialog(undefined)}
+          onApply={async (companyId, title) => {
+            const ids = [...selected]
+            setDialog(undefined)
+            try {
+              for (const contactId of ids) {
+                await call("affiliations.create", {
+                  teamId,
+                  contactId: contactId as ContactId,
+                  companyId: companyId as CompanyId,
+                  ...(title ? { title } : {}),
+                })
+              }
+              setSelected(new Set())
+              showToast({ text: `${ids.length} ${ids.length === 1 ? "contact" : "contacts"} added.` })
+            } catch (failure) {
+              showToast({ text: messageOf(failure) })
+            }
+            await collection.utils.refetch()
+            await companyCollection.utils.refetch()
+          }}
+        />
+      ) : null}
       {search.new ? (
         <CreatePanel
           teamId={teamId}

@@ -1679,7 +1679,7 @@ body {
 .addr-grid .full {
   grid-column: 1 / -1;
 }
-.sub {
+.sublabel {
   color: var(--fg-subtle);
   font-size: 11px;
   line-height: 14px;
@@ -1777,4 +1777,109 @@ body {
 }
 .w-custom {
   width: 140px;
+}
+
+/* Filters (D59, D65). */
+.fbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.fchip-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.fjoin {
+  color: var(--fg-subtle);
+}
+.fchip {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  border-radius: 6px;
+  background: var(--fill);
+  max-width: 320px;
+}
+.fchip.bad {
+  box-shadow: inset 0 0 0 1px var(--danger);
+}
+.fchip-b {
+  border: 0;
+  background: none;
+  color: var(--fg-muted);
+  padding: 0 4px 0 8px;
+  height: 24px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  font: inherit;
+}
+.fchip-b b {
+  color: var(--fg);
+  font-weight: 470;
+}
+.fchip-x {
+  border: 0;
+  background: none;
+  color: var(--fg-subtle);
+  width: 20px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  border-radius: 0 6px 6px 0;
+}
+.fchip-x:hover {
+  color: var(--fg);
+  background: var(--bg-hover);
+}
+.fpop {
+  left: 0;
+  top: 30px;
+  width: 280px;
+  max-width: none;
+}
+.fpop-b {
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.fpop .fsel {
+  margin: 0;
+  box-shadow: inset 0 0 0 1px var(--control);
+}
+.fopts {
+  max-height: 200px;
+  overflow: auto;
+}
+.hd2 {
+  min-height: 36px;
+  height: auto;
+  flex-wrap: wrap;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+.view-actions {
+  display: flex;
+  gap: 4px;
+  flex: none;
+}
+.nav.sub {
+  height: 26px;
+}
+.nav.sub .lbl {
+  font-size: 12.5px;
+}
+.nav .dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.6;
 }
