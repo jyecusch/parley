@@ -1,12 +1,10 @@
-import type { ActivityEntry, Contact, ContactId, FieldProblem, TeamId } from "@parley/domain"
+import type { Contact, ContactId, FieldProblem, TeamId } from "@parley/domain"
 import type { UserText } from "@parley/errors"
 import { useLiveQuery } from "@tanstack/react-db"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
-  AgentIcon,
-  AlertIcon,
   ChevronDown,
   ChevronUp,
   CloseIcon,
@@ -16,6 +14,16 @@ import {
   RestoreIcon,
   TrashIcon,
 } from "../components/icons.tsx"
+import {
+  ActivityRow,
+  EditableList,
+  EditableText,
+  LoadFailed,
+  problemFor,
+  problemsOf,
+  toE164,
+  toggle,
+} from "../components/record.tsx"
 import { isTyping, useShell } from "../components/shell.tsx"
 import { call, isApiFailure, messageOf } from "../lib/client.ts"
 import { contactsCollection, displayNameOf, initialsOf } from "../lib/contacts.ts"
@@ -239,7 +247,11 @@ function ContactsScreen() {
           ) : isLoading ? (
             <LoadingRows />
           ) : loadError ? (
-            <LoadFailed message={messageOf(loadError)} onRetry={() => void collection.utils.refetch()} />
+            <LoadFailed
+              title="Contacts didn't load"
+              message={messageOf(loadError)}
+              onRetry={() => void collection.utils.refetch()}
+            />
           ) : isEmpty ? (
             <EmptyTeam onNew={() => void setSearch({ new: true })} onCommand={openCommand} />
           ) : contacts.length === 0 ? (
@@ -379,13 +391,6 @@ function ContactsScreen() {
 /** The shape TanStack DB hands to an update: the contact, writable. */
 type Draft = { -readonly [K in keyof Contact]: Contact[K] }
 
-const toggle = (set: ReadonlySet<string>, id: string): ReadonlySet<string> => {
-  const next = new Set(set)
-  if (next.has(id)) next.delete(id)
-  else next.add(id)
-  return next
-}
-
 function ContactRow(props: {
   readonly contact: Contact
   readonly checked: boolean
@@ -493,25 +498,6 @@ function EmptyTeam(props: { readonly onNew: () => void; readonly onCommand: () =
   )
 }
 
-function LoadFailed(props: { readonly message: UserText; readonly onRetry: () => void }) {
-  return (
-    <div className="center" role="alert">
-      <div className="empty">
-        <div className="e-ic err">
-          <AlertIcon />
-        </div>
-        <h2>Contacts didn't load</h2>
-        <p>{props.message}</p>
-        <div className="actions">
-          <button className="btn primary" type="button" onClick={props.onRetry}>
-            Try again
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 function DeletedContacts(props: {
   readonly teamId: TeamId
   readonly onRestore: (ids: ReadonlyArray<string>) => Promise<void>
@@ -521,7 +507,15 @@ function DeletedContacts(props: {
     queryFn: () => call("contacts.list", { teamId: props.teamId, deleted: true, limit: 200 }),
   })
   if (deleted.isLoading) return <LoadingRows />
-  if (deleted.isError) return <LoadFailed message={messageOf(deleted.error)} onRetry={() => void deleted.refetch()} />
+  if (deleted.isError) {
+    return (
+      <LoadFailed
+        title="Deleted contacts didn't load"
+        message={messageOf(deleted.error)}
+        onRetry={() => void deleted.refetch()}
+      />
+    )
+  }
   const items = deleted.data?.items ?? []
   if (items.length === 0) {
     return (
@@ -583,17 +577,6 @@ function DeletedContacts(props: {
       </table>
     </div>
   )
-}
-
-/** Normalises what people type ("+61 400 812 337") to E.164 (D34). */
-const toE164 = (value: string) => value.replace(/[\s().-]/g, "")
-
-const problemFor = (problems: ReadonlyArray<FieldProblem> | undefined, field: string) =>
-  problems?.find((problem) => problem.field === field)?.userMessage
-
-const problemsOf = (failure: unknown): ReadonlyArray<FieldProblem> | undefined => {
-  if (!isApiFailure(failure) || failure.error._tag !== "InputRejected") return undefined
-  return (failure.error.details as { problems?: ReadonlyArray<FieldProblem> } | undefined)?.problems
 }
 
 function CreatePanel(props: {
@@ -910,192 +893,10 @@ function ContactPanel(props: {
           {activity.isLoading ? <div className="sk" style={{ width: "60%", margin: "8px 0" }} /> : null}
           {activity.isError ? <p className="ferr sm-t">{messageOf(activity.error)}</p> : null}
           {(activity.data ?? []).map((entry, index) => (
-            <ActivityRow key={entry.id} entry={entry} first={index === 0} />
+            <ActivityRow key={entry.id} entry={entry} recordType="contact" first={index === 0} />
           ))}
         </section>
       </div>
     </aside>
-  )
-}
-
-const describe = (entry: ActivityEntry): string => {
-  switch (entry.kind) {
-    case "created":
-      return "created this contact"
-    case "deleted":
-      return "deleted this contact"
-    case "restored":
-      return "restored this contact"
-    case "affiliated":
-      return `added this contact to ${entry.related?.name ?? "a company"}${entry.reason === "domain-matching" ? " by domain matching" : ""}`
-    case "unaffiliated":
-      return `removed this contact from ${entry.related?.name ?? "a company"}`
-    case "updated": {
-      if (entry.related) return `changed the title at ${entry.related.name}`
-      const names: Record<string, string> = {
-        firstName: "first name",
-        lastName: "last name",
-        emails: "emails",
-        phones: "phones",
-      }
-      const fields = entry.changedFields.map((field) => names[field] ?? field)
-      return fields.length > 0 ? `changed ${fields.join(", ")}` : "edited this contact"
-    }
-  }
-}
-
-function ActivityRow(props: { readonly entry: ActivityEntry; readonly first: boolean }) {
-  const { entry } = props
-  const initials = entry.actorName
-    .split(/\s+/)
-    .map((part) => part[0] ?? "")
-    .join("")
-    .slice(0, 2)
-    .toUpperCase()
-  return (
-    <div className={`act ${props.first ? "first" : ""}`}>
-      <span className="av" aria-hidden="true">
-        {initials}
-        {entry.via ? (
-          <span className="agent">
-            <AgentIcon />
-          </span>
-        ) : null}
-      </span>
-      <div style={{ minWidth: 0 }}>
-        <div className="act-l">
-          <b>{entry.actorName}</b>
-          {entry.via ? <span> via {entry.via}</span> : null} {describe(entry)}
-        </div>
-      </div>
-      <span className="when sm-t" title={absolute(entry.at)}>
-        {relative(entry.at)}
-      </span>
-    </div>
-  )
-}
-
-function EditableText(props: {
-  readonly label: string
-  readonly value: string | null
-  readonly onSave: (value: string | null) => void
-}) {
-  const [editing, setEditing] = useState(false)
-  const id = `edit-${props.label.replace(/\s+/g, "-").toLowerCase()}`
-  if (editing) {
-    return (
-      <div className="field">
-        <label className="flabel sm-t" htmlFor={id}>
-          {props.label}
-        </label>
-        <div className="fval" style={{ padding: "0 6px" }}>
-          <input
-            id={id}
-            className="finp"
-            defaultValue={props.value ?? ""}
-            // biome-ignore lint/a11y/noAutofocus: the person just clicked this field to edit it
-            autoFocus
-            onBlur={(event) => {
-              setEditing(false)
-              const next = event.currentTarget.value.trim() || null
-              if (next !== props.value) props.onSave(next)
-            }}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") event.currentTarget.blur()
-              if (event.key === "Escape") {
-                event.stopPropagation()
-                setEditing(false)
-              }
-            }}
-          />
-        </div>
-      </div>
-    )
-  }
-  return (
-    <div className="field">
-      <span className="flabel sm-t">{props.label}</span>
-      <button className="fval" type="button" onClick={() => setEditing(true)}>
-        {props.value ?? <span className="empty-v">Empty</span>}
-      </button>
-    </div>
-  )
-}
-
-function EditableList(props: {
-  readonly label: string
-  readonly empty: string
-  readonly items: ReadonlyArray<{ readonly value: string; readonly tag: string | undefined }>
-  readonly type: "email" | "tel"
-  readonly onSave: (values: ReadonlyArray<string>) => void
-}) {
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState<ReadonlyArray<string>>([])
-  const begin = () => {
-    setDraft([...props.items.map((item) => item.value), ""])
-    setEditing(true)
-  }
-  const commit = () => {
-    setEditing(false)
-    const values = draft.map((value) => value.trim()).filter(Boolean)
-    const same =
-      values.length === props.items.length && values.every((value, index) => value === props.items[index]?.value)
-    if (!same) props.onSave(values)
-  }
-  if (editing) {
-    return (
-      <div className="field">
-        <span className="flabel sm-t">{props.label}</span>
-        <fieldset
-          className="fval"
-          style={{ padding: "0 6px", gap: 2, border: 0, minInlineSize: 0 }}
-          onBlur={(event) => {
-            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) commit()
-          }}
-        >
-          <legend className="vh">{props.label}</legend>
-          {draft.map((value, index) => (
-            <input
-              // biome-ignore lint/suspicious/noArrayIndexKey: rows are positional while editing
-              key={index}
-              className="finp"
-              type={props.type}
-              aria-label={`${props.label} ${index + 1}`}
-              placeholder={index === draft.length - 1 ? props.empty : undefined}
-              // biome-ignore lint/a11y/noAutofocus: the person just clicked this field to edit it
-              autoFocus={index === 0}
-              value={value}
-              onChange={(event) => {
-                const next = [...draft]
-                next[index] = event.target.value
-                if (index === draft.length - 1 && event.target.value) next.push("")
-                setDraft(next)
-              }}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") commit()
-                if (event.key === "Escape") {
-                  event.stopPropagation()
-                  setEditing(false)
-                }
-              }}
-            />
-          ))}
-        </fieldset>
-      </div>
-    )
-  }
-  return (
-    <div className="field">
-      <span className="flabel sm-t">{props.label}</span>
-      <button className="fval" type="button" onClick={begin}>
-        {props.items.length === 0 ? <span className="empty-v">Empty</span> : null}
-        {props.items.map((item) => (
-          <span className="fline" key={item.value}>
-            <span className="t">{item.value}</span>
-            {item.tag ? <span className="tag sm-t">{item.tag}</span> : null}
-          </span>
-        ))}
-      </button>
-    </div>
   )
 }
