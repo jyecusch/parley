@@ -146,7 +146,9 @@ Milestone 1: the monorepo; `@parley/errors`, `domain`, `db`, `core`, `api`, `htt
 
 Milestone 2: API keys (`apiKeys.list/create/revoke`), MCP OAuth connections (`connections.list/create/revoke`, discovery, the consent page), service accounts (`serviceAccounts.list/create`), Settings (Connections, API keys, Service accounts), and CRT mode drawn by a WebGL shader with convex glass, chromatic aberration and its own cursor.
 
-Not yet: companies and affiliations, custom fields, saved views, notes, CSV import and export, bulk "set field", members management and invitations, renaming and removing service accounts, the 30-day purge job, avatars and logos, a full record view, and paging in the table beyond loading everything.
+Milestone 3: companies (`companies.list/get/create/update/delete/restore/activity`) with many domains, free email domains refused and a structured address; affiliations (`affiliations.list/create/update/delete`); domain matching both ways, recorded in activity with the matched domain; the Companies screen and affiliations on Contacts (D103–D113).
+
+Not yet: logos (favicons, D75), custom fields, saved views, notes, CSV import and export, bulk "set field", members management and invitations, renaming and removing service accounts, the 30-day purge job, avatars and logos, a full record view, and paging in the table beyond loading everything.
 
 ## Proposed (awaiting the owner)
 
