@@ -18,6 +18,7 @@ import { Route as SignUpRouteImport } from './routes/sign-up'
 import { Route as DotwellKnownSplatRouteImport } from './routes/[.]well-known.$'
 import { Route as ApiSplatRouteImport } from './routes/api/$'
 import { Route as TTeamIdRouteImport } from './routes/t.$teamId'
+import { Route as TTeamIdCompaniesRouteImport } from './routes/t.$teamId.companies'
 import { Route as TTeamIdContactsRouteImport } from './routes/t.$teamId.contacts'
 import { Route as TTeamIdSettingsRouteImport } from './routes/t.$teamId.settings'
 import { Route as TTeamIdSettingsIndexRouteImport } from './routes/t.$teamId.settings.index'
@@ -70,6 +71,11 @@ const TTeamIdRoute = TTeamIdRouteImport.update({
   path: '/t/$teamId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TTeamIdCompaniesRoute = TTeamIdCompaniesRouteImport.update({
+  id: '/companies',
+  path: '/companies',
+  getParentRoute: () => TTeamIdRoute,
+} as any)
 const TTeamIdContactsRoute = TTeamIdContactsRouteImport.update({
   id: '/contacts',
   path: '/contacts',
@@ -113,6 +119,7 @@ export interface FileRoutesByFullPath {
   '/.well-known/$': typeof DotwellKnownSplatRoute
   '/api/$': typeof ApiSplatRoute
   '/t/$teamId': typeof TTeamIdRouteWithChildren
+  '/t/$teamId/companies': typeof TTeamIdCompaniesRoute
   '/t/$teamId/contacts': typeof TTeamIdContactsRoute
   '/t/$teamId/settings': typeof TTeamIdSettingsRouteWithChildren
   '/t/$teamId/settings/api-keys': typeof TTeamIdSettingsApiKeysRoute
@@ -130,6 +137,7 @@ export interface FileRoutesByTo {
   '/.well-known/$': typeof DotwellKnownSplatRoute
   '/api/$': typeof ApiSplatRoute
   '/t/$teamId': typeof TTeamIdRouteWithChildren
+  '/t/$teamId/companies': typeof TTeamIdCompaniesRoute
   '/t/$teamId/contacts': typeof TTeamIdContactsRoute
   '/t/$teamId/settings/api-keys': typeof TTeamIdSettingsApiKeysRoute
   '/t/$teamId/settings/connections': typeof TTeamIdSettingsConnectionsRoute
@@ -147,6 +155,7 @@ export interface FileRoutesById {
   '/.well-known/$': typeof DotwellKnownSplatRoute
   '/api/$': typeof ApiSplatRoute
   '/t/$teamId': typeof TTeamIdRouteWithChildren
+  '/t/$teamId/companies': typeof TTeamIdCompaniesRoute
   '/t/$teamId/contacts': typeof TTeamIdContactsRoute
   '/t/$teamId/settings': typeof TTeamIdSettingsRouteWithChildren
   '/t/$teamId/settings/api-keys': typeof TTeamIdSettingsApiKeysRoute
@@ -166,6 +175,7 @@ export interface FileRouteTypes {
     | '/.well-known/$'
     | '/api/$'
     | '/t/$teamId'
+    | '/t/$teamId/companies'
     | '/t/$teamId/contacts'
     | '/t/$teamId/settings'
     | '/t/$teamId/settings/api-keys'
@@ -183,6 +193,7 @@ export interface FileRouteTypes {
     | '/.well-known/$'
     | '/api/$'
     | '/t/$teamId'
+    | '/t/$teamId/companies'
     | '/t/$teamId/contacts'
     | '/t/$teamId/settings/api-keys'
     | '/t/$teamId/settings/connections'
@@ -199,6 +210,7 @@ export interface FileRouteTypes {
     | '/.well-known/$'
     | '/api/$'
     | '/t/$teamId'
+    | '/t/$teamId/companies'
     | '/t/$teamId/contacts'
     | '/t/$teamId/settings'
     | '/t/$teamId/settings/api-keys'
@@ -284,6 +296,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TTeamIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/t/$teamId/companies': {
+      id: '/t/$teamId/companies'
+      path: '/companies'
+      fullPath: '/t/$teamId/companies'
+      preLoaderRoute: typeof TTeamIdCompaniesRouteImport
+      parentRoute: typeof TTeamIdRoute
+    }
     '/t/$teamId/contacts': {
       id: '/t/$teamId/contacts'
       path: '/contacts'
@@ -348,11 +367,13 @@ const TTeamIdSettingsRouteWithChildren = TTeamIdSettingsRoute._addFileChildren(
 )
 
 interface TTeamIdRouteChildren {
+  TTeamIdCompaniesRoute: typeof TTeamIdCompaniesRoute
   TTeamIdContactsRoute: typeof TTeamIdContactsRoute
   TTeamIdSettingsRoute: typeof TTeamIdSettingsRouteWithChildren
 }
 
 const TTeamIdRouteChildren: TTeamIdRouteChildren = {
+  TTeamIdCompaniesRoute: TTeamIdCompaniesRoute,
   TTeamIdContactsRoute: TTeamIdContactsRoute,
   TTeamIdSettingsRoute: TTeamIdSettingsRouteWithChildren,
 }

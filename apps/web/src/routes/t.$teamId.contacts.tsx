@@ -4,6 +4,7 @@ import { useLiveQuery } from "@tanstack/react-db"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { AffiliationChips, AffiliationTags, ContactCompanies } from "../components/affiliations.tsx"
 import {
   ChevronDown,
   ChevronUp,
@@ -279,8 +280,11 @@ function ContactsScreen() {
                     <th className="w-name" scope="col">
                       Name
                     </th>
-                    <th className="w-email" scope="col">
+                    <th className="w-email col-wide" scope="col">
                       Primary email
+                    </th>
+                    <th className="w-cos" scope="col">
+                      Companies
                     </th>
                     <th className="w-date col-wide" scope="col">
                       Created
@@ -381,6 +385,7 @@ function ContactsScreen() {
           onClose={() => void setSearch({})}
           onDelete={() => remove([open.id])}
           onError={(text) => showToast({ text })}
+          onToast={showToast}
           collection={collection}
         />
       ) : null}
@@ -427,7 +432,10 @@ function ContactRow(props: {
           <span className="n">{contact.displayName}</span>
         </button>
       </td>
-      <td className={email ? "c-email" : "c-none"}>{email ?? "—"}</td>
+      <td className={`col-wide ${email ? "c-email" : "c-none"}`}>{email ?? "—"}</td>
+      <td>
+        <AffiliationChips affiliations={contact.affiliations} />
+      </td>
       <td className="col-wide c-date" title={`Created ${absolute(contact.createdAt)}`}>
         {relative(contact.createdAt)}
       </td>
@@ -456,8 +464,11 @@ function LoadingRows() {
                   <div className="sk" style={{ width: `${width * 0.6}%` }} />
                 </div>
               </td>
-              <td className="w-email">
+              <td className="w-email col-wide">
                 <div className="sk" style={{ width: `${90 - width / 2}%` }} />
+              </td>
+              <td className="w-cos">
+                <div className="sk" style={{ width: `${width * 0.5}%` }} />
               </td>
               <td className="col-wide w-date">
                 <div className="sk" style={{ width: 28 }} />
@@ -738,13 +749,14 @@ function ContactPanel(props: {
   readonly onClose: () => void
   readonly onDelete: () => void
   readonly onError: (text: UserText) => void
+  readonly onToast: (toast: Toast) => void
   readonly collection: ReturnType<typeof contactsCollection>
 }) {
   const { contact, collection } = props
   const queryClient = useQueryClient()
   const [moreMenu, setMoreMenu] = useState(false)
   const activity = useQuery({
-    queryKey: ["contact-activity", props.teamId, contact.id, contact.updatedAt],
+    queryKey: ["contact-activity", props.teamId, contact.id, contact.updatedAt, contact.affiliations.length],
     queryFn: () => call("contacts.activity", { teamId: props.teamId, contactId: contact.id }),
   })
 
@@ -830,9 +842,13 @@ function ContactPanel(props: {
           <span className="av lg" aria-hidden="true">
             {initialsOf(contact)}
           </span>
-          <div style={{ minWidth: 0 }}>
+          <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 6 }}>
             <h2 className="pname">{contact.displayName}</h2>
-            <p className="paff sm-t">{contact.emails[0]?.address ?? "No email"}</p>
+            {contact.affiliations.length > 0 ? (
+              <AffiliationTags affiliations={contact.affiliations} />
+            ) : (
+              <p className="paff sm-t">{contact.emails[0]?.address ?? "No email"}</p>
+            )}
           </div>
         </div>
       </div>
@@ -888,6 +904,7 @@ function ContactPanel(props: {
             }
           />
         </section>
+        <ContactCompanies contact={contact} teamId={props.teamId} onToast={props.onToast} />
         <section className="sec">
           <h3 className="sec-h sm-t">Activity</h3>
           {activity.isLoading ? <div className="sk" style={{ width: "60%", margin: "8px 0" }} /> : null}

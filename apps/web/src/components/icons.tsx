@@ -172,3 +172,8 @@ export const LockIcon = ({ size = 12 }: P) => (
     <path d="M8 11V8a4 4 0 0 1 8 0v3" />
   </Icon>
 )
+export const CompaniesIcon = ({ size }: P) => (
+  <Icon size={size}>
+    <path d="M4.5 20.5v-14a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v14M15.5 10.5h2a2 2 0 0 1 2 2v8M3 20.5h18M8.5 8.5h3M8.5 12h3M8.5 15.5h3" />
+  </Icon>
+)

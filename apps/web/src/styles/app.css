@@ -917,6 +917,10 @@ body {
   color: var(--fg-subtle);
 }
 .linkish {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-start;
   background: none;
   border: 0;
   padding: 0;
@@ -1401,4 +1405,305 @@ body {
   .search-inp {
     width: 140px;
   }
+}
+
+/* Companies and affiliations (D110). */
+.w-co-name {
+  width: 34%;
+}
+.w-count {
+  width: 110px;
+}
+.w-cos {
+  width: 30%;
+}
+.ctable td.tall {
+  height: 40px;
+}
+.namebtn .stack {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.namebtn .s {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fg-subtle);
+  font-weight: 400;
+}
+.tile {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  font-size: 9px;
+  line-height: 1;
+  font-weight: 560;
+  background: var(--fill);
+  color: var(--fg-muted);
+}
+.tile.md {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  font-size: 10px;
+}
+.tile.lg {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+/* An affiliation as a chip: logo, company, and in the panel its title. */
+.aff {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding: 0 7px 0 3px;
+  border-radius: 6px;
+  background: var(--fill);
+  max-width: 100%;
+  min-width: 0;
+  flex: none;
+}
+.aff .t,
+.aff .ti {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.aff .ti {
+  color: var(--fg-subtle);
+}
+.affs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+}
+.more {
+  display: inline-grid;
+  place-items: center;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--fill);
+  color: var(--fg-subtle);
+  font-size: 11px;
+  line-height: 18px;
+  flex: none;
+}
+.ph-affs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.sec-h .n {
+  color: var(--fg-subtle);
+  font-weight: 400;
+  margin-left: 4px;
+}
+.sec-h.split {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.ibtn.xs {
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+}
+/* Affiliation rows, in the contact panel and the company panel. */
+.arow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 0 4px 0 6px;
+  margin: 0 -6px;
+  border-radius: 6px;
+}
+.arow:hover,
+.arow.editing {
+  background: var(--bg-hover);
+}
+.arow .who {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+  min-width: 0;
+  flex: 1;
+  background: none;
+  border: 0;
+  padding: 0;
+  text-align: left;
+  color: inherit;
+  text-decoration: none;
+}
+.arow .who:hover .n {
+  text-decoration: underline;
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: 3px;
+}
+.arow button.who {
+  cursor: pointer;
+}
+.arow .n {
+  font-weight: 470;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.arow .ti {
+  color: var(--fg-subtle);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.arow .acts {
+  display: flex;
+  opacity: 0;
+}
+.arow:hover .acts,
+.arow:focus-within .acts,
+.arow.editing .acts {
+  opacity: 1;
+}
+.tinp {
+  height: 24px;
+  border: 0;
+  border-radius: 5px;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  font-size: 12px;
+  padding: 0 6px;
+  box-shadow: inset 0 0 0 1px var(--control);
+  width: 100%;
+}
+.tinp:focus {
+  outline: none;
+  box-shadow: inset 0 0 0 1px var(--fg-muted);
+}
+.act-l .src,
+.act-l .via {
+  color: var(--fg-subtle);
+}
+/* The company picker. */
+.pop {
+  position: absolute;
+  z-index: 12;
+  width: 320px;
+  max-width: calc(100% - 24px);
+  background: var(--bg-elev);
+  border-radius: 10px;
+  box-shadow: var(--pop);
+  overflow: hidden;
+}
+.pop-in {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--line);
+  color: var(--fg-subtle);
+}
+.pop-in input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  outline: none;
+}
+.pop-in input::placeholder {
+  color: var(--fg-subtle);
+}
+.pop-list {
+  padding: 4px;
+  max-height: 260px;
+  overflow: auto;
+}
+.pop-gh {
+  color: var(--fg-subtle);
+  padding: 6px 6px 4px;
+  margin: 0;
+}
+.pop-i {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 6px;
+  border-radius: 6px;
+  width: 100%;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  color: var(--fg);
+}
+.pop-i:hover,
+.pop-i.on {
+  background: var(--bg-active);
+}
+.pop-i .s {
+  color: var(--fg-subtle);
+  margin-left: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pop-f {
+  border-top: 1px solid var(--line);
+  padding: 4px;
+}
+/* The address, edited as a small form. */
+.addr {
+  display: flex;
+  flex-direction: column;
+}
+.addr-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 12px;
+}
+.addr-grid .full {
+  grid-column: 1 / -1;
+}
+.sub {
+  color: var(--fg-subtle);
+  font-size: 11px;
+  line-height: 14px;
+  display: block;
+  margin-top: 4px;
+}
+.fsel {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  height: 28px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  padding: 0 6px;
+  margin: 0 -6px;
+  cursor: pointer;
+}
+.fsel:hover {
+  background: var(--bg-hover);
+}
+.fhint {
+  color: var(--fg-subtle);
+  margin: 4px 0;
 }

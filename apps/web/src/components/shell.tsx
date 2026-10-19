@@ -1,7 +1,7 @@
 import type { Contact, Team, TeamId } from "@parley/domain"
 import { useLiveQuery } from "@tanstack/react-db"
 import { useQueryClient } from "@tanstack/react-query"
-import { Link, useNavigate } from "@tanstack/react-router"
+import { Link, useMatchRoute, useNavigate } from "@tanstack/react-router"
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
 import {
   applyTheme,
@@ -13,11 +13,13 @@ import {
   themeChoice,
 } from "../lib/appearance.ts"
 import { signOut } from "../lib/auth.ts"
+import { companiesCollection, primaryDomainOf } from "../lib/companies.ts"
 import { contactsCollection, initialsOf } from "../lib/contacts.ts"
 import { useCrt } from "./crt.tsx"
 import {
   ChevronDown,
   CloseIcon,
+  CompaniesIcon,
   ContactsIcon,
   PlusIcon,
   RestoreIcon,
@@ -92,9 +94,15 @@ export function AppShell(props: {
     })
   }, [])
 
-  const newContact = useCallback(
-    () => navigate({ to: "/t/$teamId/contacts", params: { teamId: props.team.id }, search: { new: true } }),
-    [navigate, props.team.id],
+  // "New" means a record of the type on screen: a company on Companies, otherwise a contact.
+  const matchRoute = useMatchRoute()
+  const onCompanies = Boolean(matchRoute({ to: "/t/$teamId/companies" }))
+  const newRecord = useCallback(
+    () =>
+      onCompanies
+        ? navigate({ to: "/t/$teamId/companies", params: { teamId: props.team.id }, search: { new: true } })
+        : navigate({ to: "/t/$teamId/contacts", params: { teamId: props.team.id }, search: { new: true } }),
+    [navigate, onCompanies, props.team.id],
   )
 
   useEffect(() => {
@@ -112,12 +120,12 @@ export function AppShell(props: {
       if (isTyping(event) || event.metaKey || event.ctrlKey || event.altKey) return
       if (event.key === "c" && !commandOpen) {
         event.preventDefault()
-        void newContact()
+        void newRecord()
       }
     }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
-  }, [commandOpen, newContact, toggleSidebar])
+  }, [commandOpen, newRecord, toggleSidebar])
 
   const shell = useMemo<Shell>(
     () => ({ team: props.team, teams: props.teams, openCommand: () => setCommandOpen(true) }),
@@ -187,9 +195,9 @@ export function AppShell(props: {
             <button
               className="ibtn tip tip-b sb-new"
               type="button"
-              aria-label="New contact"
-              data-tip="New contact  C"
-              onClick={() => void newContact()}
+              aria-label={onCompanies ? "New company" : "New contact"}
+              data-tip={onCompanies ? "New company  C" : "New contact  C"}
+              onClick={() => void newRecord()}
             >
               <PlusIcon />
             </button>
@@ -217,6 +225,19 @@ export function AppShell(props: {
                 <ContactsIcon />
               </span>
               <span className="lbl">Contacts</span>
+            </Link>
+            <Link
+              className="nav tip tip-r"
+              activeProps={{ className: "nav tip tip-r on" }}
+              to="/t/$teamId/companies"
+              params={{ teamId: props.team.id }}
+              search={{}}
+              data-tip="Companies"
+            >
+              <span className="ic">
+                <CompaniesIcon />
+              </span>
+              <span className="lbl">Companies</span>
             </Link>
           </div>
 
@@ -320,7 +341,7 @@ function AccountMenu(props: { readonly onClose: () => void; readonly onSignOut: 
 
 interface CommandItem {
   readonly id: string
-  readonly group: "Contacts" | "Operations" | "Go to"
+  readonly group: "Contacts" | "Companies" | "Operations" | "Go to"
   readonly label: string
   readonly sub?: string
   readonly hint?: ReactNode
@@ -334,6 +355,8 @@ function CommandMenu(props: { readonly onClose: () => void }) {
   const queryClient = useQueryClient()
   const collection = contactsCollection(team.id as TeamId, queryClient)
   const { data: contacts } = useLiveQuery((q) => q.from({ contact: collection }), [collection])
+  const companyCollection = companiesCollection(team.id as TeamId, queryClient)
+  const { data: companies } = useLiveQuery((q) => q.from({ company: companyCollection }), [companyCollection])
   const [query, setQuery] = useState("")
   const [active, setActive] = useState(0)
 
@@ -361,6 +384,24 @@ function CommandMenu(props: { readonly onClose: () => void }) {
           ),
         }),
       )
+    const companyItems = [...(companies ?? [])]
+      .filter((company) => matches(company.name) || company.domains.some((entry) => matches(entry.domain)))
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+      .slice(0, q ? 6 : 3)
+      .map((company): CommandItem => {
+        const domain = primaryDomainOf(company)
+        return {
+          id: `company:${company.id}`,
+          group: "Companies",
+          label: company.name,
+          ...(domain ? { sub: domain } : {}),
+          hint: <span className="sm-t">Company</span>,
+          icon: <span className="tile">{company.name[0]?.toUpperCase()}</span>,
+          run: go(() =>
+            navigate({ to: "/t/$teamId/companies", params: { teamId: team.id }, search: { company: company.id } }),
+          ),
+        }
+      })
     const operations: Array<CommandItem> = [
       {
         id: "op:new-contact",
@@ -369,6 +410,20 @@ function CommandMenu(props: { readonly onClose: () => void }) {
         hint: <span className="kbd">C</span>,
         icon: <PlusIcon />,
         run: go(() => navigate({ to: "/t/$teamId/contacts", params: { teamId: team.id }, search: { new: true } })),
+      },
+      {
+        id: "op:new-company",
+        group: "Operations" as const,
+        label: "New company",
+        icon: <PlusIcon />,
+        run: go(() => navigate({ to: "/t/$teamId/companies", params: { teamId: team.id }, search: { new: true } })),
+      },
+      {
+        id: "go:companies",
+        group: "Go to" as const,
+        label: "Companies",
+        icon: <CompaniesIcon />,
+        run: go(() => navigate({ to: "/t/$teamId/companies", params: { teamId: team.id }, search: {} })),
       },
       {
         id: "op:deleted",
@@ -414,8 +469,8 @@ function CommandMenu(props: { readonly onClose: () => void }) {
           }),
         ),
     ].filter((item) => matches(item.label))
-    return [...contactItems, ...operations]
-  }, [contacts, query, team.id, teams, navigate, props])
+    return [...contactItems, ...companyItems, ...operations]
+  }, [contacts, companies, query, team.id, teams, navigate, props])
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: reset the highlight whenever the query changes
   useEffect(() => setActive(0), [query])
@@ -435,7 +490,7 @@ function CommandMenu(props: { readonly onClose: () => void }) {
     }
   }
 
-  const groups = ["Contacts", "Operations", "Go to"] as const
+  const groups = ["Contacts", "Companies", "Operations", "Go to"] as const
   return (
     <>
       <button className="scrim" type="button" tabIndex={-1} aria-hidden="true" onClick={props.onClose} />

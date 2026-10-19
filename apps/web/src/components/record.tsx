@@ -198,7 +198,7 @@ export function EditableList(props: {
   readonly label: string
   readonly empty: string
   readonly items: ReadonlyArray<{ readonly value: string; readonly tag: string | undefined }>
-  readonly type: "email" | "tel"
+  readonly type: "email" | "tel" | "text"
   readonly onSave: (values: ReadonlyArray<string>) => void
 }) {
   const [editing, setEditing] = useState(false)
