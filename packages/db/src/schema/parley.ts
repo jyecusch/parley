@@ -290,3 +290,22 @@ export const teamSettings = pgTable("team_settings", {
   /** Show contacts' Gravatar pictures (D77). Off by default. */
   gravatar: boolean("gravatar").notNull().default(false),
 })
+
+/** A named filter, sort and columns for an index view, personal or shared (D59, D60). */
+export const savedViews = pgTable(
+  "saved_views",
+  {
+    id: uuid("id").primaryKey(),
+    teamId: teamId(),
+    recordType: text("record_type", { enum: ["contact", "company"] }).notNull(),
+    name: text("name").notNull(),
+    shared: boolean("shared").notNull().default(false),
+    ownerUserId: text("owner_user_id").references(() => user.id, { onDelete: "set null" }),
+    ownerName: text("owner_name").notNull(),
+    filter: jsonb("filter").$type<unknown>().notNull(),
+    sort: jsonb("sort").$type<unknown>(),
+    columns: jsonb("columns").$type<Array<string>>().notNull().default([]),
+    ...timestamps,
+  },
+  (t) => [index("saved_views_team_id_idx").on(t.teamId, t.recordType)],
+)

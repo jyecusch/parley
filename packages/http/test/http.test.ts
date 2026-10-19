@@ -121,7 +121,10 @@ describe("HTTP entrypoint", () => {
   it("lets an API key read but not write, as its scopes say", async () => {
     const saved = cookie
     cookie = ""
-    const read = await call("POST", `/api/v1/teams/${teamId}/contacts/list`, { headers: { "x-api-key": readOnlyKey }, body: {} })
+    const read = await call("POST", `/api/v1/teams/${teamId}/contacts/list`, {
+      headers: { "x-api-key": readOnlyKey },
+      body: {},
+    })
     const write = await call("POST", `/api/v1/teams/${teamId}/contacts`, {
       headers: { authorization: `Bearer ${readOnlyKey}` },
       body: { firstName: "Agent" },

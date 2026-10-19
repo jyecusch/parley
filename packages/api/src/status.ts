@@ -41,6 +41,7 @@ export const ERROR_STATUS: { readonly [Tag in ErrorTag]: Status } = {
   CustomFieldNameTaken: 409,
   CustomFieldNotFound: 404,
   MemberNotFound: 404,
+  SavedViewNotFound: 404,
   LastOwner: 409,
   OwnerChangeNeedsOwner: 403,
   AlreadyAMember: 409,

@@ -10,6 +10,7 @@ import type { CustomFields } from "../services/custom-fields.ts"
 import type { Invitations } from "../services/invitations.ts"
 import type { Members } from "../services/members.ts"
 import type { Notes } from "../services/notes.ts"
+import type { SavedViews } from "../services/saved-views.ts"
 import type { ServiceAccounts } from "../services/service-accounts.ts"
 import type { Teams } from "../services/teams.ts"
 import type { Users } from "../services/users.ts"
@@ -21,6 +22,7 @@ import * as contacts from "./contacts.ts"
 import * as customFields from "./custom-fields.ts"
 import * as members from "./members.ts"
 import * as notes from "./notes.ts"
+import * as savedViews from "./saved-views.ts"
 import * as serviceAccounts from "./service-accounts.ts"
 import * as teams from "./teams.ts"
 
@@ -34,6 +36,7 @@ export type OperationServices =
   | Invitations
   | Users
   | Notes
+  | SavedViews
   | Teams
   | ApiKeys
   | Connections
@@ -82,6 +85,10 @@ export const implementations: { readonly [Name in OperationName]: Implementation
   "fields.create": customFields.create,
   "fields.update": customFields.update,
   "fields.delete": customFields.remove,
+  "savedViews.list": savedViews.list,
+  "savedViews.create": savedViews.create,
+  "savedViews.update": savedViews.update,
+  "savedViews.delete": savedViews.remove,
   "notes.list": notes.list,
   "notes.create": notes.create,
   "notes.update": notes.update,

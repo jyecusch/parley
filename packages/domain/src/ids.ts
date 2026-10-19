@@ -32,3 +32,6 @@ export type CustomFieldId = typeof CustomFieldId.Type
 
 export const InvitationId = Schema.String.pipe(Schema.brand("InvitationId"))
 export type InvitationId = typeof InvitationId.Type
+
+export const SavedViewId = Schema.String.pipe(Schema.brand("SavedViewId"))
+export type SavedViewId = typeof SavedViewId.Type

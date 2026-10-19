@@ -57,6 +57,13 @@
       "when": 1792445343715,
       "tag": "0007_team_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792445915412,
+      "tag": "0008_saved_views",
+      "breakpoints": true
     }
   ]
 }

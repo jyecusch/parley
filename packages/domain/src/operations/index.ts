@@ -31,6 +31,7 @@ import {
   updateMember,
 } from "./members.ts"
 import { createNote, deleteNote, listNotes, updateNote } from "./notes.ts"
+import { createSavedView, deleteSavedView, listSavedViews, updateSavedView } from "./saved-views.ts"
 import {
   createServiceAccount,
   deleteServiceAccount,
@@ -47,6 +48,7 @@ export * from "./contacts.ts"
 export * from "./custom-fields.ts"
 export * from "./members.ts"
 export * from "./notes.ts"
+export * from "./saved-views.ts"
 export * from "./service-accounts.ts"
 export * from "./teams.ts"
 
@@ -85,6 +87,10 @@ export const operations = {
   "fields.create": createField,
   "fields.update": updateField,
   "fields.delete": deleteField,
+  "savedViews.list": listSavedViews,
+  "savedViews.create": createSavedView,
+  "savedViews.update": updateSavedView,
+  "savedViews.delete": deleteSavedView,
   "notes.list": listNotes,
   "notes.create": createNote,
   "notes.update": updateNote,
