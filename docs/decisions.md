@@ -129,11 +129,13 @@ What we decided, who decided it, and what's still open. Nothing becomes "decided
 | I14 | Dynamic client registration is open (no client ID metadata documents yet) | What Claude, ChatGPT and Cursor use today; `@better-auth/cimd` can be added later |
 | I15 | Service accounts are users of kind `service-account` (no password, an undeliverable email) plus a member row; a connection acting as one also needs the connecting person to still be a member | D18, D94 |
 
-## Milestone 1: what's built, and what's next
+## What's built, and what's next
 
-Built: the monorepo; `@parley/errors`, `domain`, `db`, `core`, `api`, `http` and `mcp`; Better-Auth with teams and API keys; proofs and lint enforcement; the operations `teams.list`, `teams.create`, `contacts.list/get/create/update/delete/restore/activity` over HTTP, MCP and the web; the app shell and Contacts screen in Ink with Host Grotesk, light and dark themes, CRT mode, the command menu and shortcuts.
+Milestone 1: the monorepo; `@parley/errors`, `domain`, `db`, `core`, `api`, `http` and `mcp`; Better-Auth with teams; proofs and lint enforcement; `teams.list/create` and `contacts.list/get/create/update/delete/restore/activity` over HTTP, MCP and the web; the app shell and Contacts screen in Ink with Host Grotesk, light and dark themes, the command menu and shortcuts.
 
-Not yet: companies and affiliations, custom fields, saved views, notes, CSV import and export, bulk "set field", API key and member management screens (and their operations), Settings, the 30-day purge job, avatars and logos, a full record view, and paging in the table beyond loading everything.
+Milestone 2: API keys (`apiKeys.list/create/revoke`), MCP OAuth connections (`connections.list/create/revoke`, discovery, the consent page), service accounts (`serviceAccounts.list/create`), Settings (Connections, API keys, Service accounts), and CRT mode drawn by a WebGL shader with convex glass, chromatic aberration and its own cursor.
+
+Not yet: companies and affiliations, custom fields, saved views, notes, CSV import and export, bulk "set field", members management and invitations, renaming and removing service accounts, the 30-day purge job, avatars and logos, a full record view, and paging in the table beyond loading everything.
 
 ## Proposed (awaiting the owner)
 
