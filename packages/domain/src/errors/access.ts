@@ -160,7 +160,7 @@ export const PermissionErrors = [
  */
 export class SignInRequired
   extends Schema.TaggedError<SignInRequired>()("SignInRequired", {
-    action: Schema.Literals(["create a team", "create an API key", "connect an agent"]),
+    action: Schema.Literals(["create a team", "create an API key", "connect an agent", "accept an invitation"]),
   })
   implements DomainError
 {

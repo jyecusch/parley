@@ -3,7 +3,7 @@ import type { OperationError, OperationName, Operations } from "@parley/domain"
 /** Every error tag any operation can produce. */
 export type ErrorTag = { [Name in OperationName]: OperationError<Operations[Name]>["_tag"] }[OperationName]
 
-export type Status = 401 | 403 | 404 | 409 | 422 | 429 | 503
+export type Status = 401 | 403 | 404 | 409 | 410 | 422 | 429 | 502 | 503
 
 /**
  * How each error is sent over HTTP. Typed over every operation's errors, so a new error
@@ -40,6 +40,17 @@ export const ERROR_STATUS: { readonly [Tag in ErrorTag]: Status } = {
   NoteNotFound: 404,
   CustomFieldNameTaken: 409,
   CustomFieldNotFound: 404,
+  MemberNotFound: 404,
+  LastOwner: 409,
+  OwnerChangeNeedsOwner: 403,
+  AlreadyAMember: 409,
+  InvitationNotFound: 404,
+  InvitationExpired: 410,
+  InvitationForAnotherEmail: 403,
+  EmailServiceUnavailable: 502,
+  EmailRejected: 502,
+  EmailSendingTooFast: 429,
+  EmailNotConfigured: 503,
   NotNoteAuthor: 403,
   CannotDeleteOthersNote: 403,
   RequestsTooFrequent: 429,

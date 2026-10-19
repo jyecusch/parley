@@ -281,3 +281,12 @@ export const customFields = pgTable(
     index("custom_fields_team_id_idx").on(t.teamId, t.recordType, t.position),
   ],
 )
+
+/** Parley's own settings for a team (the team itself is a Better-Auth organization). */
+export const teamSettings = pgTable("team_settings", {
+  teamId: text("team_id")
+    .primaryKey()
+    .references(() => organization.id, { onDelete: "cascade" }),
+  /** Show contacts' Gravatar pictures (D77). Off by default. */
+  gravatar: boolean("gravatar").notNull().default(false),
+})

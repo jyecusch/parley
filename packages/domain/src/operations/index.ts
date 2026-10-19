@@ -20,9 +20,24 @@ import {
   updateContact,
 } from "./contacts.ts"
 import { createField, deleteField, listFields, updateField } from "./custom-fields.ts"
+import {
+  acceptInvitation,
+  createInvitation,
+  getInvitation,
+  listInvitations,
+  listMembers,
+  removeMember,
+  revokeInvitation,
+  updateMember,
+} from "./members.ts"
 import { createNote, deleteNote, listNotes, updateNote } from "./notes.ts"
-import { createServiceAccount, listServiceAccounts } from "./service-accounts.ts"
-import { createTeam, listTeams } from "./teams.ts"
+import {
+  createServiceAccount,
+  deleteServiceAccount,
+  listServiceAccounts,
+  updateServiceAccount,
+} from "./service-accounts.ts"
+import { createTeam, listTeams, updateTeam } from "./teams.ts"
 
 export * from "./affiliations.ts"
 export * from "./api-keys.ts"
@@ -30,6 +45,7 @@ export * from "./companies.ts"
 export * from "./connections.ts"
 export * from "./contacts.ts"
 export * from "./custom-fields.ts"
+export * from "./members.ts"
 export * from "./notes.ts"
 export * from "./service-accounts.ts"
 export * from "./teams.ts"
@@ -38,6 +54,15 @@ export * from "./teams.ts"
 export const operations = {
   "teams.list": listTeams,
   "teams.create": createTeam,
+  "teams.update": updateTeam,
+  "members.list": listMembers,
+  "members.update": updateMember,
+  "members.remove": removeMember,
+  "invitations.list": listInvitations,
+  "invitations.create": createInvitation,
+  "invitations.revoke": revokeInvitation,
+  "invitations.get": getInvitation,
+  "invitations.accept": acceptInvitation,
   "contacts.list": listContacts,
   "contacts.get": getContact,
   "contacts.create": createContact,
@@ -72,6 +97,8 @@ export const operations = {
   "connections.revoke": revokeConnection,
   "serviceAccounts.list": listServiceAccounts,
   "serviceAccounts.create": createServiceAccount,
+  "serviceAccounts.update": updateServiceAccount,
+  "serviceAccounts.delete": deleteServiceAccount,
 } as const
 export type Operations = typeof operations
 export type OperationName = keyof Operations

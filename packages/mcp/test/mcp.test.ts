@@ -132,21 +132,32 @@ describe("MCP entrypoint", () => {
       "fields_delete",
       "fields_list",
       "fields_update",
+      "invitations_accept",
+      "invitations_create",
+      "invitations_get",
+      "invitations_list",
+      "invitations_revoke",
+      "members_list",
+      "members_remove",
+      "members_update",
       "notes_create",
       "notes_delete",
       "notes_list",
       "notes_update",
       "serviceAccounts_create",
+      "serviceAccounts_delete",
       "serviceAccounts_list",
+      "serviceAccounts_update",
       "teams_create",
       "teams_list",
+      "teams_update",
     ])
     expect(tools.find((tool) => tool.name === "contacts_list")?.annotations.readOnlyHint).toBe(true)
   })
 
   it("runs operations as the API key's user", async () => {
     const teams = await callTool(writeKey, "teams_list", {})
-    expect(teams.value).toEqual([{ id: teamId, name: "Acme", role: "owner" }])
+    expect(teams.value).toEqual([{ id: teamId, name: "Acme", role: "owner", gravatar: false }])
     const created = await callTool(writeKey, "contacts_create", {
       teamId,
       firstName: "Sam",

@@ -1,6 +1,16 @@
-import { type createTeam, type listTeams, type OperationInput, SignInRequired, type Team } from "@parley/domain"
+import {
+  type createTeam,
+  type listTeams,
+  type OperationInput,
+  SignInRequired,
+  type Team,
+  type updateTeam,
+} from "@parley/domain"
 import { Effect } from "effect"
 import type { Principal } from "../principal.ts"
+import { proveMemberOf } from "../proofs/member-of.ts"
+import { proveCanManageTeam } from "../proofs/permissions.ts"
+import { named } from "../proofs/proof.ts"
 import { Members } from "../services/members.ts"
 import { Teams } from "../services/teams.ts"
 
@@ -16,7 +26,7 @@ export const list = (principal: Principal, _input: OperationInput<typeof listTea
         ? principal.teamId
         : null
     const visible = boundTo === null ? teams : teams.filter((team) => team.id === boundTo)
-    return visible.map((team): Team => ({ id: team.id, name: team.name, role: team.role }))
+    return visible.map((team): Team => ({ id: team.id, name: team.name, role: team.role, gravatar: team.gravatar }))
   })
 
 /** Creates a team owned by the signed-in user, server-side (D17). */
@@ -26,3 +36,13 @@ export const create = (principal: Principal, input: OperationInput<typeof create
     const teams = yield* Teams
     return yield* teams.create(principal.userId, input.name)
   })
+
+export const update = (principal: Principal, input: OperationInput<typeof updateTeam>) =>
+  named(principal, input.teamId, (principal, team) =>
+    Effect.gen(function* () {
+      const teams = yield* Teams
+      const member = yield* proveMemberOf(principal, team)
+      const canManage = yield* proveCanManageTeam(member)
+      return yield* teams.update(canManage, input)
+    }),
+  )

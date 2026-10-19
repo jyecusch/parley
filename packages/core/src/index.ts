@@ -1,12 +1,14 @@
 import { DatabaseLive } from "@parley/db"
 import { Layer } from "effect"
 import { Authenticator, BetterAuth } from "./auth/authenticator.ts"
+import { Mailer } from "./mail/mailer.ts"
 import { Affiliations } from "./services/affiliations.ts"
 import { ApiKeys } from "./services/api-keys.ts"
 import { Companies } from "./services/companies.ts"
 import { Connections } from "./services/connections.ts"
 import { Contacts } from "./services/contacts.ts"
 import { CustomFields } from "./services/custom-fields.ts"
+import { Invitations } from "./services/invitations.ts"
 import { Members } from "./services/members.ts"
 import { Notes } from "./services/notes.ts"
 import { ServiceAccounts } from "./services/service-accounts.ts"
@@ -16,6 +18,7 @@ import { Users } from "./services/users.ts"
 export { type AuthenticationFailure, Authenticator, BetterAuth, type Entrypoint } from "./auth/authenticator.ts"
 export { type Auth, issuer, mcpResource } from "./auth/better-auth.ts"
 export { classifyDecodeError } from "./input/classify.ts"
+export { Mailer, type OutgoingEmail } from "./mail/mailer.ts"
 export { type Implementation, implementations, type OperationServices } from "./operations/registry.ts"
 export type { Principal } from "./principal.ts"
 
@@ -27,6 +30,7 @@ const Records = Layer.mergeAll(Contacts.layer, Companies.layer).pipe(
 const Services = Layer.mergeAll(
   Records,
   Members.layer,
+  Invitations.layer,
   Notes.layer,
   Users.layer,
   Teams.layer,
@@ -39,5 +43,6 @@ const Services = Layer.mergeAll(
 export const CoreLive = Authenticator.layer.pipe(
   Layer.provideMerge(Services),
   Layer.provideMerge(BetterAuth.layer),
+  Layer.provideMerge(Mailer.layer),
   Layer.provideMerge(DatabaseLive),
 )

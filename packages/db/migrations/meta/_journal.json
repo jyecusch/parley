@@ -50,6 +50,13 @@
       "when": 1792444921083,
       "tag": "0006_custom_fields",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792445343715,
+      "tag": "0007_team_settings",
+      "breakpoints": true
     }
   ]
 }

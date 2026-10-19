@@ -218,7 +218,7 @@ describe("connecting an agent over OAuth", () => {
     const tokens = await finishSignIn(request, verifier)
 
     expect((await callTool(tokens.access_token, "teams_list", {})).value).toEqual([
-      { id: teamId, name: "Acme", role: "owner" },
+      { id: teamId, name: "Acme", role: "owner", gravatar: false },
     ])
     expect((await callTool(tokens.access_token, "contacts_list", { teamId })).isError).toBe(false)
     const denied = await callTool(tokens.access_token, "contacts_create", { teamId, firstName: "Sam" })

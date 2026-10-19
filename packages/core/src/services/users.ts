@@ -6,6 +6,7 @@ import { classifySqlError } from "./sql-errors.ts"
 
 export interface UserRecord {
   readonly name: string
+  readonly email: string
   readonly kind: "user" | "service-account"
 }
 
@@ -22,7 +23,7 @@ export class Users extends Context.Service<
         const [row] = yield* db
           .query((d) =>
             d
-              .select({ name: schema.user.name, kind: schema.user.kind })
+              .select({ name: schema.user.name, email: schema.user.email, kind: schema.user.kind })
               .from(schema.user)
               .where(eq(schema.user.id, userId)),
           )
@@ -30,6 +31,7 @@ export class Users extends Context.Service<
         if (!row) return undefined
         return {
           name: row.name,
+          email: row.email,
           kind: row.kind === "service-account" ? "service-account" : "user",
         } satisfies UserRecord
       })

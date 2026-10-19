@@ -36,3 +36,5 @@ export const createServiceAccount = defineTeamOperation({
   hints: { readOnly: false, destructive: false, idempotent: false },
   permissions: ["service-accounts:manage"],
 })
+
+export { deleteServiceAccount, updateServiceAccount } from "./service-accounts-manage.ts"

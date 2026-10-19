@@ -7,6 +7,9 @@ import {
 } from "@parley/domain"
 import { Effect } from "effect"
 import { actsAsServiceAccount, type MemberOf } from "./member-of.ts"
+
+export type { MemberOf }
+
 import { defineProof, type Proof } from "./proof.ts"
 
 export type PermissionError =
@@ -56,6 +59,8 @@ export const requirePermission = <P, T>(
 
 const CanManageServiceAccountsProver = defineProof("CanManageServiceAccounts")
 const CanManageFieldsProver = defineProof("CanManageFields")
+const CanManageMembersProver = defineProof("CanManageMembers")
+const CanManageTeamProver = defineProof("CanManageTeam")
 const CanReadRecordsProver = defineProof("CanReadRecords")
 const CanWriteRecordsProver = defineProof("CanWriteRecords")
 const CanDeleteRecordsProver = defineProof("CanDeleteRecords")
@@ -120,5 +125,29 @@ export const proveCanManageFields = <P, T>(
 ): Effect.Effect<CanManageFields<P, T>, PermissionError> =>
   Effect.as(requirePermission(member, "fields:manage"), {
     ...CanManageFieldsProver.prove(member.principal, member.team),
+    member,
+  })
+
+/** P may invite, change and remove members of team T. */
+export interface CanManageMembers<P, T> extends Proof<"CanManageMembers", [P, T]> {
+  readonly member: MemberOf<P, T>
+}
+
+export const proveCanManageMembers = <P, T>(
+  member: MemberOf<P, T>,
+): Effect.Effect<CanManageMembers<P, T>, PermissionError> =>
+  Effect.as(requirePermission(member, "members:manage"), {
+    ...CanManageMembersProver.prove(member.principal, member.team),
+    member,
+  })
+
+/** P may rename team T and change its settings. */
+export interface CanManageTeam<P, T> extends Proof<"CanManageTeam", [P, T]> {
+  readonly member: MemberOf<P, T>
+}
+
+export const proveCanManageTeam = <P, T>(member: MemberOf<P, T>): Effect.Effect<CanManageTeam<P, T>, PermissionError> =>
+  Effect.as(requirePermission(member, "team:manage"), {
+    ...CanManageTeamProver.prove(member.principal, member.team),
     member,
   })

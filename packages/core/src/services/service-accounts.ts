@@ -6,6 +6,7 @@ import { Context, Effect, Layer } from "effect"
 import type { MemberOf } from "../proofs/member-of.ts"
 import type { CanManageServiceAccounts } from "../proofs/permissions.ts"
 import type { Named } from "../proofs/proof.ts"
+import type { ServiceAccountInTeam } from "../proofs/service-account-in-team.ts"
 import { classifySqlError } from "./sql-errors.ts"
 
 const isRole = (role: string): role is Role => role === "owner" || role === "admin" || role === "member"
@@ -28,6 +29,16 @@ export class ServiceAccounts extends Context.Service<
     readonly create: <P, T>(
       team: Named<T, TeamId>,
       input: { readonly name: string; readonly role: Role },
+      access: CanManageServiceAccounts<P, T>,
+    ) => Effect.Effect<ServiceAccount, DatabaseUnavailable>
+    readonly update: <P, T, S>(
+      target: ServiceAccountInTeam<P, T, S>,
+      changes: { readonly name?: string | undefined; readonly role?: "admin" | "member" | undefined },
+      access: CanManageServiceAccounts<P, T>,
+    ) => Effect.Effect<ServiceAccount, DatabaseUnavailable>
+    /** Deletes the account, its API keys and its connections. Its activity and notes keep its name. */
+    readonly delete: <P, T, S>(
+      target: ServiceAccountInTeam<P, T, S>,
       access: CanManageServiceAccounts<P, T>,
     ) => Effect.Effect<ServiceAccount, DatabaseUnavailable>
   }
@@ -148,7 +159,54 @@ export class ServiceAccounts extends Context.Service<
           return created
         }).pipe(Effect.withSpan("ServiceAccounts.create"))
 
-      return { list, locate, create }
+      const update = <P, T, S>(
+        target: ServiceAccountInTeam<P, T, S>,
+        changes: { readonly name?: string | undefined; readonly role?: "admin" | "member" | undefined },
+        _access: CanManageServiceAccounts<P, T>,
+      ) =>
+        Effect.gen(function* () {
+          const id = target.serviceAccount.value
+          const teamId = target.member.team.value
+          yield* db
+            .transaction(
+              Effect.gen(function* () {
+                if (changes.name !== undefined) {
+                  const name = changes.name
+                  yield* db.query((d) => d.update(schema.user).set({ name }).where(eq(schema.user.id, id)))
+                }
+                if (changes.role !== undefined) {
+                  const role = changes.role
+                  yield* db.query((d) =>
+                    d
+                      .update(schema.member)
+                      .set({ role })
+                      .where(and(eq(schema.member.organizationId, teamId), eq(schema.member.userId, id))),
+                  )
+                }
+              }),
+            )
+            .pipe(Effect.catchTag("SqlError", classifySqlError))
+          const [updated] = yield* select(teamId, id)
+          if (!updated) return yield* Effect.die(`service account ${id} vanished`)
+          return updated
+        }).pipe(Effect.withSpan("ServiceAccounts.update"))
+
+      const remove = <P, T, S>(target: ServiceAccountInTeam<P, T, S>, _access: CanManageServiceAccounts<P, T>) =>
+        Effect.gen(function* () {
+          const id = target.serviceAccount.value
+          yield* db
+            .transaction(
+              Effect.gen(function* () {
+                // API keys name their owner without a foreign key, so they go first; the rest cascades.
+                yield* db.query((d) => d.delete(schema.apikey).where(eq(schema.apikey.referenceId, id)))
+                yield* db.query((d) => d.delete(schema.user).where(eq(schema.user.id, id)))
+              }),
+            )
+            .pipe(Effect.catchTag("SqlError", classifySqlError))
+          return target.found
+        }).pipe(Effect.withSpan("ServiceAccounts.delete"))
+
+      return { list, locate, create, update, delete: remove }
     }),
   )
 }

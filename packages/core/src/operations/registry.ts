@@ -7,16 +7,19 @@ import type { Companies } from "../services/companies.ts"
 import type { Connections } from "../services/connections.ts"
 import type { Contacts } from "../services/contacts.ts"
 import type { CustomFields } from "../services/custom-fields.ts"
+import type { Invitations } from "../services/invitations.ts"
 import type { Members } from "../services/members.ts"
 import type { Notes } from "../services/notes.ts"
 import type { ServiceAccounts } from "../services/service-accounts.ts"
 import type { Teams } from "../services/teams.ts"
+import type { Users } from "../services/users.ts"
 import * as affiliations from "./affiliations.ts"
 import * as apiKeys from "./api-keys.ts"
 import * as companies from "./companies.ts"
 import * as connections from "./connections.ts"
 import * as contacts from "./contacts.ts"
 import * as customFields from "./custom-fields.ts"
+import * as members from "./members.ts"
 import * as notes from "./notes.ts"
 import * as serviceAccounts from "./service-accounts.ts"
 import * as teams from "./teams.ts"
@@ -28,6 +31,8 @@ export type OperationServices =
   | CustomFields
   | Affiliations
   | Members
+  | Invitations
+  | Users
   | Notes
   | Teams
   | ApiKeys
@@ -46,6 +51,15 @@ export type Implementation<Name extends OperationName> = (
 export const implementations: { readonly [Name in OperationName]: Implementation<Name> } = {
   "teams.list": teams.list,
   "teams.create": teams.create,
+  "teams.update": teams.update,
+  "members.list": members.list,
+  "members.update": members.update,
+  "members.remove": members.remove,
+  "invitations.list": members.listPending,
+  "invitations.create": members.invite,
+  "invitations.revoke": members.revoke,
+  "invitations.get": members.get,
+  "invitations.accept": members.accept,
   "contacts.list": contacts.list,
   "contacts.get": contacts.get,
   "contacts.create": contacts.create,
@@ -80,4 +94,6 @@ export const implementations: { readonly [Name in OperationName]: Implementation
   "connections.revoke": connections.revoke,
   "serviceAccounts.list": serviceAccounts.list,
   "serviceAccounts.create": serviceAccounts.create,
+  "serviceAccounts.update": serviceAccounts.update,
+  "serviceAccounts.delete": serviceAccounts.remove,
 }

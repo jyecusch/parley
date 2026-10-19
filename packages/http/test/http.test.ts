@@ -69,7 +69,7 @@ describe("HTTP entrypoint", () => {
   it("lists the signed-in user's teams", async () => {
     const response = await call("GET", "/api/v1/teams")
     expect(response.status).toBe(200)
-    expect(response.body).toEqual([{ id: teamId, name: "Acme", role: "owner" }])
+    expect(response.body).toEqual([{ id: teamId, name: "Acme", role: "owner", gravatar: false }])
   })
 
   it("creates and conflicts on email, with the agreed wire shape", async () => {
