@@ -1749,3 +1749,32 @@ body {
   display: flex;
   gap: 6px;
 }
+
+/* Custom fields (D31). */
+.cb.shown {
+  opacity: 1;
+}
+.opt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 26px;
+  cursor: pointer;
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 5px;
+  background: var(--fill);
+  color: var(--fg);
+}
+.w-custom {
+  width: 140px;
+}

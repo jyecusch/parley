@@ -3,6 +3,7 @@ import { queryCollectionOptions } from "@tanstack/query-db-collection"
 import { createCollection } from "@tanstack/react-db"
 import type { QueryClient } from "@tanstack/react-query"
 import { call } from "./client.ts"
+import { customPatch } from "./custom-fields.ts"
 
 /** Loads every live contact in a team, page by page. Fine for v1 team sizes; paging in the view comes later. */
 const loadAll = async (teamId: TeamId) => {
@@ -19,9 +20,11 @@ const loadAll = async (teamId: TeamId) => {
 
 const EDITABLE: ReadonlyArray<keyof ContactFields> = ["firstName", "lastName", "emails", "phones"]
 
-const fieldsOf = (changes: Partial<Contact>): ContactFields => {
+const fieldsOf = (changes: Partial<Contact>, original: Contact): ContactFields => {
   const fields: Record<string, unknown> = {}
   for (const key of EDITABLE) if (key in changes) fields[key] = changes[key as keyof Contact]
+  // Custom values are a patch: send what changed, and null for what was cleared.
+  if (changes.custom) fields.custom = customPatch(original.custom, changes.custom)
   return fields as ContactFields
 }
 
@@ -36,7 +39,11 @@ const makeCollection = (teamId: TeamId, queryClient: QueryClient) =>
       // Edits and deletes apply locally at once, then persist; a server error rolls them back (D53).
       onUpdate: async ({ transaction }) => {
         for (const mutation of transaction.mutations) {
-          await call("contacts.update", { teamId, contactId: mutation.key as ContactId, ...fieldsOf(mutation.changes) })
+          await call("contacts.update", {
+            teamId,
+            contactId: mutation.key as ContactId,
+            ...fieldsOf(mutation.changes, mutation.original as Contact),
+          })
         }
       },
       onDelete: async ({ transaction }) => {

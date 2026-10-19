@@ -24,6 +24,7 @@ import { Route as TTeamIdSettingsRouteImport } from './routes/t.$teamId.settings
 import { Route as TTeamIdSettingsIndexRouteImport } from './routes/t.$teamId.settings.index'
 import { Route as TTeamIdSettingsApiKeysRouteImport } from './routes/t.$teamId.settings.api-keys'
 import { Route as TTeamIdSettingsConnectionsRouteImport } from './routes/t.$teamId.settings.connections'
+import { Route as TTeamIdSettingsFieldsRouteImport } from './routes/t.$teamId.settings.fields'
 import { Route as TTeamIdSettingsServiceAccountsRouteImport } from './routes/t.$teamId.settings.service-accounts'
 
 const IndexRoute = IndexRouteImport.update({
@@ -102,6 +103,11 @@ const TTeamIdSettingsConnectionsRoute =
     path: '/connections',
     getParentRoute: () => TTeamIdSettingsRoute,
   } as any)
+const TTeamIdSettingsFieldsRoute = TTeamIdSettingsFieldsRouteImport.update({
+  id: '/fields',
+  path: '/fields',
+  getParentRoute: () => TTeamIdSettingsRoute,
+} as any)
 const TTeamIdSettingsServiceAccountsRoute =
   TTeamIdSettingsServiceAccountsRouteImport.update({
     id: '/service-accounts',
@@ -124,6 +130,7 @@ export interface FileRoutesByFullPath {
   '/t/$teamId/settings': typeof TTeamIdSettingsRouteWithChildren
   '/t/$teamId/settings/api-keys': typeof TTeamIdSettingsApiKeysRoute
   '/t/$teamId/settings/connections': typeof TTeamIdSettingsConnectionsRoute
+  '/t/$teamId/settings/fields': typeof TTeamIdSettingsFieldsRoute
   '/t/$teamId/settings/service-accounts': typeof TTeamIdSettingsServiceAccountsRoute
   '/t/$teamId/settings/': typeof TTeamIdSettingsIndexRoute
 }
@@ -141,6 +148,7 @@ export interface FileRoutesByTo {
   '/t/$teamId/contacts': typeof TTeamIdContactsRoute
   '/t/$teamId/settings/api-keys': typeof TTeamIdSettingsApiKeysRoute
   '/t/$teamId/settings/connections': typeof TTeamIdSettingsConnectionsRoute
+  '/t/$teamId/settings/fields': typeof TTeamIdSettingsFieldsRoute
   '/t/$teamId/settings/service-accounts': typeof TTeamIdSettingsServiceAccountsRoute
   '/t/$teamId/settings': typeof TTeamIdSettingsIndexRoute
 }
@@ -160,6 +168,7 @@ export interface FileRoutesById {
   '/t/$teamId/settings': typeof TTeamIdSettingsRouteWithChildren
   '/t/$teamId/settings/api-keys': typeof TTeamIdSettingsApiKeysRoute
   '/t/$teamId/settings/connections': typeof TTeamIdSettingsConnectionsRoute
+  '/t/$teamId/settings/fields': typeof TTeamIdSettingsFieldsRoute
   '/t/$teamId/settings/service-accounts': typeof TTeamIdSettingsServiceAccountsRoute
   '/t/$teamId/settings/': typeof TTeamIdSettingsIndexRoute
 }
@@ -180,6 +189,7 @@ export interface FileRouteTypes {
     | '/t/$teamId/settings'
     | '/t/$teamId/settings/api-keys'
     | '/t/$teamId/settings/connections'
+    | '/t/$teamId/settings/fields'
     | '/t/$teamId/settings/service-accounts'
     | '/t/$teamId/settings/'
   fileRoutesByTo: FileRoutesByTo
@@ -197,6 +207,7 @@ export interface FileRouteTypes {
     | '/t/$teamId/contacts'
     | '/t/$teamId/settings/api-keys'
     | '/t/$teamId/settings/connections'
+    | '/t/$teamId/settings/fields'
     | '/t/$teamId/settings/service-accounts'
     | '/t/$teamId/settings'
   id:
@@ -215,6 +226,7 @@ export interface FileRouteTypes {
     | '/t/$teamId/settings'
     | '/t/$teamId/settings/api-keys'
     | '/t/$teamId/settings/connections'
+    | '/t/$teamId/settings/fields'
     | '/t/$teamId/settings/service-accounts'
     | '/t/$teamId/settings/'
   fileRoutesById: FileRoutesById
@@ -338,6 +350,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TTeamIdSettingsConnectionsRouteImport
       parentRoute: typeof TTeamIdSettingsRoute
     }
+    '/t/$teamId/settings/fields': {
+      id: '/t/$teamId/settings/fields'
+      path: '/fields'
+      fullPath: '/t/$teamId/settings/fields'
+      preLoaderRoute: typeof TTeamIdSettingsFieldsRouteImport
+      parentRoute: typeof TTeamIdSettingsRoute
+    }
     '/t/$teamId/settings/service-accounts': {
       id: '/t/$teamId/settings/service-accounts'
       path: '/service-accounts'
@@ -351,6 +370,7 @@ declare module '@tanstack/react-router' {
 interface TTeamIdSettingsRouteChildren {
   TTeamIdSettingsApiKeysRoute: typeof TTeamIdSettingsApiKeysRoute
   TTeamIdSettingsConnectionsRoute: typeof TTeamIdSettingsConnectionsRoute
+  TTeamIdSettingsFieldsRoute: typeof TTeamIdSettingsFieldsRoute
   TTeamIdSettingsServiceAccountsRoute: typeof TTeamIdSettingsServiceAccountsRoute
   TTeamIdSettingsIndexRoute: typeof TTeamIdSettingsIndexRoute
 }
@@ -358,6 +378,7 @@ interface TTeamIdSettingsRouteChildren {
 const TTeamIdSettingsRouteChildren: TTeamIdSettingsRouteChildren = {
   TTeamIdSettingsApiKeysRoute: TTeamIdSettingsApiKeysRoute,
   TTeamIdSettingsConnectionsRoute: TTeamIdSettingsConnectionsRoute,
+  TTeamIdSettingsFieldsRoute: TTeamIdSettingsFieldsRoute,
   TTeamIdSettingsServiceAccountsRoute: TTeamIdSettingsServiceAccountsRoute,
   TTeamIdSettingsIndexRoute: TTeamIdSettingsIndexRoute,
 }

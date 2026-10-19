@@ -3,6 +3,7 @@ import { queryCollectionOptions } from "@tanstack/query-db-collection"
 import { createCollection } from "@tanstack/react-db"
 import type { QueryClient } from "@tanstack/react-query"
 import { call } from "./client.ts"
+import { customPatch } from "./custom-fields.ts"
 
 /** Loads every live company in a team, page by page, like contacts. */
 const loadAll = async (teamId: TeamId) => {
@@ -19,9 +20,11 @@ const loadAll = async (teamId: TeamId) => {
 
 const EDITABLE: ReadonlyArray<keyof CompanyFields> = ["name", "domains", "website", "phone", "address"]
 
-const fieldsOf = (changes: Partial<Company>): CompanyFields => {
+const fieldsOf = (changes: Partial<Company>, original: Company): CompanyFields => {
   const fields: Record<string, unknown> = {}
   for (const key of EDITABLE) if (key in changes) fields[key] = changes[key as keyof Company]
+  // Custom values are a patch: send what changed, and null for what was cleared.
+  if (changes.custom) fields.custom = customPatch(original.custom, changes.custom)
   return fields as CompanyFields
 }
 
@@ -39,7 +42,7 @@ const makeCollection = (teamId: TeamId, queryClient: QueryClient) =>
           await call("companies.update", {
             teamId,
             companyId: mutation.key as CompanyId,
-            ...fieldsOf(mutation.changes),
+            ...fieldsOf(mutation.changes, mutation.original as Company),
           })
         }
       },

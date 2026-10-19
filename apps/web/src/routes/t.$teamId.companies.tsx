@@ -13,6 +13,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { CompanyContacts, type ToastRequest } from "../components/affiliations.tsx"
+import { CustomCell, CustomFieldsSection } from "../components/custom-fields.tsx"
 import {
   ChevronDown,
   ChevronUp,
@@ -39,6 +40,7 @@ import { Timeline } from "../components/timeline.tsx"
 import { call, isApiFailure, messageOf } from "../lib/client.ts"
 import { companiesCollection, primaryDomainOf } from "../lib/companies.ts"
 import { COUNTRIES, countryName } from "../lib/countries.ts"
+import { readColumns, useFields, writeColumns } from "../lib/custom-fields.ts"
 import { absolute, relative } from "../lib/time.ts"
 
 export interface Search {
@@ -79,6 +81,9 @@ function CompaniesScreen() {
   const [cursor, setCursor] = useState<string>()
   const [toast, setToast] = useState<ToastRequest>()
   const [displayMenu, setDisplayMenu] = useState(false)
+  const { fields } = useFields(teamId, "company")
+  const [columns, setColumns] = useState<ReadonlyArray<string>>(() => readColumns(teamId, "company"))
+  const shownFields = fields.filter((field) => columns.includes(field.id))
   const filterRef = useRef<HTMLInputElement>(null)
 
   const companies = useMemo(() => {
@@ -247,6 +252,29 @@ function CompaniesScreen() {
                     Show deleted companies
                     {search.deleted ? <span className="hint">✓</span> : null}
                   </button>
+                  {fields.length > 0 ? (
+                    <>
+                      <div className="menu-sep" />
+                      <p className="menu-h sm-t">Columns</p>
+                      {fields.map((field) => (
+                        <button
+                          key={field.id}
+                          className="menu-i"
+                          type="button"
+                          onClick={() => {
+                            const next = columns.includes(field.id)
+                              ? columns.filter((id) => id !== field.id)
+                              : [...columns, field.id]
+                            setColumns(next)
+                            writeColumns(teamId, "company", next)
+                          }}
+                        >
+                          {field.name}
+                          {columns.includes(field.id) ? <span className="hint">✓</span> : null}
+                        </button>
+                      ))}
+                    </>
+                  ) : null}
                 </div>
               ) : null}
             </div>
@@ -310,6 +338,11 @@ function CompaniesScreen() {
                     <th className="w-count" scope="col">
                       Contacts
                     </th>
+                    {shownFields.map((field) => (
+                      <th key={field.id} className="w-custom col-wide" scope="col">
+                        {field.name}
+                      </th>
+                    ))}
                     <th className="col-wide" scope="col">
                       <span className="vh">Spacer</span>
                     </th>
@@ -360,6 +393,11 @@ function CompaniesScreen() {
                         <td className={`tall tab ${company.contactCount === 0 ? "c-none" : ""}`}>
                           {contactsLabel(company.contactCount)}
                         </td>
+                        {shownFields.map((field) => (
+                          <td key={field.id} className="tall col-wide c-muted">
+                            <CustomCell field={field} value={company.custom[field.id]} />
+                          </td>
+                        ))}
                         <td className="tall col-wide" />
                         <td className="tall col-wide c-date" title={`Created ${absolute(company.createdAt)}`}>
                           {relative(company.createdAt)}
@@ -891,6 +929,7 @@ function CompanyPanel(props: {
 }) {
   const { company, collection } = props
   const queryClient = useQueryClient()
+  const { fields } = useFields(props.teamId, "company")
   const [moreMenu, setMoreMenu] = useState(false)
   const activity = useQuery({
     queryKey: ["company-activity", props.teamId, company.id, company.updatedAt, company.contactCount],
@@ -1037,6 +1076,18 @@ function CompanyPanel(props: {
             }
           />
         </section>
+        <CustomFieldsSection
+          fields={fields}
+          values={company.custom}
+          onSave={(field, value) =>
+            save((draft) => {
+              const next = { ...draft.custom }
+              if (value === null) delete next[field.id]
+              else next[field.id] = value
+              draft.custom = next
+            })
+          }
+        />
         <CompanyContacts company={company} teamId={props.teamId} onToast={props.onToast} />
         <Timeline
           teamId={props.teamId}

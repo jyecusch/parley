@@ -1,10 +1,11 @@
-import type { Contact, ContactId, FieldProblem, TeamId } from "@parley/domain"
+import type { Contact, ContactId, CustomField, FieldProblem, TeamId } from "@parley/domain"
 import type { UserText } from "@parley/errors"
 import { useLiveQuery } from "@tanstack/react-db"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { AffiliationChips, AffiliationTags, ContactCompanies } from "../components/affiliations.tsx"
+import { CustomCell, CustomFieldsSection } from "../components/custom-fields.tsx"
 import {
   ChevronDown,
   ChevronUp,
@@ -28,6 +29,7 @@ import { isTyping, useShell } from "../components/shell.tsx"
 import { Timeline } from "../components/timeline.tsx"
 import { call, isApiFailure, messageOf } from "../lib/client.ts"
 import { contactsCollection, displayNameOf, initialsOf } from "../lib/contacts.ts"
+import { readColumns, useFields, writeColumns } from "../lib/custom-fields.ts"
 import { absolute, relative } from "../lib/time.ts"
 
 export interface Search {
@@ -64,6 +66,9 @@ function ContactsScreen() {
   const [cursor, setCursor] = useState<string>()
   const [toast, setToast] = useState<Toast>()
   const [displayMenu, setDisplayMenu] = useState(false)
+  const { fields } = useFields(teamId, "contact")
+  const [columns, setColumns] = useState<ReadonlyArray<string>>(() => readColumns(teamId, "contact"))
+  const shownFields = fields.filter((field) => columns.includes(field.id))
   const filterRef = useRef<HTMLInputElement>(null)
 
   const contacts = useMemo(() => {
@@ -236,6 +241,29 @@ function ContactsScreen() {
                     Show deleted contacts
                     {search.deleted ? <span className="hint">✓</span> : null}
                   </button>
+                  {fields.length > 0 ? (
+                    <>
+                      <div className="menu-sep" />
+                      <p className="menu-h sm-t">Columns</p>
+                      {fields.map((field) => (
+                        <button
+                          key={field.id}
+                          className="menu-i"
+                          type="button"
+                          onClick={() => {
+                            const next = columns.includes(field.id)
+                              ? columns.filter((id) => id !== field.id)
+                              : [...columns, field.id]
+                            setColumns(next)
+                            writeColumns(teamId, "contact", next)
+                          }}
+                        >
+                          {field.name}
+                          {columns.includes(field.id) ? <span className="hint">✓</span> : null}
+                        </button>
+                      ))}
+                    </>
+                  ) : null}
                 </div>
               ) : null}
             </div>
@@ -286,6 +314,11 @@ function ContactsScreen() {
                     <th className="w-cos" scope="col">
                       Companies
                     </th>
+                    {shownFields.map((field) => (
+                      <th key={field.id} className="w-custom col-wide" scope="col">
+                        {field.name}
+                      </th>
+                    ))}
                     <th className="w-date col-wide" scope="col">
                       Created
                     </th>
@@ -304,6 +337,7 @@ function ContactsScreen() {
                       isCursor={!open && cursor === contact.id}
                       onToggle={() => setSelected((current) => toggle(current, contact.id))}
                       onOpen={() => void setSearch({ contact: contact.id })}
+                      fields={shownFields}
                     />
                   ))}
                 </tbody>
@@ -403,6 +437,7 @@ function ContactRow(props: {
   readonly isCursor: boolean
   readonly onToggle: () => void
   readonly onOpen: () => void
+  readonly fields: ReadonlyArray<CustomField>
 }) {
   const { contact } = props
   const email = contact.emails.find((e) => e.isPrimary)?.address ?? contact.emails[0]?.address
@@ -436,6 +471,11 @@ function ContactRow(props: {
       <td>
         <AffiliationChips affiliations={contact.affiliations} />
       </td>
+      {props.fields.map((field) => (
+        <td key={field.id} className="col-wide c-muted">
+          <CustomCell field={field} value={contact.custom[field.id]} />
+        </td>
+      ))}
       <td className="col-wide c-date" title={`Created ${absolute(contact.createdAt)}`}>
         {relative(contact.createdAt)}
       </td>
@@ -754,6 +794,7 @@ function ContactPanel(props: {
 }) {
   const { contact, collection } = props
   const queryClient = useQueryClient()
+  const { fields } = useFields(props.teamId, "contact")
   const [moreMenu, setMoreMenu] = useState(false)
   const activity = useQuery({
     queryKey: ["contact-activity", props.teamId, contact.id, contact.updatedAt, contact.affiliations.length],
@@ -904,6 +945,18 @@ function ContactPanel(props: {
             }
           />
         </section>
+        <CustomFieldsSection
+          fields={fields}
+          values={contact.custom}
+          onSave={(field, value) =>
+            save((draft) => {
+              const next = { ...draft.custom }
+              if (value === null) delete next[field.id]
+              else next[field.id] = value
+              draft.custom = next
+            })
+          }
+        />
         <ContactCompanies contact={contact} teamId={props.teamId} onToast={props.onToast} />
         <Timeline
           teamId={props.teamId}
