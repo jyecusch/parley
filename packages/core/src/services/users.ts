@@ -8,6 +8,8 @@ export interface UserRecord {
   readonly name: string
   readonly email: string
   readonly kind: "user" | "service-account"
+  /** Whether they proved they own the address, by the link in the verification email. */
+  readonly emailVerified: boolean
 }
 
 /** Reads users. Used by the Authenticator to name the principal behind an API key. */
@@ -23,7 +25,12 @@ export class Users extends Context.Service<
         const [row] = yield* db
           .query((d) =>
             d
-              .select({ name: schema.user.name, email: schema.user.email, kind: schema.user.kind })
+              .select({
+                name: schema.user.name,
+                email: schema.user.email,
+                kind: schema.user.kind,
+                emailVerified: schema.user.emailVerified,
+              })
               .from(schema.user)
               .where(eq(schema.user.id, userId)),
           )
@@ -33,6 +40,7 @@ export class Users extends Context.Service<
           name: row.name,
           email: row.email,
           kind: row.kind === "service-account" ? "service-account" : "user",
+          emailVerified: row.emailVerified,
         } satisfies UserRecord
       })
       return { find }

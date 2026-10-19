@@ -1,6 +1,7 @@
 import {
   type acceptInvitation,
   type createInvitation,
+  EmailNotVerified,
   type getInvitation,
   type listInvitations,
   type listMembers,
@@ -95,7 +96,7 @@ const recipient = (principal: Principal, action: "accept an invitation") =>
     const users = yield* Users
     const user = yield* users.find(principal.userId)
     if (!user) return yield* Effect.die("signed-in user has no user record")
-    return { id: principal.userId, email: user.email }
+    return { id: principal.userId, email: user.email, emailVerified: user.emailVerified }
   })
 
 export const get = (principal: Principal, input: OperationInput<typeof getInvitation>) =>
@@ -111,5 +112,8 @@ export const accept = (principal: Principal, input: OperationInput<typeof accept
   Effect.gen(function* () {
     const invitations = yield* Invitations
     const user = yield* recipient(principal, "accept an invitation")
+    yield* invitations.forRecipient(input.invitationId, user.email)
+    // The invitation names an address; only someone who proved they own it may take it.
+    if (!user.emailVerified) return yield* new EmailNotVerified()
     return yield* invitations.accept(input.invitationId, user)
   })

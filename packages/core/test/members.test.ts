@@ -5,12 +5,21 @@ import { Effect } from "effect"
 import { BetterAuth, CoreLive, Mailer, type Principal, implementations as run } from "../src/index.ts"
 import { Fixture } from "./fixture.ts"
 
-const signUp = (name: string, email: string) =>
+/** Signs someone up and, unless told not to, follows the link in their verification email. */
+const signUp = (name: string, email: string, verify = true) =>
   Effect.gen(function* () {
     const auth = yield* BetterAuth
+    const mailer = yield* Mailer
     const created = yield* Effect.tryPromise(() =>
       auth.api.signUpEmail({ body: { name, email, password: "correct-horse-battery" } }),
     ).pipe(Effect.orDie)
+    if (verify) {
+      const sent = (yield* mailer.outbox).findLast((message) => message.to === email)
+      const token = new URL(sent?.text.match(/https?:\/\/\S+/)?.[0] ?? "http://x").searchParams.get("token") ?? ""
+      // verifyEmail isn't on our narrowed Auth type; tests call it the way the emailed link does.
+      const api = auth.api as unknown as { verifyEmail: (input: { query: { token: string } }) => Promise<unknown> }
+      yield* Effect.tryPromise(() => api.verifyEmail({ query: { token } })).pipe(Effect.orDie)
+    }
     const principal: Principal = {
       _tag: "UserSession",
       userId: created.user.id as UserId,
@@ -142,6 +151,21 @@ describe("members and invitations", () => {
         serviceAccountId: f.jane.userId,
       }).pipe(Effect.flip)
       expect(notABot._tag).toBe("ServiceAccountNotFound")
+    }).pipe(Effect.provide(CoreLive)),
+  )
+
+  it.effect("only someone who confirmed the invited address can accept", () =>
+    Effect.gen(function* () {
+      const f = yield* Fixture
+      const email = `unverified-${crypto.randomUUID().slice(0, 8)}@example.com`
+      const invitation = yield* run["invitations.create"](f.jane, {
+        teamId: f.acme,
+        email: email as never,
+        role: "admin",
+      })
+      const squatter = yield* signUp("Squatter", email, false)
+      const refused = yield* run["invitations.accept"](squatter, { invitationId: invitation.id }).pipe(Effect.flip)
+      expect(refused._tag).toBe("EmailNotVerified")
     }).pipe(Effect.provide(CoreLive)),
   )
 })

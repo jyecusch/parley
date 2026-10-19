@@ -76,6 +76,8 @@ export interface AuthConfig {
   readonly secret: string
   readonly baseURL: string
   readonly connections: ConnectionHooks
+  /** Sends the link that proves someone owns their email address. */
+  readonly sendVerificationEmail: (to: string, link: string) => Promise<void>
 }
 
 interface SessionResult {
@@ -171,6 +173,13 @@ export const makeAuth = (config: AuthConfig): Auth =>
     basePath: BASE_PATH,
     database: drizzleAdapter(config.db, { provider: "pg", schema: config.schema }),
     emailAndPassword: { enabled: true },
+    // Signing in doesn't wait for this, but accepting an invitation does: the invitation names an
+    // address, and only someone who proved they own it may take it.
+    emailVerification: {
+      sendOnSignUp: true,
+      autoSignInAfterVerification: true,
+      sendVerificationEmail: async ({ user, url }) => config.sendVerificationEmail(user.email, url),
+    },
     user: {
       additionalFields: {
         /** "service-account" users can never sign in with a password (D18). */

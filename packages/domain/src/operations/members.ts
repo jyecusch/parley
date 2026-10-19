@@ -5,6 +5,7 @@ import { SignInRequired } from "../errors/access.ts"
 import { EmailErrors } from "../errors/email.ts"
 import {
   AlreadyAMember,
+  EmailNotVerified,
   InvitationExpired,
   InvitationForAnotherEmail,
   InvitationNotFound,
@@ -112,7 +113,7 @@ export const acceptInvitation = defineOperation({
   description: "Accept an invitation you were sent and join the team. Only a signed-in person can.",
   input: Schema.Struct({ invitationId: InvitationId.annotate({ description: "From the invitation link." }) }),
   output: Team,
-  errors: [SignInRequired, InvitationNotFound, InvitationExpired, InvitationForAnotherEmail],
+  errors: [SignInRequired, InvitationNotFound, InvitationExpired, InvitationForAnotherEmail, EmailNotVerified],
   http: { method: "POST", path: "/invitations/:invitationId/accept" },
   hints: { readOnly: false, destructive: false, idempotent: true },
 })

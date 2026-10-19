@@ -209,3 +209,17 @@ describe("files", () => {
     expect(missing.status).toBe(404)
   })
 })
+
+describe("Better-Auth endpoints", () => {
+  it("serves only the ones Parley uses", async () => {
+    const closed = [
+      "/api/auth/organization/list-invitations",
+      "/api/auth/organization/get-full-organization",
+      "/api/auth/update-user",
+      "/api/auth/list-accounts",
+      "/api/auth/oauth2/client/rotate-keys",
+    ]
+    for (const path of closed) expect((await call("GET", path)).status, path).toBe(404)
+    expect((await call("GET", "/api/auth/get-session")).status).toBe(200)
+  })
+})

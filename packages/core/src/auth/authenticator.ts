@@ -22,6 +22,8 @@ import { Config, Context, Duration, Effect, Layer, Redacted } from "effect"
 import { createLocalJWKSet, type JWTPayload, jwtVerify } from "jose"
 import { Pool } from "pg"
 import { PublicUrl } from "../config/public-url.ts"
+import { Mailer } from "../mail/mailer.ts"
+import { renderVerification } from "../mail/templates.ts"
 import type { Principal } from "../principal.ts"
 import { Connections } from "../services/connections.ts"
 import { Users } from "../services/users.ts"
@@ -77,7 +79,25 @@ export class BetterAuth extends Context.Service<BetterAuth, Auth>()("@parley/cor
           if (rows.length === 0) throw new Error(`connection ${connectionId} is missing or revoked`)
         },
       }
-      return makeAuth({ db, schema, secret: Redacted.value(secret), baseURL, connections: hooks })
+      const mailer = yield* Mailer
+      const runtime = yield* Effect.context<never>()
+      const sendVerificationEmail = (to: string, link: string) => {
+        const message = renderVerification({ link })
+        return Effect.runPromiseWith(runtime)(
+          mailer.send({ to, ...message }).pipe(
+            Effect.asVoid,
+            Effect.catch((error) => Effect.logWarning("verification email not sent", error._tag)),
+          ),
+        )
+      }
+      return makeAuth({
+        db,
+        schema,
+        secret: Redacted.value(secret),
+        baseURL,
+        connections: hooks,
+        sendVerificationEmail,
+      })
     }),
   )
 }

@@ -34,3 +34,14 @@ export const renderInvitation = (input: {
     text: `${heading}\n\n${body}\n\nAccept the invitation: ${input.link}\n\n${footer}\n`,
   }
 }
+
+export const renderVerification = (input: { readonly link: string }) => {
+  const heading = "Confirm your email address"
+  const body = "Confirm this is your address to finish setting up Parley. Invitations to join a team need it."
+  const footer = "If you didn't create a Parley account, you can ignore this email."
+  return {
+    subject: "Confirm your email address for Parley",
+    html: layout({ heading, body, action: "Confirm email", link: input.link, footer }),
+    text: `${heading}\n\n${body}\n\nConfirm: ${input.link}\n\n${footer}\n`,
+  }
+}

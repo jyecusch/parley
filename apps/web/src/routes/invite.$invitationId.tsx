@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query"
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router"
 import { useState } from "react"
 import { getSession, signOut } from "../lib/auth.ts"
-import { call, messageOf } from "../lib/client.ts"
+import { call, isApiFailure, messageOf } from "../lib/client.ts"
 
 /** Where an invitation email's link lands. Signed out, it goes through sign-in and comes back. */
 export const Route = createFileRoute("/invite/$invitationId")({
@@ -23,6 +23,8 @@ function Invite() {
   const navigate = useNavigate()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<UserText>()
+  const [unverified, setUnverified] = useState(false)
+  const [resent, setResent] = useState(false)
   const invitation = useQuery({
     queryKey: ["invitation", invitationId],
     queryFn: () => call("invitations.get", { invitationId: invitationId as InvitationId }),
@@ -37,8 +39,20 @@ function Invite() {
       await navigate({ to: "/t/$teamId/contacts", params: { teamId: team.id }, search: {} })
     } catch (failure) {
       setError(messageOf(failure))
+      setUnverified(isApiFailure(failure) && failure.error._tag === "EmailNotVerified")
       setBusy(false)
     }
+  }
+
+  /** Sends the confirmation link again, coming back to this invitation once it's followed. */
+  const resend = async () => {
+    await fetch("/api/auth/send-verification-email", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: user.email, callbackURL: `/invite/${invitationId}` }),
+    }).catch(() => undefined)
+    setResent(true)
   }
 
   const switchAccount = async () => {
@@ -84,6 +98,15 @@ function Invite() {
               <p className="form-error" role="alert">
                 {error}
               </p>
+            ) : null}
+            {unverified ? (
+              resent ? (
+                <p className="sm-t">We sent a new link to {user.email}. It brings you back here.</p>
+              ) : (
+                <button className="btn wide" type="button" onClick={() => void resend()}>
+                  Email me the link again
+                </button>
+              )
             ) : null}
             <button className="btn primary wide" type="button" disabled={busy} onClick={() => void accept()}>
               Accept invitation
