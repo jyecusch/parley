@@ -43,7 +43,8 @@ const escapeHtml = (text: string) =>
     (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char] ?? char,
   )
 
-const TAG = /\{\{\s*([a-zA-Z_]+)\s*(?:\|([^}]*))?\}\}/g
+/** A merge tag, with an optional fallback of plain words: no braces, markup characters or new lines. */
+const TAG = /\{\{\s*([a-zA-Z_]+)\s*(?:\|([^{}<>"&\n]{0,100}))?\}\}/g
 
 /** Fills merge tags. Unknown tags are left as typed and reported, so a typo is visible in the preview. */
 const fill = (text: string, values: MergeValues, encode: (value: string) => string, unknown: Set<string>) =>
@@ -51,7 +52,7 @@ const fill = (text: string, values: MergeValues, encode: (value: string) => stri
     const key = name.toLowerCase()
     if (!(MERGE_TAGS as ReadonlyArray<string>).includes(key)) {
       unknown.add(name)
-      return whole
+      return encode(whole)
     }
     const value = values[key as MergeTag].trim() || (fallback ?? "").trim()
     return encode(value)
@@ -138,8 +139,16 @@ export const renderEmail = (
   const plain = (value: string) => value
   const subject = fill(content.subject, values, plain, unknown).replace(/\s+/g, " ").trim()
   const previewText = fill(content.previewText, values, plain, unknown).trim()
-  // Markdown first, then tags, so a value can't turn into markup.
-  const bodyHtml = fill(markdown.parse(content.body, { async: false }), values, escapeHtml, unknown)
+  // Tags become inert placeholders before Markdown runs, and their values go in afterwards, escaped.
+  // Filling them into the HTML directly would let a fallback reach across tags and into attributes.
+  const nonce = crypto.randomUUID().replaceAll("-", "").slice(0, 10)
+  const tags: Array<string> = []
+  const marked = content.body.replace(TAG, (whole) => `mt${nonce}x${tags.push(whole) - 1}x`)
+  const bodyHtml = markdown
+    .parse(marked, { async: false })
+    .replace(new RegExp(`mt${nonce}x(\\d+)x`, "g"), (_, index: string) =>
+      fill(tags[Number(index)] ?? "", values, escapeHtml, unknown),
+    )
   const bodyText = fill(content.body, values, plain, unknown).trim()
 
   const link = footer.unsubscribeUrl
