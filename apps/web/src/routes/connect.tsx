@@ -10,7 +10,7 @@ import { DisplayName, type UserText, userText } from "@parley/errors"
 import { useQuery } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
 import { useState } from "react"
-import { AlertIcon, CheckIcon, ChevronDown, CloseIcon, LockIcon } from "../components/icons.tsx"
+import { AlertIcon, CheckIcon, ChevronDown, CloseIcon } from "../components/icons.tsx"
 import { initialsOf, SCOPE_LABELS } from "../components/settings.tsx"
 import { agentRequest, getSession, signOut, withAgentRequest } from "../lib/auth.ts"
 import { call, messageOf } from "../lib/client.ts"
@@ -32,26 +32,36 @@ export const Route = createFileRoute("/connect")({
   component: Connect,
 })
 
-/** What the agent says about itself when it registered. */
+/**
+ * The agent asking for access. Its name is whatever it chose when it registered itself, so the page
+ * says so, and shows where access is actually sent: the redirect address in the signed request.
+ */
 interface Agent {
   readonly name: string
-  readonly origin: string | undefined
-  readonly logo: string | undefined
+  /** The host the authorization goes to, or "an app on this computer" for a loopback address. */
+  readonly destination: string | undefined
 }
 
-const loadAgent = async (clientId: string): Promise<Agent> => {
+const LOOPBACK = new Set(["localhost", "127.0.0.1", "[::1]", "::1"])
+
+const destinationOf = (request: string): string | undefined => {
+  try {
+    const url = new URL(new URLSearchParams(request).get("redirect_uri") ?? "")
+    if (url.protocol !== "http:" && url.protocol !== "https:") return `${url.protocol}//${url.host}`
+    return LOOPBACK.has(url.hostname) ? "an app on this computer" : url.hostname || undefined
+  } catch {
+    return undefined
+  }
+}
+
+const loadAgent = async (clientId: string, request: string): Promise<Agent> => {
   const response = await fetch(`/api/auth/oauth2/public-client?client_id=${encodeURIComponent(clientId)}`, {
     credentials: "same-origin",
   })
   if (!response.ok) throw new Error("unknown agent")
-  const client = (await response.json()) as { client_name?: string; client_uri?: string; logo_uri?: string }
-  let origin: string | undefined
-  try {
-    origin = client.client_uri ? new URL(client.client_uri).hostname : undefined
-  } catch {
-    origin = undefined
-  }
-  return { name: client.client_name?.trim() || "Your agent", origin, logo: client.logo_uri }
+  // The logo isn't shown: it's loaded from wherever the agent says, which would tell that site who opened this page.
+  const client = (await response.json()) as { client_name?: string }
+  return { name: client.client_name?.trim() || "Your agent", destination: destinationOf(request) }
 }
 
 /** Better-Auth's consent step, after the connection is recorded. Returns where the agent waits. */
@@ -80,7 +90,7 @@ function Connect() {
   const clientId = request ? new URLSearchParams(request).get("client_id") : null
   const agent = useQuery({
     queryKey: ["agent", clientId],
-    queryFn: () => loadAgent(clientId ?? ""),
+    queryFn: () => loadAgent(clientId ?? "", request ?? ""),
     enabled: clientId !== null,
     retry: false,
   })
@@ -146,9 +156,7 @@ function AgentHeader(props: {
   return (
     <div className="a-h">
       <div className="pair" aria-hidden="true">
-        <span className="big">
-          {props.agent.logo ? <img src={props.agent.logo} alt="" /> : initialsOf(props.agent.name)}
-        </span>
+        <span className="big">{initialsOf(props.agent.name)}</span>
         <svg
           width="28"
           height="12"
@@ -165,12 +173,10 @@ function AgentHeader(props: {
         <span className="big p">P</span>
       </div>
       <h1>{props.agent.name} wants to work in Parley</h1>
-      {props.agent.origin ? (
-        <span className="origin sm-t">
-          <LockIcon />
-          {props.agent.origin}
-        </span>
-      ) : null}
+      <span className="origin sm-t">
+        Unverified agent: it named itself. Access goes to{" "}
+        <b>{props.agent.destination ?? "an address Parley can't read"}</b>.
+      </span>
       <p className="sm-t">
         Signed in as {props.user.name} · {props.user.email} ·{" "}
         <button

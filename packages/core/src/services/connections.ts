@@ -19,7 +19,6 @@ const columns = {
   connection: schema.connections,
   actsAsName: actsAs.name,
   actsAsKind: actsAs.kind,
-  clientUri: schema.oauthClient.uri,
   redirectUris: schema.oauthClient.redirectUris,
 }
 
@@ -27,14 +26,14 @@ type Row = {
   readonly connection: typeof schema.connections.$inferSelect
   readonly actsAsName: string
   readonly actsAsKind: string | null
-  readonly clientUri: string | null
   readonly redirectUris: Array<string> | null
 }
 
 const LOOPBACK = new Set(["localhost", "127.0.0.1", "[::1]"])
 
 /** "claude.ai" from the agent's website, or "Local app" when it only redirects to this computer. */
-const originOf = (clientUri: string | null, redirectUris: ReadonlyArray<string> | null): string | null => {
+/** Where the agent receives access (not the website it claimed when it registered itself). */
+const originOf = (redirectUris: ReadonlyArray<string> | null): string | null => {
   const hostOf = (url: string | null | undefined) => {
     try {
       return url ? new URL(url).hostname : undefined
@@ -42,17 +41,15 @@ const originOf = (clientUri: string | null, redirectUris: ReadonlyArray<string> 
       return undefined
     }
   }
-  const site = hostOf(clientUri)
-  if (site && !LOOPBACK.has(site)) return site
   const redirect = hostOf(redirectUris?.[0])
   if (!redirect) return null
   return LOOPBACK.has(redirect) ? "Local app" : redirect
 }
 
-const summarize = ({ connection, actsAsName, actsAsKind, clientUri, redirectUris }: Row): Connection => ({
+const summarize = ({ connection, actsAsName, actsAsKind, redirectUris }: Row): Connection => ({
   id: connection.id as ConnectionId,
   name: connection.name,
-  origin: originOf(clientUri, redirectUris),
+  origin: originOf(redirectUris),
   actsAs: {
     userId: connection.actsAsUserId as UserId,
     name: actsAsName,
