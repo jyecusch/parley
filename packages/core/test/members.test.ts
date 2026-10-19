@@ -57,6 +57,7 @@ describe("members and invitations", () => {
       expect(people.map((member) => [member.name, member.role])).toEqual([
         ["Jane", "owner"],
         ["Max", "member"],
+        ["Sam", "member"],
       ])
 
       // A member can't manage members; an admin can't touch owners.

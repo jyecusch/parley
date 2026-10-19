@@ -54,6 +54,8 @@ export const Contact = Schema.Struct({
   custom: CustomValues,
   /** The uploaded avatar, or null (D75). The web app falls back to Gravatar, then initials. */
   avatarUrl: Schema.NullOr(Schema.String),
+  /** Whether the contact receives marketing email (R37). */
+  subscriptionStatus: Schema.Literals(["subscribed", "unsubscribed", "bounced", "marked-as-spam"]),
   createdAt: Timestamp,
   updatedAt: Timestamp,
   deletedAt: Schema.NullOr(Timestamp),
@@ -81,6 +83,13 @@ export const ContactFields = Schema.Struct({
     ).check(Schema.isMaxLength(20)),
   ),
   custom: Schema.optional(CustomValuesPatch),
+  subscriptionStatus: Schema.optional(
+    Schema.Literals(["subscribed", "unsubscribed"]).annotate({
+      title: "Subscription status",
+      description:
+        "Whether the contact receives marketing email. Only subscribe someone who has agreed to get it. Bounced and marked-as-spam are set by Parley.",
+    }),
+  ),
 })
 export type ContactFields = typeof ContactFields.Type
 
@@ -96,15 +105,35 @@ export const ActivityEntry = Schema.Struct({
   actorName: Schema.String,
   /** The API key's or connection's name when the change came through one ("Claude on my laptop"). */
   via: Schema.NullOr(Schema.String),
-  /** "affiliated" and "unaffiliated" name the other record in `related`; a title change is "updated" with `related`. */
-  kind: Schema.Literals(["created", "updated", "deleted", "restored", "affiliated", "unaffiliated"]),
+  /** "emailed" names the campaign in `related`. "affiliated" and "unaffiliated" name the other record in `related`; a title change is "updated" with `related`. */
+  kind: Schema.Literals([
+    "created",
+    "updated",
+    "deleted",
+    "restored",
+    "affiliated",
+    "unaffiliated",
+    "emailed",
+    "unsubscribed",
+    "resubscribed",
+    "bounced",
+    "marked-as-spam",
+  ]),
   changedFields: Schema.Array(Schema.String),
   /** The other record an affiliation change was about, by its name at the time. */
-  related: Schema.NullOr(Schema.Struct({ recordType: RecordType, id: Schema.String, name: Schema.String })),
+  related: Schema.NullOr(
+    Schema.Struct({
+      recordType: Schema.Union([RecordType, Schema.Literal("campaign")]),
+      id: Schema.String,
+      name: Schema.String,
+    }),
+  ),
   /** Set when Parley made the change itself, rather than the actor asking for it directly (D105). */
   reason: Schema.NullOr(Schema.Literals(["domain-matching"])),
   /** For domain matching, the domain that matched ("acme.com") (D111). */
   matchedDomain: Schema.NullOr(Schema.String),
+  /** For an unsubscribe or resubscribe from one topic, its name. Null means all marketing email. */
+  topicName: Schema.NullOr(Schema.String),
   at: Timestamp,
 })
 export type ActivityEntry = typeof ActivityEntry.Type

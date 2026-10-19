@@ -71,6 +71,13 @@
       "when": 1792446597402,
       "tag": "0009_files",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1792447403137,
+      "tag": "0010_email",
+      "breakpoints": true
     }
   ]
 }

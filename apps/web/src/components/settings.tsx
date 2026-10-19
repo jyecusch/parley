@@ -13,8 +13,10 @@ import {
   CopyIcon,
   DisplayIcon,
   KeyIcon,
+  MailIcon,
   MembersIcon,
   ServiceAccountIcon,
+  SettingsIcon,
 } from "./icons.tsx"
 
 /** What each scope lets a key or connection do, in the words the dialogs use. */
@@ -26,10 +28,14 @@ export const SCOPE_LABELS: Readonly<Record<Permission, string>> = {
   "members:manage": "Manage members",
   "service-accounts:manage": "Manage service accounts",
   "team:manage": "Manage the team",
+  "email:write": "Write campaigns, templates and segments",
+  "email:send": "Send campaigns",
+  "email:manage": "Manage email settings",
 }
 
 /** Short scope names for lists: "records:write" → "write", "fields:manage" → "fields". */
-const shortScope = (scope: Permission) => (scope.startsWith("records:") ? scope.slice(8) : scope.split(":")[0])
+const shortScope = (scope: Permission) =>
+  scope.startsWith("records:") ? scope.slice(8) : scope.startsWith("email:") ? scope : scope.split(":")[0]
 
 export const initialsOf = (name: string) => {
   const words = name.trim().split(/\s+/).filter(Boolean)
@@ -69,20 +75,50 @@ export function SettingsShell(props: { readonly team: Team; readonly children: R
             <h2 className="glabel sm-t" id="settings-team">
               {props.team.name}
             </h2>
-            <button className="nav" type="button" disabled title="Coming later">
+            <Link
+              className="nav"
+              activeProps={{ className: "nav on", "aria-current": "page" }}
+              to="/t/$teamId/settings/general"
+              params={params}
+            >
               <span className="ic">
-                <DisplayIcon size={16} />
+                <SettingsIcon />
               </span>
               <span className="lbl">General</span>
-              <span className="trail sm-t">Later</span>
-            </button>
-            <button className="nav" type="button" disabled title="Coming later">
+            </Link>
+            <Link
+              className="nav"
+              activeProps={{ className: "nav on", "aria-current": "page" }}
+              to="/t/$teamId/settings/members"
+              params={params}
+            >
               <span className="ic">
                 <MembersIcon />
               </span>
               <span className="lbl">Members</span>
-              <span className="trail sm-t">Later</span>
-            </button>
+            </Link>
+            <Link
+              className="nav"
+              activeProps={{ className: "nav on", "aria-current": "page" }}
+              to="/t/$teamId/settings/fields"
+              params={params}
+            >
+              <span className="ic">
+                <DisplayIcon size={16} />
+              </span>
+              <span className="lbl">Fields</span>
+            </Link>
+            <Link
+              className="nav"
+              activeProps={{ className: "nav on", "aria-current": "page" }}
+              to="/t/$teamId/settings/email"
+              params={params}
+            >
+              <span className="ic">
+                <MailIcon />
+              </span>
+              <span className="lbl">Email</span>
+            </Link>
             <Link
               className="nav"
               activeProps={{ className: "nav on", "aria-current": "page" }}

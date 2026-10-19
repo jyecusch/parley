@@ -21,6 +21,20 @@ import {
 } from "./contacts.ts"
 import { exportCompanies, exportContacts, importCompanies, importContacts } from "./csv.ts"
 import { createField, deleteField, listFields, updateField } from "./custom-fields.ts"
+import {
+  createSendingDomain,
+  createTopic,
+  deleteSendingDomain,
+  deleteTopic,
+  getContactSubscriptions,
+  getEmailSettings,
+  listSendingDomains,
+  listTopics,
+  updateContactSubscriptions,
+  updateEmailSettings,
+  updateTopic,
+  verifySendingDomain,
+} from "./email-setup.ts"
 import { removeCompanyLogo, removeContactAvatar, setCompanyLogo, setContactAvatar } from "./images.ts"
 import {
   acceptInvitation,
@@ -49,6 +63,7 @@ export * from "./connections.ts"
 export * from "./contacts.ts"
 export * from "./csv.ts"
 export * from "./custom-fields.ts"
+export * from "./email-setup.ts"
 export * from "./images.ts"
 export * from "./members.ts"
 export * from "./notes.ts"
@@ -80,6 +95,8 @@ export const operations = {
   "contacts.setAvatar": setContactAvatar,
   "contacts.removeAvatar": removeContactAvatar,
   "contacts.import": importContacts,
+  "contacts.subscriptions": getContactSubscriptions,
+  "contacts.updateSubscriptions": updateContactSubscriptions,
   "companies.list": listCompanies,
   "companies.get": getCompany,
   "companies.create": createCompany,
@@ -117,6 +134,16 @@ export const operations = {
   "serviceAccounts.create": createServiceAccount,
   "serviceAccounts.update": updateServiceAccount,
   "serviceAccounts.delete": deleteServiceAccount,
+  "emailSettings.get": getEmailSettings,
+  "emailSettings.update": updateEmailSettings,
+  "sendingDomains.list": listSendingDomains,
+  "sendingDomains.create": createSendingDomain,
+  "sendingDomains.verify": verifySendingDomain,
+  "sendingDomains.delete": deleteSendingDomain,
+  "topics.list": listTopics,
+  "topics.create": createTopic,
+  "topics.update": updateTopic,
+  "topics.delete": deleteTopic,
 } as const
 export type Operations = typeof operations
 export type OperationName = keyof Operations

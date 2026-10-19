@@ -104,7 +104,19 @@ How to pick a name: choose the most common name for the concept. Reject anything
 | --- | --- | --- |
 | **Segment** | A group of contacts that a campaign is sent to. It comes in two kinds: a **dynamic segment** is defined by filters and its contacts change as records change; a **fixed segment** is a hand-picked set of contacts. It matches Resend's current term (Resend replaced "Audiences" with "Segments" in Nov 2025). | audience, list, group, cohort, contact set |
 
-Still to define before v2 design begins (reserved, so nothing in v1 takes them): campaign, template, draft, test send, unsubscribe, subscription status, sending domain, footer. Note that Resend's **Topics** (recipients opt out of specific kinds of email) overlap with our subscription management. Decide how they map when we define those terms.
+| **Campaign** | One marketing email: its subject, content, segment and topic, and, once sent, its recipients and results. | broadcast, blast, newsletter (as a noun for the thing sent), mailing, send |
+| **Draft** | A campaign that hasn't been sent. A status of a campaign, not a separate thing. | unsent campaign, pending campaign |
+| **Template** | Reusable content (subject and body) that a new campaign starts from. The campaign takes a copy; editing the template later doesn't change it. | layout, design (for email content), theme |
+| **Merge tag** | A placeholder in a subject or body, like `{{first_name}}`, filled in per recipient. | variable, placeholder, token, personalization tag |
+| **Test send** | Sending a draft to members of the team (not contacts) to check it. | preview email, proof, test email |
+| **Recipient** | A contact a campaign was sent, or is being sent, to. | subscriber (as a noun for a contact), target |
+| **Topic** | A kind of marketing email a team sends (for example "Product updates"). A campaign can have one; a contact can unsubscribe from a single topic. Kept by Parley, not Resend. | category, list, channel, preference |
+| **Subscription status** | Whether a contact receives marketing email: subscribed, unsubscribed, bounced or marked as spam. | opt-in status, consent status, email status |
+| **Unsubscribe** | A contact choosing to stop getting marketing email, from one topic or all of them, through the unsubscribe link. | opt out (as a verb), remove me |
+| **Unsubscribe link** | The link in every campaign email (and its List-Unsubscribe header) that unsubscribes the recipient. | opt-out link, manage preferences link |
+| **Footer** | What Parley adds to the end of every campaign email: the sender's legal name and postal address, and the unsubscribe link. Required by anti-spam law. | signature, compliance block, legal text |
+| **Sender** | Who a campaign email is from: a name and an address on a sending domain. | from, sender identity, mailbox |
+| **Sending domain** | A domain the team has verified with DNS records so Parley can send email from it. Not a company's domain. | email domain (here), verified domain, DKIM domain |
 
 ## Changelog
 
@@ -121,4 +133,5 @@ Still to define before v2 design begins (reserved, so nothing in v1 takes them):
 | 2026-10-20 | Added **CRT mode** (D102). |
 | 2026-10-20 | Added **invitation**. |
 | 2026-10-20 | Added **domain**, **free email domain** and **domain matching** (D105, D106). |
+| 2026-10-20 | Added the v2 email terms: campaign, draft, template, merge tag, test send, recipient, topic, subscription status, unsubscribe, unsubscribe link, footer, sender and sending domain. Claude's picks, open to veto (see `docs/review.md`). |
 | 2026-10-20 | Added **access token**, and removed it from API key's banned synonyms (P5, D97). |

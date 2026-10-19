@@ -16,6 +16,8 @@ export const contactFieldReader =
         return contact.phones.map((phone) => phone.number)
       case "company":
         return contact.affiliations.map((affiliation) => affiliation.companyId)
+      case "subscriptionStatus":
+        return contact.subscriptionStatus
       case "createdAt":
         return contact.createdAt
       case "updatedAt":

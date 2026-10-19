@@ -1944,3 +1944,46 @@ body {
 .imgx:focus-visible {
   opacity: 1;
 }
+.topics {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 6px 0;
+}
+.fsel.c-warn {
+  color: var(--danger);
+}
+
+/* The public unsubscribe page (R39). */
+.unsub .warn {
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--fill);
+  color: var(--fg);
+}
+.unsub .done-note {
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--fill);
+  color: var(--fg);
+}
+.unsub-topics {
+  border: 0;
+  margin: 6px 0 0;
+  padding: 10px 0 0;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.unsub-topics legend {
+  color: var(--fg-subtle);
+  padding: 0;
+  margin-bottom: 4px;
+}
+.unsub-topics .opt {
+  align-items: flex-start;
+}
+.unsub-topics .hint {
+  display: block;
+}

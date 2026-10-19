@@ -35,3 +35,18 @@ export type InvitationId = typeof InvitationId.Type
 
 export const SavedViewId = Schema.String.pipe(Schema.brand("SavedViewId"))
 export type SavedViewId = typeof SavedViewId.Type
+
+export const TopicId = Schema.String.pipe(Schema.brand("TopicId"))
+export type TopicId = typeof TopicId.Type
+
+export const SegmentId = Schema.String.pipe(Schema.brand("SegmentId"))
+export type SegmentId = typeof SegmentId.Type
+
+export const TemplateId = Schema.String.pipe(Schema.brand("TemplateId"))
+export type TemplateId = typeof TemplateId.Type
+
+export const CampaignId = Schema.String.pipe(Schema.brand("CampaignId"))
+export type CampaignId = typeof CampaignId.Type
+
+export const SendingDomainId = Schema.String.pipe(Schema.brand("SendingDomainId"))
+export type SendingDomainId = typeof SendingDomainId.Type

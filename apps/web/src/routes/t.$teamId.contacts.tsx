@@ -39,6 +39,7 @@ import {
   toggle,
 } from "../components/record.tsx"
 import { isTyping, useShell } from "../components/shell.tsx"
+import { SubscriptionSection } from "../components/subscriptions.tsx"
 import { Timeline } from "../components/timeline.tsx"
 import { call, isApiFailure, messageOf } from "../lib/client.ts"
 import { companiesCollection } from "../lib/companies.ts"
@@ -1111,6 +1112,17 @@ function ContactPanel(props: {
           }
         />
         <ContactCompanies contact={contact} teamId={props.teamId} onToast={props.onToast} />
+        <SubscriptionSection
+          contact={contact}
+          teamId={props.teamId}
+          canWrite={props.canWrite}
+          onError={props.onError}
+          onStatus={(status) =>
+            save((draft) => {
+              draft.subscriptionStatus = status
+            })
+          }
+        />
         <Timeline
           teamId={props.teamId}
           recordType="contact"

@@ -1,5 +1,11 @@
 import { BackgroundLive, CoreLive } from "@parley/core"
-import { ApiRoutesLive, AuthRoutesLive, FailureResponsesLive, FileRoutesLive } from "@parley/http"
+import {
+  ApiRoutesLive,
+  AuthRoutesLive,
+  FailureResponsesLive,
+  FileRoutesLive,
+  UnsubscribeRoutesLive,
+} from "@parley/http"
 import { McpRoutesLive } from "@parley/mcp"
 import { Layer } from "effect"
 import { HttpRouter, HttpServer } from "effect/http"
@@ -12,6 +18,7 @@ const AppLive = Layer.mergeAll(
   ApiRoutesLive,
   AuthRoutesLive,
   FileRoutesLive,
+  UnsubscribeRoutesLive,
   McpRoutesLive,
   FailureResponsesLive,
   BackgroundLive,

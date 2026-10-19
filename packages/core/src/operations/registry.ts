@@ -11,8 +11,11 @@ import type { Invitations } from "../services/invitations.ts"
 import type { Members } from "../services/members.ts"
 import type { Notes } from "../services/notes.ts"
 import type { SavedViews } from "../services/saved-views.ts"
+import type { Sending } from "../services/sending.ts"
 import type { ServiceAccounts } from "../services/service-accounts.ts"
+import type { Subscriptions } from "../services/subscriptions.ts"
 import type { Teams } from "../services/teams.ts"
+import type { Topics } from "../services/topics.ts"
 import type { Users } from "../services/users.ts"
 import * as affiliations from "./affiliations.ts"
 import * as apiKeys from "./api-keys.ts"
@@ -21,6 +24,7 @@ import * as connections from "./connections.ts"
 import * as contacts from "./contacts.ts"
 import * as csv from "./csv.ts"
 import * as customFields from "./custom-fields.ts"
+import * as emailSetup from "./email-setup.ts"
 import * as images from "./images.ts"
 import * as members from "./members.ts"
 import * as notes from "./notes.ts"
@@ -43,6 +47,9 @@ export type OperationServices =
   | ApiKeys
   | Connections
   | ServiceAccounts
+  | Sending
+  | Topics
+  | Subscriptions
 
 export type Implementation<Name extends OperationName> = (
   principal: Principal,
@@ -76,6 +83,8 @@ export const implementations: { readonly [Name in OperationName]: Implementation
   "contacts.import": csv.importContactsCsv,
   "contacts.setAvatar": images.setAvatar,
   "contacts.removeAvatar": images.removeAvatar,
+  "contacts.subscriptions": emailSetup.contactSubscriptions,
+  "contacts.updateSubscriptions": emailSetup.updateSubscriptions,
   "companies.list": companies.list,
   "companies.get": companies.get,
   "companies.create": companies.create,
@@ -113,4 +122,14 @@ export const implementations: { readonly [Name in OperationName]: Implementation
   "serviceAccounts.create": serviceAccounts.create,
   "serviceAccounts.update": serviceAccounts.update,
   "serviceAccounts.delete": serviceAccounts.remove,
+  "emailSettings.get": emailSetup.getSettings,
+  "emailSettings.update": emailSetup.updateSettings,
+  "sendingDomains.list": emailSetup.listDomains,
+  "sendingDomains.create": emailSetup.createDomain,
+  "sendingDomains.verify": emailSetup.verifyDomain,
+  "sendingDomains.delete": emailSetup.deleteDomain,
+  "topics.list": emailSetup.listAllTopics,
+  "topics.create": emailSetup.addTopic,
+  "topics.update": emailSetup.changeTopic,
+  "topics.delete": emailSetup.removeTopic,
 }

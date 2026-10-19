@@ -253,6 +253,7 @@ export class Contacts extends Context.Service<
                 affiliations: companies.get(id) ?? [],
                 custom: row.custom as Contact["custom"],
                 avatarUrl: fileUrl(row.avatarKey),
+                subscriptionStatus: row.subscriptionStatus,
                 createdAt: row.createdAt.toISOString(),
                 updatedAt: row.updatedAt.toISOString(),
                 deletedAt: row.deletedAt?.toISOString() ?? null,
@@ -518,6 +519,7 @@ export class Contacts extends Context.Service<
                   firstName: normalized.firstName ?? null,
                   lastName: normalized.lastName ?? null,
                   custom: custom.values,
+                  ...(fields.subscriptionStatus ? { subscriptionStatus: fields.subscriptionStatus } : {}),
                 }),
               )
               yield* replaceEmails(team.value, id, normalized.emails)
@@ -550,7 +552,11 @@ export class Contacts extends Context.Service<
             ? yield* customFields.apply(teamId, "contact", current.custom, fields.custom)
             : undefined
           const changed = [...Object.keys(normalized), ...(custom?.changed ?? [])]
-          if (changed.length > 0) {
+          const status =
+            fields.subscriptionStatus !== undefined && fields.subscriptionStatus !== current.subscriptionStatus
+              ? fields.subscriptionStatus
+              : undefined
+          if (changed.length > 0 || status) {
             const before = new Set(current.emails.map((email) => email.address as string))
             const added = addresses.filter((address) => !before.has(address))
             const principal = access.member.principal.value
@@ -572,13 +578,24 @@ export class Contacts extends Context.Service<
                       ...("firstName" in normalized ? { firstName: normalized.firstName ?? null } : {}),
                       ...("lastName" in normalized ? { lastName: normalized.lastName ?? null } : {}),
                       ...(custom ? { custom: custom.values } : {}),
+                      ...(status ? { subscriptionStatus: status } : {}),
                       updatedAt: sql`now()`,
                     })
                     .where(and(eq(schema.contacts.teamId, teamId), eq(schema.contacts.id, id))),
                 )
                 yield* replaceEmails(teamId, id, normalized.emails)
                 yield* replacePhones(teamId, id, normalized.phones)
-                yield* recordActivity(principal, teamId, id, "updated", changed)
+                if (changed.length > 0) yield* recordActivity(principal, teamId, id, "updated", changed)
+                // A change of subscription status is its own event, so it reads plainly in activity (R49).
+                if (status) {
+                  yield* recordActivity(
+                    principal,
+                    teamId,
+                    id,
+                    status === "subscribed" ? "resubscribed" : "unsubscribed",
+                    [],
+                  )
+                }
                 // Only newly added emails match; removed affiliations stay removed (D107).
                 yield* affiliations.matchContact(principal, teamId, { id, name }, added)
               }),

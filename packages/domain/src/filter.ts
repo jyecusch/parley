@@ -10,13 +10,32 @@ import type { RecordType } from "./record-type.ts"
 
 /** The built-in fields a filter can use, by record type. Custom fields are "custom:<field id>". */
 export const BUILT_IN_FILTER_FIELDS: Readonly<
-  Record<RecordType, ReadonlyArray<{ readonly field: string; readonly label: string; readonly kind: FilterKind }>>
+  Record<
+    RecordType,
+    ReadonlyArray<{
+      readonly field: string
+      readonly label: string
+      readonly kind: FilterKind
+      readonly options?: ReadonlyArray<FilterOption>
+    }>
+  >
 > = {
   contact: [
     { field: "name", label: "Name", kind: "text" },
     { field: "email", label: "Email", kind: "text" },
     { field: "phone", label: "Phone", kind: "text" },
     { field: "company", label: "Company", kind: "company" },
+    {
+      field: "subscriptionStatus",
+      label: "Subscription status",
+      kind: "select",
+      options: [
+        { id: "subscribed", label: "Subscribed" },
+        { id: "unsubscribed", label: "Unsubscribed" },
+        { id: "bounced", label: "Bounced" },
+        { id: "marked-as-spam", label: "Marked as spam" },
+      ],
+    },
     { field: "createdAt", label: "Created", kind: "date" },
     { field: "updatedAt", label: "Updated", kind: "date" },
   ],
@@ -29,6 +48,12 @@ export const BUILT_IN_FILTER_FIELDS: Readonly<
     { field: "createdAt", label: "Created", kind: "date" },
     { field: "updatedAt", label: "Updated", kind: "date" },
   ],
+}
+
+/** A choice for a select field. */
+export interface FilterOption {
+  readonly id: string
+  readonly label: string
 }
 
 /** What sort of value a field holds, which decides its operators. */
@@ -143,6 +168,8 @@ export interface FilterFieldInfo {
   readonly label: string
   readonly kind: FilterKind
   readonly custom: CustomField | undefined
+  /** The choices of a select field, built-in or custom. */
+  readonly options?: ReadonlyArray<FilterOption>
 }
 
 const kindOfCustom = (field: CustomField): FilterKind => {
@@ -170,7 +197,13 @@ export const filterFields = (
   ...BUILT_IN_FILTER_FIELDS[recordType].map((entry) => ({ ...entry, custom: undefined })),
   ...custom
     .filter((field) => field.recordType === recordType)
-    .map((field) => ({ field: `custom:${field.id}`, label: field.name, kind: kindOfCustom(field), custom: field })),
+    .map((field) => ({
+      field: `custom:${field.id}`,
+      label: field.name,
+      kind: kindOfCustom(field),
+      custom: field,
+      ...(field.options.length > 0 ? { options: field.options } : {}),
+    })),
 ]
 
 /** Why a condition can't be used, or undefined if it can. Shared so the web app catches it early. */

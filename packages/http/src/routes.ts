@@ -7,10 +7,22 @@ import {
   type Members,
   type OperationServices,
   readFile,
+  type Subscriptions,
+  type UnsubscribeLinks,
+  unsubscribeApply,
+  unsubscribePage,
 } from "@parley/core"
-import { type FileNotFound, type OperationName, operations } from "@parley/domain"
+import {
+  type DatabaseUnavailable,
+  type FileNotFound,
+  type OperationName,
+  operations,
+  UnsubscribeChange,
+  type UnsubscribeLinkInvalid,
+  type UnsubscribePage,
+} from "@parley/domain"
 import { toPublicError } from "@parley/errors"
-import { Effect, Layer } from "effect"
+import { Effect, Layer, Schema } from "effect"
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http"
 import { HttpApiBuilder } from "effect/http-api"
 import { errorBody } from "./respond.ts"
@@ -143,6 +155,56 @@ export const FileRoutesLive = HttpRouter.use((router) =>
         ),
         Effect.provide(services),
       ),
+    )
+  }),
+)
+
+const decodeChange = Schema.decodeUnknownOption(UnsubscribeChange)
+
+/**
+ * The unsubscribe page's data and changes (R39), with no sign-in: the signed link is the authority.
+ * A POST with no JSON body is RFC 8058's one-click unsubscribe, sent by mail apps.
+ */
+export const UnsubscribeRoutesLive = HttpRouter.use((router) =>
+  Effect.gen(function* () {
+    const services = yield* Effect.context<Subscriptions | UnsubscribeLinks>()
+    const tokenOf = (request: HttpServerRequest.HttpServerRequest) =>
+      decodeURIComponent(new URL(request.url, "http://parley").pathname.replace(/^\/api\/unsubscribe\//, ""))
+    const answer = (
+      effect: Effect.Effect<
+        UnsubscribePage,
+        UnsubscribeLinkInvalid | DatabaseUnavailable,
+        Subscriptions | UnsubscribeLinks
+      >,
+    ): Effect.Effect<HttpServerResponse.HttpServerResponse> =>
+      effect.pipe(
+        Effect.map((page) =>
+          HttpServerResponse.jsonUnsafe(page, {
+            headers: { "cache-control": "no-store", "referrer-policy": "no-referrer" },
+          }),
+        ),
+        Effect.catchTag("UnsubscribeLinkInvalid", (error: UnsubscribeLinkInvalid) =>
+          Effect.succeed(
+            HttpServerResponse.jsonUnsafe({ _tag: "NotFound", error: toPublicError(error, {}) }, { status: 404 }),
+          ),
+        ),
+        Effect.catchTag("DatabaseUnavailable", (error: DatabaseUnavailable) =>
+          Effect.succeed(HttpServerResponse.jsonUnsafe(errorBody(error), { status: ERROR_STATUS[error._tag] })),
+        ),
+        Effect.provide(services),
+      )
+    yield* router.add("GET", "/api/unsubscribe/*", (request) => answer(unsubscribePage(tokenOf(request))))
+    yield* router.add("POST", "/api/unsubscribe/*", (request) =>
+      Effect.gen(function* () {
+        const type = request.headers["content-type"] ?? ""
+        const body: unknown = type.includes("application/json")
+          ? yield* request.json.pipe(Effect.orElseSucceed(() => null))
+          : null
+        const change = body === null ? undefined : decodeChange(body)
+        return yield* answer(
+          unsubscribeApply(tokenOf(request), change && change._tag === "Some" ? change.value : { kind: "one-click" }),
+        )
+      }),
     )
   }),
 )

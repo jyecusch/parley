@@ -151,3 +151,42 @@ export const proveCanManageTeam = <P, T>(member: MemberOf<P, T>): Effect.Effect<
     ...CanManageTeamProver.prove(member.principal, member.team),
     member,
   })
+
+const CanWriteEmailProver = defineProof("CanWriteEmail")
+const CanSendEmailProver = defineProof("CanSendEmail")
+const CanManageEmailProver = defineProof("CanManageEmail")
+
+/** P may write segments, templates and draft campaigns, and test-send them, in team T (R36). */
+export interface CanWriteEmail<P, T> extends Proof<"CanWriteEmail", [P, T]> {
+  readonly member: MemberOf<P, T>
+}
+
+/** P may send campaigns to their segments in team T (R36). */
+export interface CanSendEmail<P, T> extends Proof<"CanSendEmail", [P, T]> {
+  readonly member: MemberOf<P, T>
+}
+
+/** P may change team T's sender, footer, sending domains and topics (R36). */
+export interface CanManageEmail<P, T> extends Proof<"CanManageEmail", [P, T]> {
+  readonly member: MemberOf<P, T>
+}
+
+export const proveCanWriteEmail = <P, T>(member: MemberOf<P, T>): Effect.Effect<CanWriteEmail<P, T>, PermissionError> =>
+  Effect.as(requirePermission(member, "email:write"), {
+    ...CanWriteEmailProver.prove(member.principal, member.team),
+    member,
+  })
+
+export const proveCanSendEmail = <P, T>(member: MemberOf<P, T>): Effect.Effect<CanSendEmail<P, T>, PermissionError> =>
+  Effect.as(requirePermission(member, "email:send"), {
+    ...CanSendEmailProver.prove(member.principal, member.team),
+    member,
+  })
+
+export const proveCanManageEmail = <P, T>(
+  member: MemberOf<P, T>,
+): Effect.Effect<CanManageEmail<P, T>, PermissionError> =>
+  Effect.as(requirePermission(member, "email:manage"), {
+    ...CanManageEmailProver.prove(member.principal, member.team),
+    member,
+  })

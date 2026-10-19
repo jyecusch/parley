@@ -34,8 +34,14 @@ export const contacts = pgTable(
     lastName: text("last_name"),
     /** Custom field values by field id (D31). */
     custom: jsonb("custom").$type<Record<string, unknown>>().notNull().default({}),
-    /** The uploaded picture's file key (D75). */
+    /** The uploaded avatar's file key (D75). */
     avatarKey: text("avatar_key"),
+    /** Whether the contact receives marketing email (R37). */
+    subscriptionStatus: text("subscription_status", {
+      enum: ["subscribed", "unsubscribed", "bounced", "marked-as-spam"],
+    })
+      .notNull()
+      .default("subscribed"),
     ...timestamps,
     /** Soft delete: hidden at once, restorable for 30 days, then purged (D30). */
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
@@ -106,17 +112,31 @@ export const activity = pgTable(
     /** The API key's or connection's name at the time ("Claude on my laptop", D78). */
     viaName: text("via_name"),
     kind: text("kind", {
-      enum: ["created", "updated", "deleted", "restored", "affiliated", "unaffiliated"],
+      enum: [
+        "created",
+        "updated",
+        "deleted",
+        "restored",
+        "affiliated",
+        "unaffiliated",
+        "emailed",
+        "unsubscribed",
+        "resubscribed",
+        "bounced",
+        "marked-as-spam",
+      ],
     }).notNull(),
     changedFields: text("changed_fields").array().notNull().default(sql`'{}'::text[]`),
     /** The other record an affiliation change was about, and its name at the time. */
-    relatedRecordType: text("related_record_type", { enum: ["contact", "company"] }),
+    relatedRecordType: text("related_record_type", { enum: ["contact", "company", "campaign"] }),
     relatedRecordId: uuid("related_record_id"),
     relatedName: text("related_name"),
     /** Set when Parley made the change itself (D105). */
     reason: text("reason", { enum: ["domain-matching"] }),
     /** For domain matching, the domain that matched (D111). */
     matchedDomain: text("matched_domain"),
+    /** For an unsubscribe or resubscribe from one topic, the topic's name at the time (R38). */
+    topicName: text("topic_name"),
     at: timestamp("at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [index("activity_record_idx").on(t.teamId, t.recordId, t.at)],
@@ -326,3 +346,176 @@ export const files = pgTable("files", {
   data: text("data").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 })
+
+/** A team's sender and footer (R40). One row per team, made on first save. */
+export const emailSettings = pgTable("email_settings", {
+  teamId: text("team_id")
+    .primaryKey()
+    .references(() => organization.id, { onDelete: "cascade" }),
+  senderName: text("sender_name"),
+  /** The full address, on one of the team's sending domains. */
+  senderAddress: text("sender_address"),
+  replyTo: text("reply_to"),
+  legalName: text("legal_name"),
+  postalAddress: text("postal_address"),
+  /** Why recipients get the email ("You're getting this because you signed up at acme.com."). */
+  footerReason: text("footer_reason"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+})
+
+/** A domain a team sends from, registered with the email provider (R44). Unique across teams. */
+export const sendingDomains = pgTable(
+  "sending_domains",
+  {
+    id: uuid("id").primaryKey(),
+    teamId: teamId(),
+    domain: text("domain").notNull(),
+    providerId: text("provider_id"),
+    status: text("status", { enum: ["pending", "verified", "failed"] }).notNull(),
+    /** The DNS records to add, as the provider gave them. */
+    records: jsonb("records").$type<Array<unknown>>().notNull().default([]),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex("sending_domains_domain_key").on(t.domain), index("sending_domains_team_idx").on(t.teamId)],
+)
+
+/** A kind of marketing email a contact can unsubscribe from on its own (R38). */
+export const topics = pgTable(
+  "topics",
+  {
+    id: uuid("id").primaryKey(),
+    teamId: teamId(),
+    name: text("name").notNull(),
+    description: text("description"),
+    ...timestamps,
+  },
+  (t) => [index("topics_team_idx").on(t.teamId)],
+)
+
+/** A contact unsubscribed from one topic. */
+export const topicUnsubscribes = pgTable(
+  "topic_unsubscribes",
+  {
+    teamId: teamId(),
+    contactId: uuid("contact_id")
+      .notNull()
+      .references(() => contacts.id, { onDelete: "cascade" }),
+    topicId: uuid("topic_id")
+      .notNull()
+      .references(() => topics.id, { onDelete: "cascade" }),
+    at: timestamp("at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [unique("topic_unsubscribes_key").on(t.contactId, t.topicId)],
+)
+
+/** A group of contacts a campaign is sent to (D23): by filter, or hand-picked. */
+export const segments = pgTable(
+  "segments",
+  {
+    id: uuid("id").primaryKey(),
+    teamId: teamId(),
+    name: text("name").notNull(),
+    kind: text("kind", { enum: ["dynamic", "fixed"] }).notNull(),
+    /** A dynamic segment's filter over contacts (D59). Null for a fixed segment. */
+    filter: jsonb("filter").$type<unknown>(),
+    ...timestamps,
+  },
+  (t) => [index("segments_team_idx").on(t.teamId)],
+)
+
+/** The contacts of a fixed segment. */
+export const segmentContacts = pgTable(
+  "segment_contacts",
+  {
+    teamId: teamId(),
+    segmentId: uuid("segment_id")
+      .notNull()
+      .references(() => segments.id, { onDelete: "cascade" }),
+    contactId: uuid("contact_id")
+      .notNull()
+      .references(() => contacts.id, { onDelete: "cascade" }),
+    addedAt: timestamp("added_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    unique("segment_contacts_key").on(t.segmentId, t.contactId),
+    index("segment_contacts_contact_idx").on(t.contactId),
+  ],
+)
+
+/** Reusable content a campaign starts from (R41). */
+export const templates = pgTable(
+  "templates",
+  {
+    id: uuid("id").primaryKey(),
+    teamId: teamId(),
+    name: text("name").notNull(),
+    subject: text("subject").notNull().default(""),
+    previewText: text("preview_text").notNull().default(""),
+    body: text("body").notNull().default(""),
+    ...timestamps,
+  },
+  (t) => [index("templates_team_idx").on(t.teamId)],
+)
+
+/** One marketing email (R42). A draft until sent; sent ones keep their sender and footer as sent. */
+export const campaigns = pgTable(
+  "campaigns",
+  {
+    id: uuid("id").primaryKey(),
+    teamId: teamId(),
+    name: text("name").notNull(),
+    subject: text("subject").notNull().default(""),
+    previewText: text("preview_text").notNull().default(""),
+    body: text("body").notNull().default(""),
+    segmentId: uuid("segment_id").references(() => segments.id, { onDelete: "set null" }),
+    topicId: uuid("topic_id").references(() => topics.id, { onDelete: "set null" }),
+    status: text("status", { enum: ["draft", "sending", "sent", "cancelled"] })
+      .notNull()
+      .default("draft"),
+    /** Copied when sending starts, so later settings changes don't alter a campaign in flight. */
+    sentAs: jsonb("sent_as").$type<unknown>(),
+    segmentName: text("segment_name"),
+    topicName: text("topic_name"),
+    sentByUserId: text("sent_by_user_id").references(() => user.id, { onDelete: "set null" }),
+    sentByName: text("sent_by_name"),
+    sendingStartedAt: timestamp("sending_started_at", { withTimezone: true }),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (t) => [index("campaigns_team_idx").on(t.teamId, t.updatedAt)],
+)
+
+/** A contact a campaign is sent to, and what happened (R42, R46). */
+export const campaignRecipients = pgTable(
+  "campaign_recipients",
+  {
+    id: uuid("id").primaryKey(),
+    teamId: teamId(),
+    campaignId: uuid("campaign_id")
+      .notNull()
+      .references(() => campaigns.id, { onDelete: "cascade" }),
+    contactId: uuid("contact_id").references(() => contacts.id, { onDelete: "set null" }),
+    /** Kept as sent, in case the contact changes or is purged. */
+    address: text("address"),
+    name: text("name").notNull(),
+    /** Merge tag values, taken when the campaign was queued. */
+    merge: jsonb("merge").$type<Record<string, string>>().notNull().default({}),
+    status: text("status", {
+      enum: ["queued", "sent", "delivered", "skipped", "failed", "bounced", "marked-as-spam", "cancelled"],
+    }).notNull(),
+    skipReason: text("skip_reason", {
+      enum: ["no-email", "unsubscribed", "unsubscribed-from-topic", "bounced", "marked-as-spam"],
+    }),
+    providerId: text("provider_id"),
+    error: text("error"),
+    attempts: integer("attempts").notNull().default(0),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (t) => [
+    unique("campaign_recipients_key").on(t.campaignId, t.contactId),
+    index("campaign_recipients_queue_idx").on(t.status, t.teamId, t.createdAt),
+    index("campaign_recipients_provider_idx").on(t.providerId),
+  ],
+)

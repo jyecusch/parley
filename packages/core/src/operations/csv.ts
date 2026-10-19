@@ -23,6 +23,7 @@ import {
   PhoneNumber,
   parseCsv,
   type RecordType,
+  SUBSCRIPTION_STATUS_LABELS,
   toCsv,
   Website,
 } from "@parley/domain"
@@ -158,6 +159,7 @@ export const exportContactsCsv = (principal: Principal, input: OperationInput<ty
         "Other emails",
         "Phones",
         "Companies",
+        "Subscription status",
         "Created",
         "Updated",
         ...fields.map((field) => field.name),
@@ -180,6 +182,7 @@ export const exportContactsCsv = (principal: Principal, input: OperationInput<ty
                 affiliation.title ? `${affiliation.companyName} (${affiliation.title})` : affiliation.companyName,
               )
               .join("; "),
+            SUBSCRIPTION_STATUS_LABELS[contact.subscriptionStatus],
             isoDay(contact.createdAt),
             isoDay(contact.updatedAt),
             ...fields.map((field) => cellOfCustom(field, contact.custom[field.id])),
@@ -326,6 +329,15 @@ const rowProblems = (error: { readonly _tag: string; readonly userMessage: UserT
     ? (error as InputRejected).problems
     : [{ field: "row", problem: "conflict", userMessage: error.userMessage }]
 
+/** A Subscription status cell: our own labels, or yes and no. Empty leaves it as it is. */
+const subscriptionOf = (cell: string | undefined): "subscribed" | "unsubscribed" | "invalid" | undefined => {
+  const value = cell?.trim().toLowerCase()
+  if (!value) return undefined
+  if (["subscribed", "yes", "y", "true", "1"].includes(value)) return "subscribed"
+  if (["unsubscribed", "no", "n", "false", "0"].includes(value)) return "unsubscribed"
+  return "invalid"
+}
+
 export const importContactsCsv = (principal: Principal, input: OperationInput<typeof importContacts>) =>
   named(principal, input.teamId, (principal, team) =>
     Effect.gen(function* () {
@@ -376,6 +388,14 @@ export const importContactsCsv = (principal: Principal, input: OperationInput<ty
             userMessage: userText`Phone numbers need their country code, like +61 400 812 337.`,
           })
         }
+        const subscription = subscriptionOf(cells.subscriptionStatus)
+        if (subscription === "invalid") {
+          problems.push({
+            field: "subscriptionStatus",
+            problem: "invalid-format",
+            userMessage: userText`Subscription status should be Subscribed or Unsubscribed (or yes or no).`,
+          })
+        }
         if (problems.length > 0) {
           result.failed.push({ line, problems })
           continue
@@ -387,6 +407,7 @@ export const importContactsCsv = (principal: Principal, input: OperationInput<ty
             : {}),
           ...(phones.length > 0 ? { phones: phones.map((number) => ({ number: number as never })) } : {}),
           ...(Object.keys(custom).length > 0 ? { custom } : {}),
+          ...(subscription && subscription !== "invalid" ? { subscriptionStatus: subscription } : {}),
         }
         const existing = emails.map((email) => byEmail.get(email)).find(Boolean)
         const outcome = yield* Effect.matchEffect(

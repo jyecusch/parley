@@ -46,6 +46,8 @@ const FIELD_NAMES: Readonly<Record<string, string>> = {
   phone: "phone",
   address: "address",
   title: "title",
+  avatar: "avatar",
+  logo: "logo",
 }
 
 /** One activity entry in words (D111): "added Sam to this company by domain matching on acme.com". */
@@ -92,6 +94,44 @@ const describe = (entry: ActivityEntry, recordType: RecordType): ReactNode => {
       const fields = entry.changedFields.map((field) => FIELD_NAMES[field] ?? field)
       return fields.length > 0 ? `changed ${fields.join(", ")}` : `edited ${self}`
     }
+    case "emailed":
+      return (
+        <>
+          sent {self} {other}
+        </>
+      )
+    case "unsubscribed":
+    case "resubscribed": {
+      // From the unsubscribe link, the contact is the actor: "Ada unsubscribed from Newsletter".
+      const fromLink = entry.via === "unsubscribe link"
+      const what = entry.topicName ? <b>{entry.topicName}</b> : "all marketing email"
+      if (entry.kind === "unsubscribed") {
+        return fromLink ? (
+          <>unsubscribed from {what}</>
+        ) : (
+          <>
+            unsubscribed {self} from {what}
+          </>
+        )
+      }
+      return fromLink ? (
+        <>subscribed again to {what}</>
+      ) : (
+        <>
+          subscribed {self} again to {what}
+        </>
+      )
+    }
+    case "bounced":
+      return entry.related ? (
+        <>
+          recorded that {other} bounced, so campaigns skip {self}
+        </>
+      ) : (
+        `recorded a bounce`
+      )
+    case "marked-as-spam":
+      return entry.related ? <>marked {other} as spam</> : "marked a campaign as spam"
   }
 }
 

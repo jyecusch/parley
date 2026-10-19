@@ -135,7 +135,11 @@ describe("MCP entrypoint", () => {
       "contacts_removeAvatar",
       "contacts_restore",
       "contacts_setAvatar",
+      "contacts_subscriptions",
       "contacts_update",
+      "contacts_updateSubscriptions",
+      "emailSettings_get",
+      "emailSettings_update",
       "fields_create",
       "fields_delete",
       "fields_list",
@@ -156,6 +160,10 @@ describe("MCP entrypoint", () => {
       "savedViews_delete",
       "savedViews_list",
       "savedViews_update",
+      "sendingDomains_create",
+      "sendingDomains_delete",
+      "sendingDomains_list",
+      "sendingDomains_verify",
       "serviceAccounts_create",
       "serviceAccounts_delete",
       "serviceAccounts_list",
@@ -163,6 +171,10 @@ describe("MCP entrypoint", () => {
       "teams_create",
       "teams_list",
       "teams_update",
+      "topics_create",
+      "topics_delete",
+      "topics_list",
+      "topics_update",
     ])
     expect(tools.find((tool) => tool.name === "contacts_list")?.annotations.readOnlyHint).toBe(true)
   })

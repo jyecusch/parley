@@ -1,3 +1,4 @@
+import type { DnsRecord } from "@parley/domain"
 import {
   type EmailError,
   EmailNotConfigured,
@@ -19,6 +20,13 @@ export interface OutgoingEmail {
   readonly headers?: Readonly<Record<string, string>>
 }
 
+/** A sending domain as the provider sees it (R44). */
+export interface ProviderDomain {
+  readonly providerId: string
+  readonly status: "pending" | "verified" | "failed"
+  readonly records: ReadonlyArray<DnsRecord>
+}
+
 export interface SentEmail {
   /** The provider's id for the message, for tracing deliveries. */
   readonly providerId: string
@@ -36,6 +44,13 @@ export class Mailer extends Context.Service<
     readonly sendBatch: (emails: ReadonlyArray<OutgoingEmail>) => Effect.Effect<ReadonlyArray<SentEmail>, EmailError>
     /** Messages sent in this process when no provider is configured. Empty with a real provider. */
     readonly outbox: Effect.Effect<ReadonlyArray<OutgoingEmail>>
+    /** Registers sending domains with the provider. Without one, every domain counts as verified. */
+    readonly domains: {
+      readonly create: (domain: string) => Effect.Effect<ProviderDomain, EmailError>
+      /** Asks the provider to check the DNS records again, and returns what it found. */
+      readonly verify: (providerId: string) => Effect.Effect<ProviderDomain, EmailError>
+      readonly remove: (providerId: string) => Effect.Effect<void, EmailError>
+    }
   }
 >()("@parley/core/Mailer") {
   static readonly layer = Layer.effect(
@@ -52,10 +67,16 @@ export class Mailer extends Context.Service<
             yield* Effect.logInfo(`email (not sent, no RESEND_API_KEY) to ${email.to}: ${email.subject}`)
             return { providerId: `log-${crypto.randomUUID()}` }
           })
+        const verified = (providerId: string): ProviderDomain => ({ providerId, status: "verified", records: [] })
         return {
           send: record,
           sendBatch: (emails) => Effect.forEach(emails, record),
           outbox: Ref.get(outbox),
+          domains: {
+            create: (domain) => Effect.succeed(verified(`log-${domain}`)),
+            verify: (providerId) => Effect.succeed(verified(providerId)),
+            remove: () => Effect.void,
+          },
         }
       }
 
@@ -82,12 +103,12 @@ export class Mailer extends Context.Service<
         ...(email.headers ? { headers: email.headers } : {}),
       })
 
-      const post = (path: string, body: unknown) =>
+      const request = (method: string, path: string, body?: unknown) =>
         Effect.callback<unknown, EmailError>((resume) => {
           fetch(`https://api.resend.com${path}`, {
-            method: "POST",
+            method,
             headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
-            body: JSON.stringify(body),
+            ...(body === undefined ? {} : { body: JSON.stringify(body) }),
           }).then(
             async (response) => {
               const text = await response.text()
@@ -104,6 +125,44 @@ export class Mailer extends Context.Service<
             (cause) => resume(Effect.fail(new EmailServiceUnavailable({ cause }))),
           )
         })
+
+      const post = (path: string, body: unknown) => request("POST", path, body)
+
+      interface ResendDomain {
+        readonly id?: string
+        readonly status?: string
+        readonly records?: ReadonlyArray<{
+          readonly type?: string
+          readonly name?: string
+          readonly value?: string
+          readonly priority?: number
+          readonly status?: string
+        }>
+      }
+      const statusOf = (status: string | undefined): ProviderDomain["status"] =>
+        status === "verified" ? "verified" : status === "failed" ? "failed" : "pending"
+      const toDomain = (domain: ResendDomain): ProviderDomain => ({
+        providerId: domain.id ?? "",
+        status: statusOf(domain.status),
+        records: (domain.records ?? []).map((record) => ({
+          type: record.type ?? "",
+          name: record.name ?? "",
+          value: record.value ?? "",
+          priority: record.priority ?? null,
+          status: statusOf(record.status),
+        })),
+      })
+      const domains = {
+        create: (domain: string) =>
+          Effect.map(post("/domains", { name: domain }), (result) => toDomain(result as ResendDomain)),
+        verify: (providerId: string) =>
+          Effect.gen(function* () {
+            yield* post(`/domains/${encodeURIComponent(providerId)}/verify`, {})
+            return toDomain((yield* request("GET", `/domains/${encodeURIComponent(providerId)}`)) as ResendDomain)
+          }),
+        remove: (providerId: string) =>
+          request("DELETE", `/domains/${encodeURIComponent(providerId)}`).pipe(Effect.asVoid),
+      }
 
       const requireSender = (emails: ReadonlyArray<OutgoingEmail>) =>
         emails.every((email) => sender(email)) ? Effect.void : Effect.fail(new EmailNotConfigured())
@@ -125,7 +184,7 @@ export class Mailer extends Context.Service<
           return emails.map((_, index) => ({ providerId: result.data?.[index]?.id ?? "" }))
         }).pipe(Effect.withSpan("Mailer.sendBatch"))
 
-      return { send, sendBatch, outbox: Effect.succeed([]) }
+      return { send, sendBatch, outbox: Effect.succeed([]), domains }
     }),
   )
 }

@@ -4,7 +4,7 @@ import { attribution, type Principal } from "../principal.ts"
 
 /** The other record an affiliation change was about, named as it was at the time. */
 export interface RelatedRecord {
-  readonly recordType: RecordType
+  readonly recordType: RecordType | "campaign"
   readonly id: string
   readonly name: string
 }
@@ -21,6 +21,7 @@ export const activityRow = (
     readonly related?: RelatedRecord
     readonly reason?: "domain-matching"
     readonly matchedDomain?: string
+    readonly topicName?: string
   },
 ): typeof schema.activity.$inferInsert => ({
   id: crypto.randomUUID(),
@@ -34,6 +35,7 @@ export const activityRow = (
   relatedName: entry.related?.name ?? null,
   reason: entry.reason ?? null,
   matchedDomain: entry.matchedDomain ?? null,
+  topicName: entry.topicName ?? null,
   ...attribution(principal),
 })
 
@@ -49,5 +51,6 @@ export const toActivityEntry = (row: typeof schema.activity.$inferSelect): Activ
       : null,
   reason: row.reason,
   matchedDomain: row.matchedDomain,
+  topicName: row.topicName,
   at: row.at.toISOString(),
 })

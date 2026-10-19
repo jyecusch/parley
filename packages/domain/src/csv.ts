@@ -58,6 +58,11 @@ export const IMPORT_FIELDS = {
     { field: "phone", label: "Phone", aliases: ["phone", "phone number", "mobile", "phones"] },
     { field: "company", label: "Company", aliases: ["company", "organization", "organisation", "companies"] },
     { field: "title", label: "Title", aliases: ["title", "job title", "position", "role"] },
+    {
+      field: "subscriptionStatus",
+      label: "Subscription status",
+      aliases: ["subscription status", "subscription", "subscribed", "marketing email", "email consent"],
+    },
   ],
   company: [
     { field: "name", label: "Name", aliases: ["name", "company", "company name"] },

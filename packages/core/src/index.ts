@@ -14,12 +14,17 @@ import { Members } from "./services/members.ts"
 import { Notes } from "./services/notes.ts"
 import { Purge } from "./services/purge.ts"
 import { SavedViews } from "./services/saved-views.ts"
+import { Sending } from "./services/sending.ts"
 import { ServiceAccounts } from "./services/service-accounts.ts"
+import { Subscriptions } from "./services/subscriptions.ts"
 import { Teams } from "./services/teams.ts"
+import { Topics } from "./services/topics.ts"
+import { UnsubscribeLinks } from "./services/unsubscribe-links.ts"
 import { Users } from "./services/users.ts"
 
 export { type AuthenticationFailure, Authenticator, BetterAuth, type Entrypoint } from "./auth/authenticator.ts"
 export { type Auth, issuer, mcpResource } from "./auth/better-auth.ts"
+export { unsubscribeApply, unsubscribePage } from "./email/unsubscribe.ts"
 export { readFile } from "./files/serve.ts"
 export { classifyDecodeError } from "./input/classify.ts"
 export { Mailer, type OutgoingEmail } from "./mail/mailer.ts"
@@ -27,6 +32,8 @@ export { type Implementation, implementations, type OperationServices } from "./
 export type { Principal } from "./principal.ts"
 export { FileStore } from "./services/file-store.ts"
 export type { Members } from "./services/members.ts"
+export type { Subscriptions } from "./services/subscriptions.ts"
+export { UnsubscribeLinks } from "./services/unsubscribe-links.ts"
 
 /** Contacts and companies both do domain matching through Affiliations. */
 const Records = Layer.mergeAll(Contacts.layer, Companies.layer, SavedViews.layer).pipe(
@@ -44,6 +51,10 @@ const Services = Layer.mergeAll(
   ApiKeys.layer,
   Connections.layer,
   ServiceAccounts.layer,
+  Topics.layer,
+  Sending.layer,
+  Subscriptions.layer,
+  UnsubscribeLinks.layer,
 )
 
 /** Everything operations and authentication need, built once per process. */

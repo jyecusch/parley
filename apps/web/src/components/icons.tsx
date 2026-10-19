@@ -177,3 +177,27 @@ export const CompaniesIcon = ({ size }: P) => (
     <path d="M4.5 20.5v-14a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v14M15.5 10.5h2a2 2 0 0 1 2 2v8M3 20.5h18M8.5 8.5h3M8.5 12h3M8.5 15.5h3" />
   </Icon>
 )
+export const MailIcon = ({ size }: P) => (
+  <Icon size={size}>
+    <rect x="3.5" y="5.5" width="17" height="13" rx="2" />
+    <path d="m4 7 8 6 8-6" />
+  </Icon>
+)
+export const SegmentIcon = ({ size }: P) => (
+  <Icon size={size}>
+    <circle cx="9" cy="9" r="3" />
+    <circle cx="16" cy="11" r="2.5" />
+    <path d="M3.5 19c.6-3 2.8-4.5 5.5-4.5s4.9 1.5 5.5 4.5M14.5 15.2c.5-.2 1-.2 1.5-.2 2.2 0 3.8 1.2 4.3 4" />
+  </Icon>
+)
+export const TemplateIcon = ({ size }: P) => (
+  <Icon size={size}>
+    <rect x="4.5" y="3.5" width="15" height="17" rx="2" />
+    <path d="M8 8h8M8 11.5h8M8 15h5" />
+  </Icon>
+)
+export const SendIcon = ({ size }: P) => (
+  <Icon size={size}>
+    <path d="M20.5 3.5 10 14M20.5 3.5l-6.5 17-4-6.5-6.5-4 17-6.5Z" />
+  </Icon>
+)

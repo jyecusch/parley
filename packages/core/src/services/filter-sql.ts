@@ -217,6 +217,19 @@ const contactCondition = (condition: FilterCondition, info: FilterFieldInfo): SQ
           return sql`false`
       }
     }
+    case "subscriptionStatus":
+      switch (condition.operator) {
+        case "is-any-of":
+          return sql`"contacts"."subscription_status" = any(${textArray(condition.value)})`
+        case "is-none-of":
+          return sql`not ("contacts"."subscription_status" = any(${textArray(condition.value)}))`
+        case "is-empty":
+          return sql`false`
+        case "is-not-empty":
+          return sql`true`
+        default:
+          return sql`false`
+      }
     case "createdAt":
       return dateCondition(timestampDay(sql`"contacts"."created_at"`), condition)
     case "updatedAt":

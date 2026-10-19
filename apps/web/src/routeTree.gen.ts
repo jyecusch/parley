@@ -19,12 +19,14 @@ import { Route as DotwellKnownSplatRouteImport } from './routes/[.]well-known.$'
 import { Route as ApiSplatRouteImport } from './routes/api/$'
 import { Route as InviteInvitationIdRouteImport } from './routes/invite.$invitationId'
 import { Route as TTeamIdRouteImport } from './routes/t.$teamId'
+import { Route as UnsubscribeTokenRouteImport } from './routes/unsubscribe.$token'
 import { Route as TTeamIdCompaniesRouteImport } from './routes/t.$teamId.companies'
 import { Route as TTeamIdContactsRouteImport } from './routes/t.$teamId.contacts'
 import { Route as TTeamIdSettingsRouteImport } from './routes/t.$teamId.settings'
 import { Route as TTeamIdSettingsIndexRouteImport } from './routes/t.$teamId.settings.index'
 import { Route as TTeamIdSettingsApiKeysRouteImport } from './routes/t.$teamId.settings.api-keys'
 import { Route as TTeamIdSettingsConnectionsRouteImport } from './routes/t.$teamId.settings.connections'
+import { Route as TTeamIdSettingsEmailRouteImport } from './routes/t.$teamId.settings.email'
 import { Route as TTeamIdSettingsFieldsRouteImport } from './routes/t.$teamId.settings.fields'
 import { Route as TTeamIdSettingsGeneralRouteImport } from './routes/t.$teamId.settings.general'
 import { Route as TTeamIdSettingsMembersRouteImport } from './routes/t.$teamId.settings.members'
@@ -80,6 +82,11 @@ const TTeamIdRoute = TTeamIdRouteImport.update({
   path: '/t/$teamId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const UnsubscribeTokenRoute = UnsubscribeTokenRouteImport.update({
+  id: '/unsubscribe/$token',
+  path: '/unsubscribe/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TTeamIdCompaniesRoute = TTeamIdCompaniesRouteImport.update({
   id: '/companies',
   path: '/companies',
@@ -111,6 +118,11 @@ const TTeamIdSettingsConnectionsRoute =
     path: '/connections',
     getParentRoute: () => TTeamIdSettingsRoute,
   } as any)
+const TTeamIdSettingsEmailRoute = TTeamIdSettingsEmailRouteImport.update({
+  id: '/email',
+  path: '/email',
+  getParentRoute: () => TTeamIdSettingsRoute,
+} as any)
 const TTeamIdSettingsFieldsRoute = TTeamIdSettingsFieldsRouteImport.update({
   id: '/fields',
   path: '/fields',
@@ -144,11 +156,13 @@ export interface FileRoutesByFullPath {
   '/api/$': typeof ApiSplatRoute
   '/invite/$invitationId': typeof InviteInvitationIdRoute
   '/t/$teamId': typeof TTeamIdRouteWithChildren
+  '/unsubscribe/$token': typeof UnsubscribeTokenRoute
   '/t/$teamId/companies': typeof TTeamIdCompaniesRoute
   '/t/$teamId/contacts': typeof TTeamIdContactsRoute
   '/t/$teamId/settings': typeof TTeamIdSettingsRouteWithChildren
   '/t/$teamId/settings/api-keys': typeof TTeamIdSettingsApiKeysRoute
   '/t/$teamId/settings/connections': typeof TTeamIdSettingsConnectionsRoute
+  '/t/$teamId/settings/email': typeof TTeamIdSettingsEmailRoute
   '/t/$teamId/settings/fields': typeof TTeamIdSettingsFieldsRoute
   '/t/$teamId/settings/general': typeof TTeamIdSettingsGeneralRoute
   '/t/$teamId/settings/members': typeof TTeamIdSettingsMembersRoute
@@ -166,10 +180,12 @@ export interface FileRoutesByTo {
   '/api/$': typeof ApiSplatRoute
   '/invite/$invitationId': typeof InviteInvitationIdRoute
   '/t/$teamId': typeof TTeamIdRouteWithChildren
+  '/unsubscribe/$token': typeof UnsubscribeTokenRoute
   '/t/$teamId/companies': typeof TTeamIdCompaniesRoute
   '/t/$teamId/contacts': typeof TTeamIdContactsRoute
   '/t/$teamId/settings/api-keys': typeof TTeamIdSettingsApiKeysRoute
   '/t/$teamId/settings/connections': typeof TTeamIdSettingsConnectionsRoute
+  '/t/$teamId/settings/email': typeof TTeamIdSettingsEmailRoute
   '/t/$teamId/settings/fields': typeof TTeamIdSettingsFieldsRoute
   '/t/$teamId/settings/general': typeof TTeamIdSettingsGeneralRoute
   '/t/$teamId/settings/members': typeof TTeamIdSettingsMembersRoute
@@ -188,11 +204,13 @@ export interface FileRoutesById {
   '/api/$': typeof ApiSplatRoute
   '/invite/$invitationId': typeof InviteInvitationIdRoute
   '/t/$teamId': typeof TTeamIdRouteWithChildren
+  '/unsubscribe/$token': typeof UnsubscribeTokenRoute
   '/t/$teamId/companies': typeof TTeamIdCompaniesRoute
   '/t/$teamId/contacts': typeof TTeamIdContactsRoute
   '/t/$teamId/settings': typeof TTeamIdSettingsRouteWithChildren
   '/t/$teamId/settings/api-keys': typeof TTeamIdSettingsApiKeysRoute
   '/t/$teamId/settings/connections': typeof TTeamIdSettingsConnectionsRoute
+  '/t/$teamId/settings/email': typeof TTeamIdSettingsEmailRoute
   '/t/$teamId/settings/fields': typeof TTeamIdSettingsFieldsRoute
   '/t/$teamId/settings/general': typeof TTeamIdSettingsGeneralRoute
   '/t/$teamId/settings/members': typeof TTeamIdSettingsMembersRoute
@@ -212,11 +230,13 @@ export interface FileRouteTypes {
     | '/api/$'
     | '/invite/$invitationId'
     | '/t/$teamId'
+    | '/unsubscribe/$token'
     | '/t/$teamId/companies'
     | '/t/$teamId/contacts'
     | '/t/$teamId/settings'
     | '/t/$teamId/settings/api-keys'
     | '/t/$teamId/settings/connections'
+    | '/t/$teamId/settings/email'
     | '/t/$teamId/settings/fields'
     | '/t/$teamId/settings/general'
     | '/t/$teamId/settings/members'
@@ -234,10 +254,12 @@ export interface FileRouteTypes {
     | '/api/$'
     | '/invite/$invitationId'
     | '/t/$teamId'
+    | '/unsubscribe/$token'
     | '/t/$teamId/companies'
     | '/t/$teamId/contacts'
     | '/t/$teamId/settings/api-keys'
     | '/t/$teamId/settings/connections'
+    | '/t/$teamId/settings/email'
     | '/t/$teamId/settings/fields'
     | '/t/$teamId/settings/general'
     | '/t/$teamId/settings/members'
@@ -255,11 +277,13 @@ export interface FileRouteTypes {
     | '/api/$'
     | '/invite/$invitationId'
     | '/t/$teamId'
+    | '/unsubscribe/$token'
     | '/t/$teamId/companies'
     | '/t/$teamId/contacts'
     | '/t/$teamId/settings'
     | '/t/$teamId/settings/api-keys'
     | '/t/$teamId/settings/connections'
+    | '/t/$teamId/settings/email'
     | '/t/$teamId/settings/fields'
     | '/t/$teamId/settings/general'
     | '/t/$teamId/settings/members'
@@ -278,6 +302,7 @@ export interface RootRouteChildren {
   ApiSplatRoute: typeof ApiSplatRoute
   InviteInvitationIdRoute: typeof InviteInvitationIdRoute
   TTeamIdRoute: typeof TTeamIdRouteWithChildren
+  UnsubscribeTokenRoute: typeof UnsubscribeTokenRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -352,6 +377,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TTeamIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/unsubscribe/$token': {
+      id: '/unsubscribe/$token'
+      path: '/unsubscribe/$token'
+      fullPath: '/unsubscribe/$token'
+      preLoaderRoute: typeof UnsubscribeTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/t/$teamId/companies': {
       id: '/t/$teamId/companies'
       path: '/companies'
@@ -394,6 +426,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TTeamIdSettingsConnectionsRouteImport
       parentRoute: typeof TTeamIdSettingsRoute
     }
+    '/t/$teamId/settings/email': {
+      id: '/t/$teamId/settings/email'
+      path: '/email'
+      fullPath: '/t/$teamId/settings/email'
+      preLoaderRoute: typeof TTeamIdSettingsEmailRouteImport
+      parentRoute: typeof TTeamIdSettingsRoute
+    }
     '/t/$teamId/settings/fields': {
       id: '/t/$teamId/settings/fields'
       path: '/fields'
@@ -428,6 +467,7 @@ declare module '@tanstack/react-router' {
 interface TTeamIdSettingsRouteChildren {
   TTeamIdSettingsApiKeysRoute: typeof TTeamIdSettingsApiKeysRoute
   TTeamIdSettingsConnectionsRoute: typeof TTeamIdSettingsConnectionsRoute
+  TTeamIdSettingsEmailRoute: typeof TTeamIdSettingsEmailRoute
   TTeamIdSettingsFieldsRoute: typeof TTeamIdSettingsFieldsRoute
   TTeamIdSettingsGeneralRoute: typeof TTeamIdSettingsGeneralRoute
   TTeamIdSettingsMembersRoute: typeof TTeamIdSettingsMembersRoute
@@ -438,6 +478,7 @@ interface TTeamIdSettingsRouteChildren {
 const TTeamIdSettingsRouteChildren: TTeamIdSettingsRouteChildren = {
   TTeamIdSettingsApiKeysRoute: TTeamIdSettingsApiKeysRoute,
   TTeamIdSettingsConnectionsRoute: TTeamIdSettingsConnectionsRoute,
+  TTeamIdSettingsEmailRoute: TTeamIdSettingsEmailRoute,
   TTeamIdSettingsFieldsRoute: TTeamIdSettingsFieldsRoute,
   TTeamIdSettingsGeneralRoute: TTeamIdSettingsGeneralRoute,
   TTeamIdSettingsMembersRoute: TTeamIdSettingsMembersRoute,
@@ -475,6 +516,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSplatRoute: ApiSplatRoute,
   InviteInvitationIdRoute: InviteInvitationIdRoute,
   TTeamIdRoute: TTeamIdRouteWithChildren,
+  UnsubscribeTokenRoute: UnsubscribeTokenRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

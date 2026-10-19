@@ -5,7 +5,7 @@ import { BetterAuth, type Principal } from "../src/index.ts"
 
 const promise = <A>(thunk: () => Promise<A>) => Effect.tryPromise(thunk).pipe(Effect.orDie)
 
-/** Two users, two teams. Jane owns Acme; Bob owns Globex. */
+/** Three users, two teams. Jane owns Acme; Bob owns Globex; Sam is a member of Acme. */
 export const Fixture = Effect.gen(function* () {
   const auth = yield* BetterAuth
   const suffix = crypto.randomUUID().slice(0, 8)
@@ -21,6 +21,12 @@ export const Fixture = Effect.gen(function* () {
   const bob = yield* signUp("Bob")
   const acme = yield* team("Acme", jane.user.id)
   const globex = yield* team("Globex", bob.user.id)
+  const sam = yield* signUp("Sam")
+  // Better-Auth's addMember isn't on our narrowed Auth type; tests use it to seed a member directly.
+  const api = auth.api as unknown as {
+    addMember: (input: { body: { userId: string; organizationId: string; role: string } }) => Promise<unknown>
+  }
+  yield* promise(() => api.addMember({ body: { userId: sam.user.id, organizationId: acme?.id ?? "", role: "member" } }))
   const session = (userId: string, name: string): Principal => ({
     _tag: "UserSession",
     userId: userId as UserId,
@@ -41,6 +47,7 @@ export const Fixture = Effect.gen(function* () {
     globex: (globex?.id ?? "") as TeamId,
     jane: session(jane.user.id, "Jane"),
     bob: session(bob.user.id, "Bob"),
+    sam: session(sam.user.id, "Sam"),
     janeReadOnlyKey: apiKey(jane.user.id, acme?.id ?? "", ["records:read"]),
     janeKeyForGlobex: apiKey(jane.user.id, globex?.id ?? "", ["records:read", "records:write"]),
   }

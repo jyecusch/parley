@@ -111,7 +111,7 @@ const describeValue = (
   const value = condition.value
   if (condition.operator === "in-last-days") return `${value} days`
   if (Array.isArray(value)) {
-    const options: ReadonlyArray<ValueOption> = info?.custom?.options ?? companies ?? []
+    const options: ReadonlyArray<ValueOption> = info?.options ?? companies ?? []
     return value.map((id) => options.find((option) => option.id === id)?.label ?? "?").join(", ")
   }
   return String(value ?? "")
@@ -156,7 +156,7 @@ function ConditionEditor(props: {
     ...(value !== undefined && !VALUELESS.has(operator) ? { value } : {}),
   }
   const problem = checkCondition(condition, props.fields)
-  const options: ReadonlyArray<ValueOption> = info?.kind === "company" ? props.companies : (info?.custom?.options ?? [])
+  const options: ReadonlyArray<ValueOption> = info?.kind === "company" ? props.companies : (info?.options ?? [])
 
   return (
     <div

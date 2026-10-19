@@ -20,6 +20,12 @@ const ability = (permission: Permission): UserText => {
       return userText`manage service accounts`
     case "team:manage":
       return userText`manage the team`
+    case "email:write":
+      return userText`write marketing email`
+    case "email:send":
+      return userText`send campaigns`
+    case "email:manage":
+      return userText`manage the team's email settings`
   }
 }
 
