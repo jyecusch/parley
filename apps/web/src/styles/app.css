@@ -155,6 +155,7 @@ body {
 /* The app always fits the window, in CRT mode or not. The page itself never scrolls; lists scroll inside it. */
 .app {
   display: flex;
+  width: 100%;
   height: 100dvh;
   overflow: hidden;
   position: relative;
@@ -172,6 +173,8 @@ body {
   display: flex;
   gap: 6px;
   padding: 6px 6px 6px 0;
+  position: relative;
+  container: content / inline-size;
 }
 .card {
   background: var(--bg);
@@ -190,6 +193,29 @@ body {
 .panel {
   width: 380px;
   flex: none;
+}
+/* A narrow list drops its secondary columns before anything scrolls sideways. */
+@container content (max-width: 640px) {
+  .col-wide {
+    display: none;
+  }
+  /* Without them, the remaining text columns share the width; the checkbox column stays narrow. */
+  .ctable .w-name,
+  .ctable .w-email {
+    width: auto;
+  }
+}
+/* Too narrow for the list and the panel side by side: the panel floats over the list, so the list keeps its width. */
+@container content (max-width: 920px) {
+  .panel {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    bottom: 6px;
+    width: min(380px, calc(100% - 12px));
+    z-index: 5;
+    box-shadow: var(--pop);
+  }
 }
 
 /* Tooltips */
@@ -541,6 +567,13 @@ body {
   margin: 0;
   font-size: 13px;
   font-weight: 520;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hd1 > .btn,
+.hd1 > .count {
+  flex: none;
 }
 .crumb .root {
   color: var(--fg-muted);
