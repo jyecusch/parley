@@ -108,6 +108,13 @@ What we decided, who decided it, and what's still open. Nothing becomes "decided
 | D100 | Consent defaults | Admins default to "New service account…" (created as a member when they allow), members default to "You" | Owner (approved with D97) | 2026-10-20 |
 | D101 | Settings sidebar | General and Members are shown, disabled and marked "Later", until they're built. Rename, change role and delete for service accounts come later | Owner (approved with D97) | 2026-10-20 |
 | D102 | CRT glass | The shader adds convex glass (barrel curvature with a curved bezel and a soft reflection) and chromatic aberration towards the edges. Both are tunable per browser in localStorage: `parley.crt.curvature` 0–1 (default 0.5) and `parley.crt.aberration` 0–4 px (default 1). With a mouse, the shader also draws the cursor (arrow, hand or text beam) so it bends with the glass, and the system cursor is hidden. Hit-testing follows the bend under the pointer (by shifting the app's CSS transform, which moves hit-testing but not the drawing), so clicks land on what's drawn | Owner | 2026-10-20 |
+| D103 | Milestone 3 | Companies and affiliations: company records, linking contacts and companies, a Companies screen, and affiliations on contacts | Owner | 2026-10-20 |
+| D104 | Company address | Structured: two street lines, city, region, postcode and country (ISO 3166-1 alpha-2 code) | Owner | 2026-10-20 |
+| D105 | Domain matching | Parley affiliates contacts with companies by email domain on its own, both ways: a contact that gets an email (create, edit, import) is affiliated with the company that has that domain, and a company that gets a domain is affiliated with existing contacts that have it | Owner | 2026-10-20 |
+| D106 | Free email domains | A built-in list of free email domains (gmail.com, outlook.com, icloud.com…) can never be a company domain, so they never match | Owner | 2026-10-20 |
+| D107 | Removed affiliations | Domain matching runs only when an email or domain is added. Removing an affiliation is never undone by Parley | Owner | 2026-10-20 |
+| D108 | Companies table default columns | Logo and name with the primary domain under it, number of affiliated contacts, created, updated | Owner | 2026-10-20 |
+| D109 | Deleting a company | Its affiliations are hidden while it's deleted and come back if it's restored; they're purged with it after 30 days | Owner | 2026-10-20 |
 
 ## Implementation choices made during milestones 1 and 2 (Claude; low-stakes, open to veto)
 

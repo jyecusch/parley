@@ -17,6 +17,9 @@ How to pick a name: choose the most common name for the concept. Reject anything
 | **Team** | The tenant. Everything in Parley belongs to exactly one team. A user can be a member of many teams and switches between them. Stored as a Better-Auth *organization*; Better-Auth's own "teams" sub-feature is not used. Code: `TeamId`. | org, organization, workspace, tenant, account |
 | **Contact** | A person tracked in the CRM. | lead, person, customer, prospect |
 | **Company** | An organization tracked in the CRM. | account, organization, org, business |
+| **Domain** | An email domain a company owns ("acme.com"), lower-cased, without "www.". A company has many; each is unique within a team. Not its website. | email domain (in UI, just "domain"), hostname |
+| **Free email domain** | A domain anyone can get an address at (gmail.com, outlook.com). Never a company's domain (D106). | consumer domain, webmail domain, public domain |
+| **Domain matching** | Parley affiliating a contact with the company that has its email's domain (D105). | auto-link, auto-affiliation, enrichment, domain linking |
 | **Record** | A contact or a company. The umbrella term for CRM data. | entity, object, item, row (outside SQL) |
 | **Affiliation** | The link between a contact and a company, optionally carrying a title ("CTO"). A contact can have affiliations with many companies. | association, relationship, employment, position, link |
 | **Record type** | Contact or company. | entity type, object type, model |
@@ -115,4 +118,5 @@ Still to define before v2 design begins (reserved, so nothing in v1 takes them):
 | 2026-10-19 | Added note, avatar and logo. |
 | 2026-10-20 | Added **connection** (D95). |
 | 2026-10-20 | Added **CRT mode** (D102). |
+| 2026-10-20 | Added **domain**, **free email domain** and **domain matching** (D105, D106). |
 | 2026-10-20 | Added **access token**, and removed it from API key's banned synonyms (P5, D97). |
