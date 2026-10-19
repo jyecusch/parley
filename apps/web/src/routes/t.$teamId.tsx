@@ -1,5 +1,5 @@
 import type { TeamId } from "@parley/domain"
-import { createFileRoute, Outlet, redirect, useMatchRoute } from "@tanstack/react-router"
+import { createFileRoute, Outlet, redirect, useChildMatches } from "@tanstack/react-router"
 import { SettingsShell } from "../components/settings.tsx"
 import { AppShell } from "../components/shell.tsx"
 import { getSession } from "../lib/auth.ts"
@@ -24,7 +24,11 @@ export const Route = createFileRoute("/t/$teamId")({
 function TeamLayout() {
   const { team, teams } = Route.useLoaderData()
   const { userName } = Route.useRouteContext()
-  const inSettings = useMatchRoute()({ to: "/t/$teamId/settings", fuzzy: true })
+  // Decided from the matches the Outlet renders, not the URL: mid-navigation the URL can already point
+  // elsewhere while the old page is still rendered, and each page needs its own shell around it.
+  const inSettings = useChildMatches({
+    select: (matches) => matches.some((match) => match.routeId.startsWith("/t/$teamId/settings")),
+  })
   if (inSettings) {
     return (
       <SettingsShell team={team}>
