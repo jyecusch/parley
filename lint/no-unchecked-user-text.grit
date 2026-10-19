@@ -1,0 +1,12 @@
+language js
+
+or {
+  `$value as UserText`,
+  `$value as DisplayName`,
+  `$value as EchoedInput`,
+  `$value as ReferenceId`,
+  `UserText.schema.make($args)`,
+  `DisplayName.schema.make($args)`
+} as $cast where {
+  register_diagnostic(span=$cast, message="Build user text with the userText template, and names with DisplayName.fromRecord in a service. Never assert or make these brands directly.", severity="error")
+}

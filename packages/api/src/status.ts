@@ -1,0 +1,28 @@
+import type { OperationError, OperationName, Operations } from "@parley/domain"
+
+/** Every error tag any operation can produce. */
+export type ErrorTag = { [Name in OperationName]: OperationError<Operations[Name]>["_tag"] }[OperationName]
+
+export type Status = 401 | 403 | 404 | 409 | 422 | 429 | 503
+
+/**
+ * How each error is sent over HTTP. Typed over every operation's errors, so a new error
+ * class anywhere fails to compile until it has a status here (docs/01-errors-are-data.md).
+ */
+export const ERROR_STATUS: { readonly [Tag in ErrorTag]: Status } = {
+  SessionMissing: 401,
+  SessionExpired: 401,
+  ApiKeyUnrecognized: 401,
+  ApiKeyExpired: 401,
+  ApiKeyRevoked: 401,
+  NotATeamMember: 404,
+  ApiKeyNotValidForTeam: 403,
+  TeamCreationNeedsSignIn: 403,
+  RoleLacksPermission: 403,
+  ApiKeyScopeExcludes: 403,
+  InputRejected: 422,
+  ContactNotFound: 404,
+  ContactEmailTaken: 409,
+  RequestsTooFrequent: 429,
+  DatabaseUnavailable: 503,
+}

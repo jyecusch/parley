@@ -1,0 +1,6 @@
+language js
+
+`defineProof($kind)` as $call where {
+  $filename <: not includes "core/src/proofs/",
+  register_diagnostic(span=$call, message="Proofs are minted only in core/src/proofs/ (docs/04-authorization-proofs.md).", severity="error")
+}

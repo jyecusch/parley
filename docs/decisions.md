@@ -1,0 +1,131 @@
+# Decisions log
+
+What we decided, who decided it, and what's still open. Nothing becomes "decided" without the project owner's say-so. Claude proposes and the owner decides.
+
+## Decided
+
+| # | Decision | Choice | Decided by | Date |
+| --- | --- | --- | --- | --- |
+| D1 | Product scope v1 | Contacts and companies | Owner | 2026-10-19 |
+| D2 | Product scope v2 | Marketing email: filter-based dynamic segments, fixed lists, templates, drafts, test sends to CRM users, subscription management, compliant unsubscribe footer (Spam Act etc.) | Owner | 2026-10-19 |
+| D3 | Agent parity | Everything a user can do in the web UI, an agent can do via API/MCP | Owner | 2026-10-19 |
+| D4 | Tech stack | TanStack Start, Postgres, Effect v4 (backend at least), TanStack DB/Query, Better-Auth + organizations plugin, Drizzle, Tailwind | Owner | 2026-10-19 |
+| D5 | Tenancy | Multi-team: a user can be a member of many teams and switch between them | Owner | 2026-10-19 |
+| D6 | Record visibility | Team-wide visibility. Roles decide actions | Owner | 2026-10-19 |
+| D7 | Roles | Better-Auth defaults: `owner`, `admin`, `member` | Owner | 2026-10-19 |
+| D8 | Agent identity | Both: a user's API key (acts as that user, limited by scopes) **and** service accounts that are members in their own right. Agents are external software using either kind of API key | Owner | 2026-10-19 |
+| D9 | Repo layout | Monorepo of Bun workspace packages with hard package boundaries | Owner | 2026-10-19 |
+| D10 | Authz mechanism | Effect-native "ghosts of departed proofs" module of our own (not the `@gdp-ts/core` library) | Owner | 2026-10-19 |
+| D11 | Lint and enforcement | Biome + GritQL rules, plus `@effect/language-service` diagnostics | Owner | 2026-10-19 |
+| D12 | Error model | One `Schema.TaggedError` per error (highly granular), `PublicError` as the only way an error leaves the core | Owner (mandated) | 2026-10-19 |
+| D13 | Web entrypoint | The web UI is a client of the same Effect `HttpApi` (`/api/v1`) that agents use. The MCP server is a separate thin entrypoint over core operations | Delegated to Claude ("go with your recommendation") | 2026-10-19 |
+| D14 | UX process | Before each screen: discuss → design asset → agree → implement | Owner | 2026-10-19 |
+| D15 | Email provider | Resend is the default email provider | Owner | 2026-10-19 |
+| D16 | Operation registry (was P1) | Each operation is defined once. HTTP endpoints and MCP tools are derived from it, so parity holds by construction | Owner | 2026-10-19 |
+| D17 | Better-Auth organization endpoints (was Q-A3) | Its client-facing organization mutation endpoints are disabled. Member and team changes are Parley operations that prove `CanManageMembers` and then call `auth.api.*` server-side | Owner | 2026-10-19 |
+| D18 | Service accounts (was Q-A1) | Stored as Better-Auth users with `kind: "service-account"` and a normal member row. Password sign-in is blocked for them | Owner | 2026-10-19 |
+| D19 | User API keys (was Q-A4) | A user's API key is bound to one team. Use elsewhere fails with `ApiKeyNotValidForTeam` | Owner | 2026-10-19 |
+| D20 | Terminology | One name per concept, synonyms banned. `docs/terminology.md` is canonical; the rule lives in `AGENTS.md` | Owner | 2026-10-19 |
+| D21 | Tenant name | The tenant is a **team** (stored as a Better-Auth organization) | Owner | 2026-10-19 |
+| D22 | Member term | "Member" (not "membership") means anyone in a team; the `member` role is the default role | Owner | 2026-10-19 |
+| D23 | Segment | A group of contacts a campaign is sent to is a **segment**, either dynamic (defined by filters) or fixed (hand-picked). This matches Resend | Owner | 2026-10-19 |
+| D24 | Contact emails (was Q-E1) | Many per contact, one marked primary. Each address is unique within a team | Owner | 2026-10-19 |
+| D25 | Company domains (was Q-E1) | Many per company, unique within a team | Owner | 2026-10-19 |
+| D26 | Invalid input (was Q-E2) | One `InputRejected` error listing every field problem: fixed problem vocabulary, our own wording, never echoes the rejected value. HTTP 422 | Owner | 2026-10-19 |
+| D27 | Permission implication (was Q-A5) | None. Every permission is explicit (delete doesn't imply write, write doesn't imply read) | Owner | 2026-10-19 |
+| D28 | Row-level security (was Q-A7) | Later. v1 relies on proofs plus composite foreign keys `(team_id, id)`; every tenant table has `team_id` so RLS can be added without pain | Owner | 2026-10-19 |
+| D29 | Contacts and companies | Many-to-many, through an affiliation that can carry a title | Owner | 2026-10-19 |
+| D30 | Deletion | Soft delete: hidden immediately, restorable for 30 days, then purged. Unique emails and domains are released at deletion | Owner | 2026-10-19 |
+| D31 | Custom fields | In v1, on contacts and companies. Types: text, number, date, checkbox, single select, multi select, URL, email, phone. No reference-to-record type | Owner | 2026-10-19 |
+| D32 | Custom field administration | New permission `fields:manage`, held by owner and admin | Owner | 2026-10-19 |
+| D33 | Contact name | Optional first name and last name. The display name is derived from them, falling back to the primary email | Owner | 2026-10-19 |
+| D34 | Phone numbers | Many per contact, each labelled (work, mobile, …), stored in E.164 format, not unique | Owner | 2026-10-19 |
+| D35 | Team existence (was Q-A2) | An unknown team and "not a member" give the identical error, `NotATeamMember` (404). No existence oracle | Owner | 2026-10-19 |
+| D36 | Authz races (was Q-A6) | Role changes, member removal and team deletion re-read the member row `FOR UPDATE` in the write transaction and enforce "at least one owner" there | Owner | 2026-10-19 |
+| D37 | Cross-team lookups (was Q-A8) | A record from another team is always `ContactNotFound`/`CompanyNotFound`, even for someone who is a member of both teams | Owner | 2026-10-19 |
+| D38 | Echoing input (was Q-E3) | User messages may repeat a value from the current request, only through an `EchoedInput` brand, length-capped | Owner | 2026-10-19 |
+| D39 | Team as argument (was Q-T1) | Services are process-tier and receive the team as a named, proven argument. Team-tier services need explicit approval | Owner | 2026-10-19 |
+| D40 | Tier check (was Q-T2) | Type-level tier check from day one, plus lint rules (no module-level mutable state in services, no proofs stored in Refs/Layers) | Owner | 2026-10-19 |
+| D41 | Untiered services (was Q-T3) | Third-party services without a tier marker are allowed anywhere, treated as process-tier | Owner | 2026-10-19 |
+| D42 | Team-keyed caches (was Q-T4) | A review-checklist item, not a lint rule | Owner | 2026-10-19 |
+| D43 | Re-affiliating (was Q-E4) | Idempotent: affiliating an already-affiliated contact and company returns the existing affiliation (updating the title if one is given) | Owner | 2026-10-19 |
+| D44 | Error context (was Q-E5) | `PublicError` has a fixed shape plus an optional `details` object whose schema is declared per tag (and published in OpenAPI) | Owner | 2026-10-19 |
+| D45 | Saved errors (was Q-E6) | Store the tag plus context fields, and render the user message when it's read | Owner | 2026-10-19 |
+| D46 | Defects (was Q-E7) | A fixed message plus a reference id that finds the full log entry. Self-hosted: the instance operator is who you contact | Owner | 2026-10-19 |
+| D47 | Rate limiting (was Q-E9) | In v1, a generous per-API-key limit: `RequestsTooFrequent` with `retryAfterMillis` | Owner | 2026-10-19 |
+| D48 | Unsaved edits (was Q-E10) | v1 requirement: unsaved edits survive a failed save and a re-sign-in | Owner | 2026-10-19 |
+| D49 | Telemetry (was Q-E11) | Opt-in OpenTelemetry, off by default, no phone-home. Our hosted instance reviews error frequency 30 days after each launch | Owner | 2026-10-19 |
+| D50 | Mailer (was Q-T6, P4) | A pluggable process-tier `Mailer` service, with Resend as the default implementation | Owner | 2026-10-19 |
+| D51 | Themes (was Q-U1/U2) | Light and dark (follow the OS, with a manual override), generated from base/accent/contrast in OKLCH. No theme picker in v1 | Owner | 2026-10-19 |
+| D52 | Density (was Q-U4) | One dense default. No toggle | Owner | 2026-10-19 |
+| D53 | Keyboard (was Q-U5/U6) | A command menu (⌘K) in v1 that reaches every operation. Single-key shortcuts, disabled while typing | Owner | 2026-10-19 |
+| D54 | Index views (was Q-U7) | A table by default, with custom fields as columns and inline editing | Owner | 2026-10-19 |
+| D55 | Opening records (was Q-U8) | A side panel from an index view (J/K moves between records), expandable to the full record view at its own URL | Owner | 2026-10-19 |
+| D56 | Platforms (was Q-U9/U10) | Desktop web first. Usable at 390px, but not specially designed for mobile. No desktop app | Owner | 2026-10-19 |
+| D57 | Design assets (was Q-U11) | Error, empty and loading states are mandatory in every design asset | Owner | 2026-10-19 |
+| D58 | Sidebar layout | Team switcher at the top, user menu at the bottom. "Search ⌘K" opens the command menu. Record types (Contacts, Companies) with their saved views, and Settings | Owner | 2026-10-19 |
+| D59 | Saved views | In v1, listed under their record type in the sidebar. They share the filter component that v2 dynamic segments reuse | Owner | 2026-10-19 |
+| D60 | Saved view visibility | Personal or shared with the team. Any member with `records:write` can create and edit shared views | Owner | 2026-10-19 |
+| D61 | Search | The command menu only: it searches records and operations together. No separate search screen. Index views have their own filters | Owner | 2026-10-19 |
+| D62 | Import and export | CSV import and export of contacts and companies in v1, both as operations. Import maps columns to fields, including custom fields, and reports `InputRejected` per row. Export follows the current filters | Owner | 2026-10-19 |
+| D63 | Activity | Per record only in v1 (in the record view). No team-wide activity screen | Owner | 2026-10-19 |
+| D64 | Sidebar collapse | Collapses to an icon rail (⌘\\). The state is remembered per browser | Owner | 2026-10-19 |
+| D65 | Index view header | Two rows. Row 1: title or saved view name, record count, primary action. Row 2: filters plus Display (columns, sort). Unsaved changes show Save view / Reset | Owner | 2026-10-19 |
+| D66 | Deleted records | A "Deleted" option in an index view's Display menu shows deleted records with a Restore action. An undo toast appears right after a delete | Owner | 2026-10-19 |
+| D67 | Restoring a live record | Idempotent: returns the live record | Owner | 2026-10-19 |
+| D68 | Custom field names | Unique per record type, case-insensitive, and not allowed to clash with built-in field names (`CustomFieldNameTaken`) | Owner | 2026-10-19 |
+| D69 | Contacts table default columns | Avatar, name + primary email, companies (affiliations as chips), created, updated | Owner | 2026-10-19 |
+| D70 | Inline editing | Click selects a cell, Enter or double-click edits it, arrow keys move between cells. Saved optimistically on Enter or blur, Esc cancels. Clicking the name opens the panel | Owner | 2026-10-19 |
+| D71 | Bulk actions | On selected rows: delete (undo toast), set a field, affiliate with a company, export selected | Owner | 2026-10-19 |
+| D72 | Creating a contact | "New contact" (or C) opens the panel in create mode, with focus on first name. It stays open on the new record after saving | Owner | 2026-10-19 |
+| D73 | Record panel | Header (avatar, display name, affiliations, quick actions), then built-in fields, then custom fields (all editable inline), then activity | Owner | 2026-10-19 |
+| D74 | Notes | Entries in a record's activity, each with an author and a time, and editable/deletable. Adding a note is an operation, so agents can leave notes | Owner | 2026-10-19 |
+| D75 | Avatars and logos | An uploaded image, else a third-party source, else coloured initials. Contacts: Gravatar for the primary email. Companies: the favicon from the primary domain, fetched by our server through SSRF-safe egress and stored | Owner | 2026-10-19 |
+| D76 | File storage | A process-tier `FileStore` service speaking the S3 API (S3, R2, MinIO, …). Images are resized and re-encoded server-side, never served raw | Owner | 2026-10-19 |
+| D77 | Gravatar | A team setting, off by default | Owner | 2026-10-19 |
+| D78 | "via" attribution | Activity shows the API key's name, which the user chooses: "Jane via Claude on my laptop" | Owner | 2026-10-19 |
+| D79 | Typeface (was Q-U3) | Host Grotesk for the UI, DM Mono for monospace. Visual direction: "Ink" (monochrome, dark and light) | Owner | 2026-10-19 |
+| D80 | Design asset: app shell + Contacts | Approved after critique rounds. Source in `docs/design/app-shell-contacts/` (canvas: https://claude.ai/artifact/2EA4QXAWWcPa5j4cipBaFS) | Owner | 2026-10-19 |
+| D81 | CRT appearance mode | Experimental, opt-in, never the default. Amber phosphor, DM Mono, scanlines, aperture mask, flicker, vignette and glow, with no rolling band. CSS layer everywhere. Later, a progressive WebGL shader via HTML-in-Canvas where supported | Owner | 2026-10-19 |
+| D82 | Drizzle + Effect | Drizzle defines the schema, migrations and type-safe queries. Queries execute through Effect's `@effect/sql-pg` SqlClient (pool, transactions, spans), using a small Drizzle→SQL adapter | Owner | 2026-10-19 |
+| D83 | MCP implementation | Effect's `McpServer` (`effect/unstable/ai`), with tools derived from the operation registry | Owner | 2026-10-19 |
+| D84 | Milestone 1 | Foundation (monorepo, lint, errors, proofs, DB, auth with teams) plus an end-to-end contacts slice through the operation registry to the HTTP API, MCP and web | Owner | 2026-10-19 |
+
+## Implementation choices made during milestone 1 (Claude; low-stakes, open to veto)
+
+| # | Choice | Why |
+| --- | --- | --- |
+| I1 | TypeScript 6.0, not 7 | `@effect/language-service` (our Effect diagnostics) supports up to TS 6; TS 7 needs a separate tool (`@effect/tsgo`) |
+| I2 | Local Postgres on port 5433 | 5432 was already taken by another container on the dev machine |
+| I3 | REST-style paths (`/api/v1/teams/:teamId/contacts/:contactId`) | Conventional for OpenAPI consumers; each operation declares its method and path, and the path parameters come from its input |
+| I4 | The web client is derived from the operation contracts (`apps/web/src/lib/client.ts`), not `HttpApiClient` | The HttpApi is built from the registry at runtime, so its static types are loose; the contracts carry exact input, output and error types |
+| I5 | New operation `teams.create`, with error `TeamCreationNeedsSignIn` (403) | D17 disabled Better-Auth's own team creation, so new users had no way to create a first team |
+| I6 | New sanctioned `userText` brand `FieldLabel` | Input errors need field labels, which come from title annotations we write on our own schemas |
+| I7 | MCP authenticates in an HTTP middleware and provides a request-tier `CurrentPrincipal` | Effect's McpServer hides HTTP headers from tool handlers by design |
+| I8 | Signed-in screens render on the client (`ssr: false`) | Keeps cookies and auth out of server rendering for now; revisit if first paint matters |
+| I9 | API key scopes are stored as Better-Auth permissions; a key with none can do nothing | Deny by default |
+
+## Milestone 1: what's built, and what's next
+
+Built: the monorepo; `@parley/errors`, `domain`, `db`, `core`, `api`, `http` and `mcp`; Better-Auth with teams and API keys; proofs and lint enforcement; the operations `teams.list`, `teams.create`, `contacts.list/get/create/update/delete/restore/activity` over HTTP, MCP and the web; the app shell and Contacts screen in Ink with Host Grotesk, light and dark themes, CRT mode, the command menu and shortcuts.
+
+Not yet: companies and affiliations, custom fields, saved views, notes, CSV import and export, bulk "set field", API key and member management screens (and their operations), Settings, the 30-day purge job, avatars and logos, a full record view, and paging in the table beyond loading everything.
+
+## Proposed (awaiting the owner)
+
+| # | Proposal | Where it's argued |
+| --- | --- | --- |
+| P2 | Permission set and role mapping (`records:read/write/delete`, `fields:manage`, `members:manage`, `service-accounts:manage`, `team:manage`) | [00](./00-architecture.md), [04](./04-authorization-proofs.md) |
+| ~~P4~~ (now D50) | "Default" implies pluggable: a process-tier `Mailer` service interface in core, with `Resend` as the first (default) implementation. Resend errors are classified into our own error classes, and Resend's text never reaches a user | [01](./01-errors-are-data.md), [03](./03-tiers.md) |
+| P3 | Effective permissions = role permissions ∩ scopes, computed in one function | [00](./00-architecture.md), [04](./04-authorization-proofs.md) |
+
+Each post ends with its own **Open questions**, and those are collected below once reviewed.
+
+## Open questions
+
+
+### Deferred to v2 design
+
+- **Q-T5** Per-team send rate limiting: an in-memory team-tier limiter, or a shared store keyed by `TeamId`?
+- **Q-E8** How Resend errors are split into classes, and whether user messages ever name the email provider.
+- How Resend's **Topics** map onto our subscription management.

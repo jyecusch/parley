@@ -1,0 +1,107 @@
+import { sql } from "drizzle-orm"
+import {
+  boolean,
+  foreignKey,
+  index,
+  integer,
+  pgTable,
+  text,
+  timestamp,
+  unique,
+  uniqueIndex,
+  uuid,
+} from "drizzle-orm/pg-core"
+import { organization, user } from "./auth.ts"
+
+const timestamps = {
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}
+
+/** Every tenant table carries team_id, so row-level security can be added later without a migration (D28). */
+const teamId = () =>
+  text("team_id")
+    .notNull()
+    .references(() => organization.id, { onDelete: "cascade" })
+
+export const contacts = pgTable(
+  "contacts",
+  {
+    id: uuid("id").primaryKey(),
+    teamId: teamId(),
+    firstName: text("first_name"),
+    lastName: text("last_name"),
+    ...timestamps,
+    /** Soft delete: hidden at once, restorable for 30 days, then purged (D30). */
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  },
+  (t) => [
+    unique("contacts_team_id_id_key").on(t.teamId, t.id),
+    index("contacts_team_id_updated_at_idx").on(t.teamId, t.updatedAt.desc(), t.id.desc()),
+  ],
+)
+
+export const contactEmails = pgTable(
+  "contact_emails",
+  {
+    id: uuid("id").primaryKey(),
+    teamId: teamId(),
+    contactId: uuid("contact_id").notNull(),
+    /** Stored lower-cased. */
+    address: text("address").notNull(),
+    isPrimary: boolean("is_primary").notNull(),
+    position: integer("position").notNull(),
+    /** False while the contact is deleted, which releases the address (D30). */
+    active: boolean("active").notNull().default(true),
+  },
+  (t) => [
+    foreignKey({
+      name: "contact_emails_contact_fk",
+      columns: [t.teamId, t.contactId],
+      foreignColumns: [contacts.teamId, contacts.id],
+    }).onDelete("cascade"),
+    uniqueIndex("contact_emails_team_id_address_key").on(t.teamId, t.address).where(sql`active`),
+    index("contact_emails_contact_id_idx").on(t.contactId),
+  ],
+)
+
+export const contactPhones = pgTable(
+  "contact_phones",
+  {
+    id: uuid("id").primaryKey(),
+    teamId: teamId(),
+    contactId: uuid("contact_id").notNull(),
+    /** E.164 (D34). */
+    number: text("number").notNull(),
+    label: text("label"),
+    position: integer("position").notNull(),
+  },
+  (t) => [
+    foreignKey({
+      name: "contact_phones_contact_fk",
+      columns: [t.teamId, t.contactId],
+      foreignColumns: [contacts.teamId, contacts.id],
+    }).onDelete("cascade"),
+    index("contact_phones_contact_id_idx").on(t.contactId),
+  ],
+)
+
+export const activity = pgTable(
+  "activity",
+  {
+    id: uuid("id").primaryKey(),
+    teamId: teamId(),
+    recordType: text("record_type", { enum: ["contact"] }).notNull(),
+    recordId: uuid("record_id").notNull(),
+    actorUserId: text("actor_user_id").references(() => user.id, { onDelete: "set null" }),
+    /** The name shown at the time, kept if the user is later removed. */
+    actorName: text("actor_name").notNull(),
+    viaApiKeyId: text("via_api_key_id"),
+    /** The API key's name at the time ("Claude on my laptop", D78). */
+    viaName: text("via_name"),
+    kind: text("kind", { enum: ["created", "updated", "deleted", "restored"] }).notNull(),
+    changedFields: text("changed_fields").array().notNull().default(sql`'{}'::text[]`),
+    at: timestamp("at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [index("activity_record_idx").on(t.teamId, t.recordId, t.at)],
+)

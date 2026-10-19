@@ -1,0 +1,13 @@
+language js
+
+or {
+  `class $name extends Data.TaggedError($args) { $body }`,
+  `class $name extends Data.TaggedError($args)<$fields> { $body }`,
+  `class $name extends Data.Error { $body }`,
+  `class $name extends Error { $body }`,
+  `class $name extends Schema.TaggedError<$self>()($args) { $body }` where {
+    $name <: not within `class $_ extends $_ implements DomainError { $_ }`
+  }
+} as $class where {
+  register_diagnostic(span=$name, message="Every error is a Schema.TaggedError class that implements DomainError (see docs/01-errors-are-data.md).", severity="error")
+}

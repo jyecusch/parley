@@ -1,0 +1,13 @@
+{
+  "name": "@parley/domain",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@parley/errors": "workspace:*",
+    "effect": "4.0.5"
+  }
+}

@@ -1,0 +1,5 @@
+language js
+
+`Effect.promise($args)` where {
+  register_diagnostic(span=$args, message="Use Effect.tryPromise with a catch that classifies the error into a DomainError. Effect.promise turns every rejection into an unexplained defect.", severity="error")
+}

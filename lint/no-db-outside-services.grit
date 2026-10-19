@@ -1,0 +1,10 @@
+language js
+
+`import $what from "@parley/db"` as $import where {
+  $filename <: not includes "core/src/services/",
+  $filename <: not includes "core/src/auth/",
+  $filename <: not includes "core/src/index.ts",
+  $filename <: not includes "packages/db/",
+  $filename <: not includes "/test/",
+  register_diagnostic(span=$import, message="Only core services read and write the database. Call a service that demands a proof.", severity="error")
+}

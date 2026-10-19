@@ -1,0 +1,15 @@
+language js
+
+or {
+  `$value as Named<$args>`,
+  `$value as Proof<$args>`,
+  `$value as MemberOf<$args>`,
+  `$value as CanReadRecords<$args>`,
+  `$value as CanWriteRecords<$args>`,
+  `$value as CanDeleteRecords<$args>`,
+  `$value as ContactInTeam<$args>`,
+  `$value as ContactRestorable<$args>`
+} as $cast where {
+  $filename <: not includes "core/src/proofs/proof.ts",
+  register_diagnostic(span=$cast, message="Never assert a proof or a named value. Get it from a prover in core/src/proofs/.", severity="error")
+}

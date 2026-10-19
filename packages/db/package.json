@@ -1,0 +1,26 @@
+{
+  "name": "@parley/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./schema": "./src/schema/index.ts"
+  },
+  "scripts": {
+    "generate": "drizzle-kit generate",
+    "migrate": "drizzle-kit migrate"
+  },
+  "dependencies": {
+    "@effect/sql-pg": "4.0.5",
+    "@parley/domain": "workspace:*",
+    "@parley/errors": "workspace:*",
+    "drizzle-orm": "0.45.4",
+    "effect": "4.0.5",
+    "pg": "8.23.1"
+  },
+  "devDependencies": {
+    "@types/pg": "8.23.1",
+    "drizzle-kit": "0.31.11"
+  }
+}

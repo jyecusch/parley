@@ -1,0 +1,66 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.15/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "files": {
+    "includes": [
+      "**",
+      "!**/node_modules",
+      "!**/dist",
+      "!docs/design",
+      "!**/routeTree.gen.ts",
+      "!packages/db/migrations"
+    ]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 120
+  },
+  "javascript": {
+    "formatter": {
+      "semicolons": "asNeeded",
+      "quoteStyle": "double",
+      "trailingCommas": "all"
+    }
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "suspicious": {
+        "noExplicitAny": "error"
+      },
+      "style": {
+        "noNonNullAssertion": "error"
+      },
+      "preset": "recommended"
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["**/*.ts", "**/*.tsx", "!packages/errors/src/**"],
+      "plugins": [
+        "./lint/no-effect-promise.grit",
+        "./lint/no-unchecked-user-text.grit",
+        "./lint/errors-implement-domain-error.grit",
+        "./lint/proofs-only-in-proofs.grit",
+        "./lint/no-proof-assertion.grit",
+        "./lint/no-db-outside-services.grit"
+      ]
+    },
+    {
+      "includes": ["**/*.css"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noDescendingSpecificity": "off"
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,1096 @@
+import type { ActivityEntry, Contact, ContactId, FieldProblem, TeamId } from "@parley/domain"
+import type { UserText } from "@parley/errors"
+import { useLiveQuery } from "@tanstack/react-db"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { createFileRoute, useNavigate } from "@tanstack/react-router"
+import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import {
+  AgentIcon,
+  AlertIcon,
+  ChevronDown,
+  ChevronUp,
+  CloseIcon,
+  ContactsIcon,
+  DisplayIcon,
+  MoreIcon,
+  RestoreIcon,
+  TrashIcon,
+} from "../components/icons.tsx"
+import { isTyping, useShell } from "../components/shell.tsx"
+import { call, isApiFailure, messageOf } from "../lib/client.ts"
+import { contactsCollection, displayNameOf, initialsOf } from "../lib/contacts.ts"
+import { absolute, relative } from "../lib/time.ts"
+
+export interface Search {
+  readonly contact?: string
+  readonly new?: boolean
+  readonly deleted?: boolean
+}
+
+export const Route = createFileRoute("/t/$teamId/contacts")({
+  ssr: false,
+  validateSearch: (search: Record<string, unknown>): Search => ({
+    ...(typeof search.contact === "string" ? { contact: search.contact } : {}),
+    ...(search.new === true || search.new === "true" ? { new: true } : {}),
+    ...(search.deleted === true || search.deleted === "true" ? { deleted: true } : {}),
+  }),
+  component: ContactsScreen,
+})
+
+interface Toast {
+  readonly text: string
+  readonly undo?: () => void
+}
+
+function ContactsScreen() {
+  const { team, openCommand } = useShell()
+  const teamId = team.id as TeamId
+  const search = Route.useSearch()
+  const navigate = useNavigate({ from: Route.fullPath })
+  const queryClient = useQueryClient()
+  const collection = contactsCollection(teamId, queryClient)
+  const live = useLiveQuery((q) => q.from({ contact: collection }), [collection])
+  const [filter, setFilter] = useState("")
+  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
+  const [cursor, setCursor] = useState<string>()
+  const [toast, setToast] = useState<Toast>()
+  const [displayMenu, setDisplayMenu] = useState(false)
+  const filterRef = useRef<HTMLInputElement>(null)
+
+  const contacts = useMemo(() => {
+    const q = filter.trim().toLowerCase()
+    return [...(live.data ?? [])]
+      .filter(
+        (contact) =>
+          !q ||
+          contact.displayName.toLowerCase().includes(q) ||
+          contact.emails.some((email) => email.address.includes(q)),
+      )
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || b.id.localeCompare(a.id))
+  }, [live.data, filter])
+
+  const open = search.contact ? contacts.find((contact) => contact.id === search.contact) : undefined
+
+  const setSearch = useCallback((next: Search) => navigate({ search: next, replace: false }), [navigate])
+
+  const showToast = useCallback((next: Toast) => {
+    setToast(next)
+    window.setTimeout(() => setToast((current) => (current === next ? undefined : current)), 8000)
+  }, [])
+
+  const restore = useCallback(
+    async (ids: ReadonlyArray<string>) => {
+      try {
+        for (const id of ids) await call("contacts.restore", { teamId, contactId: id as ContactId })
+      } catch (failure) {
+        showToast({ text: messageOf(failure) })
+      }
+      await collection.utils.refetch()
+      await queryClient.invalidateQueries({ queryKey: ["contacts-deleted", teamId] })
+    },
+    [collection, queryClient, showToast, teamId],
+  )
+
+  const remove = useCallback(
+    (ids: ReadonlyArray<string>) => {
+      if (ids.length === 0) return
+      const transaction = collection.delete(ids.map((id) => id as ContactId))
+      setSelected(new Set())
+      if (search.contact && ids.includes(search.contact)) void setSearch({})
+      const text = ids.length === 1 ? "1 contact deleted" : `${ids.length} contacts deleted`
+      showToast({ text, undo: () => void restore(ids) })
+      transaction.isPersisted.promise.catch((failure: unknown) => showToast({ text: messageOf(failure) }))
+    },
+    [collection, restore, search.contact, setSearch, showToast],
+  )
+
+  // Keyboard: j/k move, Enter opens, x selects, ⌫ deletes the selection, / filters, ⌘Z undoes.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z" && toast?.undo && !isTyping(event)) {
+        event.preventDefault()
+        toast.undo()
+        setToast(undefined)
+        return
+      }
+      if (isTyping(event) || event.metaKey || event.ctrlKey || event.altKey) return
+      const index = contacts.findIndex((contact) => contact.id === (open?.id ?? cursor))
+      const move = (delta: number) => {
+        const next = contacts[Math.min(Math.max(index + delta, 0), contacts.length - 1)]
+        if (!next) return
+        if (open) void setSearch({ contact: next.id })
+        else setCursor(next.id)
+      }
+      if (event.key === "j" || event.key === "ArrowDown") {
+        event.preventDefault()
+        move(index < 0 ? 0 : 1)
+      } else if (event.key === "k" || event.key === "ArrowUp") {
+        event.preventDefault()
+        move(index < 0 ? 0 : -1)
+      } else if (event.key === "Enter" && cursor && !open) {
+        void setSearch({ contact: cursor })
+      } else if (event.key === "x" && cursor) {
+        setSelected((current) => toggle(current, cursor))
+      } else if ((event.key === "Backspace" || event.key === "Delete") && selected.size > 0) {
+        event.preventDefault()
+        remove([...selected])
+      } else if (event.key === "/") {
+        event.preventDefault()
+        filterRef.current?.focus()
+      } else if (event.key === "Escape") {
+        if (search.contact || search.new) void setSearch({})
+        else if (selected.size > 0) setSelected(new Set())
+      }
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [contacts, cursor, open, remove, search, selected, setSearch, toast])
+
+  const allChecked = contacts.length > 0 && contacts.every((contact) => selected.has(contact.id))
+  const someChecked = !allChecked && contacts.some((contact) => selected.has(contact.id))
+
+  const isLoading = live.isLoading
+  const loadError = live.isError ? collection.utils.lastError : undefined
+  const isEmpty = !isLoading && !loadError && (live.data?.length ?? 0) === 0
+
+  return (
+    <>
+      <main className={`card main ${selected.size > 0 ? "has-sel" : ""}`}>
+        <div className="hd1">
+          <h1 className="crumb">
+            {search.deleted ? (
+              <>
+                <button className="root linkish" type="button" onClick={() => void setSearch({})}>
+                  Contacts
+                </button>
+                <span className="sep" aria-hidden="true">
+                  /
+                </span>
+                <span>Deleted</span>
+              </>
+            ) : (
+              <span>Contacts</span>
+            )}
+          </h1>
+          {!search.deleted && !isLoading && !isEmpty ? <span className="count">{contacts.length}</span> : null}
+          <div className="spacer" />
+          {isEmpty && !search.deleted ? null : (
+            <button className="btn primary" type="button" onClick={() => void setSearch({ new: true })}>
+              New contact <span className="kbd on-primary">C</span>
+            </button>
+          )}
+        </div>
+
+        {isEmpty && !search.deleted ? null : (
+          <div className="hd2">
+            {search.deleted ? (
+              <span className="sm-t" style={{ color: "var(--fg-subtle)", marginLeft: 7 }}>
+                Deleted contacts can be restored for 30 days.
+              </span>
+            ) : (
+              <>
+                <label className="vh" htmlFor="contact-filter">
+                  Filter contacts
+                </label>
+                <input
+                  ref={filterRef}
+                  id="contact-filter"
+                  className="search-inp"
+                  placeholder="Filter by name or email  /"
+                  value={filter}
+                  onChange={(event) => setFilter(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Escape") {
+                      setFilter("")
+                      event.currentTarget.blur()
+                    }
+                  }}
+                />
+              </>
+            )}
+            <div className="spacer" />
+            <div style={{ position: "relative" }}>
+              <button className="btn ghost sm trail-btn" type="button" onClick={() => setDisplayMenu((v) => !v)}>
+                <DisplayIcon />
+                Display
+              </button>
+              {displayMenu ? (
+                <div className="menu" style={{ right: 0, top: 30 }}>
+                  <button
+                    className="menu-i"
+                    type="button"
+                    onClick={() => {
+                      setDisplayMenu(false)
+                      void setSearch(search.deleted ? {} : { deleted: true })
+                    }}
+                  >
+                    Show deleted contacts
+                    {search.deleted ? <span className="hint">✓</span> : null}
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          </div>
+        )}
+
+        <div className="body">
+          {search.deleted ? (
+            <DeletedContacts teamId={teamId} onRestore={restore} />
+          ) : isLoading ? (
+            <LoadingRows />
+          ) : loadError ? (
+            <LoadFailed message={messageOf(loadError)} onRetry={() => void collection.utils.refetch()} />
+          ) : isEmpty ? (
+            <EmptyTeam onNew={() => void setSearch({ new: true })} onCommand={openCommand} />
+          ) : contacts.length === 0 ? (
+            <div className="center">
+              <div className="empty">
+                <h2>No contacts match “{filter}”</h2>
+                <p>Try part of a name or an email address.</p>
+              </div>
+            </div>
+          ) : (
+            <div className="tablewrap">
+              <table className="ctable">
+                <caption className="vh">Contacts</caption>
+                <thead>
+                  <tr>
+                    <th className="w-check c-check" scope="col">
+                      <input
+                        className={`cb ${someChecked ? "is-mixed" : ""}`}
+                        type="checkbox"
+                        aria-label="Select all contacts"
+                        checked={allChecked}
+                        onChange={() => setSelected(allChecked ? new Set() : new Set(contacts.map((c) => c.id)))}
+                      />
+                    </th>
+                    <th className="w-name" scope="col">
+                      Name
+                    </th>
+                    <th className="w-email" scope="col">
+                      Primary email
+                    </th>
+                    <th className="w-date col-wide" scope="col">
+                      Created
+                    </th>
+                    <th className="w-date col-wide" scope="col">
+                      Updated
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {contacts.map((contact) => (
+                    <ContactRow
+                      key={contact.id}
+                      contact={contact}
+                      checked={selected.has(contact.id)}
+                      isOpen={open?.id === contact.id}
+                      isCursor={!open && cursor === contact.id}
+                      onToggle={() => setSelected((current) => toggle(current, contact.id))}
+                      onOpen={() => void setSearch({ contact: contact.id })}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {selected.size > 0 ? (
+          <div className="floatbar" role="toolbar" aria-label="Bulk actions">
+            <span className="n">
+              <b>{selected.size}</b> selected
+            </span>
+            <span className="div" />
+            <button
+              className="btn ghost sm danger tip tip-b"
+              type="button"
+              data-tip="Delete  ⌫"
+              onClick={() => remove([...selected])}
+            >
+              Delete
+            </button>
+            <span className="div" />
+            <button
+              className="ibtn tip tip-b"
+              type="button"
+              aria-label="Clear selection"
+              data-tip="Clear selection  Esc"
+              style={{ width: 24, height: 24 }}
+              onClick={() => setSelected(new Set())}
+            >
+              <CloseIcon size={12} />
+            </button>
+          </div>
+        ) : toast ? (
+          <div className="floatbar" role="status">
+            <span className="n" style={{ color: "var(--fg)" }}>
+              {toast.text}
+            </span>
+            {toast.undo ? (
+              <>
+                <span className="div" />
+                <button
+                  className="btn ghost sm"
+                  type="button"
+                  onClick={() => {
+                    toast.undo?.()
+                    setToast(undefined)
+                  }}
+                >
+                  Undo <span className="kbd">⌘Z</span>
+                </button>
+              </>
+            ) : null}
+          </div>
+        ) : null}
+      </main>
+
+      {search.new ? (
+        <CreatePanel
+          teamId={teamId}
+          onClose={() => void setSearch({})}
+          onCreated={async (contact) => {
+            await collection.utils.refetch()
+            void setSearch({ contact: contact.id })
+          }}
+          onOpenExisting={(id) => void setSearch({ contact: id })}
+        />
+      ) : open ? (
+        <ContactPanel
+          key={open.id}
+          contact={open}
+          teamId={teamId}
+          position={{ index: contacts.indexOf(open), total: contacts.length }}
+          onMove={(delta) => {
+            const next = contacts[contacts.indexOf(open) + delta]
+            if (next) void setSearch({ contact: next.id })
+          }}
+          onClose={() => void setSearch({})}
+          onDelete={() => remove([open.id])}
+          onError={(text) => showToast({ text })}
+          collection={collection}
+        />
+      ) : null}
+    </>
+  )
+}
+
+/** The shape TanStack DB hands to an update: the contact, writable. */
+type Draft = { -readonly [K in keyof Contact]: Contact[K] }
+
+const toggle = (set: ReadonlySet<string>, id: string): ReadonlySet<string> => {
+  const next = new Set(set)
+  if (next.has(id)) next.delete(id)
+  else next.add(id)
+  return next
+}
+
+function ContactRow(props: {
+  readonly contact: Contact
+  readonly checked: boolean
+  readonly isOpen: boolean
+  readonly isCursor: boolean
+  readonly onToggle: () => void
+  readonly onOpen: () => void
+}) {
+  const { contact } = props
+  const email = contact.emails.find((e) => e.isPrimary)?.address ?? contact.emails[0]?.address
+  const className = [
+    props.checked ? "is-checked" : "",
+    props.isOpen ? "is-open" : "",
+    props.isCursor ? "is-cursor" : "",
+  ]
+    .join(" ")
+    .trim()
+  return (
+    <tr className={className}>
+      <td className="c-check">
+        <input
+          className="cb"
+          type="checkbox"
+          aria-label={`Select ${contact.displayName}`}
+          checked={props.checked}
+          onChange={props.onToggle}
+        />
+      </td>
+      <td>
+        <button className="namebtn" type="button" onClick={props.onOpen}>
+          <span className="av" aria-hidden="true">
+            {initialsOf(contact)}
+          </span>
+          <span className="n">{contact.displayName}</span>
+        </button>
+      </td>
+      <td className={email ? "c-email" : "c-none"}>{email ?? "—"}</td>
+      <td className="col-wide c-date" title={`Created ${absolute(contact.createdAt)}`}>
+        {relative(contact.createdAt)}
+      </td>
+      <td className="col-wide c-date" title={`Updated ${absolute(contact.updatedAt)}`}>
+        {relative(contact.updatedAt)}
+      </td>
+    </tr>
+  )
+}
+
+function LoadingRows() {
+  const widths = [56, 72, 48, 64, 80, 52, 68, 60, 44, 76, 58, 66]
+  return (
+    <div className="tablewrap" aria-busy="true">
+      <span className="vh" role="status">
+        Loading contacts
+      </span>
+      <table className="ctable" aria-hidden="true">
+        <tbody>
+          {widths.map((width) => (
+            <tr key={width}>
+              <td className="c-check w-check" />
+              <td className="w-name">
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div className="sk r" />
+                  <div className="sk" style={{ width: `${width * 0.6}%` }} />
+                </div>
+              </td>
+              <td className="w-email">
+                <div className="sk" style={{ width: `${90 - width / 2}%` }} />
+              </td>
+              <td className="col-wide w-date">
+                <div className="sk" style={{ width: 28 }} />
+              </td>
+              <td className="col-wide w-date">
+                <div className="sk" style={{ width: 28 }} />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function EmptyTeam(props: { readonly onNew: () => void; readonly onCommand: () => void }) {
+  return (
+    <div className="center">
+      <div className="empty">
+        <div className="e-ic">
+          <ContactsIcon />
+        </div>
+        <h2>No contacts yet</h2>
+        <p>
+          Contacts are the people your team works with. Connect an agent over MCP and let it do the typing, or add them
+          yourself.
+        </p>
+        <div className="actions">
+          <button className="btn primary" type="button" onClick={props.onNew}>
+            New contact <span className="kbd on-primary">C</span>
+          </button>
+          <button className="btn" type="button" onClick={props.onCommand}>
+            Search <span className="kbd">⌘K</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function LoadFailed(props: { readonly message: UserText; readonly onRetry: () => void }) {
+  return (
+    <div className="center" role="alert">
+      <div className="empty">
+        <div className="e-ic err">
+          <AlertIcon />
+        </div>
+        <h2>Contacts didn't load</h2>
+        <p>{props.message}</p>
+        <div className="actions">
+          <button className="btn primary" type="button" onClick={props.onRetry}>
+            Try again
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function DeletedContacts(props: {
+  readonly teamId: TeamId
+  readonly onRestore: (ids: ReadonlyArray<string>) => Promise<void>
+}) {
+  const deleted = useQuery({
+    queryKey: ["contacts-deleted", props.teamId],
+    queryFn: () => call("contacts.list", { teamId: props.teamId, deleted: true, limit: 200 }),
+  })
+  if (deleted.isLoading) return <LoadingRows />
+  if (deleted.isError) return <LoadFailed message={messageOf(deleted.error)} onRetry={() => void deleted.refetch()} />
+  const items = deleted.data?.items ?? []
+  if (items.length === 0) {
+    return (
+      <div className="center">
+        <div className="empty">
+          <div className="e-ic">
+            <TrashIcon />
+          </div>
+          <h2>Nothing deleted</h2>
+          <p>Contacts you delete stay here for 30 days, so you can restore them.</p>
+        </div>
+      </div>
+    )
+  }
+  return (
+    <div className="tablewrap">
+      <table className="ctable">
+        <caption className="vh">Deleted contacts</caption>
+        <thead>
+          <tr>
+            <th className="w-name" scope="col" style={{ paddingLeft: 14 }}>
+              Name
+            </th>
+            <th className="w-email" scope="col">
+              Primary email
+            </th>
+            <th className="w-date col-wide" scope="col">
+              Deleted
+            </th>
+            <th style={{ width: 120 }} scope="col">
+              <span className="vh">Restore</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((contact) => (
+            <tr key={contact.id}>
+              <td style={{ paddingLeft: 14 }}>
+                <span className="namebtn" style={{ cursor: "default" }}>
+                  <span className="av" aria-hidden="true">
+                    {initialsOf(contact)}
+                  </span>
+                  <span className="n">{contact.displayName}</span>
+                </span>
+              </td>
+              <td className="c-email">{contact.emails[0]?.address ?? "—"}</td>
+              <td className="col-wide c-date" title={contact.deletedAt ? absolute(contact.deletedAt) : undefined}>
+                {contact.deletedAt ? relative(contact.deletedAt) : ""}
+              </td>
+              <td style={{ textAlign: "right" }}>
+                <button className="btn sm" type="button" onClick={() => void props.onRestore([contact.id])}>
+                  <RestoreIcon size={13} />
+                  Restore
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+/** Normalises what people type ("+61 400 812 337") to E.164 (D34). */
+const toE164 = (value: string) => value.replace(/[\s().-]/g, "")
+
+const problemFor = (problems: ReadonlyArray<FieldProblem> | undefined, field: string) =>
+  problems?.find((problem) => problem.field === field)?.userMessage
+
+const problemsOf = (failure: unknown): ReadonlyArray<FieldProblem> | undefined => {
+  if (!isApiFailure(failure) || failure.error._tag !== "InputRejected") return undefined
+  return (failure.error.details as { problems?: ReadonlyArray<FieldProblem> } | undefined)?.problems
+}
+
+function CreatePanel(props: {
+  readonly teamId: TeamId
+  readonly onClose: () => void
+  readonly onCreated: (contact: Contact) => Promise<void>
+  readonly onOpenExisting: (id: string) => void
+}) {
+  const [busy, setBusy] = useState(false)
+  const [problems, setProblems] = useState<ReadonlyArray<FieldProblem>>()
+  const [emailTaken, setEmailTaken] = useState<{ readonly message: UserText; readonly existing: string }>()
+  const [error, setError] = useState<UserText>()
+  const formRef = useRef<HTMLFormElement>(null)
+
+  const submit = async (event?: FormEvent) => {
+    event?.preventDefault()
+    const form = new FormData(formRef.current ?? undefined)
+    const text = (name: string) => String(form.get(name) ?? "").trim()
+    const email = text("email")
+    const phone = toE164(text("phone"))
+    setBusy(true)
+    setProblems(undefined)
+    setEmailTaken(undefined)
+    setError(undefined)
+    try {
+      const contact = await call("contacts.create", {
+        teamId: props.teamId,
+        ...(text("firstName") ? { firstName: text("firstName") } : {}),
+        ...(text("lastName") ? { lastName: text("lastName") } : {}),
+        ...(email ? { emails: [{ address: email as Contact["emails"][number]["address"] }] } : {}),
+        ...(phone ? { phones: [{ number: phone as Contact["phones"][number]["number"] }] } : {}),
+      })
+      await props.onCreated(contact)
+    } catch (failure) {
+      setBusy(false)
+      const fieldProblems = problemsOf(failure)
+      if (fieldProblems) return setProblems(fieldProblems)
+      if (isApiFailure(failure) && failure.error._tag === "ContactEmailTaken") {
+        const existing = (failure.error.details as { existing?: string } | undefined)?.existing ?? ""
+        return setEmailTaken({ message: failure.error.userMessage, existing })
+      }
+      setError(messageOf(failure))
+    }
+  }
+
+  const fields: ReadonlyArray<{ name: string; label: string; field: string; type?: string; autoFocus?: boolean }> = [
+    { name: "firstName", label: "First name", field: "firstName", autoFocus: true },
+    { name: "lastName", label: "Last name", field: "lastName" },
+    { name: "email", label: "Email", field: "emails.0.address", type: "email" },
+    { name: "phone", label: "Phone", field: "phones.0.number", type: "tel" },
+  ]
+
+  return (
+    <aside className="card panel" aria-label="New contact">
+      <div className="ph">
+        <div className="ph-bar">
+          <span className="pos sm-t" style={{ marginLeft: 6 }}>
+            New contact
+          </span>
+          <div className="spacer" />
+          <button
+            className="ibtn tip tip-b"
+            type="button"
+            aria-label="Close panel"
+            data-tip="Close  Esc"
+            onClick={props.onClose}
+          >
+            <CloseIcon />
+          </button>
+        </div>
+        <div className="ph-id">
+          <span className="av lg" aria-hidden="true" />
+          <div style={{ minWidth: 0 }}>
+            <h2 className="pname" style={{ color: "var(--fg-subtle)" }}>
+              Untitled contact
+            </h2>
+            <p className="paff sm-t">Only a name or an email is needed.</p>
+          </div>
+        </div>
+      </div>
+      <form
+        ref={formRef}
+        className="pbody"
+        onSubmit={submit}
+        onKeyDown={(event) => {
+          if ((event.metaKey || event.ctrlKey) && event.key === "Enter") void submit()
+          if (event.key === "Escape") props.onClose()
+        }}
+      >
+        <section className="sec">
+          {fields.map((f) => {
+            const message = problemFor(problems, f.field) ?? (f.name === "email" ? emailTaken?.message : undefined)
+            return (
+              <div className="field" key={f.name}>
+                <label className="flabel sm-t" htmlFor={`nc-${f.name}`}>
+                  {f.label}
+                </label>
+                <div className="fval" style={{ padding: "0 6px" }}>
+                  <input
+                    id={`nc-${f.name}`}
+                    name={f.name}
+                    className="finp"
+                    type={f.type ?? "text"}
+                    autoComplete="off"
+                    placeholder="Empty"
+                    // biome-ignore lint/a11y/noAutofocus: the create panel opens for typing, like a dialog
+                    autoFocus={f.autoFocus}
+                    aria-invalid={message ? true : undefined}
+                    aria-describedby={message ? `nc-${f.name}-err` : undefined}
+                  />
+                  {message ? (
+                    <p id={`nc-${f.name}-err`} className="ferr sm-t">
+                      {message}{" "}
+                      {f.name === "email" && emailTaken?.existing ? (
+                        <button
+                          className="linkish sm-t"
+                          type="button"
+                          onClick={() => props.onOpenExisting(emailTaken.existing)}
+                        >
+                          Open contact
+                        </button>
+                      ) : null}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+            )
+          })}
+          {problems && !fields.some((f) => problemFor(problems, f.field)) ? (
+            <p className="ferr sm-t">{problems[0]?.userMessage}</p>
+          ) : null}
+          {error ? (
+            <p className="ferr sm-t" role="alert">
+              {error}
+            </p>
+          ) : null}
+        </section>
+        <button type="submit" className="vh" tabIndex={-1}>
+          Create contact
+        </button>
+      </form>
+      <div className="pfoot">
+        <button className="btn primary" type="button" disabled={busy} onClick={() => void submit()}>
+          Create contact <span className="kbd on-primary">⌘↵</span>
+        </button>
+        <button className="btn ghost" type="button" onClick={props.onClose}>
+          Cancel
+        </button>
+      </div>
+    </aside>
+  )
+}
+
+function ContactPanel(props: {
+  readonly contact: Contact
+  readonly teamId: TeamId
+  readonly position: { readonly index: number; readonly total: number }
+  readonly onMove: (delta: number) => void
+  readonly onClose: () => void
+  readonly onDelete: () => void
+  readonly onError: (text: UserText) => void
+  readonly collection: ReturnType<typeof contactsCollection>
+}) {
+  const { contact, collection } = props
+  const queryClient = useQueryClient()
+  const [moreMenu, setMoreMenu] = useState(false)
+  const activity = useQuery({
+    queryKey: ["contact-activity", props.teamId, contact.id, contact.updatedAt],
+    queryFn: () => call("contacts.activity", { teamId: props.teamId, contactId: contact.id }),
+  })
+
+  const save = (change: (draft: Draft) => void) => {
+    const transaction = collection.update(contact.id, (draft) => {
+      change(draft as Draft)
+      const primary = draft.emails.find((email) => email.isPrimary)?.address ?? draft.emails[0]?.address
+      draft.displayName = displayNameOf(draft.firstName, draft.lastName, primary)
+    })
+    transaction.isPersisted.promise
+      .then(() => queryClient.invalidateQueries({ queryKey: ["contact-activity", props.teamId, contact.id] }))
+      .catch((failure: unknown) => props.onError(messageOf(failure)))
+  }
+
+  return (
+    <aside className="card panel" aria-label={`Contact ${contact.displayName}`}>
+      <div className="ph">
+        <div className="ph-bar">
+          <button
+            className="ibtn tip tip-b"
+            type="button"
+            aria-label="Previous contact"
+            data-tip="Previous  K"
+            onClick={() => props.onMove(-1)}
+          >
+            <ChevronUp />
+          </button>
+          <button
+            className="ibtn tip tip-b"
+            type="button"
+            aria-label="Next contact"
+            data-tip="Next  J"
+            onClick={() => props.onMove(1)}
+          >
+            <ChevronDown size={16} />
+          </button>
+          <span className="pos sm-t tab">
+            {props.position.index + 1} of {props.position.total}
+          </span>
+          <div className="spacer" />
+          <div style={{ position: "relative" }}>
+            <button
+              className="ibtn tip tip-b"
+              type="button"
+              aria-label="More actions"
+              data-tip="More"
+              onClick={() => setMoreMenu((v) => !v)}
+            >
+              <MoreIcon />
+            </button>
+            {moreMenu ? (
+              <div className="menu" style={{ right: 0, top: 30 }}>
+                <button
+                  className="menu-i"
+                  type="button"
+                  onClick={() => {
+                    const email = contact.emails[0]?.address
+                    if (email) void navigator.clipboard?.writeText(email)
+                    setMoreMenu(false)
+                  }}
+                >
+                  Copy email
+                </button>
+                <div className="menu-sep" />
+                <button className="menu-i" type="button" style={{ color: "var(--danger)" }} onClick={props.onDelete}>
+                  <TrashIcon size={14} />
+                  Delete contact
+                </button>
+              </div>
+            ) : null}
+          </div>
+          <button
+            className="ibtn tip tip-b"
+            type="button"
+            aria-label="Close panel"
+            data-tip="Close  Esc"
+            onClick={props.onClose}
+          >
+            <CloseIcon />
+          </button>
+        </div>
+        <div className="ph-id">
+          <span className="av lg" aria-hidden="true">
+            {initialsOf(contact)}
+          </span>
+          <div style={{ minWidth: 0 }}>
+            <h2 className="pname">{contact.displayName}</h2>
+            <p className="paff sm-t">{contact.emails[0]?.address ?? "No email"}</p>
+          </div>
+        </div>
+      </div>
+      <div className="pbody">
+        <section className="sec">
+          <EditableText
+            label="First name"
+            value={contact.firstName}
+            onSave={(value) =>
+              save((draft) => {
+                draft.firstName = value
+              })
+            }
+          />
+          <EditableText
+            label="Last name"
+            value={contact.lastName}
+            onSave={(value) =>
+              save((draft) => {
+                draft.lastName = value
+              })
+            }
+          />
+          <EditableList
+            label="Emails"
+            empty="Add email"
+            items={contact.emails.map((email) => ({
+              value: email.address,
+              tag: email.isPrimary && contact.emails.length > 1 ? "Primary" : undefined,
+            }))}
+            type="email"
+            onSave={(values) =>
+              save((draft) => {
+                draft.emails = values.map((address, index) => ({
+                  address: address.toLowerCase() as Contact["emails"][number]["address"],
+                  isPrimary: index === 0,
+                }))
+              })
+            }
+          />
+          <EditableList
+            label="Phones"
+            empty="Add phone"
+            items={contact.phones.map((phone) => ({ value: phone.number, tag: phone.label ?? undefined }))}
+            type="tel"
+            onSave={(values) =>
+              save((draft) => {
+                draft.phones = values.map((value, index) => ({
+                  number: toE164(value) as Contact["phones"][number]["number"],
+                  label: contact.phones[index]?.label ?? null,
+                }))
+              })
+            }
+          />
+        </section>
+        <section className="sec">
+          <h3 className="sec-h sm-t">Activity</h3>
+          {activity.isLoading ? <div className="sk" style={{ width: "60%", margin: "8px 0" }} /> : null}
+          {activity.isError ? <p className="ferr sm-t">{messageOf(activity.error)}</p> : null}
+          {(activity.data ?? []).map((entry, index) => (
+            <ActivityRow key={entry.id} entry={entry} first={index === 0} />
+          ))}
+        </section>
+      </div>
+    </aside>
+  )
+}
+
+const describe = (entry: ActivityEntry): string => {
+  switch (entry.kind) {
+    case "created":
+      return "created this contact"
+    case "deleted":
+      return "deleted this contact"
+    case "restored":
+      return "restored this contact"
+    case "updated": {
+      const names: Record<string, string> = {
+        firstName: "first name",
+        lastName: "last name",
+        emails: "emails",
+        phones: "phones",
+      }
+      const fields = entry.changedFields.map((field) => names[field] ?? field)
+      return fields.length > 0 ? `changed ${fields.join(", ")}` : "edited this contact"
+    }
+  }
+}
+
+function ActivityRow(props: { readonly entry: ActivityEntry; readonly first: boolean }) {
+  const { entry } = props
+  const initials = entry.actorName
+    .split(/\s+/)
+    .map((part) => part[0] ?? "")
+    .join("")
+    .slice(0, 2)
+    .toUpperCase()
+  return (
+    <div className={`act ${props.first ? "first" : ""}`}>
+      <span className="av" aria-hidden="true">
+        {initials}
+        {entry.via ? (
+          <span className="agent">
+            <AgentIcon />
+          </span>
+        ) : null}
+      </span>
+      <div style={{ minWidth: 0 }}>
+        <div className="act-l">
+          <b>{entry.actorName}</b>
+          {entry.via ? <span> via {entry.via}</span> : null} {describe(entry)}
+        </div>
+      </div>
+      <span className="when sm-t" title={absolute(entry.at)}>
+        {relative(entry.at)}
+      </span>
+    </div>
+  )
+}
+
+function EditableText(props: {
+  readonly label: string
+  readonly value: string | null
+  readonly onSave: (value: string | null) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const id = `edit-${props.label.replace(/\s+/g, "-").toLowerCase()}`
+  if (editing) {
+    return (
+      <div className="field">
+        <label className="flabel sm-t" htmlFor={id}>
+          {props.label}
+        </label>
+        <div className="fval" style={{ padding: "0 6px" }}>
+          <input
+            id={id}
+            className="finp"
+            defaultValue={props.value ?? ""}
+            // biome-ignore lint/a11y/noAutofocus: the person just clicked this field to edit it
+            autoFocus
+            onBlur={(event) => {
+              setEditing(false)
+              const next = event.currentTarget.value.trim() || null
+              if (next !== props.value) props.onSave(next)
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") event.currentTarget.blur()
+              if (event.key === "Escape") {
+                event.stopPropagation()
+                setEditing(false)
+              }
+            }}
+          />
+        </div>
+      </div>
+    )
+  }
+  return (
+    <div className="field">
+      <span className="flabel sm-t">{props.label}</span>
+      <button className="fval" type="button" onClick={() => setEditing(true)}>
+        {props.value ?? <span className="empty-v">Empty</span>}
+      </button>
+    </div>
+  )
+}
+
+function EditableList(props: {
+  readonly label: string
+  readonly empty: string
+  readonly items: ReadonlyArray<{ readonly value: string; readonly tag: string | undefined }>
+  readonly type: "email" | "tel"
+  readonly onSave: (values: ReadonlyArray<string>) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState<ReadonlyArray<string>>([])
+  const begin = () => {
+    setDraft([...props.items.map((item) => item.value), ""])
+    setEditing(true)
+  }
+  const commit = () => {
+    setEditing(false)
+    const values = draft.map((value) => value.trim()).filter(Boolean)
+    const same =
+      values.length === props.items.length && values.every((value, index) => value === props.items[index]?.value)
+    if (!same) props.onSave(values)
+  }
+  if (editing) {
+    return (
+      <div className="field">
+        <span className="flabel sm-t">{props.label}</span>
+        <fieldset
+          className="fval"
+          style={{ padding: "0 6px", gap: 2, border: 0, minInlineSize: 0 }}
+          onBlur={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) commit()
+          }}
+        >
+          <legend className="vh">{props.label}</legend>
+          {draft.map((value, index) => (
+            <input
+              // biome-ignore lint/suspicious/noArrayIndexKey: rows are positional while editing
+              key={index}
+              className="finp"
+              type={props.type}
+              aria-label={`${props.label} ${index + 1}`}
+              placeholder={index === draft.length - 1 ? props.empty : undefined}
+              // biome-ignore lint/a11y/noAutofocus: the person just clicked this field to edit it
+              autoFocus={index === 0}
+              value={value}
+              onChange={(event) => {
+                const next = [...draft]
+                next[index] = event.target.value
+                if (index === draft.length - 1 && event.target.value) next.push("")
+                setDraft(next)
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") commit()
+                if (event.key === "Escape") {
+                  event.stopPropagation()
+                  setEditing(false)
+                }
+              }}
+            />
+          ))}
+        </fieldset>
+      </div>
+    )
+  }
+  return (
+    <div className="field">
+      <span className="flabel sm-t">{props.label}</span>
+      <button className="fval" type="button" onClick={begin}>
+        {props.items.length === 0 ? <span className="empty-v">Empty</span> : null}
+        {props.items.map((item) => (
+          <span className="fline" key={item.value}>
+            <span className="t">{item.value}</span>
+            {item.tag ? <span className="tag sm-t">{item.tag}</span> : null}
+          </span>
+        ))}
+      </button>
+    </div>
+  )
+}

@@ -1,0 +1,13 @@
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: parley
+      POSTGRES_PASSWORD: parley
+      POSTGRES_DB: parley
+    ports:
+      - "5433:5432"
+    volumes:
+      - parley-pg:/var/lib/postgresql/data
+volumes:
+  parley-pg:

@@ -1,0 +1,16 @@
+{
+  "name": "@parley/mcp",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@parley/api": "workspace:*",
+    "@parley/core": "workspace:*",
+    "@parley/domain": "workspace:*",
+    "@parley/errors": "workspace:*",
+    "effect": "4.0.5"
+  }
+}
