@@ -82,8 +82,8 @@ interface ElementGl extends WebGL2RenderingContext {
 }
 interface ElementCanvas extends HTMLCanvasElement {
   requestPaint(): void
-  /** Makes a drawn child hit-testable where it was drawn; without it, the canvas takes every pointer event. */
-  updateElementGeometry(element: Element, transform?: DOMMatrix): void
+  /** Makes a drawn child hit-testable; without it, the canvas takes every pointer event. */
+  updateElementGeometry(element: Element): void
 }
 
 const shaderSupported = () =>
@@ -119,6 +119,62 @@ const barrel = (x: number, y: number, width: number, height: number, curvature: 
   return { x: (0.5 + cx * bulge) * width, y: (0.5 + cy * bulge) * height }
 }
 
+/**
+ * The cursor drawn by the shader. The system cursor is hidden over the glass (the CSS hides every cursor
+ * there), so which shape to draw is worked out from what's under the pointer.
+ */
+type CursorShape = "arrow" | "hand" | "beam"
+const CURSOR_PX = 24
+const cursorShapeAt = (target: EventTarget | null): CursorShape => {
+  if (!(target instanceof Element)) return "arrow"
+  const field = target.closest("input, textarea, [contenteditable=true]")
+  if (field && !(field instanceof HTMLInputElement && ["checkbox", "radio", "button", "submit"].includes(field.type))) {
+    return "beam"
+  }
+  if (target.closest("a[href], button:not(:disabled), label, select, summary, [role=button], input")) return "hand"
+  return "arrow"
+}
+
+/** Draws a cursor shape, tip at the top-left, in the theme's colours. */
+const paintCursor = (context: CanvasRenderingContext2D, shape: CursorShape, scale: number) => {
+  const styles = getComputedStyle(document.documentElement)
+  const fill = styles.getPropertyValue("--fg").trim() || "#ffb000"
+  const outline = styles.getPropertyValue("--bg-app").trim() || "#000"
+  context.setTransform(1, 0, 0, 1, 0, 0)
+  context.clearRect(0, 0, context.canvas.width, context.canvas.height)
+  context.setTransform(scale, 0, 0, scale, 0, 0)
+  context.lineJoin = "round"
+  context.lineWidth = 1.5
+  context.fillStyle = fill
+  context.strokeStyle = outline
+  const path = new Path2D(
+    shape === "beam"
+      ? "M7 3h6M7 19h6M10 3v16"
+      : shape === "hand"
+        ? "M7.5 11V4.5a1.5 1.5 0 0 1 3 0V10h.2V8.3a1.5 1.5 0 0 1 3 0V10h.2V9a1.5 1.5 0 0 1 3 0v1.6h.1a1.5 1.5 0 0 1 3 0V15c0 3.5-2.4 6-5.8 6h-1.5c-2 0-3.3-.8-4.4-2.4L4.6 14.4a1.6 1.6 0 0 1 2.6-1.8z"
+        : "M2 1.5v16.2l4.2-4 2.7 6.2 2.9-1.3-2.6-6h5.8z",
+  )
+  if (shape === "beam") {
+    context.lineCap = "round"
+    context.lineWidth = 4
+    context.strokeStyle = outline
+    context.stroke(path)
+    context.lineWidth = 1.6
+    context.strokeStyle = fill
+    context.stroke(path)
+    return
+  }
+  context.fill(path)
+  context.stroke(path)
+}
+
+/** Where the cursor's hot spot sits in its picture, by shape. */
+const HOT_SPOT: Readonly<Record<CursorShape, readonly [number, number]>> = {
+  arrow: [2, 1.5],
+  hand: [9, 3.5],
+  beam: [10, 11],
+}
+
 /** How long the app may stay undrawn after it moves into the canvas before the CSS layer takes over. */
 const FIRST_PAINT_TIMEOUT_MS = 1500
 
@@ -145,15 +201,44 @@ function mountShader(screen: HTMLElement, options: { readonly still: boolean; re
   const uFlicker = uniform("u_flicker")
   const uCurvature = uniform("u_curvature")
   const uAberration = uniform("u_aberration")
+  const uCursorAt = uniform("u_cursor_at")
+  const uCursorSize = uniform("u_cursor_size")
+  const uCursorOn = uniform("u_cursor_on")
   // biome-ignore lint/correctness/useHookAtTopLevel: WebGL's useProgram, not a React hook
   gl.useProgram(program)
   gl.uniform1i(uniform("u_screen"), 0)
+  gl.uniform1i(uniform("u_cursor"), 1)
   const texture = gl.createTexture()
   gl.bindTexture(gl.TEXTURE_2D, texture)
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR)
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+
+  const cursorPicture = document.createElement("canvas")
+  const cursorContext = cursorPicture.getContext("2d")
+  const cursorTexture = gl.createTexture()
+  gl.activeTexture(gl.TEXTURE1)
+  gl.bindTexture(gl.TEXTURE_2D, cursorTexture)
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+  gl.activeTexture(gl.TEXTURE0)
+  /** The cursor in app coordinates (where the shader samples the app under the pointer), or null when hidden. */
+  let cursor: { x: number; y: number; shape: CursorShape } | null = null
+  let cursorShape: CursorShape | null = null
+  const uploadCursor = (shape: CursorShape) => {
+    if (!cursorContext || shape === cursorShape) return
+    cursorShape = shape
+    const scale = Math.max(devicePixelRatio, 1) * 2
+    cursorPicture.width = cursorPicture.height = Math.round(CURSOR_PX * scale)
+    paintCursor(cursorContext, shape, scale)
+    gl.activeTexture(gl.TEXTURE1)
+    gl.bindTexture(gl.TEXTURE_2D, cursorTexture)
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, cursorPicture)
+    gl.activeTexture(gl.TEXTURE0)
+  }
 
   let drawn = false
   let unmounted = false
@@ -172,6 +257,12 @@ function mountShader(screen: HTMLElement, options: { readonly still: boolean; re
     const glass = glassSettings()
     gl.uniform1f(uCurvature, glass.curvature)
     gl.uniform1f(uAberration, glass.aberration)
+    gl.uniform1f(uCursorOn, cursor ? 1 : 0)
+    if (cursor) {
+      const [hotX, hotY] = HOT_SPOT[cursor.shape]
+      gl.uniform2f(uCursorAt, cursor.x - hotX, cursor.y - hotY)
+      gl.uniform1f(uCursorSize, CURSOR_PX)
+    }
     gl.drawArrays(gl.TRIANGLES, 0, 3)
   }
 
@@ -181,25 +272,35 @@ function mountShader(screen: HTMLElement, options: { readonly still: boolean; re
   }
 
   /*
-   * The glass bends the picture but the browser hit-tests the flat app. Hit-testing can only be moved by a
-   * matrix, so on every pointer move the app's hit geometry is shifted by how far the bend moves the point
-   * under the pointer. Near the pointer, what you see is then what you click.
+   * The glass bends the picture but the browser hit-tests the flat app. The app's CSS transform moves where
+   * it is hit-tested without moving what the canvas draws, so on every pointer move the app is shifted by how
+   * far the bend moves the point under the pointer. Near the pointer, what you see is then what you click.
    */
   let hitShift = { x: 0, y: 0 }
-  const hitGeometry = () => new DOMMatrix().translate(hitShift.x, hitShift.y)
   const onPointer = (event: PointerEvent) => {
     const box = canvas.getBoundingClientRect()
     const x = event.clientX - box.left
     const y = event.clientY - box.top
     const seen = barrel(x, y, box.width, box.height, glassSettings().curvature)
+    if (event.pointerType === "mouse") {
+      canvas.classList.add("crt-cursor")
+      const shape = cursorShapeAt(event.target)
+      uploadCursor(shape)
+      cursor = { x: seen.x, y: seen.y, shape }
+    } else {
+      canvas.classList.remove("crt-cursor")
+      cursor = null
+    }
+    draw()
     const next = { x: x - seen.x, y: y - seen.y }
     if (Math.abs(next.x - hitShift.x) < 0.5 && Math.abs(next.y - hitShift.y) < 0.5) return
     hitShift = next
-    try {
-      canvas.updateElementGeometry(screen, hitGeometry())
-    } catch {
-      fail()
-    }
+    screen.style.transform = `translate(${next.x}px, ${next.y}px)`
+  }
+
+  const onLeave = () => {
+    cursor = null
+    draw()
   }
 
   const onPaint = () => {
@@ -207,7 +308,7 @@ function mountShader(screen: HTMLElement, options: { readonly still: boolean; re
       gl.bindTexture(gl.TEXTURE_2D, texture)
       elementGl.texElementImage2D(gl.TEXTURE_2D, gl.RGBA8, screen)
       gl.generateMipmap(gl.TEXTURE_2D)
-      canvas.updateElementGeometry(screen, hitGeometry())
+      canvas.updateElementGeometry(screen)
     } catch {
       fail()
       return
@@ -241,7 +342,9 @@ function mountShader(screen: HTMLElement, options: { readonly still: boolean; re
     canvas.removeEventListener("paint", onPaint)
     window.removeEventListener("pointermove", onPointer, true)
     window.removeEventListener("pointerdown", onPointer, true)
+    document.documentElement.removeEventListener("pointerleave", onLeave)
     canvas.removeEventListener("webglcontextlost", fail)
+    screen.style.transform = ""
     const canvasParent = canvas.parentNode
     if (canvasParent) moveInto(canvasParent, screen, canvas)
     else moveInto(parent, screen, null)
@@ -254,6 +357,7 @@ function mountShader(screen: HTMLElement, options: { readonly still: boolean; re
   // Capture phase, so the shift is in place before the next event is hit-tested.
   window.addEventListener("pointermove", onPointer, { capture: true, passive: true })
   window.addEventListener("pointerdown", onPointer, { capture: true, passive: true })
+  document.documentElement.addEventListener("pointerleave", onLeave)
   parent.insertBefore(canvas, screen)
   moveInto(canvas, screen, null)
   resizer.observe(canvas, { box: "device-pixel-content-box" })
@@ -315,6 +419,10 @@ uniform vec2 u_extent;  // app size over canvas size; above 1 when the app overf
 uniform float u_flicker;
 uniform float u_curvature;   // barrel factor; 0 is flat
 uniform float u_aberration;  // colour fringing at the edges, in CSS pixels
+uniform sampler2D u_cursor;
+uniform vec2 u_cursor_at;    // the cursor picture's top-left, in app CSS pixels
+uniform float u_cursor_size; // the cursor picture's size, in CSS pixels
+uniform float u_cursor_on;
 in vec2 v_uv;
 out vec4 frag;
 
@@ -325,6 +433,17 @@ const vec3 WASH = vec3(0.98, 0.86, 0.64);
 
 vec3 screenBlend(vec3 base, vec3 light) {
   return 1.0 - (1.0 - base) * (1.0 - light);
+}
+
+// The cursor over the app at a point in app CSS pixels, so it bends, fringes and glows like everything else.
+vec3 withCursor(vec3 color, vec2 at, int channel) {
+  if (u_cursor_on < 0.5) return color;
+  vec2 local = (at - u_cursor_at) / u_cursor_size;
+  if (any(lessThan(local, vec2(0.0))) || any(greaterThan(local, vec2(1.0)))) return color;
+  vec4 c = texture(u_cursor, local);
+  // WebGL uploads the picture unpremultiplied, so this is an ordinary blend of one channel.
+  color[channel] = mix(color[channel], c[channel], c.a);
+  return color;
 }
 
 float luma(vec3 color) {
@@ -353,6 +472,10 @@ void main() {
     texture(u_screen, texel).g,
     texture(u_screen, texel - fringe).b
   );
+  vec2 fringePx = fringe * u_extent * u_size;
+  color = withCursor(color, px + fringePx, 0);
+  color = withCursor(color, px, 1);
+  color = withCursor(color, px - fringePx, 2);
 
   // Bloom: phosphor light spilling from the brightest strokes.
   vec3 glow = textureLod(u_screen, texel, 2.5).rgb * 0.6 + textureLod(u_screen, texel, 4.5).rgb * 0.4;

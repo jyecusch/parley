@@ -1225,6 +1225,12 @@ body {
   width: 100%;
   height: 100%;
 }
+/* With a mouse, the shader draws the cursor too, so it bends with the glass; the system one is hidden. */
+.crt-screen.crt-cursor,
+.crt-screen.crt-cursor * {
+  /* biome-ignore lint/complexity/noImportantStyles: must beat every element's own cursor while the shader draws it */
+  cursor: none !important;
+}
 /* The canvas draws only the app, not the page behind it. */
 .crt-screen > .app {
   background: var(--bg-app);
