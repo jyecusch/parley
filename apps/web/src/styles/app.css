@@ -155,7 +155,6 @@ body {
 /* The app always fits the window, in CRT mode or not. The page itself never scrolls; lists scroll inside it. */
 .app {
   display: flex;
-  height: 100vh;
   height: 100dvh;
   overflow: hidden;
   position: relative;
