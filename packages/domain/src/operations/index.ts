@@ -1,4 +1,5 @@
 import { createApiKey, listApiKeys, revokeApiKey } from "./api-keys.ts"
+import { createConnection, listConnections, revokeConnection } from "./connections.ts"
 import {
   contactActivity,
   createContact,
@@ -8,10 +9,13 @@ import {
   restoreContact,
   updateContact,
 } from "./contacts.ts"
+import { createServiceAccount, listServiceAccounts } from "./service-accounts.ts"
 import { createTeam, listTeams } from "./teams.ts"
 
 export * from "./api-keys.ts"
+export * from "./connections.ts"
 export * from "./contacts.ts"
+export * from "./service-accounts.ts"
 export * from "./teams.ts"
 
 /** Every operation. Entrypoints iterate this, so adding an operation here exposes it everywhere. */
@@ -28,6 +32,11 @@ export const operations = {
   "apiKeys.list": listApiKeys,
   "apiKeys.create": createApiKey,
   "apiKeys.revoke": revokeApiKey,
+  "connections.list": listConnections,
+  "connections.create": createConnection,
+  "connections.revoke": revokeConnection,
+  "serviceAccounts.list": listServiceAccounts,
+  "serviceAccounts.create": createServiceAccount,
 } as const
 export type Operations = typeof operations
 export type OperationName = keyof Operations

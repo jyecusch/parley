@@ -32,7 +32,7 @@ const handlerFor =
   ({ params, query, payload, request }) =>
     Effect.gen(function* () {
       const authenticator = yield* Authenticator
-      const principal = yield* authenticator.authenticate(headersOf(request))
+      const principal = yield* authenticator.authenticate(headersOf(request), "http")
       const input = { ...params, ...query, ...payload }
       const run = implementations[name] as (
         principal: unknown,
@@ -72,5 +72,32 @@ export const AuthRoutesLive = HttpRouter.use((router) =>
         }),
       ).pipe(Effect.orDie)
     yield* router.add("*", "/api/auth/*", handle)
+    // OAuth discovery for agents (D89). The protected-resource metadata is answered by Better-Auth's
+    // MCP plugin; the authorization server's lives under its base path, so it is re-served here.
+    yield* router.add("GET", "/.well-known/oauth-protected-resource/*", handle)
+    const metadata = (load: (request: Request) => Promise<unknown>) => (request: HttpServerRequest.HttpServerRequest) =>
+      Effect.flatMap(HttpServerRequest.toWeb(request), (web) =>
+        Effect.callback<HttpServerResponse.HttpServerResponse>((resume) => {
+          load(web).then(
+            (body) =>
+              resume(
+                Effect.succeed(
+                  HttpServerResponse.jsonUnsafe(body, { headers: { "cache-control": "public, max-age=3600" } }),
+                ),
+              ),
+            (cause) => resume(Effect.die(cause)),
+          )
+        }),
+      ).pipe(Effect.orDie)
+    yield* router.add(
+      "GET",
+      "/.well-known/oauth-authorization-server/*",
+      metadata((request) => auth.api.getOAuthServerConfig({ request, asResponse: false })),
+    )
+    yield* router.add(
+      "GET",
+      "/.well-known/openid-configuration/*",
+      metadata((request) => auth.api.getOpenIdConfig({ request, asResponse: false })),
+    )
   }),
 )

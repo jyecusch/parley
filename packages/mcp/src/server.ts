@@ -9,7 +9,7 @@ import {
 } from "@parley/core"
 import { type Operation, type OperationName, operations } from "@parley/domain"
 import { defectPublicError, type PublicError, ReferenceId, toPublicError } from "@parley/errors"
-import { Context, Effect, Layer, Option, Schema } from "effect"
+import { Config, Context, Effect, Layer, Option, Schema } from "effect"
 import { McpProtocol, McpSchema, McpServer } from "effect/ai"
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http"
 
@@ -116,18 +116,30 @@ const ToolsLive = Layer.effectDiscard(
  * Authenticates every MCP request before the MCP server sees it. Agents send an API key
  * (x-api-key or Authorization: Bearer). Failures are plain HTTP errors with a PublicError body.
  */
+/** Where an MCP client learns how to sign in (RFC 9728). Served by Better-Auth's MCP plugin. */
+export const protectedResourceMetadataUrl = (baseURL: string) =>
+  `${baseURL}/.well-known/oauth-protected-resource${MCP_PATH}`
+
 const AuthenticateLive = HttpRouter.middleware<{ provides: CurrentPrincipal }>()(
   Effect.gen(function* () {
     const authenticator = yield* Authenticator
+    const baseURL = yield* Config.String("BETTER_AUTH_URL").pipe(Effect.orDie)
+    // A 401 tells the agent to start OAuth: where to sign in comes from the metadata URL.
+    const challenge = `Bearer resource_metadata="${protectedResourceMetadataUrl(baseURL)}"`
     return (httpEffect) =>
       Effect.gen(function* () {
         const request = yield* HttpServerRequest.HttpServerRequest
-        return yield* authenticator.authenticate(headersOf(request)).pipe(
+        return yield* authenticator.authenticate(headersOf(request), "mcp").pipe(
           Effect.matchEffect({
-            onFailure: (error: AuthenticationFailure) =>
-              Effect.succeed(
-                HttpServerResponse.jsonUnsafe({ error: toPublicError(error) }, { status: ERROR_STATUS[error._tag] }),
-              ),
+            onFailure: (error: AuthenticationFailure) => {
+              const status = ERROR_STATUS[error._tag]
+              return Effect.succeed(
+                HttpServerResponse.jsonUnsafe(
+                  { error: toPublicError(error) },
+                  { status, ...(status === 401 ? { headers: { "www-authenticate": challenge } } : {}) },
+                ),
+              )
+            },
             onSuccess: (principal) => Effect.provideService(httpEffect, CurrentPrincipal, principal),
           }),
         )

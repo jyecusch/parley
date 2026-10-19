@@ -41,6 +41,7 @@ How to pick a name: choose the most common name for the concept. Reject anything
 | **Agent** | External AI software (Claude, ChatGPT, opencode, …) that calls Parley through the MCP server or the HTTP API. An agent is never a principal: it authenticates with an API key that belongs to a user or a service account. | assistant, AI, bot |
 | **Session** | A user's sign-in to the web app (a Better-Auth session cookie). | login, auth cookie |
 | **API key** | A secret credential used by an agent or script. It belongs to either a user (it acts as that user, is limited by its scopes, and is bound to one team) or a service account. | token, access token, PAT, secret, credential (as a noun for this) |
+| **Connection** | An agent someone authorized over OAuth (MCP sign-in), bound to one team, acting as that person or as a service account, limited to its scopes. Listed and revoked in Settings. | grant, authorization, integration, connected app, OAuth app |
 | **Principal** | The authenticated identity making a request, and the output of authentication. Exactly one of `UserSession`, `UserApiKey`, `ServiceAccountApiKey`. | actor, caller, requester, subject, identity |
 | **Member** | A user or service account that belongs to a team, with exactly one role. Stored in Better-Auth's `member` table. "Jane is a member of Acme." | membership, seat, team member, teammate |
 | **Role** | `owner`, `admin` or `member`, held by each member. The role named `member` is the default role, so "a member" (anyone in the team) and "the `member` role" rarely conflict. When it matters, say "the `member` role". | level, user type |
@@ -110,3 +111,4 @@ Still to define before v2 design begins (reserved, so nothing in v1 takes them):
 | 2026-10-19 | Added record type, reference id, command menu and shortcut. |
 | 2026-10-19 | Added saved view, filter, import/export and toast. |
 | 2026-10-19 | Added note, avatar and logo. |
+| 2026-10-20 | Added **connection** (D95). |

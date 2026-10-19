@@ -26,6 +26,7 @@ const Fixture = Effect.gen(function* () {
     _tag: "UserSession",
     userId: userId as UserId,
     name: DisplayName.fromRecord(name),
+    sessionId: `test-session-${userId}`,
   })
   const apiKey = (userId: string, teamId: string, scopes: ReadonlyArray<Permission>): Principal => ({
     _tag: "UserApiKey",

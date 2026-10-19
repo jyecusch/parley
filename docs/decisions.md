@@ -94,8 +94,16 @@ What we decided, who decided it, and what's still open. Nothing becomes "decided
 | D86 | Note permissions | The author can edit or delete their note; admins and owners can delete any note | Owner | 2026-10-20 |
 | D87 | API key defaults | Scopes default to `records:read` (write and delete opt-in), no expiry by default (optionally 30/90/365 days), and the secret is shown once | Owner | 2026-10-20 |
 | D88 | Company fields | Name, domains (many, unique per team), website, phone and postal address. Everything else is a custom field | Owner | 2026-10-20 |
+| D89 | MCP OAuth | In milestone 2, using `@better-auth/mcp` (an OAuth 2.1 authorization server with client metadata documents and dynamic registration), with Parley's own sign-in and consent pages | Owner | 2026-10-20 |
+| D90 | Settings layout | Entering Settings swaps the app sidebar for a settings sidebar with a back arrow (team sections and "You" sections) | Owner | 2026-10-20 |
+| D91 | How agents connect | Agents connect over MCP OAuth: you sign in and choose who the agent acts as. API keys are mainly for the HTTP API | Owner | 2026-10-20 |
+| D92 | Consent | A connection is bound to one team, acts as you or as a service account, and has scopes that default to read-only (write and delete opt-in) | Owner | 2026-10-20 |
+| D93 | MCP authentication | MCP accepts both OAuth connections and API keys (for headless or CI agents) | Owner | 2026-10-20 |
+| D94 | Service accounts | Creating one needs `service-accounts:manage` (admin, owner). Any member may connect an agent as an existing service account, limited to the lower of the service account's role and their own, intersected with the connection's scopes | Owner | 2026-10-20 |
+| D95 | Term | "Connection": an agent someone authorized over OAuth. Listed and revoked in Settings | Owner | 2026-10-20 |
+| D96 | Key and connection activity | Show "last used", and changes are attributed in record activity ("via …"). No separate per-key log yet | Owner | 2026-10-20 |
 
-## Implementation choices made during milestone 1 (Claude; low-stakes, open to veto)
+## Implementation choices made during milestones 1 and 2 (Claude; low-stakes, open to veto)
 
 | # | Choice | Why |
 | --- | --- | --- |
@@ -108,6 +116,12 @@ What we decided, who decided it, and what's still open. Nothing becomes "decided
 | I7 | MCP authenticates in an HTTP middleware and provides a request-tier `CurrentPrincipal` | Effect's McpServer hides HTTP headers from tool handlers by design |
 | I8 | Signed-in screens render on the client (`ssr: false`) | Keeps cookies and auth out of server rendering for now; revisit if first paint matters |
 | I9 | API key scopes are stored as Better-Auth permissions; a key with none can do nothing | Deny by default |
+| I10 | OAuth scopes are only `openid profile email offline_access`. What an agent may do is the connection's scopes, chosen on Parley's consent page and stored in `connections` | Agents request whatever scopes servers advertise; the real choice (team, acts as, scopes) needs our own page anyway |
+| I11 | The consent page calls `connections.create` (records a pending connection tied to the sign-in session), then Better-Auth's `/oauth2/consent`. A hook refuses consent unless a pending connection for that session and agent exists; its id becomes the consent's reference and the only Parley claim in the access token (`connection_id`) | Tokens carry no permissions, so revoking a connection or changing a role takes effect on the next request |
+| I12 | Access tokens are verified in-process (JWKS read from Better-Auth, cached, refetched on an unknown key) and must match the connection's agent and person. Only `/mcp` accepts them; the HTTP API answers `AccessTokenUnrecognized` | Tokens are audience-bound to `/mcp` (RFC 8707) |
+| I13 | `/mcp` without credentials answers 401 with `WWW-Authenticate: Bearer resource_metadata=…`, and `/.well-known/oauth-protected-resource/mcp` and `/.well-known/oauth-authorization-server/api/auth` are served at the site root | MCP clients discover sign-in this way |
+| I14 | Dynamic client registration is open (no client ID metadata documents yet) | What Claude, ChatGPT and Cursor use today; `@better-auth/cimd` can be added later |
+| I15 | Service accounts are users of kind `service-account` (no password, an undeliverable email) plus a member row; a connection acting as one also needs the connecting person to still be a member | D18, D94 |
 
 ## Milestone 1: what's built, and what's next
 
@@ -122,6 +136,7 @@ Not yet: companies and affiliations, custom fields, saved views, notes, CSV impo
 | P2 | Permission set and role mapping (`records:read/write/delete`, `fields:manage`, `members:manage`, `service-accounts:manage`, `team:manage`) | [00](./00-architecture.md), [04](./04-authorization-proofs.md) |
 | ~~P4~~ (now D50) | "Default" implies pluggable: a process-tier `Mailer` service interface in core, with `Resend` as the first (default) implementation. Resend errors are classified into our own error classes, and Resend's text never reaches a user | [01](./01-errors-are-data.md), [03](./03-tiers.md) |
 | P3 | Effective permissions = role permissions ∩ scopes, computed in one function | [00](./00-architecture.md), [04](./04-authorization-proofs.md) |
+| P5 | Term: **access token** = the OAuth token an agent gets for a connection (code: `AccessTokenUnrecognized`, `AccessTokenExpired`). It is currently banned as a synonym for API key, so it needs the owner's call. User-facing text says "the agent's sign-in" instead | [terminology](./terminology.md) |
 
 Each post ends with its own **Open questions**, and those are collected below once reviewed.
 

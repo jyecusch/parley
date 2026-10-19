@@ -65,12 +65,60 @@ export class ApiKeyRevoked extends Schema.TaggedError<ApiKeyRevoked>()("ApiKeyRe
   }
 }
 
+/** An agent's OAuth access token didn't verify, or names no connection. Never says which. */
+export class AccessTokenUnrecognized
+  extends Schema.TaggedError<AccessTokenUnrecognized>()("AccessTokenUnrecognized", {})
+  implements DomainError
+{
+  readonly isRetryable = false
+  override readonly [ErrorReporter.severity] = "Info" as const
+  override get message() {
+    return "access token did not verify"
+  }
+  get userMessage() {
+    return userText`Parley doesn't recognise this agent's sign-in. Connect the agent to Parley again.`
+  }
+}
+
+/** The access token passed its expiry. The agent should refresh it; most do so on their own. */
+export class AccessTokenExpired
+  extends Schema.TaggedError<AccessTokenExpired>()("AccessTokenExpired", {})
+  implements DomainError
+{
+  readonly isRetryable = false
+  override readonly [ErrorReporter.severity] = "Info" as const
+  override get message() {
+    return "access token expired"
+  }
+  get userMessage() {
+    return userText`This agent's sign-in to Parley has expired. Reconnect the agent if it doesn't sign in again by itself.`
+  }
+}
+
+/** Someone revoked the connection the access token belongs to. */
+export class ConnectionRevoked
+  extends Schema.TaggedError<ConnectionRevoked>()("ConnectionRevoked", {})
+  implements DomainError
+{
+  readonly isRetryable = false
+  override readonly [ErrorReporter.severity] = "Info" as const
+  override get message() {
+    return "connection revoked"
+  }
+  get userMessage() {
+    return userText`This agent's connection to Parley was revoked. Connect the agent again to keep using it.`
+  }
+}
+
 export const AuthenticationErrors = [
   SessionMissing,
   SessionExpired,
   ApiKeyUnrecognized,
   ApiKeyExpired,
   ApiKeyRevoked,
+  AccessTokenUnrecognized,
+  AccessTokenExpired,
+  ConnectionRevoked,
 ] as const
 export const AuthenticationError = Schema.Union(AuthenticationErrors)
 export type AuthenticationError = typeof AuthenticationError.Type

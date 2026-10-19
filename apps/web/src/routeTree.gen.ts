@@ -14,6 +14,7 @@ import { Route as McpRouteImport } from './routes/mcp'
 import { Route as NewTeamRouteImport } from './routes/new-team'
 import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as SignUpRouteImport } from './routes/sign-up'
+import { Route as DotwellKnownSplatRouteImport } from './routes/[.]well-known.$'
 import { Route as ApiSplatRouteImport } from './routes/api/$'
 import { Route as TTeamIdRouteImport } from './routes/t.$teamId'
 import { Route as TTeamIdContactsRouteImport } from './routes/t.$teamId.contacts'
@@ -43,6 +44,11 @@ const SignUpRoute = SignUpRouteImport.update({
   path: '/sign-up',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DotwellKnownSplatRoute = DotwellKnownSplatRouteImport.update({
+  id: '/.well-known/$',
+  path: '/.well-known/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiSplatRoute = ApiSplatRouteImport.update({
   id: '/api/$',
   path: '/api/$',
@@ -65,6 +71,7 @@ export interface FileRoutesByFullPath {
   '/new-team': typeof NewTeamRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
+  '/.well-known/$': typeof DotwellKnownSplatRoute
   '/api/$': typeof ApiSplatRoute
   '/t/$teamId': typeof TTeamIdRouteWithChildren
   '/t/$teamId/contacts': typeof TTeamIdContactsRoute
@@ -75,6 +82,7 @@ export interface FileRoutesByTo {
   '/new-team': typeof NewTeamRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
+  '/.well-known/$': typeof DotwellKnownSplatRoute
   '/api/$': typeof ApiSplatRoute
   '/t/$teamId': typeof TTeamIdRouteWithChildren
   '/t/$teamId/contacts': typeof TTeamIdContactsRoute
@@ -86,6 +94,7 @@ export interface FileRoutesById {
   '/new-team': typeof NewTeamRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
+  '/.well-known/$': typeof DotwellKnownSplatRoute
   '/api/$': typeof ApiSplatRoute
   '/t/$teamId': typeof TTeamIdRouteWithChildren
   '/t/$teamId/contacts': typeof TTeamIdContactsRoute
@@ -98,6 +107,7 @@ export interface FileRouteTypes {
     | '/new-team'
     | '/sign-in'
     | '/sign-up'
+    | '/.well-known/$'
     | '/api/$'
     | '/t/$teamId'
     | '/t/$teamId/contacts'
@@ -108,6 +118,7 @@ export interface FileRouteTypes {
     | '/new-team'
     | '/sign-in'
     | '/sign-up'
+    | '/.well-known/$'
     | '/api/$'
     | '/t/$teamId'
     | '/t/$teamId/contacts'
@@ -118,6 +129,7 @@ export interface FileRouteTypes {
     | '/new-team'
     | '/sign-in'
     | '/sign-up'
+    | '/.well-known/$'
     | '/api/$'
     | '/t/$teamId'
     | '/t/$teamId/contacts'
@@ -129,6 +141,7 @@ export interface RootRouteChildren {
   NewTeamRoute: typeof NewTeamRoute
   SignInRoute: typeof SignInRoute
   SignUpRoute: typeof SignUpRoute
+  DotwellKnownSplatRoute: typeof DotwellKnownSplatRoute
   ApiSplatRoute: typeof ApiSplatRoute
   TTeamIdRoute: typeof TTeamIdRouteWithChildren
 }
@@ -168,6 +181,13 @@ declare module '@tanstack/react-router' {
       path: '/sign-up'
       fullPath: '/sign-up'
       preLoaderRoute: typeof SignUpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/.well-known/$': {
+      id: '/.well-known/$'
+      path: '/.well-known/$'
+      fullPath: '/.well-known/$'
+      preLoaderRoute: typeof DotwellKnownSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/$': {
@@ -211,6 +231,7 @@ const rootRouteChildren: RootRouteChildren = {
   NewTeamRoute: NewTeamRoute,
   SignInRoute: SignInRoute,
   SignUpRoute: SignUpRoute,
+  DotwellKnownSplatRoute: DotwellKnownSplatRoute,
   ApiSplatRoute: ApiSplatRoute,
   TTeamIdRoute: TTeamIdRouteWithChildren,
 }

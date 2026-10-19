@@ -76,7 +76,7 @@ export const ActivityEntry = Schema.Struct({
   id: Schema.String,
   /** Who made the change, as shown in the app. */
   actorName: Schema.String,
-  /** The API key's name when the change came through one ("Claude on my laptop"). */
+  /** The API key's or connection's name when the change came through one ("Claude on my laptop"). */
   via: Schema.NullOr(Schema.String),
   kind: Schema.Literals(["created", "updated", "deleted", "restored"]),
   changedFields: Schema.Array(Schema.String),

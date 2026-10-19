@@ -7,4 +7,5 @@ export const auth = makeAuth({
   schema: {},
   secret: "generate-only-secret-generate-only-secret",
   baseURL: "http://localhost:3000",
+  connections: { pendingFor: async () => undefined, authorize: async () => {} },
 })

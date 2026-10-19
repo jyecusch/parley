@@ -4,12 +4,18 @@ import type { Principal } from "../principal.ts"
 import { Members } from "../services/members.ts"
 import { Teams } from "../services/teams.ts"
 
-/** Lists teams the principal can work in. A user's API key is bound to one team (D19). */
+/** Lists teams the principal can work in. A user's API key and a connection are each bound to one team (D19, D92). */
 export const list = (principal: Principal, _input: OperationInput<typeof listTeams>) =>
   Effect.gen(function* () {
     const members = yield* Members
     const teams = yield* members.teamsOf(principal.userId)
-    const visible = principal._tag === "UserApiKey" ? teams.filter((team) => team.id === principal.teamId) : teams
+    const boundTo =
+      principal._tag === "UserApiKey" ||
+      principal._tag === "UserConnection" ||
+      principal._tag === "ServiceAccountConnection"
+        ? principal.teamId
+        : null
+    const visible = boundTo === null ? teams : teams.filter((team) => team.id === boundTo)
     return visible.map((team): Team => ({ id: team.id, name: team.name, role: team.role }))
   })
 

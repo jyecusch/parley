@@ -1,9 +1,12 @@
 import { schema } from "@parley/db"
 import {
+  AccessTokenExpired,
+  AccessTokenUnrecognized,
   ApiKeyExpired,
   type ApiKeyId,
   ApiKeyRevoked,
   ApiKeyUnrecognized,
+  ConnectionRevoked,
   type DatabaseUnavailable,
   type Permission,
   RequestsTooFrequent,
@@ -13,12 +16,18 @@ import {
   type UserId,
 } from "@parley/domain"
 import { DisplayName } from "@parley/errors"
+import { and, desc, eq, gt, isNull, sql } from "drizzle-orm"
 import { drizzle } from "drizzle-orm/node-postgres"
 import { Config, Context, Duration, Effect, Layer, Redacted } from "effect"
+import { createLocalJWKSet, type JWTPayload, jwtVerify } from "jose"
 import { Pool } from "pg"
 import type { Principal } from "../principal.ts"
+import { Connections } from "../services/connections.ts"
 import { Users } from "../services/users.ts"
-import { type Auth, makeAuth } from "./better-auth.ts"
+import { type Auth, CONNECTION_CLAIM, type ConnectionHooks, issuer, makeAuth, mcpResource } from "./better-auth.ts"
+
+/** How long the consent page has between recording a connection and the agent finishing sign-in. */
+const PENDING_FOR = "10 minutes"
 
 /** The Better-Auth instance. Process tier: one per server, with its own small pool. */
 export class BetterAuth extends Context.Service<BetterAuth, Auth>()("@parley/core/BetterAuth") {
@@ -38,7 +47,36 @@ export class BetterAuth extends Context.Service<BetterAuth, Auth>()("@parley/cor
             )
           }),
       )
-      return makeAuth({ db: drizzle(pool, { schema }), schema, secret: Redacted.value(secret), baseURL })
+      const db = drizzle(pool, { schema })
+      const { connections } = schema
+      // Better-Auth calls these mid-request, outside any fiber, so they use its pool directly.
+      const hooks: ConnectionHooks = {
+        pendingFor: async (sessionId) => {
+          const [row] = await db
+            .select({ id: connections.id, clientId: connections.clientId })
+            .from(connections)
+            .where(
+              and(
+                eq(connections.sessionId, sessionId),
+                isNull(connections.authorizedAt),
+                isNull(connections.revokedAt),
+                gt(connections.createdAt, sql`now() - ${PENDING_FOR}::interval`),
+              ),
+            )
+            .orderBy(desc(connections.createdAt))
+            .limit(1)
+          return row
+        },
+        authorize: async (connectionId) => {
+          const rows = await db
+            .update(connections)
+            .set({ authorizedAt: sql`coalesce(${connections.authorizedAt}, now())` })
+            .where(and(eq(connections.id, connectionId), isNull(connections.revokedAt)))
+            .returning({ id: connections.id })
+          if (rows.length === 0) throw new Error(`connection ${connectionId} is missing or revoked`)
+        },
+      }
+      return makeAuth({ db, schema, secret: Redacted.value(secret), baseURL, connections: hooks })
     }),
   )
 }
@@ -49,16 +87,31 @@ export type AuthenticationFailure =
   | ApiKeyUnrecognized
   | ApiKeyExpired
   | ApiKeyRevoked
+  | AccessTokenUnrecognized
+  | AccessTokenExpired
+  | ConnectionRevoked
   | RequestsTooFrequent
   | DatabaseUnavailable
 
 const SESSION_COOKIE = "better-auth.session_token"
 
-const apiKeyFrom = (headers: Headers): string | undefined => {
+/** A bearer credential: an API key, or an agent's OAuth access token (a JWT). */
+type Credential =
+  | { readonly _tag: "ApiKey"; readonly key: string }
+  | { readonly _tag: "AccessToken"; readonly token: string }
+
+const API_KEY_PREFIX = "parley_"
+const isJwt = (value: string) => /^[\w-]+\.[\w-]+\.[\w-]+$/.test(value)
+
+const credentialFrom = (headers: Headers): Credential | undefined => {
   const explicit = headers.get("x-api-key")
-  if (explicit) return explicit.trim()
+  if (explicit) return { _tag: "ApiKey", key: explicit.trim() }
   const authorization = headers.get("authorization")
-  return authorization?.toLowerCase().startsWith("bearer ") ? authorization.slice(7).trim() : undefined
+  if (!authorization?.toLowerCase().startsWith("bearer ")) return undefined
+  const value = authorization.slice(7).trim()
+  return !value.startsWith(API_KEY_PREFIX) && isJwt(value)
+    ? { _tag: "AccessToken", token: value }
+    : { _tag: "ApiKey", key: value }
 }
 
 const PERMISSIONS: ReadonlySet<string> = new Set<Permission>([
@@ -118,19 +171,78 @@ const call = <A>(thunk: () => Promise<A>): Effect.Effect<A> =>
     )
   })
 
+/** Where a request arrived. Access tokens are bound to the MCP endpoint, so only it accepts them. */
+export type Entrypoint = "http" | "mcp"
+
 /**
  * Turns a request's credentials into a Principal. Entrypoints call this and nothing else
  * about auth: they authenticate; proofs authorize (docs/04-authorization-proofs.md).
  */
 export class Authenticator extends Context.Service<
   Authenticator,
-  { readonly authenticate: (headers: Headers) => Effect.Effect<Principal, AuthenticationFailure> }
+  {
+    readonly authenticate: (headers: Headers, entrypoint: Entrypoint) => Effect.Effect<Principal, AuthenticationFailure>
+  }
 >()("@parley/core/Authenticator") {
   static readonly layer = Layer.effect(
     Authenticator,
     Effect.gen(function* () {
       const auth = yield* BetterAuth
       const users = yield* Users
+      const connections = yield* Connections
+      const baseURL = yield* Config.String("BETTER_AUTH_URL")
+
+      // Better-Auth's signing keys, fetched in-process and refetched when a token names a new one.
+      let keys: ReturnType<typeof createLocalJWKSet> | undefined
+      const loadKeys = async (refresh: boolean) => {
+        if (!keys || refresh)
+          keys = createLocalJWKSet((await auth.api.getJwks()) as Parameters<typeof createLocalJWKSet>[0])
+        return keys
+      }
+      const verify = async (token: string): Promise<JWTPayload> => {
+        const options = { issuer: issuer(baseURL), audience: mcpResource(baseURL) }
+        try {
+          return (await jwtVerify(token, await loadKeys(false), options)).payload
+        } catch (error) {
+          if ((error as { readonly code?: unknown }).code !== "ERR_JWKS_NO_MATCHING_KEY") throw error
+          return (await jwtVerify(token, await loadKeys(true), options)).payload
+        }
+      }
+
+      const fromAccessToken = Effect.fn("Authenticator.fromAccessToken")(function* (token: string) {
+        const verified = yield* Effect.callback<JWTPayload | "expired" | "invalid">((resume) => {
+          verify(token).then(
+            (payload) => resume(Effect.succeed(payload)),
+            (error: { readonly code?: unknown }) =>
+              resume(Effect.succeed(error.code === "ERR_JWT_EXPIRED" ? "expired" : "invalid")),
+          )
+        })
+        if (verified === "expired") return yield* new AccessTokenExpired()
+        if (verified === "invalid") return yield* new AccessTokenUnrecognized()
+        const connectionId = verified[CONNECTION_CLAIM]
+        if (typeof connectionId !== "string") return yield* new AccessTokenUnrecognized()
+        const grant = yield* connections.grant(connectionId)
+        // The token must come from the agent and the person the connection was made for.
+        const clientId = verified.azp ?? verified.client_id
+        if (!grant || grant.clientId !== clientId || grant.connectedByUserId !== verified.sub) {
+          return yield* new AccessTokenUnrecognized()
+        }
+        if (grant.revoked) return yield* new ConnectionRevoked()
+        yield* connections.touch(grant.id)
+        const common = {
+          userId: grant.actsAs.userId,
+          name: DisplayName.fromRecord(grant.actsAs.name),
+          connectionId: grant.id,
+          connectionName: grant.name,
+          teamId: grant.teamId,
+          scopes: grant.scopes,
+        }
+        const principal: Principal =
+          grant.actsAs.kind === "service-account"
+            ? { _tag: "ServiceAccountConnection", ...common, connectedByUserId: grant.connectedByUserId }
+            : { _tag: "UserConnection", ...common }
+        return principal
+      })
 
       const fromApiKey = Effect.fn("Authenticator.fromApiKey")(function* (key: string) {
         const result = yield* call(() => auth.api.verifyApiKey({ body: { key } }))
@@ -174,13 +286,22 @@ export class Authenticator extends Context.Service<
           _tag: "UserSession",
           userId: session.user.id as UserId,
           name: DisplayName.fromRecord(session.user.name),
+          sessionId: session.session.id,
         }
         return principal
       })
 
-      const authenticate = (headers: Headers): Effect.Effect<Principal, AuthenticationFailure> => {
-        const key = apiKeyFrom(headers)
-        return key ? fromApiKey(key) : fromSession(headers)
+      const authenticate = (
+        headers: Headers,
+        entrypoint: Entrypoint,
+      ): Effect.Effect<Principal, AuthenticationFailure> => {
+        const credential = credentialFrom(headers)
+        if (credential?._tag === "ApiKey") return fromApiKey(credential.key)
+        if (credential?._tag === "AccessToken") {
+          return entrypoint === "mcp" ? fromAccessToken(credential.token) : Effect.fail(new AccessTokenUnrecognized())
+        }
+        // Agents on MCP never have a session cookie; asking them to sign in starts OAuth.
+        return entrypoint === "mcp" ? Effect.fail(new SessionMissing()) : fromSession(headers)
       }
 
       return { authenticate }

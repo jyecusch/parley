@@ -107,6 +107,9 @@ describe("MCP entrypoint", () => {
       "apiKeys_create",
       "apiKeys_list",
       "apiKeys_revoke",
+      "connections_create",
+      "connections_list",
+      "connections_revoke",
       "contacts_activity",
       "contacts_create",
       "contacts_delete",
@@ -114,6 +117,8 @@ describe("MCP entrypoint", () => {
       "contacts_list",
       "contacts_restore",
       "contacts_update",
+      "serviceAccounts_create",
+      "serviceAccounts_list",
       "teams_create",
       "teams_list",
     ])

@@ -56,6 +56,21 @@ export class ApiKeyNotValidForTeam
   }
 }
 
+/** A connection was used against a team other than the one it was authorized for (D92). */
+export class ConnectionNotValidForTeam
+  extends Schema.TaggedError<ConnectionNotValidForTeam>()("ConnectionNotValidForTeam", { teamId: TeamId })
+  implements DomainError
+{
+  readonly isRetryable = false
+  override readonly [ErrorReporter.severity] = "Info" as const
+  override get message() {
+    return `connection is bound to a different team than ${this.teamId}`
+  }
+  get userMessage() {
+    return userText`This agent is connected to a different team, so it can't work here. Connect the agent again and choose this team.`
+  }
+}
+
 /** The member's role doesn't grant the permission. Fixer: a team admin. */
 export class RoleLacksPermission
   extends Schema.TaggedError<RoleLacksPermission>()("RoleLacksPermission", {
@@ -93,23 +108,69 @@ export class ApiKeyScopeExcludes
   }
 }
 
-export const MembershipErrors = [NotATeamMember, ApiKeyNotValidForTeam] as const
-export const PermissionErrors = [RoleLacksPermission, ApiKeyScopeExcludes] as const
-
-/** Some actions need someone signed in, never an API key: an API key can't mint teams or more API keys. */
-export class SignInRequired
-  extends Schema.TaggedError<SignInRequired>()("SignInRequired", {
-    action: Schema.Literals(["create a team", "create an API key"]),
+/** The service account's role doesn't grant the permission. Fixer: a team admin. */
+export class ServiceAccountRoleLacksPermission
+  extends Schema.TaggedError<ServiceAccountRoleLacksPermission>()("ServiceAccountRoleLacksPermission", {
+    team: DisplayName.schema,
+    serviceAccount: DisplayName.schema,
+    role: Role,
+    needed: Permission,
   })
   implements DomainError
 {
   readonly isRetryable = false
   override readonly [ErrorReporter.severity] = "Info" as const
   override get message() {
-    return `attempted to ${this.action} with an API key`
+    return `service account role ${this.role} lacks ${this.needed}`
   }
   get userMessage() {
-    return userText`Only someone signed in to Parley can ${this.action}, not an API key. Sign in to ${this.action}.`
+    return userText`${this.serviceAccount}'s role in ${this.team} can't ${ability(this.needed)}. A team admin can change its role in Settings → Service accounts.`
+  }
+}
+
+/** The roles allow it, but the connection's scopes don't. Fixer: whoever connected the agent. */
+export class ConnectionScopeExcludes
+  extends Schema.TaggedError<ConnectionScopeExcludes>()("ConnectionScopeExcludes", {
+    team: DisplayName.schema,
+    needed: Permission,
+  })
+  implements DomainError
+{
+  readonly isRetryable = false
+  override readonly [ErrorReporter.severity] = "Info" as const
+  override get message() {
+    return `connection scopes exclude ${this.needed}`
+  }
+  get userMessage() {
+    return userText`This agent wasn't allowed to ${ability(this.needed)} in ${this.team} when it was connected. Whoever connected it can connect it again with more access.`
+  }
+}
+
+export const MembershipErrors = [NotATeamMember, ApiKeyNotValidForTeam, ConnectionNotValidForTeam] as const
+export const PermissionErrors = [
+  RoleLacksPermission,
+  ServiceAccountRoleLacksPermission,
+  ApiKeyScopeExcludes,
+  ConnectionScopeExcludes,
+] as const
+
+/**
+ * Some actions need someone signed in, never an API key or an agent's connection: neither can
+ * mint teams, API keys or more connections.
+ */
+export class SignInRequired
+  extends Schema.TaggedError<SignInRequired>()("SignInRequired", {
+    action: Schema.Literals(["create a team", "create an API key", "connect an agent"]),
+  })
+  implements DomainError
+{
+  readonly isRetryable = false
+  override readonly [ErrorReporter.severity] = "Info" as const
+  override get message() {
+    return `attempted to ${this.action} without a signed-in session`
+  }
+  get userMessage() {
+    return userText`Only someone signed in to Parley can ${this.action}, not an API key or an agent. Sign in to ${this.action}.`
   }
 }
 

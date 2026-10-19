@@ -97,11 +97,48 @@ export const activity = pgTable(
     /** The name shown at the time, kept if the user is later removed. */
     actorName: text("actor_name").notNull(),
     viaApiKeyId: text("via_api_key_id"),
-    /** The API key's name at the time ("Claude on my laptop", D78). */
+    viaConnectionId: uuid("via_connection_id"),
+    /** The API key's or connection's name at the time ("Claude on my laptop", D78). */
     viaName: text("via_name"),
     kind: text("kind", { enum: ["created", "updated", "deleted", "restored"] }).notNull(),
     changedFields: text("changed_fields").array().notNull().default(sql`'{}'::text[]`),
     at: timestamp("at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [index("activity_record_idx").on(t.teamId, t.recordId, t.at)],
+)
+
+/**
+ * An agent someone authorized over OAuth (D92). Bound to one team, acting as the person who
+ * connected it or as a service account, limited to its scopes. Access tokens carry only its id,
+ * so revoking it takes effect on the next request.
+ */
+export const connections = pgTable(
+  "connections",
+  {
+    id: uuid("id").primaryKey(),
+    teamId: teamId(),
+    /** The OAuth client (the agent's registration). */
+    clientId: text("client_id").notNull(),
+    /** The client's own name at the time of consent ("Claude", "Cursor"). */
+    name: text("name").notNull(),
+    connectedByUserId: text("connected_by_user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    /** The connecting user, or a service account (D94). */
+    actsAsUserId: text("acts_as_user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    scopes: text("scopes").array().notNull(),
+    /** The sign-in session that gave consent. Links the consent to this row until the first token is issued. */
+    sessionId: text("session_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    /** Set when the first access token is issued. Until then the connection is pending. */
+    authorizedAt: timestamp("authorized_at", { withTimezone: true }),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("connections_team_id_idx").on(t.teamId, t.createdAt.desc()),
+    index("connections_session_id_idx").on(t.sessionId).where(sql`authorized_at is null`),
+  ],
 )

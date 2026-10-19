@@ -14,3 +14,6 @@ export type ContactId = typeof ContactId.Type
 
 export const ActivityId = Schema.String.pipe(Schema.brand("ActivityId"))
 export type ActivityId = typeof ActivityId.Type
+
+export const ConnectionId = Schema.String.pipe(Schema.brand("ConnectionId"))
+export type ConnectionId = typeof ConnectionId.Type

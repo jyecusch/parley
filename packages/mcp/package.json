@@ -12,5 +12,8 @@
     "@parley/domain": "workspace:*",
     "@parley/errors": "workspace:*",
     "effect": "4.0.5"
+  },
+  "devDependencies": {
+    "@parley/http": "workspace:*"
   }
 }

@@ -1,24 +1,60 @@
-import { ApiKeyScopeExcludes, type Permission, RoleLacksPermission } from "@parley/domain"
+import {
+  ApiKeyScopeExcludes,
+  ConnectionScopeExcludes,
+  type Permission,
+  RoleLacksPermission,
+  ServiceAccountRoleLacksPermission,
+} from "@parley/domain"
 import { Effect } from "effect"
-import type { MemberOf } from "./member-of.ts"
+import { actsAsServiceAccount, type MemberOf } from "./member-of.ts"
 import { defineProof, type Proof } from "./proof.ts"
 
+export type PermissionError =
+  | RoleLacksPermission
+  | ServiceAccountRoleLacksPermission
+  | ApiKeyScopeExcludes
+  | ConnectionScopeExcludes
+
 /**
- * The only code that answers "is this permission granted?". The role is checked first,
- * because the two failures have different fixers (an admin vs. whoever created the API key).
+ * The only code that answers "is this permission granted?". Roles are checked before scopes,
+ * because each failure has a different fixer: an admin, or whoever created the API key or
+ * connected the agent.
  */
-const requirePermission = <P, T>(member: MemberOf<P, T>, needed: Permission): Effect.Effect<void, PermissionError> => {
+export const requirePermission = <P, T>(
+  member: MemberOf<P, T>,
+  needed: Permission,
+): Effect.Effect<void, PermissionError> => {
+  const principal = member.principal.value
   if (!member.rolePermissions.has(needed)) {
-    return Effect.fail(new RoleLacksPermission({ team: member.teamName, role: member.role, needed }))
+    return Effect.fail(
+      actsAsServiceAccount(principal)
+        ? new ServiceAccountRoleLacksPermission({
+            team: member.teamName,
+            serviceAccount: principal.name,
+            role: member.role,
+            needed,
+          })
+        : new RoleLacksPermission({ team: member.teamName, role: member.role, needed }),
+    )
   }
-  if (member.scopes !== "unrestricted" && !member.scopes.has(needed)) {
-    return Effect.fail(new ApiKeyScopeExcludes({ team: member.teamName, needed }))
+  if (member.connectedBy && !member.connectedBy.rolePermissions.has(needed)) {
+    return Effect.fail(new RoleLacksPermission({ team: member.teamName, role: member.connectedBy.role, needed }))
   }
-  return Effect.void
+  switch (member.ceiling._tag) {
+    case "None":
+      return Effect.void
+    case "ApiKey":
+      return member.ceiling.scopes.has(needed)
+        ? Effect.void
+        : Effect.fail(new ApiKeyScopeExcludes({ team: member.teamName, needed }))
+    case "Connection":
+      return member.ceiling.scopes.has(needed)
+        ? Effect.void
+        : Effect.fail(new ConnectionScopeExcludes({ team: member.teamName, needed }))
+  }
 }
 
-type PermissionError = RoleLacksPermission | ApiKeyScopeExcludes
-
+const CanManageServiceAccountsProver = defineProof("CanManageServiceAccounts")
 const CanReadRecordsProver = defineProof("CanReadRecords")
 const CanWriteRecordsProver = defineProof("CanWriteRecords")
 const CanDeleteRecordsProver = defineProof("CanDeleteRecords")
@@ -57,5 +93,18 @@ export const proveCanDeleteRecords = <P, T>(
 ): Effect.Effect<CanDeleteRecords<P, T>, PermissionError> =>
   Effect.as(requirePermission(member, "records:delete"), {
     ...CanDeleteRecordsProver.prove(member.principal, member.team),
+    member,
+  })
+
+/** P may create and change service accounts in team T. */
+export interface CanManageServiceAccounts<P, T> extends Proof<"CanManageServiceAccounts", [P, T]> {
+  readonly member: MemberOf<P, T>
+}
+
+export const proveCanManageServiceAccounts = <P, T>(
+  member: MemberOf<P, T>,
+): Effect.Effect<CanManageServiceAccounts<P, T>, PermissionError> =>
+  Effect.as(requirePermission(member, "service-accounts:manage"), {
+    ...CanManageServiceAccountsProver.prove(member.principal, member.team),
     member,
   })
