@@ -240,7 +240,6 @@ export function SaveViewDialog(props: {
           type="text"
           maxLength={60}
           placeholder="Renewals this quarter"
-          // biome-ignore lint/a11y/noAutofocus: the dialog's only text field
           autoFocus
           value={name}
           onChange={(event) => setName(event.target.value)}

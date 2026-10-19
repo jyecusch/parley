@@ -174,7 +174,7 @@ export class Invitations extends Context.Service<
               sql`${schema.invitation.id} = ${invitationId}`,
             ),
           )
-          if (!row || row.invitation.status !== "pending") return yield* new InvitationNotFound({ invitationId })
+          if (row?.invitation.status !== "pending") return yield* new InvitationNotFound({ invitationId })
           yield* run(
             db.query((d) =>
               d.update(schema.invitation).set({ status: "revoked" }).where(eq(schema.invitation.id, invitationId)),
