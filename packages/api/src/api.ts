@@ -22,12 +22,14 @@ const pick = (fields: Schema.Struct.Fields, keys: ReadonlyArray<string>, keep: b
 const endpointFor = (op: Operation) => {
   const pathKeys = pathParamsOf(op.http.path)
   const params = pick(op.input.fields, pathKeys, true)
-  const rest = Schema.Struct(pick(op.input.fields, pathKeys, false))
-  const hasBody = op.http.method === "POST" || op.http.method === "PATCH"
+  const restFields = pick(op.input.fields, pathKeys, false)
+  const rest = Schema.Struct(restFields)
+  // An operation whose whole input is in the path takes no body, so agents can POST without one.
+  const hasBody = (op.http.method === "POST" || op.http.method === "PATCH") && Object.keys(restFields).length > 0
   const make = HttpApiEndpoint.make(op.http.method)
   return make(op.name, `${API_PREFIX}${op.http.path}`, {
     params,
-    ...(hasBody ? { payload: rest } : { query: rest }),
+    ...(hasBody ? { payload: rest } : Object.keys(restFields).length > 0 ? { query: rest } : {}),
     success: op.output,
     error: ErrorBodies,
   })

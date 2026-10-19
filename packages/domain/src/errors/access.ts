@@ -2,7 +2,7 @@ import { DisplayName, type DomainError, type UserText, userText } from "@parley/
 import { Schema } from "effect"
 import * as ErrorReporter from "effect/ErrorReporter"
 import { Permission, Role } from "../access.ts"
-import { TeamId } from "../ids.ts"
+import { ApiKeyId, TeamId } from "../ids.ts"
 
 const ability = (permission: Permission): UserText => {
   switch (permission) {
@@ -96,17 +96,34 @@ export class ApiKeyScopeExcludes
 export const MembershipErrors = [NotATeamMember, ApiKeyNotValidForTeam] as const
 export const PermissionErrors = [RoleLacksPermission, ApiKeyScopeExcludes] as const
 
-/** Teams are created by someone signed in, never through an API key. */
-export class TeamCreationNeedsSignIn
-  extends Schema.TaggedError<TeamCreationNeedsSignIn>()("TeamCreationNeedsSignIn", {})
+/** Some actions need someone signed in, never an API key: an API key can't mint teams or more API keys. */
+export class SignInRequired
+  extends Schema.TaggedError<SignInRequired>()("SignInRequired", {
+    action: Schema.Literals(["create a team", "create an API key"]),
+  })
   implements DomainError
 {
   readonly isRetryable = false
   override readonly [ErrorReporter.severity] = "Info" as const
   override get message() {
-    return "team creation attempted with an API key"
+    return `attempted to ${this.action} with an API key`
   }
   get userMessage() {
-    return userText`Teams can only be created by someone signed in to Parley, not through an API key. Sign in to create a team.`
+    return userText`Only someone signed in to Parley can ${this.action}, not an API key. Sign in to ${this.action}.`
+  }
+}
+
+/** No API key with that id belongs to you in this team. Also for other people's keys: no oracle. */
+export class ApiKeyNotFound
+  extends Schema.TaggedError<ApiKeyNotFound>()("ApiKeyNotFound", { apiKeyId: ApiKeyId })
+  implements DomainError
+{
+  readonly isRetryable = false
+  override readonly [ErrorReporter.severity] = "Info" as const
+  override get message() {
+    return `API key ${this.apiKeyId} not found among the principal's keys in this team`
+  }
+  get userMessage() {
+    return userText`We can't find that API key among yours in this team. It may have been revoked already.`
   }
 }

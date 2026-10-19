@@ -81,8 +81,12 @@ export interface Auth {
         readonly userId: string
         readonly permissions?: Record<string, Array<string>>
         readonly metadata?: Record<string, unknown>
+        readonly expiresIn?: number
       }
     }) => Promise<{ readonly id: string; readonly key: string }>
+    readonly updateApiKey: (input: {
+      readonly body: { readonly keyId: string; readonly userId: string; readonly enabled: boolean }
+    }) => Promise<unknown>
   }
 }
 

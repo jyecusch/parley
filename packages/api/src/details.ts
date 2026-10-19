@@ -17,6 +17,8 @@ export const detailsOf = (error: AnyOperationError): unknown => {
       return { problems: error.problems }
     case "ContactNotFound":
       return { contactId: error.contactId }
+    case "ApiKeyNotFound":
+      return { apiKeyId: error.apiKeyId }
     default:
       return undefined
   }

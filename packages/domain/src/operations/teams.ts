@@ -1,6 +1,6 @@
 import { Schema } from "effect"
 import { Role } from "../access.ts"
-import { TeamCreationNeedsSignIn } from "../errors/access.ts"
+import { SignInRequired } from "../errors/access.ts"
 import { TeamId } from "../ids.ts"
 import { defineOperation } from "../operation.ts"
 
@@ -32,7 +32,7 @@ export const createTeam = defineOperation({
     }),
   }),
   output: Team,
-  errors: [TeamCreationNeedsSignIn],
+  errors: [SignInRequired],
   http: { method: "POST", path: "/teams" },
   hints: { readOnly: false, destructive: false, idempotent: false },
 })

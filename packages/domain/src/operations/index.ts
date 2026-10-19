@@ -1,3 +1,4 @@
+import { createApiKey, listApiKeys, revokeApiKey } from "./api-keys.ts"
 import {
   contactActivity,
   createContact,
@@ -9,6 +10,7 @@ import {
 } from "./contacts.ts"
 import { createTeam, listTeams } from "./teams.ts"
 
+export * from "./api-keys.ts"
 export * from "./contacts.ts"
 export * from "./teams.ts"
 
@@ -23,6 +25,9 @@ export const operations = {
   "contacts.delete": deleteContact,
   "contacts.restore": restoreContact,
   "contacts.activity": contactActivity,
+  "apiKeys.list": listApiKeys,
+  "apiKeys.create": createApiKey,
+  "apiKeys.revoke": revokeApiKey,
 } as const
 export type Operations = typeof operations
 export type OperationName = keyof Operations

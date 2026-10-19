@@ -1,4 +1,5 @@
 export * from "./access.ts"
+export * from "./api-key.ts"
 export * from "./contact.ts"
 export * from "./errors/access.ts"
 export * from "./errors/authentication.ts"

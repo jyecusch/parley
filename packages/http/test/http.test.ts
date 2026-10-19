@@ -141,3 +141,45 @@ describe("HTTP entrypoint", () => {
     expect(Object.keys(response.body.paths)).toContain("/api/v1/teams/{teamId}/contacts/{contactId}")
   })
 })
+
+describe("API keys", () => {
+  it("are created by a signed-in user, act within their scopes, and stop working when revoked", async () => {
+    const created = await call("POST", `/api/v1/teams/${teamId}/api-keys`, { body: { name: "Claude on my laptop" } })
+    expect(created.status).toBe(200)
+    expect(created.body.apiKey).toMatchObject({ name: "Claude on my laptop", scopes: ["records:read"], revoked: false })
+    expect(created.body.secret).toMatch(/^parley_/)
+    const secret = created.body.secret as string
+
+    const listed = await call("GET", `/api/v1/teams/${teamId}/api-keys`)
+    expect(listed.body.map((key: { id: string }) => key.id)).toContain(created.body.apiKey.id)
+    expect(JSON.stringify(listed.body)).not.toContain(secret)
+
+    const saved = cookie
+    cookie = ""
+    const asKey = (method: string, path: string, body?: unknown) =>
+      call(method, path, { headers: { "x-api-key": secret }, ...(body !== undefined ? { body } : {}) })
+    expect((await asKey("GET", `/api/v1/teams/${teamId}/contacts`)).status).toBe(200)
+    const mint = await asKey("POST", `/api/v1/teams/${teamId}/api-keys`, { name: "Sneaky" })
+    expect(mint.status).toBe(403)
+    expect(mint.body.error._tag).toBe("SignInRequired")
+    cookie = saved
+
+    const revoked = await call("POST", `/api/v1/teams/${teamId}/api-keys/${created.body.apiKey.id}/revoke`)
+    expect(revoked.body.revoked).toBe(true)
+    cookie = ""
+    const after = await asKey("GET", `/api/v1/teams/${teamId}/contacts`)
+    cookie = saved
+    expect(after.status).toBe(401)
+    expect(after.body.error._tag).toBe("ApiKeyRevoked")
+  })
+
+  it("can't grant more than the creator's role, and can't revoke someone else's key", async () => {
+    const tooMuch = await call("POST", `/api/v1/teams/${teamId}/api-keys`, {
+      body: { name: "Admin key", scopes: ["records:read", "team:manage"] },
+    })
+    expect(tooMuch.status).toBe(200) // Jane owns Acme, so team:manage is within her role.
+    const unknown = await call("POST", `/api/v1/teams/${teamId}/api-keys/not-a-key/revoke`)
+    expect(unknown.status).toBe(404)
+    expect(unknown.body.error._tag).toBe("ApiKeyNotFound")
+  })
+})

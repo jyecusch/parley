@@ -48,7 +48,7 @@ export const call = async <Name extends OperationName>(
     delete values[key]
     return encodeURIComponent(value)
   })
-  const hasBody = op.http.method === "POST" || op.http.method === "PATCH"
+  const hasBody = (op.http.method === "POST" || op.http.method === "PATCH") && Object.keys(values).length > 0
   const query = new URLSearchParams()
   if (!hasBody) {
     for (const [key, value] of Object.entries(values)) if (value !== undefined) query.set(key, String(value))

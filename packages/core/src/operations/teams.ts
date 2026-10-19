@@ -1,10 +1,4 @@
-import {
-  type createTeam,
-  type listTeams,
-  type OperationInput,
-  type Team,
-  TeamCreationNeedsSignIn,
-} from "@parley/domain"
+import { type createTeam, type listTeams, type OperationInput, SignInRequired, type Team } from "@parley/domain"
 import { Effect } from "effect"
 import type { Principal } from "../principal.ts"
 import { Members } from "../services/members.ts"
@@ -22,7 +16,7 @@ export const list = (principal: Principal, _input: OperationInput<typeof listTea
 /** Creates a team owned by the signed-in user, server-side (D17). */
 export const create = (principal: Principal, input: OperationInput<typeof createTeam>) =>
   Effect.gen(function* () {
-    if (principal._tag !== "UserSession") return yield* new TeamCreationNeedsSignIn()
+    if (principal._tag !== "UserSession") return yield* new SignInRequired({ action: "create a team" })
     const teams = yield* Teams
     return yield* teams.create(principal.userId, input.name)
   })

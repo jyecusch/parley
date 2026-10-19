@@ -90,6 +90,10 @@ What we decided, who decided it, and what's still open. Nothing becomes "decided
 | D82 | Drizzle + Effect | Drizzle defines the schema, migrations and type-safe queries. Queries execute through Effect's `@effect/sql-pg` SqlClient (pool, transactions, spans), using a small Drizzle→SQL adapter | Owner | 2026-10-19 |
 | D83 | MCP implementation | Effect's `McpServer` (`effect/unstable/ai`), with tools derived from the operation registry | Owner | 2026-10-19 |
 | D84 | Milestone 1 | Foundation (monorepo, lint, errors, proofs, DB, auth with teams) plus an end-to-end contacts slice through the operation registry to the HTTP API, MCP and web | Owner | 2026-10-19 |
+| D85 | Milestone 2 | API keys and agent onboarding first: operations to create, list and revoke API keys, plus a Settings → API keys screen with ready-to-paste agent configuration | Owner | 2026-10-20 |
+| D86 | Note permissions | The author can edit or delete their note; admins and owners can delete any note | Owner | 2026-10-20 |
+| D87 | API key defaults | Scopes default to `records:read` (write and delete opt-in), no expiry by default (optionally 30/90/365 days), and the secret is shown once | Owner | 2026-10-20 |
+| D88 | Company fields | Name, domains (many, unique per team), website, phone and postal address. Everything else is a custom field | Owner | 2026-10-20 |
 
 ## Implementation choices made during milestone 1 (Claude; low-stakes, open to veto)
 
@@ -99,7 +103,7 @@ What we decided, who decided it, and what's still open. Nothing becomes "decided
 | I2 | Local Postgres on port 5433 | 5432 was already taken by another container on the dev machine |
 | I3 | REST-style paths (`/api/v1/teams/:teamId/contacts/:contactId`) | Conventional for OpenAPI consumers; each operation declares its method and path, and the path parameters come from its input |
 | I4 | The web client is derived from the operation contracts (`apps/web/src/lib/client.ts`), not `HttpApiClient` | The HttpApi is built from the registry at runtime, so its static types are loose; the contracts carry exact input, output and error types |
-| I5 | New operation `teams.create`, with error `TeamCreationNeedsSignIn` (403) | D17 disabled Better-Auth's own team creation, so new users had no way to create a first team |
+| I5 | New operation `teams.create`, with error `SignInRequired` (403, also used for API key creation) | D17 disabled Better-Auth's own team creation, so new users had no way to create a first team |
 | I6 | New sanctioned `userText` brand `FieldLabel` | Input errors need field labels, which come from title annotations we write on our own schemas |
 | I7 | MCP authenticates in an HTTP middleware and provides a request-tier `CurrentPrincipal` | Effect's McpServer hides HTTP headers from tool handlers by design |
 | I8 | Signed-in screens render on the client (`ssr: false`) | Keeps cookies and auth out of server rendering for now; revisit if first paint matters |

@@ -1,14 +1,16 @@
 import type { OperationError, OperationInput, OperationName, OperationOutput, Operations } from "@parley/domain"
 import type { Effect } from "effect"
 import type { Principal } from "../principal.ts"
+import type { ApiKeys } from "../services/api-keys.ts"
 import type { Contacts } from "../services/contacts.ts"
 import type { Members } from "../services/members.ts"
 import type { Teams } from "../services/teams.ts"
+import * as apiKeys from "./api-keys.ts"
 import * as contacts from "./contacts.ts"
 import * as teams from "./teams.ts"
 
 /** The services operations run on. Entrypoints provide CoreLive. */
-export type OperationServices = Contacts | Members | Teams
+export type OperationServices = Contacts | Members | Teams | ApiKeys
 
 export type Implementation<Name extends OperationName> = (
   principal: Principal,
@@ -29,4 +31,7 @@ export const implementations: { readonly [Name in OperationName]: Implementation
   "contacts.delete": contacts.remove,
   "contacts.restore": contacts.restore,
   "contacts.activity": contacts.activity,
+  "apiKeys.list": apiKeys.list,
+  "apiKeys.create": apiKeys.create,
+  "apiKeys.revoke": apiKeys.revoke,
 }
