@@ -14,7 +14,7 @@ import {
 } from "../lib/appearance.ts"
 import { signOut } from "../lib/auth.ts"
 import { companiesCollection, primaryDomainOf } from "../lib/companies.ts"
-import { contactsCollection, initialsOf } from "../lib/contacts.ts"
+import { contactsCollection } from "../lib/contacts.ts"
 import { useSavedViews } from "../lib/index-view.ts"
 import { useCrt } from "./crt.tsx"
 import {
@@ -29,6 +29,7 @@ import {
   SidebarIcon,
   SwitchIcon,
 } from "./icons.tsx"
+import { ContactAvatar } from "./images.tsx"
 
 interface Shell {
   readonly team: Team
@@ -419,7 +420,7 @@ function CommandMenu(props: { readonly onClose: () => void }) {
           label: contact.displayName,
           ...(contact.emails[0] ? { sub: contact.emails[0].address } : {}),
           hint: <span className="sm-t">Contact</span>,
-          icon: <span className="av">{initialsOf(contact)}</span>,
+          icon: <ContactAvatar contact={contact} />,
           run: go(() =>
             navigate({ to: "/t/$teamId/contacts", params: { teamId: team.id }, search: { contact: contact.id } }),
           ),

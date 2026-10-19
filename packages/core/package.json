@@ -8,17 +8,19 @@
   },
   "dependencies": {
     "@better-auth/api-key": "1.7.11",
+    "@better-auth/mcp": "1.7.11",
+    "@better-auth/oauth-provider": "1.7.11",
     "@effect/sql-pg": "4.0.5",
     "@parley/db": "workspace:*",
     "@parley/domain": "workspace:*",
     "@parley/errors": "workspace:*",
+    "aws4fetch": "1.0.20",
     "better-auth": "1.7.11",
     "drizzle-orm": "0.45.4",
     "effect": "4.0.5",
+    "jose": "6.2.12",
     "pg": "8.23.1",
-    "@better-auth/mcp": "1.7.11",
-    "@better-auth/oauth-provider": "1.7.11",
-    "jose": "6.2.12"
+    "sharp": "0.34.5"
   },
   "devDependencies": {
     "@types/pg": "8.23.1"

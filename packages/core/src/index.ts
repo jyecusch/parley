@@ -8,6 +8,7 @@ import { Companies } from "./services/companies.ts"
 import { Connections } from "./services/connections.ts"
 import { Contacts } from "./services/contacts.ts"
 import { CustomFields } from "./services/custom-fields.ts"
+import { FileStore } from "./services/file-store.ts"
 import { Invitations } from "./services/invitations.ts"
 import { Members } from "./services/members.ts"
 import { Notes } from "./services/notes.ts"
@@ -19,14 +20,17 @@ import { Users } from "./services/users.ts"
 
 export { type AuthenticationFailure, Authenticator, BetterAuth, type Entrypoint } from "./auth/authenticator.ts"
 export { type Auth, issuer, mcpResource } from "./auth/better-auth.ts"
+export { readFile } from "./files/serve.ts"
 export { classifyDecodeError } from "./input/classify.ts"
 export { Mailer, type OutgoingEmail } from "./mail/mailer.ts"
 export { type Implementation, implementations, type OperationServices } from "./operations/registry.ts"
 export type { Principal } from "./principal.ts"
+export { FileStore } from "./services/file-store.ts"
+export type { Members } from "./services/members.ts"
 
 /** Contacts and companies both do domain matching through Affiliations. */
 const Records = Layer.mergeAll(Contacts.layer, Companies.layer, SavedViews.layer).pipe(
-  Layer.provideMerge(Layer.mergeAll(Affiliations.layer, CustomFields.layer)),
+  Layer.provideMerge(Layer.mergeAll(Affiliations.layer, CustomFields.layer, FileStore.layer)),
 )
 
 const Services = Layer.mergeAll(

@@ -1,6 +1,15 @@
-import { type AnyOperationError, ParleyApi } from "@parley/api"
-import { Authenticator, BetterAuth, implementations, type OperationServices } from "@parley/core"
-import { type OperationName, operations } from "@parley/domain"
+import { type AnyOperationError, ERROR_STATUS, ParleyApi } from "@parley/api"
+import {
+  Authenticator,
+  BetterAuth,
+  type FileStore,
+  implementations,
+  type Members,
+  type OperationServices,
+  readFile,
+} from "@parley/core"
+import { type FileNotFound, type OperationName, operations } from "@parley/domain"
+import { toPublicError } from "@parley/errors"
 import { Effect, Layer } from "effect"
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http"
 import { HttpApiBuilder } from "effect/http-api"
@@ -98,6 +107,42 @@ export const AuthRoutesLive = HttpRouter.use((router) =>
       "GET",
       "/.well-known/openid-configuration/*",
       metadata((request) => auth.api.getOpenIdConfig({ request, asResponse: false })),
+    )
+  }),
+)
+
+/**
+ * Avatars and logos (D76), under the same authentication as the API. Keys are unguessable and
+ * change on every upload, so a file can be cached for good.
+ */
+export const FileRoutesLive = HttpRouter.use((router) =>
+  Effect.gen(function* () {
+    const services = yield* Effect.context<Authenticator | Members | FileStore>()
+    yield* router.add("GET", "/api/files/*", (request) =>
+      Effect.gen(function* () {
+        const authenticator = yield* Authenticator
+        const principal = yield* authenticator.authenticate(headersOf(request), "http")
+        const key = decodeURIComponent(new URL(request.url, "http://parley").pathname.replace(/^\/api\/files\//, ""))
+        const file = yield* readFile(principal, key)
+        return HttpServerResponse.uint8Array(file.bytes, {
+          contentType: file.contentType,
+          headers: {
+            "cache-control": "private, max-age=31536000, immutable",
+            "x-content-type-options": "nosniff",
+            "content-security-policy": "default-src 'none'",
+          },
+        })
+      }).pipe(
+        Effect.catchTag("FileNotFound", (error: FileNotFound) =>
+          Effect.succeed(
+            HttpServerResponse.jsonUnsafe({ _tag: "NotFound", error: toPublicError(error, {}) }, { status: 404 }),
+          ),
+        ),
+        Effect.catch((error: AnyOperationError) =>
+          Effect.succeed(HttpServerResponse.jsonUnsafe(errorBody(error), { status: ERROR_STATUS[error._tag] })),
+        ),
+        Effect.provide(services),
+      ),
     )
   }),
 )

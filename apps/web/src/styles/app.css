@@ -799,6 +799,11 @@ body {
   color: var(--fg-muted);
   letter-spacing: 0;
 }
+.av.md {
+  width: 24px;
+  height: 24px;
+  font-size: 10px;
+}
 .av.lg {
   width: 36px;
   height: 36px;
@@ -1882,4 +1887,60 @@ body {
   border-radius: 50%;
   background: currentColor;
   opacity: 0.6;
+}
+
+/* Avatars and logos: an uploaded avatar or logo, a Gravatar, or a fetched favicon, over the initials. */
+.av.has-img,
+.tile.has-img {
+  background: var(--bg);
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.av.has-img img,
+.tile.has-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border-radius: inherit;
+}
+.imgedit {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}
+.imgedit.busy {
+  opacity: 0.5;
+}
+.imgbtn {
+  padding: 0;
+  border: 0;
+  background: none;
+  border-radius: 8px;
+  cursor: pointer;
+  display: inline-flex;
+}
+.imgbtn:hover > *,
+.imgbtn:focus-visible > * {
+  box-shadow: 0 0 0 2px var(--line-strong);
+}
+.imgx {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 0;
+  display: grid;
+  place-items: center;
+  background: var(--bg);
+  color: var(--fg-muted);
+  box-shadow: 0 0 0 1px var(--line-strong);
+  opacity: 0;
+  cursor: pointer;
+}
+.imgedit:hover .imgx,
+.imgx:focus-visible {
+  opacity: 1;
 }

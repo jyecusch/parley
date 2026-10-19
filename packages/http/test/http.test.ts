@@ -2,9 +2,9 @@ import { afterAll, beforeAll, describe, expect, it } from "@effect/vitest"
 import { BetterAuth, CoreLive } from "@parley/core"
 import { Effect, Layer, ManagedRuntime } from "effect"
 import { HttpRouter, HttpServer } from "effect/http"
-import { ApiRoutesLive, AuthRoutesLive, FailureResponsesLive } from "../src/index.ts"
+import { ApiRoutesLive, AuthRoutesLive, FailureResponsesLive, FileRoutesLive } from "../src/index.ts"
 
-const AppLive = Layer.mergeAll(ApiRoutesLive, AuthRoutesLive, FailureResponsesLive).pipe(
+const AppLive = Layer.mergeAll(ApiRoutesLive, AuthRoutesLive, FileRoutesLive, FailureResponsesLive).pipe(
   Layer.provide(CoreLive),
   Layer.provide(HttpServer.layerServices),
 )
@@ -184,5 +184,28 @@ describe("API keys", () => {
     const unknown = await call("POST", `/api/v1/teams/${teamId}/api-keys/not-a-key/revoke`)
     expect(unknown.status).toBe(404)
     expect(unknown.body.error._tag).toBe("ApiKeyNotFound")
+  })
+})
+
+describe("files", () => {
+  it("serves an uploaded avatar to the team, and nothing without a session", async () => {
+    const created = await call("POST", `/api/v1/teams/${teamId}/contacts`, { body: { firstName: "Pic" } })
+    // A 1x1 PNG.
+    const image = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="
+    const uploaded = await call("POST", `/api/v1/teams/${teamId}/contacts/${created.body.id}/avatar`, {
+      body: { image },
+    })
+    expect(uploaded.status).toBe(200)
+    const url = uploaded.body.avatarUrl as string
+    const file = await handler(new Request(`${base}${url}`, { headers: { cookie } }))
+    expect(file.status).toBe(200)
+    expect(file.headers.get("content-type")).toBe("image/webp")
+    const saved = cookie
+    cookie = ""
+    const anonymous = await call("GET", url)
+    cookie = saved
+    expect(anonymous.status).toBe(401)
+    const missing = await call("GET", `/api/files/${teamId}/avatars/nothing.webp`)
+    expect(missing.status).toBe(404)
   })
 })

@@ -21,6 +21,7 @@ import * as connections from "./connections.ts"
 import * as contacts from "./contacts.ts"
 import * as csv from "./csv.ts"
 import * as customFields from "./custom-fields.ts"
+import * as images from "./images.ts"
 import * as members from "./members.ts"
 import * as notes from "./notes.ts"
 import * as savedViews from "./saved-views.ts"
@@ -73,6 +74,8 @@ export const implementations: { readonly [Name in OperationName]: Implementation
   "contacts.activity": contacts.activity,
   "contacts.export": csv.exportContactsCsv,
   "contacts.import": csv.importContactsCsv,
+  "contacts.setAvatar": images.setAvatar,
+  "contacts.removeAvatar": images.removeAvatar,
   "companies.list": companies.list,
   "companies.get": companies.get,
   "companies.create": companies.create,
@@ -82,6 +85,8 @@ export const implementations: { readonly [Name in OperationName]: Implementation
   "companies.activity": companies.activity,
   "companies.export": csv.exportCompaniesCsv,
   "companies.import": csv.importCompaniesCsv,
+  "companies.setLogo": images.setLogo,
+  "companies.removeLogo": images.removeLogo,
   "affiliations.list": affiliations.list,
   "affiliations.create": affiliations.create,
   "affiliations.update": affiliations.update,

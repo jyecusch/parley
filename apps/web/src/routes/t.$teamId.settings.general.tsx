@@ -84,10 +84,10 @@ function General() {
             onChange={(event) => void save({ gravatar: event.target.checked })}
           />
           <span>
-            <b style={{ fontWeight: 470, color: "var(--fg)" }}>Show Gravatar pictures</b>
+            <b style={{ fontWeight: 470, color: "var(--fg)" }}>Show Gravatar avatars</b>
             <span className="hint sm-t" style={{ display: "block", marginTop: 2 }}>
-              Contacts without a picture show the Gravatar for their primary email. Turning this on sends a hash of each
-              email address to Gravatar when someone views it.
+              Contacts without an uploaded avatar show the Gravatar for their primary email. Turning this on sends a
+              hash of each email address to Gravatar when someone views it.
             </span>
           </span>
         </label>

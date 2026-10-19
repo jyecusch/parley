@@ -27,6 +27,7 @@ import {
   RestoreIcon,
   TrashIcon,
 } from "../components/icons.tsx"
+import { ContactAvatar, ImageEditor } from "../components/images.tsx"
 import { DisplayMenu, ImportDialog, SaveViewDialog, SetFieldDialog, ViewActions } from "../components/index-view.tsx"
 import {
   EditableList,
@@ -41,7 +42,7 @@ import { isTyping, useShell } from "../components/shell.tsx"
 import { Timeline } from "../components/timeline.tsx"
 import { call, isApiFailure, messageOf } from "../lib/client.ts"
 import { companiesCollection } from "../lib/companies.ts"
-import { contactsCollection, displayNameOf, initialsOf } from "../lib/contacts.ts"
+import { contactsCollection, displayNameOf } from "../lib/contacts.ts"
 import { useFields } from "../lib/custom-fields.ts"
 import { compareBy, download, useIndexView } from "../lib/index-view.ts"
 import { absolute, relative } from "../lib/time.ts"
@@ -555,6 +556,7 @@ function ContactsScreen() {
           onError={(text) => showToast({ text })}
           onToast={showToast}
           collection={collection}
+          canWrite={canWrite}
         />
       ) : null}
     </>
@@ -595,9 +597,7 @@ function ContactRow(props: {
       </td>
       <td>
         <button className="namebtn" type="button" onClick={props.onOpen}>
-          <span className="av" aria-hidden="true">
-            {initialsOf(contact)}
-          </span>
+          <ContactAvatar contact={contact} />
           <span className="n">{contact.displayName}</span>
         </button>
       </td>
@@ -740,9 +740,7 @@ function DeletedContacts(props: {
             <tr key={contact.id}>
               <td style={{ paddingLeft: 14 }}>
                 <span className="namebtn" style={{ cursor: "default" }}>
-                  <span className="av" aria-hidden="true">
-                    {initialsOf(contact)}
-                  </span>
+                  <ContactAvatar contact={contact} />
                   <span className="n">{contact.displayName}</span>
                 </span>
               </td>
@@ -925,6 +923,7 @@ function ContactPanel(props: {
   readonly onError: (text: UserText) => void
   readonly onToast: (toast: Toast) => void
   readonly collection: ReturnType<typeof contactsCollection>
+  readonly canWrite: boolean
 }) {
   const { contact, collection } = props
   const queryClient = useQueryClient()
@@ -944,6 +943,20 @@ function ContactPanel(props: {
     transaction.isPersisted.promise
       .then(() => queryClient.invalidateQueries({ queryKey: ["contact-activity", props.teamId, contact.id] }))
       .catch((failure: unknown) => props.onError(messageOf(failure)))
+  }
+
+  /** Uploads or removes the avatar, then shows what the server stored. */
+  const setAvatar = async (image: string | null) => {
+    try {
+      const updated =
+        image === null
+          ? await call("contacts.removeAvatar", { teamId: props.teamId, contactId: contact.id })
+          : await call("contacts.setAvatar", { teamId: props.teamId, contactId: contact.id, image })
+      collection.utils.writeUpsert(updated)
+      await queryClient.invalidateQueries({ queryKey: ["contact-activity", props.teamId, contact.id] })
+    } catch (failure) {
+      props.onError(messageOf(failure))
+    }
   }
 
   return (
@@ -1014,9 +1027,15 @@ function ContactPanel(props: {
           </button>
         </div>
         <div className="ph-id">
-          <span className="av lg" aria-hidden="true">
-            {initialsOf(contact)}
-          </span>
+          <ImageEditor
+            label="avatar"
+            hasUpload={contact.avatarUrl !== null}
+            canEdit={props.canWrite}
+            onUpload={(image) => setAvatar(image)}
+            onRemove={() => setAvatar(null)}
+          >
+            <ContactAvatar contact={contact} size="lg" />
+          </ImageEditor>
           <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 6 }}>
             <h2 className="pname">{contact.displayName}</h2>
             {contact.affiliations.length > 0 ? (

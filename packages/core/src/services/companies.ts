@@ -20,8 +20,9 @@ import {
 } from "@parley/domain"
 import { DisplayName, EchoedInput, userText } from "@parley/errors"
 import { and, asc, desc, eq, exists, ilike, inArray, isNotNull, isNull, ne, or, sql } from "drizzle-orm"
-import { Context, Effect, Layer } from "effect"
+import { Config, Context, Effect, Layer } from "effect"
 import type { SqlError } from "effect/sql"
+import { fetchFavicon } from "../files/favicon.ts"
 import type { Principal } from "../principal.ts"
 import type { CompanyInTeam, CompanyRestorable } from "../proofs/company-in-team.ts"
 import type { CanDeleteRecords, CanReadRecords, CanWriteRecords } from "../proofs/permissions.ts"
@@ -30,6 +31,7 @@ import { activityRow, toActivityEntry } from "./activity.ts"
 import { Affiliations } from "./affiliations.ts"
 import { RESTORE_WINDOW_DAYS } from "./contacts.ts"
 import { CustomFields } from "./custom-fields.ts"
+import { FileStore, fileUrl } from "./file-store.ts"
 import { checkFilter, filterSql, sortSql } from "./filter-sql.ts"
 import { classifySqlError, isUniqueViolation } from "./sql-errors.ts"
 
@@ -179,6 +181,12 @@ export class Companies extends Context.Service<
     readonly activity: <K, T>(
       target: CompanyInTeam<K, T>,
     ) => Effect.Effect<ReadonlyArray<ActivityEntry>, DatabaseUnavailable>
+    /** Stores an uploaded logo (D75, D76); null removes it and looks for the favicon again. */
+    readonly setLogo: <P, T, K>(
+      target: CompanyInTeam<K, T>,
+      image: Uint8Array | null,
+      access: CanWriteRecords<P, T>,
+    ) => Effect.Effect<Company, DatabaseUnavailable>
   }
 >()("@parley/core/Companies") {
   static readonly layer = Layer.effect(
@@ -187,8 +195,51 @@ export class Companies extends Context.Service<
       const db = yield* Database
       const affiliations = yield* Affiliations
       const customFields = yield* CustomFields
+      const files = yield* FileStore
       const run = <A>(effect: Effect.Effect<A, SqlError.SqlError>) =>
         effect.pipe(Effect.catchTag("SqlError", classifySqlError))
+      const fetchLogos = yield* Config.withDefault(Config.Boolean("FETCH_LOGOS"), true).pipe(Effect.orDie)
+
+      /** Stores a company's logo and where it came from, replacing the old file. */
+      const storeLogo = (teamId: TeamId, id: string, image: Uint8Array | null, source: "upload" | "favicon" | null) =>
+        Effect.gen(function* () {
+          const [row] = yield* run(
+            db.query((d) =>
+              d.select({ logoKey: schema.companies.logoKey }).from(schema.companies).where(eq(schema.companies.id, id)),
+            ),
+          )
+          const key = image ? `${teamId}/logos/${id}-${crypto.randomUUID().slice(0, 8)}.webp` : null
+          if (image && key) yield* files.put(teamId, key, { bytes: image, contentType: "image/webp" })
+          yield* run(
+            db.query((d) =>
+              d.update(schema.companies).set({ logoKey: key, logoSource: source }).where(eq(schema.companies.id, id)),
+            ),
+          )
+          if (row?.logoKey) yield* files.remove(row.logoKey)
+        })
+
+      /**
+       * Looks for the primary domain's icon in the background (D75). Never replaces an uploaded logo,
+       * and never holds up the request that triggered it.
+       */
+      const refreshFavicon = (teamId: TeamId, id: string, domain: string | undefined) =>
+        fetchLogos && domain
+          ? Effect.forkDetach(
+              Effect.gen(function* () {
+                const icon = yield* fetchFavicon(domain)
+                const [row] = yield* run(
+                  db.query((d) =>
+                    d
+                      .select({ logoSource: schema.companies.logoSource })
+                      .from(schema.companies)
+                      .where(eq(schema.companies.id, id)),
+                  ),
+                )
+                if (!icon || row?.logoSource === "upload") return
+                yield* storeLogo(teamId, id, icon, "favicon")
+              }).pipe(Effect.catchCause((cause) => Effect.logDebug("logo fetch failed", cause))),
+            ).pipe(Effect.asVoid)
+          : Effect.void
 
       /** Loads full companies, with domains and contact counts, in the order of `ids`. */
       const load = (teamId: TeamId, ids: ReadonlyArray<string>) =>
@@ -244,6 +295,7 @@ export class Companies extends Context.Service<
                 address,
                 contactCount,
                 custom: row.custom as Company["custom"],
+                logoUrl: fileUrl(row.logoKey),
                 createdAt: row.createdAt.toISOString(),
                 updatedAt: row.updatedAt.toISOString(),
                 deletedAt: row.deletedAt?.toISOString() ?? null,
@@ -499,6 +551,7 @@ export class Companies extends Context.Service<
               yield* affiliations.matchCompany(principal, team.value, { id, name: fields.name }, domains)
             }),
           )
+          yield* refreshFavicon(team.value, id, domains[0])
           return yield* loadOne(team.value, id)
         }).pipe(Effect.withSpan("Companies.create"))
 
@@ -549,7 +602,13 @@ export class Companies extends Context.Service<
               }),
             )
           }
-          return yield* loadOne(teamId, id)
+          const updated = yield* loadOne(teamId, id)
+          // A new primary domain may have a different icon; uploads are left alone.
+          const primary = updated.domains.find((entry) => entry.isPrimary)?.domain
+          if (normalized.domains && primary !== current.domains.find((entry) => entry.isPrimary)?.domain) {
+            yield* refreshFavicon(teamId, id, primary)
+          }
+          return updated
         }).pipe(Effect.withSpan("Companies.update"))
 
       const remove = <P, T, K>(target: CompanyInTeam<K, T>, access: CanDeleteRecords<P, T>) =>
@@ -625,7 +684,30 @@ export class Companies extends Context.Service<
           (rows) => rows.map(toActivityEntry),
         )
 
-      return { list, locate, get, create, update, delete: remove, restore, activity }
+      const setLogo = <P, T, K>(target: CompanyInTeam<K, T>, image: Uint8Array | null, access: CanWriteRecords<P, T>) =>
+        Effect.gen(function* () {
+          const teamId = target.team.value
+          const id = target.company.value
+          yield* storeLogo(teamId, id, image, image ? "upload" : null)
+          yield* run(
+            db.query((d) =>
+              d.insert(schema.activity).values(
+                activityRow(access.member.principal.value, {
+                  teamId,
+                  recordType: "company",
+                  recordId: id,
+                  kind: "updated",
+                  changedFields: ["logo"],
+                }),
+              ),
+            ),
+          )
+          const company = yield* loadOne(teamId, id)
+          if (!image) yield* refreshFavicon(teamId, id, company.domains.find((entry) => entry.isPrimary)?.domain)
+          return company
+        }).pipe(Effect.withSpan("Companies.setLogo"))
+
+      return { list, locate, get, create, update, delete: remove, restore, activity, setLogo }
     }),
   )
 }

@@ -148,7 +148,11 @@ Milestone 2: API keys (`apiKeys.list/create/revoke`), MCP OAuth connections (`co
 
 Milestone 3: companies (`companies.list/get/create/update/delete/restore/activity`) with many domains, free email domains refused and a structured address; affiliations (`affiliations.list/create/update/delete`); domain matching both ways, recorded in activity with the matched domain; the Companies screen and affiliations on Contacts (D103–D113).
 
-Not yet: logos (favicons, D75), custom fields, saved views, notes, CSV import and export, bulk "set field", members management and invitations, renaming and removing service accounts, the 30-day purge job, avatars and logos, a full record view, and paging in the table beyond loading everything.
+Milestones 4–7: notes (`notes.*`, in the timeline with activity); custom fields (`fields.*`, Settings → Fields, editable in panels and shown as columns); members and invitations (`members.*`, `invitations.*`, the Mailer with Resend or a logged outbox, Settings → Members and General); renaming and removing service accounts; filters and sorting on both lists (`POST …/list`); saved views (`savedViews.*`, in the sidebar); CSV import and export; bulk "set field" and "add to company"; the 30-day purge job.
+
+Milestone 8: avatars and logos (`contacts.setAvatar/removeAvatar`, `companies.setLogo/removeLogo`). Uploads are cropped to 256px WebP by sharp. Logos are fetched from the primary domain in the background. Gravatar is used when the team turns it on. `FileStore` uses S3 when configured, else Postgres. Files are served from `/api/files/…` to members of their team only.
+
+Not yet: v2 marketing email, a full record view (D55), and paging in the table beyond loading everything.
 
 ## Proposed (awaiting the owner)
 

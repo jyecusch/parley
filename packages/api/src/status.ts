@@ -38,6 +38,8 @@ export const ERROR_STATUS: { readonly [Tag in ErrorTag]: Status } = {
   FreeEmailDomain: 422,
   AffiliationNotFound: 404,
   NoteNotFound: 404,
+  ImageUnreadable: 422,
+  ImageTooLarge: 422,
   CustomFieldNameTaken: 409,
   CustomFieldNotFound: 404,
   MemberNotFound: 404,

@@ -21,6 +21,7 @@ import {
 } from "./contacts.ts"
 import { exportCompanies, exportContacts, importCompanies, importContacts } from "./csv.ts"
 import { createField, deleteField, listFields, updateField } from "./custom-fields.ts"
+import { removeCompanyLogo, removeContactAvatar, setCompanyLogo, setContactAvatar } from "./images.ts"
 import {
   acceptInvitation,
   createInvitation,
@@ -48,6 +49,7 @@ export * from "./connections.ts"
 export * from "./contacts.ts"
 export * from "./csv.ts"
 export * from "./custom-fields.ts"
+export * from "./images.ts"
 export * from "./members.ts"
 export * from "./notes.ts"
 export * from "./saved-views.ts"
@@ -75,6 +77,8 @@ export const operations = {
   "contacts.restore": restoreContact,
   "contacts.activity": contactActivity,
   "contacts.export": exportContacts,
+  "contacts.setAvatar": setContactAvatar,
+  "contacts.removeAvatar": removeContactAvatar,
   "contacts.import": importContacts,
   "companies.list": listCompanies,
   "companies.get": getCompany,
@@ -84,6 +88,8 @@ export const operations = {
   "companies.restore": restoreCompany,
   "companies.activity": companyActivity,
   "companies.export": exportCompanies,
+  "companies.setLogo": setCompanyLogo,
+  "companies.removeLogo": removeCompanyLogo,
   "companies.import": importCompanies,
   "affiliations.list": listAffiliations,
   "affiliations.create": createAffiliation,

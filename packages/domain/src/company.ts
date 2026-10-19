@@ -57,6 +57,8 @@ export const Company = Schema.Struct({
   contactCount: Schema.Number,
   /** Custom field values by field id (D31). */
   custom: CustomValues,
+  /** The uploaded logo, else the favicon fetched from the primary domain, else null (D75). */
+  logoUrl: Schema.NullOr(Schema.String),
   createdAt: Timestamp,
   updatedAt: Timestamp,
   deletedAt: Schema.NullOr(Timestamp),

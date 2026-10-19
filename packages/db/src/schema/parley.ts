@@ -34,6 +34,8 @@ export const contacts = pgTable(
     lastName: text("last_name"),
     /** Custom field values by field id (D31). */
     custom: jsonb("custom").$type<Record<string, unknown>>().notNull().default({}),
+    /** The uploaded picture's file key (D75). */
+    avatarKey: text("avatar_key"),
     ...timestamps,
     /** Soft delete: hidden at once, restorable for 30 days, then purged (D30). */
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
@@ -182,6 +184,9 @@ export const companies = pgTable(
     country: text("country"),
     /** Custom field values by field id (D31). */
     custom: jsonb("custom").$type<Record<string, unknown>>().notNull().default({}),
+    /** The logo's file key, and where it came from: an upload wins over the fetched favicon (D75). */
+    logoKey: text("logo_key"),
+    logoSource: text("logo_source", { enum: ["upload", "favicon"] }),
     ...timestamps,
     /** Soft delete, like contacts (D30, D109). */
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
@@ -309,3 +314,15 @@ export const savedViews = pgTable(
   },
   (t) => [index("saved_views_team_id_idx").on(t.teamId, t.recordType)],
 )
+
+/**
+ * Files kept in Postgres when no S3-compatible store is configured (D76). Small, resized images only;
+ * the content is base64 so it travels safely through every driver.
+ */
+export const files = pgTable("files", {
+  key: text("key").primaryKey(),
+  teamId: teamId(),
+  contentType: text("content_type").notNull(),
+  data: text("data").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+})

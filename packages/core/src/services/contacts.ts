@@ -25,6 +25,7 @@ import type { Named } from "../proofs/proof.ts"
 import { activityRow, toActivityEntry } from "./activity.ts"
 import { Affiliations } from "./affiliations.ts"
 import { CustomFields } from "./custom-fields.ts"
+import { FileStore, fileUrl } from "./file-store.ts"
 import { checkFilter, filterSql, sortSql } from "./filter-sql.ts"
 import { classifySqlError, isUniqueViolation } from "./sql-errors.ts"
 
@@ -171,6 +172,12 @@ export class Contacts extends Context.Service<
     readonly activity: <C, T>(
       target: ContactInTeam<C, T>,
     ) => Effect.Effect<ReadonlyArray<ActivityEntry>, DatabaseUnavailable>
+    /** Stores a normalized avatar (D75, D76), or removes it with null. */
+    readonly setAvatar: <P, T, C>(
+      target: ContactInTeam<C, T>,
+      image: Uint8Array | null,
+      access: CanWriteRecords<P, T>,
+    ) => Effect.Effect<Contact, DatabaseUnavailable>
   }
 >()("@parley/core/Contacts") {
   static readonly layer = Layer.effect(
@@ -179,6 +186,7 @@ export class Contacts extends Context.Service<
       const db = yield* Database
       const affiliations = yield* Affiliations
       const customFields = yield* CustomFields
+      const files = yield* FileStore
       const run = <A>(effect: Effect.Effect<A, SqlError.SqlError>) =>
         effect.pipe(Effect.catchTag("SqlError", classifySqlError))
 
@@ -244,6 +252,7 @@ export class Contacts extends Context.Service<
                   })),
                 affiliations: companies.get(id) ?? [],
                 custom: row.custom as Contact["custom"],
+                avatarUrl: fileUrl(row.avatarKey),
                 createdAt: row.createdAt.toISOString(),
                 updatedAt: row.updatedAt.toISOString(),
                 deletedAt: row.deletedAt?.toISOString() ?? null,
@@ -650,7 +659,37 @@ export class Contacts extends Context.Service<
           (rows) => rows.map(toActivityEntry),
         )
 
-      return { list, locate, get, create, update, delete: remove, restore, activity }
+      const setAvatar = <P, T, C>(
+        target: ContactInTeam<C, T>,
+        image: Uint8Array | null,
+        access: CanWriteRecords<P, T>,
+      ) =>
+        Effect.gen(function* () {
+          const teamId = target.team.value
+          const id = target.contact.value
+          const current = yield* loadOne(teamId, id)
+          // A new key each time, so browsers never show a cached old avatar.
+          const key = image ? `${teamId}/avatars/${id}-${crypto.randomUUID().slice(0, 8)}.webp` : null
+          if (image && key) yield* files.put(teamId, key, { bytes: image, contentType: "image/webp" })
+          yield* run(
+            db.transaction(
+              Effect.gen(function* () {
+                yield* db.query((d) =>
+                  d
+                    .update(schema.contacts)
+                    .set({ avatarKey: key, updatedAt: sql`now()` })
+                    .where(and(eq(schema.contacts.teamId, teamId), eq(schema.contacts.id, id))),
+                )
+                yield* recordActivity(access.member.principal.value, teamId, id, "updated", ["avatar"])
+              }),
+            ),
+          )
+          const previous = current.avatarUrl?.replace("/api/files/", "")
+          if (previous) yield* files.remove(previous)
+          return yield* loadOne(teamId, id)
+        }).pipe(Effect.withSpan("Contacts.setAvatar"))
+
+      return { list, locate, get, create, update, delete: remove, restore, activity, setAvatar }
     }),
   )
 }

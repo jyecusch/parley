@@ -52,6 +52,8 @@ export const Contact = Schema.Struct({
   affiliations: Schema.Array(ContactAffiliation),
   /** Custom field values by field id (D31). */
   custom: CustomValues,
+  /** The uploaded avatar, or null (D75). The web app falls back to Gravatar, then initials. */
+  avatarUrl: Schema.NullOr(Schema.String),
   createdAt: Timestamp,
   updatedAt: Timestamp,
   deletedAt: Schema.NullOr(Timestamp),

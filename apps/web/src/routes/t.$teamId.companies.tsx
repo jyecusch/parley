@@ -29,6 +29,7 @@ import {
   RestoreIcon,
   TrashIcon,
 } from "../components/icons.tsx"
+import { CompanyLogo, ImageEditor } from "../components/images.tsx"
 import { DisplayMenu, ImportDialog, SaveViewDialog, SetFieldDialog, ViewActions } from "../components/index-view.tsx"
 import {
   EditableList,
@@ -410,9 +411,7 @@ function CompaniesScreen() {
                             type="button"
                             onClick={() => void setSearch({ company: company.id })}
                           >
-                            <span className="tile md" aria-hidden="true">
-                              {initialsOfName(company.name)}
-                            </span>
+                            <CompanyLogo company={company} size="md" />
                             <span className="stack">
                               <span className="n">{company.name}</span>
                               {domain ? <span className="s sm-t">{domain}</span> : null}
@@ -572,6 +571,7 @@ function CompaniesScreen() {
           onDelete={() => remove([open.id])}
           onToast={showToast}
           collection={collection}
+          canWrite={canWrite}
         />
       ) : null}
     </>
@@ -671,9 +671,7 @@ function DeletedCompanies(props: {
             <tr key={company.id}>
               <td style={{ paddingLeft: 14 }}>
                 <span className="namebtn" style={{ cursor: "default" }}>
-                  <span className="tile md" aria-hidden="true">
-                    {initialsOfName(company.name)}
-                  </span>
+                  <CompanyLogo company={company} size="md" />
                   <span className="stack">
                     <span className="n">{company.name}</span>
                     {primaryDomainOf(company) ? <span className="s sm-t">{primaryDomainOf(company)}</span> : null}
@@ -1009,6 +1007,7 @@ function CompanyPanel(props: {
   readonly onDelete: () => void
   readonly onToast: (toast: ToastRequest) => void
   readonly collection: ReturnType<typeof companiesCollection>
+  readonly canWrite: boolean
 }) {
   const { company, collection } = props
   const queryClient = useQueryClient()
@@ -1031,6 +1030,20 @@ function CompanyPanel(props: {
         await queryClient.invalidateQueries({ queryKey: ["contacts", props.teamId] })
       })
       .catch((failure: unknown) => props.onToast({ text: messageOf(failure) }))
+  }
+
+  /** Uploads or removes the logo. Removing one fetches the domain's icon again, in the background. */
+  const setLogo = async (image: string | null) => {
+    try {
+      const updated =
+        image === null
+          ? await call("companies.removeLogo", { teamId: props.teamId, companyId: company.id })
+          : await call("companies.setLogo", { teamId: props.teamId, companyId: company.id, image })
+      collection.utils.writeUpsert(updated)
+      await queryClient.invalidateQueries({ queryKey: ["company-activity", props.teamId, company.id] })
+    } catch (failure) {
+      props.onToast({ text: messageOf(failure) })
+    }
   }
 
   return (
@@ -1089,9 +1102,15 @@ function CompanyPanel(props: {
           </button>
         </div>
         <div className="ph-id">
-          <span className="tile lg" aria-hidden="true">
-            {initialsOfName(company.name)}
-          </span>
+          <ImageEditor
+            label="logo"
+            hasUpload={company.logoUrl !== null}
+            canEdit={props.canWrite}
+            onUpload={(image) => setLogo(image)}
+            onRemove={() => setLogo(null)}
+          >
+            <CompanyLogo company={company} size="lg" />
+          </ImageEditor>
           <div style={{ minWidth: 0 }}>
             <h2 className="pname">{company.name}</h2>
             <p className="paff sm-t">
