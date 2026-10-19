@@ -182,14 +182,16 @@ export function SettingsPage(props: {
           </span>
           <span>{props.title}</span>
         </h1>
-        <div className="spacer" />
-        {props.action}
       </div>
       <div className="scroll">
         <div className="page">
+          {/* The page's main action sits beside its title, next to what it acts on, not at the window's edge. */}
           <div className="intro">
-            <h2>{props.title}</h2>
-            <p>{props.intro}</p>
+            <div className="intro-t">
+              <h2>{props.title}</h2>
+              <p>{props.intro}</p>
+            </div>
+            {props.action ? <div className="intro-a">{props.action}</div> : null}
           </div>
           {props.children}
         </div>

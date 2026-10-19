@@ -65,6 +65,20 @@
   flex-direction: column;
   gap: 20px;
 }
+.intro {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+.intro-t {
+  flex: 1;
+  min-width: 0;
+}
+.intro-a {
+  flex: none;
+  display: flex;
+  gap: 6px;
+}
 .intro h2 {
   font-size: 15px;
   line-height: 20px;
