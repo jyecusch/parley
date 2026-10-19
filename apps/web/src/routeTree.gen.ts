@@ -17,6 +17,7 @@ import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as SignUpRouteImport } from './routes/sign-up'
 import { Route as DotwellKnownSplatRouteImport } from './routes/[.]well-known.$'
 import { Route as ApiSplatRouteImport } from './routes/api/$'
+import { Route as InviteInvitationIdRouteImport } from './routes/invite.$invitationId'
 import { Route as TTeamIdRouteImport } from './routes/t.$teamId'
 import { Route as TTeamIdCompaniesRouteImport } from './routes/t.$teamId.companies'
 import { Route as TTeamIdContactsRouteImport } from './routes/t.$teamId.contacts'
@@ -25,6 +26,8 @@ import { Route as TTeamIdSettingsIndexRouteImport } from './routes/t.$teamId.set
 import { Route as TTeamIdSettingsApiKeysRouteImport } from './routes/t.$teamId.settings.api-keys'
 import { Route as TTeamIdSettingsConnectionsRouteImport } from './routes/t.$teamId.settings.connections'
 import { Route as TTeamIdSettingsFieldsRouteImport } from './routes/t.$teamId.settings.fields'
+import { Route as TTeamIdSettingsGeneralRouteImport } from './routes/t.$teamId.settings.general'
+import { Route as TTeamIdSettingsMembersRouteImport } from './routes/t.$teamId.settings.members'
 import { Route as TTeamIdSettingsServiceAccountsRouteImport } from './routes/t.$teamId.settings.service-accounts'
 
 const IndexRoute = IndexRouteImport.update({
@@ -65,6 +68,11 @@ const DotwellKnownSplatRoute = DotwellKnownSplatRouteImport.update({
 const ApiSplatRoute = ApiSplatRouteImport.update({
   id: '/api/$',
   path: '/api/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InviteInvitationIdRoute = InviteInvitationIdRouteImport.update({
+  id: '/invite/$invitationId',
+  path: '/invite/$invitationId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TTeamIdRoute = TTeamIdRouteImport.update({
@@ -108,6 +116,16 @@ const TTeamIdSettingsFieldsRoute = TTeamIdSettingsFieldsRouteImport.update({
   path: '/fields',
   getParentRoute: () => TTeamIdSettingsRoute,
 } as any)
+const TTeamIdSettingsGeneralRoute = TTeamIdSettingsGeneralRouteImport.update({
+  id: '/general',
+  path: '/general',
+  getParentRoute: () => TTeamIdSettingsRoute,
+} as any)
+const TTeamIdSettingsMembersRoute = TTeamIdSettingsMembersRouteImport.update({
+  id: '/members',
+  path: '/members',
+  getParentRoute: () => TTeamIdSettingsRoute,
+} as any)
 const TTeamIdSettingsServiceAccountsRoute =
   TTeamIdSettingsServiceAccountsRouteImport.update({
     id: '/service-accounts',
@@ -124,6 +142,7 @@ export interface FileRoutesByFullPath {
   '/sign-up': typeof SignUpRoute
   '/.well-known/$': typeof DotwellKnownSplatRoute
   '/api/$': typeof ApiSplatRoute
+  '/invite/$invitationId': typeof InviteInvitationIdRoute
   '/t/$teamId': typeof TTeamIdRouteWithChildren
   '/t/$teamId/companies': typeof TTeamIdCompaniesRoute
   '/t/$teamId/contacts': typeof TTeamIdContactsRoute
@@ -131,6 +150,8 @@ export interface FileRoutesByFullPath {
   '/t/$teamId/settings/api-keys': typeof TTeamIdSettingsApiKeysRoute
   '/t/$teamId/settings/connections': typeof TTeamIdSettingsConnectionsRoute
   '/t/$teamId/settings/fields': typeof TTeamIdSettingsFieldsRoute
+  '/t/$teamId/settings/general': typeof TTeamIdSettingsGeneralRoute
+  '/t/$teamId/settings/members': typeof TTeamIdSettingsMembersRoute
   '/t/$teamId/settings/service-accounts': typeof TTeamIdSettingsServiceAccountsRoute
   '/t/$teamId/settings/': typeof TTeamIdSettingsIndexRoute
 }
@@ -143,12 +164,15 @@ export interface FileRoutesByTo {
   '/sign-up': typeof SignUpRoute
   '/.well-known/$': typeof DotwellKnownSplatRoute
   '/api/$': typeof ApiSplatRoute
+  '/invite/$invitationId': typeof InviteInvitationIdRoute
   '/t/$teamId': typeof TTeamIdRouteWithChildren
   '/t/$teamId/companies': typeof TTeamIdCompaniesRoute
   '/t/$teamId/contacts': typeof TTeamIdContactsRoute
   '/t/$teamId/settings/api-keys': typeof TTeamIdSettingsApiKeysRoute
   '/t/$teamId/settings/connections': typeof TTeamIdSettingsConnectionsRoute
   '/t/$teamId/settings/fields': typeof TTeamIdSettingsFieldsRoute
+  '/t/$teamId/settings/general': typeof TTeamIdSettingsGeneralRoute
+  '/t/$teamId/settings/members': typeof TTeamIdSettingsMembersRoute
   '/t/$teamId/settings/service-accounts': typeof TTeamIdSettingsServiceAccountsRoute
   '/t/$teamId/settings': typeof TTeamIdSettingsIndexRoute
 }
@@ -162,6 +186,7 @@ export interface FileRoutesById {
   '/sign-up': typeof SignUpRoute
   '/.well-known/$': typeof DotwellKnownSplatRoute
   '/api/$': typeof ApiSplatRoute
+  '/invite/$invitationId': typeof InviteInvitationIdRoute
   '/t/$teamId': typeof TTeamIdRouteWithChildren
   '/t/$teamId/companies': typeof TTeamIdCompaniesRoute
   '/t/$teamId/contacts': typeof TTeamIdContactsRoute
@@ -169,6 +194,8 @@ export interface FileRoutesById {
   '/t/$teamId/settings/api-keys': typeof TTeamIdSettingsApiKeysRoute
   '/t/$teamId/settings/connections': typeof TTeamIdSettingsConnectionsRoute
   '/t/$teamId/settings/fields': typeof TTeamIdSettingsFieldsRoute
+  '/t/$teamId/settings/general': typeof TTeamIdSettingsGeneralRoute
+  '/t/$teamId/settings/members': typeof TTeamIdSettingsMembersRoute
   '/t/$teamId/settings/service-accounts': typeof TTeamIdSettingsServiceAccountsRoute
   '/t/$teamId/settings/': typeof TTeamIdSettingsIndexRoute
 }
@@ -183,6 +210,7 @@ export interface FileRouteTypes {
     | '/sign-up'
     | '/.well-known/$'
     | '/api/$'
+    | '/invite/$invitationId'
     | '/t/$teamId'
     | '/t/$teamId/companies'
     | '/t/$teamId/contacts'
@@ -190,6 +218,8 @@ export interface FileRouteTypes {
     | '/t/$teamId/settings/api-keys'
     | '/t/$teamId/settings/connections'
     | '/t/$teamId/settings/fields'
+    | '/t/$teamId/settings/general'
+    | '/t/$teamId/settings/members'
     | '/t/$teamId/settings/service-accounts'
     | '/t/$teamId/settings/'
   fileRoutesByTo: FileRoutesByTo
@@ -202,12 +232,15 @@ export interface FileRouteTypes {
     | '/sign-up'
     | '/.well-known/$'
     | '/api/$'
+    | '/invite/$invitationId'
     | '/t/$teamId'
     | '/t/$teamId/companies'
     | '/t/$teamId/contacts'
     | '/t/$teamId/settings/api-keys'
     | '/t/$teamId/settings/connections'
     | '/t/$teamId/settings/fields'
+    | '/t/$teamId/settings/general'
+    | '/t/$teamId/settings/members'
     | '/t/$teamId/settings/service-accounts'
     | '/t/$teamId/settings'
   id:
@@ -220,6 +253,7 @@ export interface FileRouteTypes {
     | '/sign-up'
     | '/.well-known/$'
     | '/api/$'
+    | '/invite/$invitationId'
     | '/t/$teamId'
     | '/t/$teamId/companies'
     | '/t/$teamId/contacts'
@@ -227,6 +261,8 @@ export interface FileRouteTypes {
     | '/t/$teamId/settings/api-keys'
     | '/t/$teamId/settings/connections'
     | '/t/$teamId/settings/fields'
+    | '/t/$teamId/settings/general'
+    | '/t/$teamId/settings/members'
     | '/t/$teamId/settings/service-accounts'
     | '/t/$teamId/settings/'
   fileRoutesById: FileRoutesById
@@ -240,6 +276,7 @@ export interface RootRouteChildren {
   SignUpRoute: typeof SignUpRoute
   DotwellKnownSplatRoute: typeof DotwellKnownSplatRoute
   ApiSplatRoute: typeof ApiSplatRoute
+  InviteInvitationIdRoute: typeof InviteInvitationIdRoute
   TTeamIdRoute: typeof TTeamIdRouteWithChildren
 }
 
@@ -301,6 +338,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/invite/$invitationId': {
+      id: '/invite/$invitationId'
+      path: '/invite/$invitationId'
+      fullPath: '/invite/$invitationId'
+      preLoaderRoute: typeof InviteInvitationIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/t/$teamId': {
       id: '/t/$teamId'
       path: '/t/$teamId'
@@ -357,6 +401,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TTeamIdSettingsFieldsRouteImport
       parentRoute: typeof TTeamIdSettingsRoute
     }
+    '/t/$teamId/settings/general': {
+      id: '/t/$teamId/settings/general'
+      path: '/general'
+      fullPath: '/t/$teamId/settings/general'
+      preLoaderRoute: typeof TTeamIdSettingsGeneralRouteImport
+      parentRoute: typeof TTeamIdSettingsRoute
+    }
+    '/t/$teamId/settings/members': {
+      id: '/t/$teamId/settings/members'
+      path: '/members'
+      fullPath: '/t/$teamId/settings/members'
+      preLoaderRoute: typeof TTeamIdSettingsMembersRouteImport
+      parentRoute: typeof TTeamIdSettingsRoute
+    }
     '/t/$teamId/settings/service-accounts': {
       id: '/t/$teamId/settings/service-accounts'
       path: '/service-accounts'
@@ -371,6 +429,8 @@ interface TTeamIdSettingsRouteChildren {
   TTeamIdSettingsApiKeysRoute: typeof TTeamIdSettingsApiKeysRoute
   TTeamIdSettingsConnectionsRoute: typeof TTeamIdSettingsConnectionsRoute
   TTeamIdSettingsFieldsRoute: typeof TTeamIdSettingsFieldsRoute
+  TTeamIdSettingsGeneralRoute: typeof TTeamIdSettingsGeneralRoute
+  TTeamIdSettingsMembersRoute: typeof TTeamIdSettingsMembersRoute
   TTeamIdSettingsServiceAccountsRoute: typeof TTeamIdSettingsServiceAccountsRoute
   TTeamIdSettingsIndexRoute: typeof TTeamIdSettingsIndexRoute
 }
@@ -379,6 +439,8 @@ const TTeamIdSettingsRouteChildren: TTeamIdSettingsRouteChildren = {
   TTeamIdSettingsApiKeysRoute: TTeamIdSettingsApiKeysRoute,
   TTeamIdSettingsConnectionsRoute: TTeamIdSettingsConnectionsRoute,
   TTeamIdSettingsFieldsRoute: TTeamIdSettingsFieldsRoute,
+  TTeamIdSettingsGeneralRoute: TTeamIdSettingsGeneralRoute,
+  TTeamIdSettingsMembersRoute: TTeamIdSettingsMembersRoute,
   TTeamIdSettingsServiceAccountsRoute: TTeamIdSettingsServiceAccountsRoute,
   TTeamIdSettingsIndexRoute: TTeamIdSettingsIndexRoute,
 }
@@ -411,6 +473,7 @@ const rootRouteChildren: RootRouteChildren = {
   SignUpRoute: SignUpRoute,
   DotwellKnownSplatRoute: DotwellKnownSplatRoute,
   ApiSplatRoute: ApiSplatRoute,
+  InviteInvitationIdRoute: InviteInvitationIdRoute,
   TTeamIdRoute: TTeamIdRouteWithChildren,
 }
 export const routeTree = rootRouteImport

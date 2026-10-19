@@ -50,8 +50,7 @@ export function When(props: { readonly at: string | null; readonly never?: strin
 }
 
 /**
- * Settings replace the app sidebar with their own, with a way back (D90). General and Members
- * are shown but not built yet (D101).
+ * Settings replace the app sidebar with their own, with a way back (D90).
  */
 export function SettingsShell(props: { readonly team: Team; readonly children: ReactNode }) {
   const params = { teamId: props.team.id }

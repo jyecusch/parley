@@ -3,7 +3,7 @@ import type { UserText } from "@parley/errors"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { createFileRoute, getRouteApi } from "@tanstack/react-router"
 import { useState } from "react"
-import { InfoIcon, ServiceAccountIcon } from "../components/icons.tsx"
+import { InfoIcon, MoreIcon, ServiceAccountIcon } from "../components/icons.tsx"
 import {
   Dialog,
   Empty,
@@ -94,6 +94,11 @@ function ServiceAccounts() {
                 <th scope="col" style={{ width: 96 }}>
                   Created
                 </th>
+                {canManage ? (
+                  <th scope="col" style={{ width: 56 }}>
+                    <span className="vh">Actions</span>
+                  </th>
+                ) : null}
               </tr>
             </thead>
             <tbody>
@@ -130,6 +135,18 @@ function ServiceAccounts() {
                   <td>
                     <When at={serviceAccount.createdAt} />
                   </td>
+                  {canManage ? (
+                    <td className="c-act">
+                      <ServiceAccountMenu
+                        serviceAccount={serviceAccount}
+                        teamId={teamId}
+                        onDone={async (text) => {
+                          if (text) showToast(text)
+                          await queryClient.invalidateQueries({ queryKey: key })
+                        }}
+                      />
+                    </td>
+                  ) : null}
                 </tr>
               ))}
             </tbody>
@@ -244,5 +261,169 @@ function NewServiceAccount(props: {
         </p>
       ) : null}
     </Dialog>
+  )
+}
+
+/** Rename, change role or delete a service account (D101). */
+function ServiceAccountMenu(props: {
+  readonly serviceAccount: ServiceAccount
+  readonly teamId: TeamId
+  readonly onDone: (text: string | undefined) => Promise<void>
+}) {
+  const { serviceAccount, teamId } = props
+  const [open, setOpen] = useState(false)
+  const [mode, setMode] = useState<"rename" | "delete">()
+  const [name, setName] = useState(serviceAccount.name)
+  const [error, setError] = useState<UserText>()
+
+  const act = async (action: () => Promise<unknown>, text: string) => {
+    setError(undefined)
+    try {
+      await action()
+      setMode(undefined)
+      await props.onDone(text)
+    } catch (failure) {
+      setError(messageOf(failure))
+    }
+  }
+
+  return (
+    <span style={{ position: "relative" }}>
+      <button
+        className="ibtn"
+        type="button"
+        aria-label={`More actions for ${serviceAccount.name}`}
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+      >
+        <MoreIcon />
+      </button>
+      {open ? (
+        <div className="menu" style={{ right: 0, top: 30 }}>
+          <button
+            className="menu-i"
+            type="button"
+            onClick={() => {
+              setOpen(false)
+              setName(serviceAccount.name)
+              setMode("rename")
+            }}
+          >
+            Rename
+          </button>
+          <button
+            className="menu-i"
+            type="button"
+            onClick={() => {
+              setOpen(false)
+              const role = serviceAccount.role === "admin" ? "member" : "admin"
+              void act(
+                () => call("serviceAccounts.update", { teamId, serviceAccountId: serviceAccount.id, role }),
+                `${serviceAccount.name} is now ${role === "admin" ? "an admin" : "a member"}.`,
+              )
+            }}
+          >
+            {serviceAccount.role === "admin" ? "Make member" : "Make admin"}
+          </button>
+          <div className="menu-sep" />
+          <button
+            className="menu-i"
+            type="button"
+            style={{ color: "var(--danger)" }}
+            onClick={() => {
+              setOpen(false)
+              setMode("delete")
+            }}
+          >
+            Delete
+          </button>
+        </div>
+      ) : null}
+      {mode === "rename" ? (
+        <Dialog
+          title={`Rename ${serviceAccount.name}`}
+          onClose={() => setMode(undefined)}
+          footer={
+            <>
+              <button className="btn ghost" type="button" onClick={() => setMode(undefined)}>
+                Cancel
+              </button>
+              <button
+                className="btn primary"
+                type="button"
+                disabled={!name.trim() || name.trim() === serviceAccount.name}
+                onClick={() =>
+                  void act(
+                    () =>
+                      call("serviceAccounts.update", {
+                        teamId,
+                        serviceAccountId: serviceAccount.id,
+                        name: name.trim(),
+                      }),
+                    `Renamed to ${name.trim()}.`,
+                  )
+                }
+              >
+                Rename
+              </button>
+            </>
+          }
+        >
+          <div className="fld">
+            <label className="fl" htmlFor="sa-rename">
+              Name
+            </label>
+            <input
+              id="sa-rename"
+              className="inp"
+              type="text"
+              maxLength={60}
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+            />
+            <p className="hint sm-t">Past activity keeps the name it had at the time.</p>
+          </div>
+          {error ? (
+            <p className="form-error" role="alert">
+              {error}
+            </p>
+          ) : null}
+        </Dialog>
+      ) : null}
+      {mode === "delete" ? (
+        <Dialog
+          title={`Delete ${serviceAccount.name}?`}
+          onClose={() => setMode(undefined)}
+          footer={
+            <>
+              <button className="btn ghost" type="button" onClick={() => setMode(undefined)}>
+                Cancel
+              </button>
+              <button
+                className="btn danger-solid"
+                type="button"
+                onClick={() =>
+                  void act(
+                    () => call("serviceAccounts.delete", { teamId, serviceAccountId: serviceAccount.id }),
+                    `${serviceAccount.name} is deleted.`,
+                  )
+                }
+              >
+                Delete service account
+              </button>
+            </>
+          }
+        >
+          <p style={{ margin: 0, color: "var(--fg-muted)", lineHeight: "19px" }}>
+            Its API keys and connected agents stop working at once. Its activity and notes stay, under its name.
+          </p>
+          {error ? (
+            <p className="form-error" role="alert">
+              {error}
+            </p>
+          ) : null}
+        </Dialog>
+      ) : null}
+    </span>
   )
 }

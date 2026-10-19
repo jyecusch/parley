@@ -4,10 +4,22 @@ import { useState } from "react"
 import { AuthForm, Field } from "../components/auth-form.tsx"
 import { agentRequest, signIn, withAgentRequest } from "../lib/auth.ts"
 
-export const Route = createFileRoute("/sign-in")({ ssr: false, component: SignIn })
+/** Only same-site paths, so a link can't send someone elsewhere after signing in. */
+export const safeRedirect = (value: unknown): string | undefined =>
+  typeof value === "string" && value.startsWith("/") && !value.startsWith("//") ? value : undefined
+
+export const Route = createFileRoute("/sign-in")({
+  ssr: false,
+  validateSearch: (search: Record<string, unknown>): { redirect?: string } => {
+    const redirect = safeRedirect(search.redirect)
+    return redirect ? { redirect } : {}
+  },
+  component: SignIn,
+})
 
 function SignIn() {
   const navigate = useNavigate()
+  const search = Route.useSearch()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<UserText>()
   const submit = async (form: FormData) => {
@@ -17,6 +29,7 @@ function SignIn() {
     if (outcome.failure) return setError(outcome.failure)
     // An agent is waiting: carry on to its consent page.
     if (outcome.next) return window.location.assign(outcome.next)
+    if (search.redirect) return window.location.assign(search.redirect)
     await navigate({ to: "/" })
   }
   return (
@@ -33,7 +46,16 @@ function SignIn() {
       onSubmit={submit}
       footer={
         <>
-          New to Parley? <a href={withAgentRequest("/sign-up")}>Create an account</a>
+          New to Parley?{" "}
+          <a
+            href={
+              search.redirect
+                ? `/sign-up?redirect=${encodeURIComponent(search.redirect)}`
+                : withAgentRequest("/sign-up")
+            }
+          >
+            Create an account
+          </a>
         </>
       }
     >

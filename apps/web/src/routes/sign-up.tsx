@@ -3,11 +3,20 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { useState } from "react"
 import { AuthForm, Field } from "../components/auth-form.tsx"
 import { agentRequest, signUp, withAgentRequest } from "../lib/auth.ts"
+import { safeRedirect } from "./sign-in.tsx"
 
-export const Route = createFileRoute("/sign-up")({ ssr: false, component: SignUp })
+export const Route = createFileRoute("/sign-up")({
+  ssr: false,
+  validateSearch: (search: Record<string, unknown>): { redirect?: string } => {
+    const redirect = safeRedirect(search.redirect)
+    return redirect ? { redirect } : {}
+  },
+  component: SignUp,
+})
 
 function SignUp() {
   const navigate = useNavigate()
+  const search = Route.useSearch()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<UserText>()
   const submit = async (form: FormData) => {
@@ -17,6 +26,8 @@ function SignUp() {
     if (outcome.failure) return setError(outcome.failure)
     // A new account has no team yet, so an agent's request waits until one is created.
     if (agentRequest()) return window.location.assign(withAgentRequest("/new-team"))
+    // Signed up from an invitation: back to it, where joining the team makes a new one unnecessary.
+    if (search.redirect) return window.location.assign(search.redirect)
     await navigate({ to: "/new-team" })
   }
   return (
@@ -29,7 +40,16 @@ function SignUp() {
       onSubmit={submit}
       footer={
         <>
-          Already have an account? <a href={withAgentRequest("/sign-in")}>Sign in</a>
+          Already have an account?{" "}
+          <a
+            href={
+              search.redirect
+                ? `/sign-in?redirect=${encodeURIComponent(search.redirect)}`
+                : withAgentRequest("/sign-in")
+            }
+          >
+            Sign in
+          </a>
         </>
       }
     >
