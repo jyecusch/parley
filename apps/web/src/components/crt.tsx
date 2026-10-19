@@ -277,18 +277,21 @@ function mountShader(screen: HTMLElement, options: { readonly still: boolean; re
    * far the bend moves the point under the pointer. Near the pointer, what you see is then what you click.
    */
   let hitShift = { x: 0, y: 0 }
+  // On <html>, not the canvas: elements moved back out of the canvas can keep a stale cursor style, so the
+  // class must come off somewhere that restyles the whole document when CRT mode is turned off.
+  const root = document.documentElement
   const onPointer = (event: PointerEvent) => {
     const box = canvas.getBoundingClientRect()
     const x = event.clientX - box.left
     const y = event.clientY - box.top
     const seen = barrel(x, y, box.width, box.height, glassSettings().curvature)
     if (event.pointerType === "mouse") {
-      canvas.classList.add("crt-cursor")
+      root.classList.add("crt-cursor")
       const shape = cursorShapeAt(event.target)
       uploadCursor(shape)
       cursor = { x: seen.x, y: seen.y, shape }
     } else {
-      canvas.classList.remove("crt-cursor")
+      root.classList.remove("crt-cursor")
       cursor = null
     }
     draw()
@@ -344,6 +347,7 @@ function mountShader(screen: HTMLElement, options: { readonly still: boolean; re
     window.removeEventListener("pointerdown", onPointer, true)
     document.documentElement.removeEventListener("pointerleave", onLeave)
     canvas.removeEventListener("webglcontextlost", fail)
+    root.classList.remove("crt-cursor")
     screen.style.transform = ""
     const canvasParent = canvas.parentNode
     if (canvasParent) moveInto(canvasParent, screen, canvas)
