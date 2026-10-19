@@ -169,7 +169,8 @@ export const FileRoutesLive = HttpRouter.use((router) =>
       Effect.gen(function* () {
         const authenticator = yield* Authenticator
         const principal = yield* authenticator.authenticate(headersOf(request), "http")
-        const key = decodeURIComponent(new URL(request.url, "http://parley").pathname.replace(/^\/api\/files\//, ""))
+        // Not URL-decoded: a key never contains anything that needs it, so an encoded "/" or "." is refused.
+        const key = new URL(request.url, "http://parley").pathname.replace(/^\/api\/files\//, "")
         const file = yield* readFile(principal, key)
         return HttpServerResponse.uint8Array(file.bytes, {
           contentType: file.contentType,
@@ -204,7 +205,8 @@ export const UnsubscribeRoutesLive = HttpRouter.use((router) =>
   Effect.gen(function* () {
     const services = yield* Effect.context<Subscriptions | UnsubscribeLinks>()
     const tokenOf = (request: HttpServerRequest.HttpServerRequest) =>
-      decodeURIComponent(new URL(request.url, "http://parley").pathname.replace(/^\/api\/unsubscribe\//, ""))
+      // Tokens are base64url and a dot, so they're never URL-encoded; a malformed % is just an invalid token.
+      new URL(request.url, "http://parley").pathname.replace(/^\/api\/unsubscribe\//, "")
     const answer = (
       effect: Effect.Effect<
         UnsubscribePage,

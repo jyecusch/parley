@@ -33,6 +33,12 @@ describe("avatars and logos", () => {
       const meta = yield* promise(() => sharp(file.bytes).metadata())
       expect([meta.format, meta.width, meta.height]).toEqual(["webp", 256, 256])
 
+      // A key that climbs out of its team is refused before any lookup.
+      const key = keyOf(withAvatar.avatarUrl)
+      for (const forged of [`${f.acme}/../${key}`, `${f.acme}/avatars/../../${key}`, `${f.acme}%2F..%2F${key}`]) {
+        expect((yield* readFile(f.jane, forged).pipe(Effect.flip))._tag).toBe("FileNotFound")
+      }
+
       // Someone outside the team can't tell the file exists.
       const hidden = yield* readFile(f.bob, keyOf(withAvatar.avatarUrl)).pipe(Effect.flip)
       expect(hidden._tag).toBe("FileNotFound")

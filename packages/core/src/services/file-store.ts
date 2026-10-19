@@ -53,15 +53,17 @@ export class FileStore extends Context.Service<
               if (!response.ok) throw new Error(`S3 put failed: ${response.status}`)
             }),
           get: (key) =>
-            call(async () => {
-              const response = await client.fetch(url(key))
-              if (response.status === 404) return undefined
-              if (!response.ok) throw new Error(`S3 get failed: ${response.status}`)
-              return {
-                bytes: new Uint8Array(await response.arrayBuffer()),
-                contentType: response.headers.get("content-type") ?? "application/octet-stream",
-              }
-            }),
+            isFileKey(key)
+              ? call(async () => {
+                  const response = await client.fetch(url(key))
+                  if (response.status === 404) return undefined
+                  if (!response.ok) throw new Error(`S3 get failed: ${response.status}`)
+                  return {
+                    bytes: new Uint8Array(await response.arrayBuffer()),
+                    contentType: response.headers.get("content-type") ?? "application/octet-stream",
+                  }
+                })
+              : Effect.succeed(undefined),
           remove: (key) =>
             call(async () => {
               await client.fetch(url(key), { method: "DELETE" })
@@ -100,6 +102,13 @@ export class FileStore extends Context.Service<
     }),
   )
 }
+
+/**
+ * Every key Parley makes: `<team id>/avatars|logos/<record id>-<random>.webp`. Reads accept nothing
+ * else, so a key can't climb out of its team (`a/../b`) in an S3 path.
+ */
+const KEY = /^[A-Za-z0-9_-]{1,64}\/(avatars|logos)\/[A-Za-z0-9-]{1,80}\.webp$/
+export const isFileKey = (key: string) => KEY.test(key)
 
 /** The URL the web app and agents fetch a file from. Access is checked when it's read. */
 export const fileUrl = (key: string | null) => (key ? `/api/files/${key}` : null)
