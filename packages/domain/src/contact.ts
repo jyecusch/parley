@@ -1,5 +1,5 @@
 import { Schema } from "effect"
-import { ContactId, TeamId } from "./ids.ts"
+import { AffiliationId, CompanyId, ContactId, TeamId } from "./ids.ts"
 
 const Timestamp = Schema.String.annotate({ description: "ISO 8601 timestamp" })
 
@@ -28,6 +28,15 @@ export const ContactPhone = Schema.Struct({
 })
 export type ContactPhone = typeof ContactPhone.Type
 
+/** One of a contact's companies, as the contact shows it (D29, D69). */
+export const ContactAffiliation = Schema.Struct({
+  id: AffiliationId,
+  companyId: CompanyId,
+  companyName: Schema.String,
+  title: Schema.NullOr(Schema.String),
+})
+export type ContactAffiliation = typeof ContactAffiliation.Type
+
 export const Contact = Schema.Struct({
   id: ContactId,
   teamId: TeamId,
@@ -37,6 +46,8 @@ export const Contact = Schema.Struct({
   displayName: Schema.String,
   emails: Schema.Array(ContactEmail),
   phones: Schema.Array(ContactPhone),
+  /** Its companies that aren't deleted, oldest first. */
+  affiliations: Schema.Array(ContactAffiliation),
   createdAt: Timestamp,
   updatedAt: Timestamp,
   deletedAt: Schema.NullOr(Timestamp),
@@ -72,14 +83,22 @@ export const ContactPage = Schema.Struct({
 })
 export type ContactPage = typeof ContactPage.Type
 
+export const RecordType = Schema.Literals(["contact", "company"])
+export type RecordType = typeof RecordType.Type
+
 export const ActivityEntry = Schema.Struct({
   id: Schema.String,
   /** Who made the change, as shown in the app. */
   actorName: Schema.String,
   /** The API key's or connection's name when the change came through one ("Claude on my laptop"). */
   via: Schema.NullOr(Schema.String),
-  kind: Schema.Literals(["created", "updated", "deleted", "restored"]),
+  /** "affiliated" and "unaffiliated" name the other record in `related`; a title change is "updated" with `related`. */
+  kind: Schema.Literals(["created", "updated", "deleted", "restored", "affiliated", "unaffiliated"]),
   changedFields: Schema.Array(Schema.String),
+  /** The other record an affiliation change was about, by its name at the time. */
+  related: Schema.NullOr(Schema.Struct({ recordType: RecordType, id: Schema.String, name: Schema.String })),
+  /** Set when Parley made the change itself, rather than the actor asking for it directly (D105). */
+  reason: Schema.NullOr(Schema.Literals(["domain-matching"])),
   at: Timestamp,
 })
 export type ActivityEntry = typeof ActivityEntry.Type

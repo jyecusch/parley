@@ -33,6 +33,10 @@ export const ERROR_STATUS: { readonly [Tag in ErrorTag]: Status } = {
   InputRejected: 422,
   ContactNotFound: 404,
   ContactEmailTaken: 409,
+  CompanyNotFound: 404,
+  CompanyDomainTaken: 409,
+  FreeEmailDomain: 422,
+  AffiliationNotFound: 404,
   RequestsTooFrequent: 429,
   DatabaseUnavailable: 503,
 }

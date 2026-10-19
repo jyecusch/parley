@@ -17,3 +17,9 @@ export type ActivityId = typeof ActivityId.Type
 
 export const ConnectionId = Schema.String.pipe(Schema.brand("ConnectionId"))
 export type ConnectionId = typeof ConnectionId.Type
+
+export const CompanyId = Schema.String.pipe(Schema.brand("CompanyId"))
+export type CompanyId = typeof CompanyId.Type
+
+export const AffiliationId = Schema.String.pipe(Schema.brand("AffiliationId"))
+export type AffiliationId = typeof AffiliationId.Type

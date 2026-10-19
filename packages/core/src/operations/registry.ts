@@ -1,20 +1,32 @@
 import type { OperationError, OperationInput, OperationName, OperationOutput, Operations } from "@parley/domain"
 import type { Effect } from "effect"
 import type { Principal } from "../principal.ts"
+import type { Affiliations } from "../services/affiliations.ts"
 import type { ApiKeys } from "../services/api-keys.ts"
+import type { Companies } from "../services/companies.ts"
 import type { Connections } from "../services/connections.ts"
 import type { Contacts } from "../services/contacts.ts"
 import type { Members } from "../services/members.ts"
 import type { ServiceAccounts } from "../services/service-accounts.ts"
 import type { Teams } from "../services/teams.ts"
+import * as affiliations from "./affiliations.ts"
 import * as apiKeys from "./api-keys.ts"
+import * as companies from "./companies.ts"
 import * as connections from "./connections.ts"
 import * as contacts from "./contacts.ts"
 import * as serviceAccounts from "./service-accounts.ts"
 import * as teams from "./teams.ts"
 
 /** The services operations run on. Entrypoints provide CoreLive. */
-export type OperationServices = Contacts | Members | Teams | ApiKeys | Connections | ServiceAccounts
+export type OperationServices =
+  | Contacts
+  | Companies
+  | Affiliations
+  | Members
+  | Teams
+  | ApiKeys
+  | Connections
+  | ServiceAccounts
 
 export type Implementation<Name extends OperationName> = (
   principal: Principal,
@@ -35,6 +47,17 @@ export const implementations: { readonly [Name in OperationName]: Implementation
   "contacts.delete": contacts.remove,
   "contacts.restore": contacts.restore,
   "contacts.activity": contacts.activity,
+  "companies.list": companies.list,
+  "companies.get": companies.get,
+  "companies.create": companies.create,
+  "companies.update": companies.update,
+  "companies.delete": companies.remove,
+  "companies.restore": companies.restore,
+  "companies.activity": companies.activity,
+  "affiliations.list": affiliations.list,
+  "affiliations.create": affiliations.create,
+  "affiliations.update": affiliations.update,
+  "affiliations.delete": affiliations.remove,
   "apiKeys.list": apiKeys.list,
   "apiKeys.create": apiKeys.create,
   "apiKeys.revoke": apiKeys.revoke,

@@ -91,7 +91,7 @@ export const activity = pgTable(
   {
     id: uuid("id").primaryKey(),
     teamId: teamId(),
-    recordType: text("record_type", { enum: ["contact"] }).notNull(),
+    recordType: text("record_type", { enum: ["contact", "company"] }).notNull(),
     recordId: uuid("record_id").notNull(),
     actorUserId: text("actor_user_id").references(() => user.id, { onDelete: "set null" }),
     /** The name shown at the time, kept if the user is later removed. */
@@ -100,8 +100,16 @@ export const activity = pgTable(
     viaConnectionId: uuid("via_connection_id"),
     /** The API key's or connection's name at the time ("Claude on my laptop", D78). */
     viaName: text("via_name"),
-    kind: text("kind", { enum: ["created", "updated", "deleted", "restored"] }).notNull(),
+    kind: text("kind", {
+      enum: ["created", "updated", "deleted", "restored", "affiliated", "unaffiliated"],
+    }).notNull(),
     changedFields: text("changed_fields").array().notNull().default(sql`'{}'::text[]`),
+    /** The other record an affiliation change was about, and its name at the time. */
+    relatedRecordType: text("related_record_type", { enum: ["contact", "company"] }),
+    relatedRecordId: uuid("related_record_id"),
+    relatedName: text("related_name"),
+    /** Set when Parley made the change itself (D105). */
+    reason: text("reason", { enum: ["domain-matching"] }),
     at: timestamp("at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [index("activity_record_idx").on(t.teamId, t.recordId, t.at)],
@@ -151,3 +159,79 @@ export const serviceAccounts = pgTable("service_accounts", {
   teamId: teamId(),
   createdByUserId: text("created_by_user_id").references(() => user.id, { onDelete: "set null" }),
 })
+
+export const companies = pgTable(
+  "companies",
+  {
+    id: uuid("id").primaryKey(),
+    teamId: teamId(),
+    name: text("name").notNull(),
+    website: text("website"),
+    phone: text("phone"),
+    /** The postal address (D104). Country is an ISO 3166-1 alpha-2 code. */
+    addressLine1: text("address_line1"),
+    addressLine2: text("address_line2"),
+    city: text("city"),
+    region: text("region"),
+    postcode: text("postcode"),
+    country: text("country"),
+    ...timestamps,
+    /** Soft delete, like contacts (D30, D109). */
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  },
+  (t) => [
+    unique("companies_team_id_id_key").on(t.teamId, t.id),
+    index("companies_team_id_updated_at_idx").on(t.teamId, t.updatedAt.desc(), t.id.desc()),
+  ],
+)
+
+export const companyDomains = pgTable(
+  "company_domains",
+  {
+    id: uuid("id").primaryKey(),
+    teamId: teamId(),
+    companyId: uuid("company_id").notNull(),
+    /** Lower-case, without "www." (D25). */
+    domain: text("domain").notNull(),
+    isPrimary: boolean("is_primary").notNull(),
+    position: integer("position").notNull(),
+    /** False while the company is deleted, which releases the domain (D30). */
+    active: boolean("active").notNull().default(true),
+  },
+  (t) => [
+    foreignKey({
+      name: "company_domains_company_fk",
+      columns: [t.teamId, t.companyId],
+      foreignColumns: [companies.teamId, companies.id],
+    }).onDelete("cascade"),
+    uniqueIndex("company_domains_team_id_domain_key").on(t.teamId, t.domain).where(sql`active`),
+    index("company_domains_company_id_idx").on(t.companyId),
+  ],
+)
+
+/** A contact's link to a company (D29). Hidden while either side is deleted (D109). */
+export const affiliations = pgTable(
+  "affiliations",
+  {
+    id: uuid("id").primaryKey(),
+    teamId: teamId(),
+    contactId: uuid("contact_id").notNull(),
+    companyId: uuid("company_id").notNull(),
+    title: text("title"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    foreignKey({
+      name: "affiliations_contact_fk",
+      columns: [t.teamId, t.contactId],
+      foreignColumns: [contacts.teamId, contacts.id],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "affiliations_company_fk",
+      columns: [t.teamId, t.companyId],
+      foreignColumns: [companies.teamId, companies.id],
+    }).onDelete("cascade"),
+    unique("affiliations_contact_id_company_id_key").on(t.contactId, t.companyId),
+    index("affiliations_company_id_idx").on(t.companyId),
+  ],
+)

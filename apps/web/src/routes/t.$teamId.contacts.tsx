@@ -926,7 +926,12 @@ const describe = (entry: ActivityEntry): string => {
       return "deleted this contact"
     case "restored":
       return "restored this contact"
+    case "affiliated":
+      return `added this contact to ${entry.related?.name ?? "a company"}${entry.reason === "domain-matching" ? " by domain matching" : ""}`
+    case "unaffiliated":
+      return `removed this contact from ${entry.related?.name ?? "a company"}`
     case "updated": {
+      if (entry.related) return `changed the title at ${entry.related.name}`
       const names: Record<string, string> = {
         firstName: "first name",
         lastName: "last name",

@@ -1,7 +1,9 @@
 import { DatabaseLive } from "@parley/db"
 import { Layer } from "effect"
 import { Authenticator, BetterAuth } from "./auth/authenticator.ts"
+import { Affiliations } from "./services/affiliations.ts"
 import { ApiKeys } from "./services/api-keys.ts"
+import { Companies } from "./services/companies.ts"
 import { Connections } from "./services/connections.ts"
 import { Contacts } from "./services/contacts.ts"
 import { Members } from "./services/members.ts"
@@ -15,8 +17,11 @@ export { classifyDecodeError } from "./input/classify.ts"
 export { type Implementation, implementations, type OperationServices } from "./operations/registry.ts"
 export type { Principal } from "./principal.ts"
 
+/** Contacts and companies both do domain matching through Affiliations. */
+const Records = Layer.mergeAll(Contacts.layer, Companies.layer).pipe(Layer.provideMerge(Affiliations.layer))
+
 const Services = Layer.mergeAll(
-  Contacts.layer,
+  Records,
   Members.layer,
   Users.layer,
   Teams.layer,

@@ -22,6 +22,13 @@
       "when": 1792440451218,
       "tag": "0002_service_accounts",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792442999729,
+      "tag": "0003_companies",
+      "breakpoints": true
     }
   ]
 }

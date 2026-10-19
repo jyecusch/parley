@@ -1,4 +1,14 @@
+import { createAffiliation, deleteAffiliation, listAffiliations, updateAffiliation } from "./affiliations.ts"
 import { createApiKey, listApiKeys, revokeApiKey } from "./api-keys.ts"
+import {
+  companyActivity,
+  createCompany,
+  deleteCompany,
+  getCompany,
+  listCompanies,
+  restoreCompany,
+  updateCompany,
+} from "./companies.ts"
 import { createConnection, listConnections, revokeConnection } from "./connections.ts"
 import {
   contactActivity,
@@ -12,7 +22,9 @@ import {
 import { createServiceAccount, listServiceAccounts } from "./service-accounts.ts"
 import { createTeam, listTeams } from "./teams.ts"
 
+export * from "./affiliations.ts"
 export * from "./api-keys.ts"
+export * from "./companies.ts"
 export * from "./connections.ts"
 export * from "./contacts.ts"
 export * from "./service-accounts.ts"
@@ -29,6 +41,17 @@ export const operations = {
   "contacts.delete": deleteContact,
   "contacts.restore": restoreContact,
   "contacts.activity": contactActivity,
+  "companies.list": listCompanies,
+  "companies.get": getCompany,
+  "companies.create": createCompany,
+  "companies.update": updateCompany,
+  "companies.delete": deleteCompany,
+  "companies.restore": restoreCompany,
+  "companies.activity": companyActivity,
+  "affiliations.list": listAffiliations,
+  "affiliations.create": createAffiliation,
+  "affiliations.update": updateAffiliation,
+  "affiliations.delete": deleteAffiliation,
   "apiKeys.list": listApiKeys,
   "apiKeys.create": createApiKey,
   "apiKeys.revoke": revokeApiKey,

@@ -15,10 +15,12 @@ import { DisplayName, EchoedInput, userText } from "@parley/errors"
 import { and, asc, desc, eq, exists, ilike, inArray, isNotNull, isNull, ne, or, sql } from "drizzle-orm"
 import { Context, Effect, Layer } from "effect"
 import type { SqlError } from "effect/sql"
-import { attribution, type Principal } from "../principal.ts"
+import type { Principal } from "../principal.ts"
 import type { ContactInTeam, ContactRestorable } from "../proofs/contact-in-team.ts"
 import type { CanDeleteRecords, CanReadRecords, CanWriteRecords } from "../proofs/permissions.ts"
 import type { Named } from "../proofs/proof.ts"
+import { activityRow, toActivityEntry } from "./activity.ts"
+import { Affiliations } from "./affiliations.ts"
 import { classifySqlError, isUniqueViolation } from "./sql-errors.ts"
 
 /** Deleted contacts can be restored for this long, then they're purged (D30). */
@@ -156,14 +158,15 @@ export class Contacts extends Context.Service<
     Contacts,
     Effect.gen(function* () {
       const db = yield* Database
+      const affiliations = yield* Affiliations
       const run = <A>(effect: Effect.Effect<A, SqlError.SqlError>) =>
         effect.pipe(Effect.catchTag("SqlError", classifySqlError))
 
-      /** Loads full contacts, with emails and phones, in the order of `ids`. */
+      /** Loads full contacts, with emails, phones and companies, in the order of `ids`. */
       const load = (teamId: TeamId, ids: ReadonlyArray<string>) =>
         Effect.gen(function* () {
           if (ids.length === 0) return []
-          const [rows, emails, phones] = yield* Effect.all([
+          const [rows, emails, phones, companies] = yield* Effect.all([
             run(
               db.query((d) =>
                 d
@@ -194,6 +197,7 @@ export class Contacts extends Context.Service<
                   .orderBy(asc(schema.contactPhones.position)),
               ),
             ),
+            affiliations.forContacts(teamId, ids),
           ])
           const byId = new Map(rows.map((row) => [row.id, row]))
           return ids.flatMap((id): Array<Contact> => {
@@ -218,6 +222,7 @@ export class Contacts extends Context.Service<
                     number: phone.number as Contact["phones"][number]["number"],
                     label: phone.label,
                   })),
+                affiliations: companies.get(id) ?? [],
                 createdAt: row.createdAt.toISOString(),
                 updatedAt: row.updatedAt.toISOString(),
                 deletedAt: row.deletedAt?.toISOString() ?? null,
@@ -340,15 +345,11 @@ export class Contacts extends Context.Service<
         changedFields: ReadonlyArray<string>,
       ) =>
         db.query((d) =>
-          d.insert(schema.activity).values({
-            id: crypto.randomUUID(),
-            teamId,
-            recordType: "contact",
-            recordId: contactId,
-            kind,
-            changedFields: [...changedFields],
-            ...attribution(principal),
-          }),
+          d
+            .insert(schema.activity)
+            .values(
+              activityRow(principal, { teamId, recordType: "contact", recordId: contactId, kind, changedFields }),
+            ),
         )
 
       const list = <P, T>(team: Named<T, TeamId>, query: ContactQuery, _access: CanReadRecords<P, T>) =>
@@ -463,7 +464,14 @@ export class Contacts extends Context.Service<
               )
               yield* replaceEmails(team.value, id, normalized.emails)
               yield* replacePhones(team.value, id, normalized.phones)
-              yield* recordActivity(access.member.principal.value, team.value, id, "created", Object.keys(normalized))
+              const principal = access.member.principal.value
+              yield* recordActivity(principal, team.value, id, "created", Object.keys(normalized))
+              const name = displayNameOf(
+                normalized.firstName ?? null,
+                normalized.lastName ?? null,
+                normalized.emails?.find((email) => email.isPrimary)?.address,
+              )
+              yield* affiliations.matchContact(principal, team.value, { id, name }, addresses)
             }),
           )
           return yield* loadOne(team.value, id as ContactId)
@@ -478,6 +486,15 @@ export class Contacts extends Context.Service<
           if (addresses.length > 0) yield* emailTaken(target.teamName, teamId, addresses, id)
           const changed = Object.keys(normalized)
           if (changed.length > 0) {
+            const current = yield* loadOne(teamId, id)
+            const before = new Set(current.emails.map((email) => email.address as string))
+            const added = addresses.filter((address) => !before.has(address))
+            const principal = access.member.principal.value
+            const name = displayNameOf(
+              normalized.firstName !== undefined ? normalized.firstName : current.firstName,
+              normalized.lastName !== undefined ? normalized.lastName : current.lastName,
+              (normalized.emails ?? current.emails).find((email) => email.isPrimary)?.address,
+            )
             yield* write(
               target.teamName,
               teamId,
@@ -496,7 +513,9 @@ export class Contacts extends Context.Service<
                 )
                 yield* replaceEmails(teamId, id, normalized.emails)
                 yield* replacePhones(teamId, id, normalized.phones)
-                yield* recordActivity(access.member.principal.value, teamId, id, "updated", changed)
+                yield* recordActivity(principal, teamId, id, "updated", changed)
+                // Only newly added emails match; removed affiliations stay removed (D107).
+                yield* affiliations.matchContact(principal, teamId, { id, name }, added)
               }),
             )
           }
@@ -565,23 +584,14 @@ export class Contacts extends Context.Service<
                 .where(
                   and(
                     eq(schema.activity.teamId, target.team.value),
+                    eq(schema.activity.recordType, "contact"),
                     eq(schema.activity.recordId, target.contact.value),
                   ),
                 )
                 .orderBy(asc(schema.activity.at)),
             ),
           ),
-          (rows) =>
-            rows.map(
-              (row): ActivityEntry => ({
-                id: row.id,
-                actorName: row.actorName,
-                via: row.viaName,
-                kind: row.kind,
-                changedFields: row.changedFields,
-                at: row.at.toISOString(),
-              }),
-            ),
+          (rows) => rows.map(toActivityEntry),
         )
 
       return { list, locate, get, create, update, delete: remove, restore, activity }

@@ -104,9 +104,20 @@ describe("MCP entrypoint", () => {
       annotations: { readOnlyHint: boolean }
     }>
     expect(tools.map((tool) => tool.name).sort()).toEqual([
+      "affiliations_create",
+      "affiliations_delete",
+      "affiliations_list",
+      "affiliations_update",
       "apiKeys_create",
       "apiKeys_list",
       "apiKeys_revoke",
+      "companies_activity",
+      "companies_create",
+      "companies_delete",
+      "companies_get",
+      "companies_list",
+      "companies_restore",
+      "companies_update",
       "connections_create",
       "connections_list",
       "connections_revoke",
