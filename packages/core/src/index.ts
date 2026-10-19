@@ -11,6 +11,7 @@ import { CustomFields } from "./services/custom-fields.ts"
 import { Invitations } from "./services/invitations.ts"
 import { Members } from "./services/members.ts"
 import { Notes } from "./services/notes.ts"
+import { Purge } from "./services/purge.ts"
 import { SavedViews } from "./services/saved-views.ts"
 import { ServiceAccounts } from "./services/service-accounts.ts"
 import { Teams } from "./services/teams.ts"
@@ -33,6 +34,7 @@ const Services = Layer.mergeAll(
   Members.layer,
   Invitations.layer,
   Notes.layer,
+  Purge.layer,
   Users.layer,
   Teams.layer,
   ApiKeys.layer,
@@ -47,3 +49,8 @@ export const CoreLive = Authenticator.layer.pipe(
   Layer.provideMerge(Mailer.layer),
   Layer.provideMerge(DatabaseLive),
 )
+
+export { Purge } from "./services/purge.ts"
+
+/** Work the server does on its own schedule, such as purging records deleted 30 days ago (D30). */
+export const BackgroundLive = Purge.schedule.pipe(Layer.provide(Purge.layer))
