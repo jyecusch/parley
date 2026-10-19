@@ -8,7 +8,10 @@ import {
   type ContactPage,
   type DatabaseUnavailable,
   type FieldProblem,
+  type Filter,
+  filterFields,
   InputRejected,
+  type Sort,
   type TeamId,
 } from "@parley/domain"
 import { DisplayName, EchoedInput, userText } from "@parley/errors"
@@ -22,6 +25,7 @@ import type { Named } from "../proofs/proof.ts"
 import { activityRow, toActivityEntry } from "./activity.ts"
 import { Affiliations } from "./affiliations.ts"
 import { CustomFields } from "./custom-fields.ts"
+import { checkFilter, filterSql, sortSql } from "./filter-sql.ts"
 import { classifySqlError, isUniqueViolation } from "./sql-errors.ts"
 
 /** Deleted contacts can be restored for this long, then they're purged (D30). */
@@ -29,6 +33,8 @@ export const RESTORE_WINDOW_DAYS = 30
 
 export interface ContactQuery {
   readonly search?: string | undefined
+  readonly filter?: Filter | undefined
+  readonly sort?: Sort | undefined
   readonly limit?: number | undefined
   readonly cursor?: string | undefined
   readonly deleted?: boolean | undefined
@@ -49,6 +55,18 @@ const displayNameOf = (firstName: string | null, lastName: string | null, primar
   [firstName, lastName].filter(Boolean).join(" ") || primaryEmail || "Unnamed contact"
 
 const encodeCursor = (updatedAt: Date, id: string) => btoa(`${updatedAt.toISOString()}|${id}`)
+/** With a custom sort, pages are by position: "o:<offset>". */
+const encodeOffset = (offset: number) => btoa(`o:${offset}`)
+const decodeOffset = (cursor: string | undefined): number => {
+  if (!cursor) return 0
+  try {
+    const text = atob(cursor)
+    const offset = text.startsWith("o:") ? Number(text.slice(2)) : 0
+    return Number.isInteger(offset) && offset > 0 ? offset : 0
+  } catch {
+    return 0
+  }
+}
 const decodeCursor = (cursor: string): { readonly updatedAt: Date; readonly id: string } | undefined => {
   try {
     const [iso, id] = atob(cursor).split("|")
@@ -123,7 +141,7 @@ export class Contacts extends Context.Service<
       team: Named<T, TeamId>,
       query: ContactQuery,
       access: CanReadRecords<P, T>,
-    ) => Effect.Effect<ContactPage, DatabaseUnavailable>
+    ) => Effect.Effect<ContactPage, InputRejected | DatabaseUnavailable>
     /** Used only by the ContactInTeam and ContactRestorable provers. */
     readonly locate: <P, T>(
       team: Named<T, TeamId>,
@@ -358,7 +376,17 @@ export class Contacts extends Context.Service<
       const list = <P, T>(team: Named<T, TeamId>, query: ContactQuery, _access: CanReadRecords<P, T>) =>
         Effect.gen(function* () {
           const limit = query.limit ?? 50
-          const cursor = query.cursor ? decodeCursor(query.cursor) : undefined
+          const custom =
+            query.filter || query.sort?.field.startsWith("custom:")
+              ? yield* customFields.ofTeam(team.value, "contact")
+              : []
+          const fields = query.filter
+            ? yield* checkFilter("contact", query.filter, custom)
+            : filterFields("contact", custom)
+          const filtered = query.filter ? filterSql("contact", query.filter, fields) : undefined
+          // A custom sort pages by position; the default sort pages by (updated, id).
+          const offset = query.sort ? decodeOffset(query.cursor) : 0
+          const cursor = !query.sort && query.cursor ? decodeCursor(query.cursor) : undefined
           const search = query.search?.trim()
           const pattern = search ? `%${search.replace(/[\\%_]/g, (c) => `\\${c}`)}%` : undefined
           const rows = yield* run(
@@ -369,6 +397,7 @@ export class Contacts extends Context.Service<
                 .where(
                   and(
                     eq(schema.contacts.teamId, team.value),
+                    filtered,
                     query.deleted
                       ? and(
                           isNotNull(schema.contacts.deletedAt),
@@ -399,8 +428,13 @@ export class Contacts extends Context.Service<
                       : undefined,
                   ),
                 )
-                .orderBy(desc(schema.contacts.updatedAt), desc(schema.contacts.id))
-                .limit(limit + 1),
+                .orderBy(
+                  ...(query.sort
+                    ? [sortSql("contact", query.sort, fields)]
+                    : [desc(schema.contacts.updatedAt), desc(schema.contacts.id)]),
+                )
+                .limit(limit + 1)
+                .offset(offset),
             ),
           )
           const page = rows.slice(0, limit)
@@ -409,7 +443,15 @@ export class Contacts extends Context.Service<
             team.value,
             page.map((row) => row.id),
           )
-          return { items, nextCursor: rows.length > limit && last ? encodeCursor(last.updatedAt, last.id) : null }
+          const more = rows.length > limit && last !== undefined
+          return {
+            items,
+            nextCursor: more
+              ? query.sort
+                ? encodeOffset(offset + limit)
+                : encodeCursor(last.updatedAt, last.id)
+              : null,
+          }
         })
 
       const locate = <P, T>(

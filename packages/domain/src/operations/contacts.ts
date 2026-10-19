@@ -1,6 +1,7 @@
 import { Schema } from "effect"
 import { ActivityEntry, Contact, ContactFields, ContactPage } from "../contact.ts"
 import { ContactEmailTaken, ContactNotFound } from "../errors/contacts.ts"
+import { Filter, Sort } from "../filter.ts"
 import { ContactId, TeamId } from "../ids.ts"
 import { defineTeamOperation } from "../operation.ts"
 
@@ -10,7 +11,7 @@ const OneContact = { ...InTeam, contactId: ContactId.annotate({ description: "Th
 export const listContacts = defineTeamOperation({
   name: "contacts.list",
   description:
-    "List contacts in a team, most recently updated first. Use search to match names and email addresses. Pass nextCursor back as cursor for the next page.",
+    "List contacts in a team, most recently updated first unless you sort. Use search to match names and email addresses, and filter for conditions on any field, including custom fields. Pass nextCursor back as cursor for the next page.",
   input: Schema.Struct({
     ...InTeam,
     search: Schema.optional(Schema.String.check(Schema.isMaxLength(200)).annotate({ title: "Search" })),
@@ -18,13 +19,15 @@ export const listContacts = defineTeamOperation({
       Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 200 })).annotate({ title: "Limit" }),
     ),
     cursor: Schema.optional(Schema.String.annotate({ title: "Cursor" })),
+    filter: Schema.optional(Filter),
+    sort: Schema.optional(Sort),
     deleted: Schema.optional(
       Schema.Boolean.annotate({ title: "Deleted", description: "List deleted contacts (restorable for 30 days)." }),
     ),
   }),
   output: ContactPage,
   errors: [],
-  http: { method: "GET", path: "/teams/:teamId/contacts" },
+  http: { method: "POST", path: "/teams/:teamId/contacts/list" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: ["records:read"],
 })

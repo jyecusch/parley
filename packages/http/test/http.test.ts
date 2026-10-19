@@ -107,7 +107,7 @@ describe("HTTP entrypoint", () => {
   })
 
   it("answers an unknown team with 404 NotATeamMember, and no session with 401", async () => {
-    const other = await call("GET", "/api/v1/teams/not-a-team/contacts")
+    const other = await call("POST", "/api/v1/teams/not-a-team/contacts/list", { body: {} })
     expect(other.status).toBe(404)
     expect(other.body.error._tag).toBe("NotATeamMember")
     const saved = cookie
@@ -121,7 +121,7 @@ describe("HTTP entrypoint", () => {
   it("lets an API key read but not write, as its scopes say", async () => {
     const saved = cookie
     cookie = ""
-    const read = await call("GET", `/api/v1/teams/${teamId}/contacts`, { headers: { "x-api-key": readOnlyKey } })
+    const read = await call("POST", `/api/v1/teams/${teamId}/contacts/list`, { headers: { "x-api-key": readOnlyKey }, body: {} })
     const write = await call("POST", `/api/v1/teams/${teamId}/contacts`, {
       headers: { authorization: `Bearer ${readOnlyKey}` },
       body: { firstName: "Agent" },
@@ -158,7 +158,7 @@ describe("API keys", () => {
     cookie = ""
     const asKey = (method: string, path: string, body?: unknown) =>
       call(method, path, { headers: { "x-api-key": secret }, ...(body !== undefined ? { body } : {}) })
-    expect((await asKey("GET", `/api/v1/teams/${teamId}/contacts`)).status).toBe(200)
+    expect((await asKey("POST", `/api/v1/teams/${teamId}/contacts/list`, {})).status).toBe(200)
     const mint = await asKey("POST", `/api/v1/teams/${teamId}/api-keys`, { name: "Sneaky" })
     expect(mint.status).toBe(403)
     expect(mint.body.error._tag).toBe("SignInRequired")
@@ -167,7 +167,7 @@ describe("API keys", () => {
     const revoked = await call("POST", `/api/v1/teams/${teamId}/api-keys/${created.body.apiKey.id}/revoke`)
     expect(revoked.body.revoked).toBe(true)
     cookie = ""
-    const after = await asKey("GET", `/api/v1/teams/${teamId}/contacts`)
+    const after = await asKey("POST", `/api/v1/teams/${teamId}/contacts/list`, {})
     cookie = saved
     expect(after.status).toBe(401)
     expect(after.body.error._tag).toBe("ApiKeyRevoked")

@@ -2,6 +2,7 @@ import { Schema } from "effect"
 import { Company, CompanyFields, CompanyName, CompanyPage } from "../company.ts"
 import { ActivityEntry } from "../contact.ts"
 import { CompanyDomainTaken, CompanyNotFound, FreeEmailDomain } from "../errors/companies.ts"
+import { Filter, Sort } from "../filter.ts"
 import { CompanyId, TeamId } from "../ids.ts"
 import { defineTeamOperation } from "../operation.ts"
 
@@ -11,7 +12,7 @@ const OneCompany = { ...InTeam, companyId: CompanyId.annotate({ description: "Th
 export const listCompanies = defineTeamOperation({
   name: "companies.list",
   description:
-    "List companies in a team, most recently updated first. Use search to match names and domains. Pass nextCursor back as cursor for the next page.",
+    "List companies in a team, most recently updated first unless you sort. Use search to match names and domains, and filter for conditions on any field, including custom fields. Pass nextCursor back as cursor for the next page.",
   input: Schema.Struct({
     ...InTeam,
     search: Schema.optional(Schema.String.check(Schema.isMaxLength(200)).annotate({ title: "Search" })),
@@ -19,13 +20,15 @@ export const listCompanies = defineTeamOperation({
       Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 200 })).annotate({ title: "Limit" }),
     ),
     cursor: Schema.optional(Schema.String.annotate({ title: "Cursor" })),
+    filter: Schema.optional(Filter),
+    sort: Schema.optional(Sort),
     deleted: Schema.optional(
       Schema.Boolean.annotate({ title: "Deleted", description: "List deleted companies (restorable for 30 days)." }),
     ),
   }),
   output: CompanyPage,
   errors: [],
-  http: { method: "GET", path: "/teams/:teamId/companies" },
+  http: { method: "POST", path: "/teams/:teamId/companies/list" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: ["records:read"],
 })

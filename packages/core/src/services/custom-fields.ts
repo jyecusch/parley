@@ -92,6 +92,11 @@ export class CustomFields extends Context.Service<
       target: CustomFieldInTeam<F, T>,
       access: CanManageFields<P, T>,
     ) => Effect.Effect<CustomField, DatabaseUnavailable>
+    /** A team's fields for one record type. For services that check filters and values themselves. */
+    readonly ofTeam: (
+      teamId: TeamId,
+      recordType: RecordType,
+    ) => Effect.Effect<ReadonlyArray<CustomField>, DatabaseUnavailable>
     /**
      * Applies a patch of values to a record's current values, checking each against its field.
      * Used by Contacts and Companies inside their own proven writes.
@@ -347,7 +352,7 @@ export class CustomFields extends Context.Service<
           return { values, changed } satisfies AppliedValues
         })
 
-      return { list, locate, create, update, delete: remove, apply }
+      return { list, locate, create, update, delete: remove, apply, ofTeam: fieldsOf }
     }),
   )
 }
