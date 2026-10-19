@@ -313,26 +313,29 @@ function FieldDialog(props: {
           Type: {typeLabel(editing.type)}. A field's type can't change; add a new field instead.
         </p>
       ) : (
-        <fieldset className="fld">
-          <legend>Type</legend>
-          <div className="radios">
-            {TYPES.map((entry) => (
-              <label key={entry.type} className={`ropt ${type === entry.type ? "on" : ""}`}>
-                <input
-                  className="rd"
-                  type="radio"
-                  name="field-type"
-                  checked={type === entry.type}
-                  onChange={() => setType(entry.type)}
-                />
-                <span className="t">
-                  <span className="n">{entry.label}</span>
-                  <span className="d sm-t">{entry.hint}</span>
-                </span>
-              </label>
-            ))}
+        <div className="fld">
+          <label className="fl" htmlFor="field-type">
+            Type
+          </label>
+          <div className="selwrap">
+            <select
+              id="field-type"
+              className="sel plain"
+              value={type}
+              onChange={(event) => setType(event.target.value as CustomFieldType)}
+            >
+              {TYPES.map((entry) => (
+                <option key={entry.type} value={entry.type}>
+                  {entry.label}
+                </option>
+              ))}
+            </select>
+            <span className="sel-chev">
+              <ChevronDown />
+            </span>
           </div>
-        </fieldset>
+          <p className="hint sm-t">{TYPES.find((entry) => entry.type === type)?.hint}</p>
+        </div>
       )}
       {isSelect(editing?.type ?? type) ? (
         <fieldset className="fld">
