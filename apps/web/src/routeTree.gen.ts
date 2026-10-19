@@ -23,6 +23,10 @@ import { Route as UnsubscribeTokenRouteImport } from './routes/unsubscribe.$toke
 import { Route as TTeamIdCompaniesRouteImport } from './routes/t.$teamId.companies'
 import { Route as TTeamIdContactsRouteImport } from './routes/t.$teamId.contacts'
 import { Route as TTeamIdSettingsRouteImport } from './routes/t.$teamId.settings'
+import { Route as TTeamIdCampaignsIndexRouteImport } from './routes/t.$teamId.campaigns.index'
+import { Route as TTeamIdCampaignsCampaignIdRouteImport } from './routes/t.$teamId.campaigns.$campaignId'
+import { Route as TTeamIdSegmentsIndexRouteImport } from './routes/t.$teamId.segments.index'
+import { Route as TTeamIdSegmentsSegmentIdRouteImport } from './routes/t.$teamId.segments.$segmentId'
 import { Route as TTeamIdSettingsIndexRouteImport } from './routes/t.$teamId.settings.index'
 import { Route as TTeamIdSettingsApiKeysRouteImport } from './routes/t.$teamId.settings.api-keys'
 import { Route as TTeamIdSettingsConnectionsRouteImport } from './routes/t.$teamId.settings.connections'
@@ -31,6 +35,8 @@ import { Route as TTeamIdSettingsFieldsRouteImport } from './routes/t.$teamId.se
 import { Route as TTeamIdSettingsGeneralRouteImport } from './routes/t.$teamId.settings.general'
 import { Route as TTeamIdSettingsMembersRouteImport } from './routes/t.$teamId.settings.members'
 import { Route as TTeamIdSettingsServiceAccountsRouteImport } from './routes/t.$teamId.settings.service-accounts'
+import { Route as TTeamIdTemplatesIndexRouteImport } from './routes/t.$teamId.templates.index'
+import { Route as TTeamIdTemplatesTemplateIdRouteImport } from './routes/t.$teamId.templates.$templateId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -102,6 +108,28 @@ const TTeamIdSettingsRoute = TTeamIdSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => TTeamIdRoute,
 } as any)
+const TTeamIdCampaignsIndexRoute = TTeamIdCampaignsIndexRouteImport.update({
+  id: '/campaigns/',
+  path: '/campaigns/',
+  getParentRoute: () => TTeamIdRoute,
+} as any)
+const TTeamIdCampaignsCampaignIdRoute =
+  TTeamIdCampaignsCampaignIdRouteImport.update({
+    id: '/campaigns/$campaignId',
+    path: '/campaigns/$campaignId',
+    getParentRoute: () => TTeamIdRoute,
+  } as any)
+const TTeamIdSegmentsIndexRoute = TTeamIdSegmentsIndexRouteImport.update({
+  id: '/segments/',
+  path: '/segments/',
+  getParentRoute: () => TTeamIdRoute,
+} as any)
+const TTeamIdSegmentsSegmentIdRoute =
+  TTeamIdSegmentsSegmentIdRouteImport.update({
+    id: '/segments/$segmentId',
+    path: '/segments/$segmentId',
+    getParentRoute: () => TTeamIdRoute,
+  } as any)
 const TTeamIdSettingsIndexRoute = TTeamIdSettingsIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -144,6 +172,17 @@ const TTeamIdSettingsServiceAccountsRoute =
     path: '/service-accounts',
     getParentRoute: () => TTeamIdSettingsRoute,
   } as any)
+const TTeamIdTemplatesIndexRoute = TTeamIdTemplatesIndexRouteImport.update({
+  id: '/templates/',
+  path: '/templates/',
+  getParentRoute: () => TTeamIdRoute,
+} as any)
+const TTeamIdTemplatesTemplateIdRoute =
+  TTeamIdTemplatesTemplateIdRouteImport.update({
+    id: '/templates/$templateId',
+    path: '/templates/$templateId',
+    getParentRoute: () => TTeamIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -160,6 +199,8 @@ export interface FileRoutesByFullPath {
   '/t/$teamId/companies': typeof TTeamIdCompaniesRoute
   '/t/$teamId/contacts': typeof TTeamIdContactsRoute
   '/t/$teamId/settings': typeof TTeamIdSettingsRouteWithChildren
+  '/t/$teamId/campaigns/$campaignId': typeof TTeamIdCampaignsCampaignIdRoute
+  '/t/$teamId/segments/$segmentId': typeof TTeamIdSegmentsSegmentIdRoute
   '/t/$teamId/settings/api-keys': typeof TTeamIdSettingsApiKeysRoute
   '/t/$teamId/settings/connections': typeof TTeamIdSettingsConnectionsRoute
   '/t/$teamId/settings/email': typeof TTeamIdSettingsEmailRoute
@@ -167,7 +208,11 @@ export interface FileRoutesByFullPath {
   '/t/$teamId/settings/general': typeof TTeamIdSettingsGeneralRoute
   '/t/$teamId/settings/members': typeof TTeamIdSettingsMembersRoute
   '/t/$teamId/settings/service-accounts': typeof TTeamIdSettingsServiceAccountsRoute
+  '/t/$teamId/templates/$templateId': typeof TTeamIdTemplatesTemplateIdRoute
+  '/t/$teamId/campaigns/': typeof TTeamIdCampaignsIndexRoute
+  '/t/$teamId/segments/': typeof TTeamIdSegmentsIndexRoute
   '/t/$teamId/settings/': typeof TTeamIdSettingsIndexRoute
+  '/t/$teamId/templates/': typeof TTeamIdTemplatesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -183,6 +228,8 @@ export interface FileRoutesByTo {
   '/unsubscribe/$token': typeof UnsubscribeTokenRoute
   '/t/$teamId/companies': typeof TTeamIdCompaniesRoute
   '/t/$teamId/contacts': typeof TTeamIdContactsRoute
+  '/t/$teamId/campaigns/$campaignId': typeof TTeamIdCampaignsCampaignIdRoute
+  '/t/$teamId/segments/$segmentId': typeof TTeamIdSegmentsSegmentIdRoute
   '/t/$teamId/settings/api-keys': typeof TTeamIdSettingsApiKeysRoute
   '/t/$teamId/settings/connections': typeof TTeamIdSettingsConnectionsRoute
   '/t/$teamId/settings/email': typeof TTeamIdSettingsEmailRoute
@@ -190,7 +237,11 @@ export interface FileRoutesByTo {
   '/t/$teamId/settings/general': typeof TTeamIdSettingsGeneralRoute
   '/t/$teamId/settings/members': typeof TTeamIdSettingsMembersRoute
   '/t/$teamId/settings/service-accounts': typeof TTeamIdSettingsServiceAccountsRoute
+  '/t/$teamId/templates/$templateId': typeof TTeamIdTemplatesTemplateIdRoute
+  '/t/$teamId/campaigns': typeof TTeamIdCampaignsIndexRoute
+  '/t/$teamId/segments': typeof TTeamIdSegmentsIndexRoute
   '/t/$teamId/settings': typeof TTeamIdSettingsIndexRoute
+  '/t/$teamId/templates': typeof TTeamIdTemplatesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -208,6 +259,8 @@ export interface FileRoutesById {
   '/t/$teamId/companies': typeof TTeamIdCompaniesRoute
   '/t/$teamId/contacts': typeof TTeamIdContactsRoute
   '/t/$teamId/settings': typeof TTeamIdSettingsRouteWithChildren
+  '/t/$teamId/campaigns/$campaignId': typeof TTeamIdCampaignsCampaignIdRoute
+  '/t/$teamId/segments/$segmentId': typeof TTeamIdSegmentsSegmentIdRoute
   '/t/$teamId/settings/api-keys': typeof TTeamIdSettingsApiKeysRoute
   '/t/$teamId/settings/connections': typeof TTeamIdSettingsConnectionsRoute
   '/t/$teamId/settings/email': typeof TTeamIdSettingsEmailRoute
@@ -215,7 +268,11 @@ export interface FileRoutesById {
   '/t/$teamId/settings/general': typeof TTeamIdSettingsGeneralRoute
   '/t/$teamId/settings/members': typeof TTeamIdSettingsMembersRoute
   '/t/$teamId/settings/service-accounts': typeof TTeamIdSettingsServiceAccountsRoute
+  '/t/$teamId/templates/$templateId': typeof TTeamIdTemplatesTemplateIdRoute
+  '/t/$teamId/campaigns/': typeof TTeamIdCampaignsIndexRoute
+  '/t/$teamId/segments/': typeof TTeamIdSegmentsIndexRoute
   '/t/$teamId/settings/': typeof TTeamIdSettingsIndexRoute
+  '/t/$teamId/templates/': typeof TTeamIdTemplatesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -234,6 +291,8 @@ export interface FileRouteTypes {
     | '/t/$teamId/companies'
     | '/t/$teamId/contacts'
     | '/t/$teamId/settings'
+    | '/t/$teamId/campaigns/$campaignId'
+    | '/t/$teamId/segments/$segmentId'
     | '/t/$teamId/settings/api-keys'
     | '/t/$teamId/settings/connections'
     | '/t/$teamId/settings/email'
@@ -241,7 +300,11 @@ export interface FileRouteTypes {
     | '/t/$teamId/settings/general'
     | '/t/$teamId/settings/members'
     | '/t/$teamId/settings/service-accounts'
+    | '/t/$teamId/templates/$templateId'
+    | '/t/$teamId/campaigns/'
+    | '/t/$teamId/segments/'
     | '/t/$teamId/settings/'
+    | '/t/$teamId/templates/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -257,6 +320,8 @@ export interface FileRouteTypes {
     | '/unsubscribe/$token'
     | '/t/$teamId/companies'
     | '/t/$teamId/contacts'
+    | '/t/$teamId/campaigns/$campaignId'
+    | '/t/$teamId/segments/$segmentId'
     | '/t/$teamId/settings/api-keys'
     | '/t/$teamId/settings/connections'
     | '/t/$teamId/settings/email'
@@ -264,7 +329,11 @@ export interface FileRouteTypes {
     | '/t/$teamId/settings/general'
     | '/t/$teamId/settings/members'
     | '/t/$teamId/settings/service-accounts'
+    | '/t/$teamId/templates/$templateId'
+    | '/t/$teamId/campaigns'
+    | '/t/$teamId/segments'
     | '/t/$teamId/settings'
+    | '/t/$teamId/templates'
   id:
     | '__root__'
     | '/'
@@ -281,6 +350,8 @@ export interface FileRouteTypes {
     | '/t/$teamId/companies'
     | '/t/$teamId/contacts'
     | '/t/$teamId/settings'
+    | '/t/$teamId/campaigns/$campaignId'
+    | '/t/$teamId/segments/$segmentId'
     | '/t/$teamId/settings/api-keys'
     | '/t/$teamId/settings/connections'
     | '/t/$teamId/settings/email'
@@ -288,7 +359,11 @@ export interface FileRouteTypes {
     | '/t/$teamId/settings/general'
     | '/t/$teamId/settings/members'
     | '/t/$teamId/settings/service-accounts'
+    | '/t/$teamId/templates/$templateId'
+    | '/t/$teamId/campaigns/'
+    | '/t/$teamId/segments/'
     | '/t/$teamId/settings/'
+    | '/t/$teamId/templates/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -405,6 +480,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TTeamIdSettingsRouteImport
       parentRoute: typeof TTeamIdRoute
     }
+    '/t/$teamId/campaigns/': {
+      id: '/t/$teamId/campaigns/'
+      path: '/campaigns'
+      fullPath: '/t/$teamId/campaigns/'
+      preLoaderRoute: typeof TTeamIdCampaignsIndexRouteImport
+      parentRoute: typeof TTeamIdRoute
+    }
+    '/t/$teamId/campaigns/$campaignId': {
+      id: '/t/$teamId/campaigns/$campaignId'
+      path: '/campaigns/$campaignId'
+      fullPath: '/t/$teamId/campaigns/$campaignId'
+      preLoaderRoute: typeof TTeamIdCampaignsCampaignIdRouteImport
+      parentRoute: typeof TTeamIdRoute
+    }
+    '/t/$teamId/segments/': {
+      id: '/t/$teamId/segments/'
+      path: '/segments'
+      fullPath: '/t/$teamId/segments/'
+      preLoaderRoute: typeof TTeamIdSegmentsIndexRouteImport
+      parentRoute: typeof TTeamIdRoute
+    }
+    '/t/$teamId/segments/$segmentId': {
+      id: '/t/$teamId/segments/$segmentId'
+      path: '/segments/$segmentId'
+      fullPath: '/t/$teamId/segments/$segmentId'
+      preLoaderRoute: typeof TTeamIdSegmentsSegmentIdRouteImport
+      parentRoute: typeof TTeamIdRoute
+    }
     '/t/$teamId/settings/': {
       id: '/t/$teamId/settings/'
       path: '/'
@@ -461,6 +564,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TTeamIdSettingsServiceAccountsRouteImport
       parentRoute: typeof TTeamIdSettingsRoute
     }
+    '/t/$teamId/templates/': {
+      id: '/t/$teamId/templates/'
+      path: '/templates'
+      fullPath: '/t/$teamId/templates/'
+      preLoaderRoute: typeof TTeamIdTemplatesIndexRouteImport
+      parentRoute: typeof TTeamIdRoute
+    }
+    '/t/$teamId/templates/$templateId': {
+      id: '/t/$teamId/templates/$templateId'
+      path: '/templates/$templateId'
+      fullPath: '/t/$teamId/templates/$templateId'
+      preLoaderRoute: typeof TTeamIdTemplatesTemplateIdRouteImport
+      parentRoute: typeof TTeamIdRoute
+    }
   }
 }
 
@@ -494,12 +611,24 @@ interface TTeamIdRouteChildren {
   TTeamIdCompaniesRoute: typeof TTeamIdCompaniesRoute
   TTeamIdContactsRoute: typeof TTeamIdContactsRoute
   TTeamIdSettingsRoute: typeof TTeamIdSettingsRouteWithChildren
+  TTeamIdCampaignsCampaignIdRoute: typeof TTeamIdCampaignsCampaignIdRoute
+  TTeamIdSegmentsSegmentIdRoute: typeof TTeamIdSegmentsSegmentIdRoute
+  TTeamIdTemplatesTemplateIdRoute: typeof TTeamIdTemplatesTemplateIdRoute
+  TTeamIdCampaignsIndexRoute: typeof TTeamIdCampaignsIndexRoute
+  TTeamIdSegmentsIndexRoute: typeof TTeamIdSegmentsIndexRoute
+  TTeamIdTemplatesIndexRoute: typeof TTeamIdTemplatesIndexRoute
 }
 
 const TTeamIdRouteChildren: TTeamIdRouteChildren = {
   TTeamIdCompaniesRoute: TTeamIdCompaniesRoute,
   TTeamIdContactsRoute: TTeamIdContactsRoute,
   TTeamIdSettingsRoute: TTeamIdSettingsRouteWithChildren,
+  TTeamIdCampaignsCampaignIdRoute: TTeamIdCampaignsCampaignIdRoute,
+  TTeamIdSegmentsSegmentIdRoute: TTeamIdSegmentsSegmentIdRoute,
+  TTeamIdTemplatesTemplateIdRoute: TTeamIdTemplatesTemplateIdRoute,
+  TTeamIdCampaignsIndexRoute: TTeamIdCampaignsIndexRoute,
+  TTeamIdSegmentsIndexRoute: TTeamIdSegmentsIndexRoute,
+  TTeamIdTemplatesIndexRoute: TTeamIdTemplatesIndexRoute,
 }
 
 const TTeamIdRouteWithChildren =

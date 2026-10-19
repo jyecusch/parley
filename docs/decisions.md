@@ -152,7 +152,13 @@ Milestones 4–7: notes (`notes.*`, in the timeline with activity); custom field
 
 Milestone 8: avatars and logos (`contacts.setAvatar/removeAvatar`, `companies.setLogo/removeLogo`). Uploads are cropped to 256px WebP by sharp. Logos are fetched from the primary domain in the background. Gravatar is used when the team turns it on. `FileStore` uses S3 when configured, else Postgres. Files are served from `/api/files/…` to members of their team only.
 
-Not yet: v2 marketing email, a full record view (D55), and paging in the table beyond loading everything.
+v2, milestones 9–12 (marketing email; choices in `docs/review.md` R36–R60):
+- Email setup and subscriptions: `emailSettings.*`, `sendingDomains.*` (Resend Domains API), `topics.*`, a subscription status on contacts (with a filter field and CSV column), `contacts.subscriptions` and `contacts.updateSubscriptions`, and signed unsubscribe links with a public page and RFC 8058 one-click (`/api/unsubscribe/…`). Settings → Email holds all of it.
+- Segments: `segments.*`, dynamic (the contacts filter, D59) or fixed. There's an index view, a segment view with a live preview, and "Add to segment" on Contacts.
+- Templates and campaigns: `templates.*` and `campaigns.*`. Content is Markdown with merge tags, rendered to HTML and plain text with the footer. The composer has a live server-rendered preview and autosave. There are test sends to members, and a send dialog with a consent reminder.
+- Sending: a background `CampaignSender` using Postgres as the queue (batches of 100, teams take turns, paced, with retries). Campaigns can be cancelled, and the report shows counts and recipients. Activity covers "sent this contact", unsubscribes, bounces and spam reports. Resend's webhook (`/api/webhooks/resend`, Svix-signed) records deliveries, bounces and complaints.
+
+Not yet: a full record view (D55), paging in the contacts table beyond loading everything, scheduling, and open or click tracking (R47, R48).
 
 ## Proposed (awaiting the owner)
 

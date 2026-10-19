@@ -2,11 +2,13 @@ import { type AnyOperationError, ERROR_STATUS, ParleyApi } from "@parley/api"
 import {
   Authenticator,
   BetterAuth,
+  type DeliveryEvents,
   type FileStore,
   implementations,
   type Members,
   type OperationServices,
   readFile,
+  receiveDeliveryEvent,
   type Subscriptions,
   type UnsubscribeLinks,
   unsubscribeApply,
@@ -205,6 +207,25 @@ export const UnsubscribeRoutesLive = HttpRouter.use((router) =>
           unsubscribeApply(tokenOf(request), change && change._tag === "Some" ? change.value : { kind: "one-click" }),
         )
       }),
+    )
+  }),
+)
+
+/** Resend's webhook (R46): deliveries, bounces and spam reports, checked by signature. */
+export const WebhookRoutesLive = HttpRouter.use((router) =>
+  Effect.gen(function* () {
+    const services = yield* Effect.context<DeliveryEvents>()
+    yield* router.add("POST", "/api/webhooks/resend", (request) =>
+      Effect.gen(function* () {
+        const body = yield* request.text.pipe(Effect.orElseSucceed(() => ""))
+        const outcome = yield* receiveDeliveryEvent(headersOf(request), body)
+        return outcome === "accepted"
+          ? HttpServerResponse.empty({ status: 204 })
+          : HttpServerResponse.empty({ status: 401 })
+      }).pipe(
+        Effect.catchTag("DatabaseUnavailable", () => Effect.succeed(HttpServerResponse.empty({ status: 503 }))),
+        Effect.provide(services),
+      ),
     )
   }),
 )

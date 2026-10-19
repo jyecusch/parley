@@ -1,6 +1,25 @@
 import { createAffiliation, deleteAffiliation, listAffiliations, updateAffiliation } from "./affiliations.ts"
 import { createApiKey, listApiKeys, revokeApiKey } from "./api-keys.ts"
 import {
+  cancelCampaign,
+  createCampaign,
+  createTemplate,
+  deleteCampaign,
+  deleteTemplate,
+  duplicateCampaign,
+  getCampaign,
+  getTemplate,
+  listCampaignRecipients,
+  listCampaigns,
+  listTemplates,
+  previewCampaign,
+  previewTemplate,
+  sendCampaign,
+  testSendCampaign,
+  updateCampaign,
+  updateTemplate,
+} from "./campaigns.ts"
+import {
   companyActivity,
   createCompany,
   deleteCompany,
@@ -49,6 +68,16 @@ import {
 import { createNote, deleteNote, listNotes, updateNote } from "./notes.ts"
 import { createSavedView, deleteSavedView, listSavedViews, updateSavedView } from "./saved-views.ts"
 import {
+  addSegmentContacts,
+  createSegment,
+  deleteSegment,
+  getSegment,
+  listSegmentContacts,
+  listSegments,
+  removeSegmentContacts,
+  updateSegment,
+} from "./segments.ts"
+import {
   createServiceAccount,
   deleteServiceAccount,
   listServiceAccounts,
@@ -58,6 +87,7 @@ import { createTeam, listTeams, updateTeam } from "./teams.ts"
 
 export * from "./affiliations.ts"
 export * from "./api-keys.ts"
+export * from "./campaigns.ts"
 export * from "./companies.ts"
 export * from "./connections.ts"
 export * from "./contacts.ts"
@@ -68,6 +98,7 @@ export * from "./images.ts"
 export * from "./members.ts"
 export * from "./notes.ts"
 export * from "./saved-views.ts"
+export * from "./segments.ts"
 export * from "./service-accounts.ts"
 export * from "./teams.ts"
 
@@ -144,6 +175,31 @@ export const operations = {
   "topics.create": createTopic,
   "topics.update": updateTopic,
   "topics.delete": deleteTopic,
+  "segments.list": listSegments,
+  "segments.get": getSegment,
+  "segments.create": createSegment,
+  "segments.update": updateSegment,
+  "segments.delete": deleteSegment,
+  "segments.contacts": listSegmentContacts,
+  "segments.addContacts": addSegmentContacts,
+  "segments.removeContacts": removeSegmentContacts,
+  "templates.list": listTemplates,
+  "templates.get": getTemplate,
+  "templates.create": createTemplate,
+  "templates.update": updateTemplate,
+  "templates.delete": deleteTemplate,
+  "templates.preview": previewTemplate,
+  "campaigns.list": listCampaigns,
+  "campaigns.get": getCampaign,
+  "campaigns.create": createCampaign,
+  "campaigns.update": updateCampaign,
+  "campaigns.delete": deleteCampaign,
+  "campaigns.duplicate": duplicateCampaign,
+  "campaigns.preview": previewCampaign,
+  "campaigns.testSend": testSendCampaign,
+  "campaigns.send": sendCampaign,
+  "campaigns.cancel": cancelCampaign,
+  "campaigns.recipients": listCampaignRecipients,
 } as const
 export type Operations = typeof operations
 export type OperationName = keyof Operations

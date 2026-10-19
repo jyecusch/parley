@@ -15,7 +15,7 @@ import {
   type TeamId,
 } from "@parley/domain"
 import { DisplayName, EchoedInput, userText } from "@parley/errors"
-import { and, asc, desc, eq, exists, ilike, inArray, isNotNull, isNull, ne, or, sql } from "drizzle-orm"
+import { and, asc, desc, eq, exists, ilike, inArray, isNotNull, isNull, ne, or, type SQL, sql } from "drizzle-orm"
 import { Context, Effect, Layer } from "effect"
 import type { SqlError } from "effect/sql"
 import type { Principal } from "../principal.ts"
@@ -39,6 +39,11 @@ export interface ContactQuery {
   readonly limit?: number | undefined
   readonly cursor?: string | undefined
   readonly deleted?: boolean | undefined
+}
+
+/** Narrows a list to a group of contacts, such as a segment's. Made by the service that owns the group. */
+export interface ContactScope {
+  readonly where: SQL
 }
 
 /** Which contacts a lookup may find: live ones, or deleted ones still inside the restore window. */
@@ -142,7 +147,14 @@ export class Contacts extends Context.Service<
       team: Named<T, TeamId>,
       query: ContactQuery,
       access: CanReadRecords<P, T>,
+      within?: ContactScope,
     ) => Effect.Effect<ContactPage, InputRejected | DatabaseUnavailable>
+    /** Used only by the ContactsInTeam prover: which of these ids are live contacts in the team. */
+    readonly locateMany: <P, T>(
+      team: Named<T, TeamId>,
+      contactIds: ReadonlyArray<ContactId>,
+      access: CanReadRecords<P, T>,
+    ) => Effect.Effect<ReadonlySet<string>, DatabaseUnavailable>
     /** Used only by the ContactInTeam and ContactRestorable provers. */
     readonly locate: <P, T>(
       team: Named<T, TeamId>,
@@ -383,7 +395,12 @@ export class Contacts extends Context.Service<
             ),
         )
 
-      const list = <P, T>(team: Named<T, TeamId>, query: ContactQuery, _access: CanReadRecords<P, T>) =>
+      const list = <P, T>(
+        team: Named<T, TeamId>,
+        query: ContactQuery,
+        _access: CanReadRecords<P, T>,
+        within?: ContactScope,
+      ) =>
         Effect.gen(function* () {
           const limit = query.limit ?? 50
           const custom =
@@ -408,6 +425,7 @@ export class Contacts extends Context.Service<
                   and(
                     eq(schema.contacts.teamId, team.value),
                     filtered,
+                    within?.where,
                     query.deleted
                       ? and(
                           isNotNull(schema.contacts.deletedAt),
@@ -706,7 +724,29 @@ export class Contacts extends Context.Service<
           return yield* loadOne(teamId, id)
         }).pipe(Effect.withSpan("Contacts.setAvatar"))
 
-      return { list, locate, get, create, update, delete: remove, restore, activity, setAvatar }
+      const locateMany = <P, T>(
+        team: Named<T, TeamId>,
+        contactIds: ReadonlyArray<ContactId>,
+        _access: CanReadRecords<P, T>,
+      ) =>
+        contactIds.length === 0
+          ? Effect.succeed(new Set<string>())
+          : run(
+              db.query((d) =>
+                d
+                  .select({ id: schema.contacts.id })
+                  .from(schema.contacts)
+                  .where(
+                    and(
+                      eq(schema.contacts.teamId, team.value),
+                      inArray(schema.contacts.id, [...contactIds]),
+                      isNull(schema.contacts.deletedAt),
+                    ),
+                  ),
+              ),
+            ).pipe(Effect.map((rows) => new Set(rows.map((row) => row.id))))
+
+      return { list, locateMany, locate, get, create, update, delete: remove, restore, activity, setAvatar }
     }),
   )
 }

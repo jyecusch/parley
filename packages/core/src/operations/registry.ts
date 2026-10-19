@@ -1,8 +1,10 @@
 import type { OperationError, OperationInput, OperationName, OperationOutput, Operations } from "@parley/domain"
 import type { Effect } from "effect"
+import type { Mailer } from "../mail/mailer.ts"
 import type { Principal } from "../principal.ts"
 import type { Affiliations } from "../services/affiliations.ts"
 import type { ApiKeys } from "../services/api-keys.ts"
+import type { Campaigns } from "../services/campaigns.ts"
 import type { Companies } from "../services/companies.ts"
 import type { Connections } from "../services/connections.ts"
 import type { Contacts } from "../services/contacts.ts"
@@ -11,14 +13,18 @@ import type { Invitations } from "../services/invitations.ts"
 import type { Members } from "../services/members.ts"
 import type { Notes } from "../services/notes.ts"
 import type { SavedViews } from "../services/saved-views.ts"
+import type { Segments } from "../services/segments.ts"
 import type { Sending } from "../services/sending.ts"
 import type { ServiceAccounts } from "../services/service-accounts.ts"
 import type { Subscriptions } from "../services/subscriptions.ts"
 import type { Teams } from "../services/teams.ts"
+import type { Templates } from "../services/templates.ts"
 import type { Topics } from "../services/topics.ts"
+import type { UnsubscribeLinks } from "../services/unsubscribe-links.ts"
 import type { Users } from "../services/users.ts"
 import * as affiliations from "./affiliations.ts"
 import * as apiKeys from "./api-keys.ts"
+import * as campaigns from "./campaigns.ts"
 import * as companies from "./companies.ts"
 import * as connections from "./connections.ts"
 import * as contacts from "./contacts.ts"
@@ -29,6 +35,7 @@ import * as images from "./images.ts"
 import * as members from "./members.ts"
 import * as notes from "./notes.ts"
 import * as savedViews from "./saved-views.ts"
+import * as segments from "./segments.ts"
 import * as serviceAccounts from "./service-accounts.ts"
 import * as teams from "./teams.ts"
 
@@ -50,6 +57,11 @@ export type OperationServices =
   | Sending
   | Topics
   | Subscriptions
+  | Segments
+  | Templates
+  | Campaigns
+  | Mailer
+  | UnsubscribeLinks
 
 export type Implementation<Name extends OperationName> = (
   principal: Principal,
@@ -132,4 +144,29 @@ export const implementations: { readonly [Name in OperationName]: Implementation
   "topics.create": emailSetup.addTopic,
   "topics.update": emailSetup.changeTopic,
   "topics.delete": emailSetup.removeTopic,
+  "segments.list": segments.list,
+  "segments.get": segments.get,
+  "segments.create": segments.create,
+  "segments.update": segments.update,
+  "segments.delete": segments.remove,
+  "segments.contacts": segments.contacts,
+  "segments.addContacts": segments.addContacts,
+  "segments.removeContacts": segments.removeContacts,
+  "templates.list": campaigns.listAllTemplates,
+  "templates.get": campaigns.getOneTemplate,
+  "templates.create": campaigns.addTemplate,
+  "templates.update": campaigns.changeTemplate,
+  "templates.delete": campaigns.removeTemplate,
+  "templates.preview": campaigns.previewOneTemplate,
+  "campaigns.list": campaigns.listAllCampaigns,
+  "campaigns.get": campaigns.getOneCampaign,
+  "campaigns.create": campaigns.addCampaign,
+  "campaigns.update": campaigns.changeCampaign,
+  "campaigns.delete": campaigns.removeCampaign,
+  "campaigns.duplicate": campaigns.copyCampaign,
+  "campaigns.preview": campaigns.previewOneCampaign,
+  "campaigns.testSend": campaigns.testSend,
+  "campaigns.send": campaigns.send,
+  "campaigns.cancel": campaigns.cancel,
+  "campaigns.recipients": campaigns.recipients,
 }

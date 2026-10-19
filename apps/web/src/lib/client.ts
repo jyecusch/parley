@@ -48,7 +48,8 @@ export const call = async <Name extends OperationName>(
     delete values[key]
     return encodeURIComponent(value)
   })
-  const hasBody = (op.http.method === "POST" || op.http.method === "PATCH") && Object.keys(values).length > 0
+  // POST and PATCH always carry a JSON body, even an empty one, so all-optional inputs decode.
+  const hasBody = op.http.method === "POST" || op.http.method === "PATCH"
   const query = new URLSearchParams()
   if (!hasBody) {
     for (const [key, value] of Object.entries(values)) if (value !== undefined) query.set(key, String(value))

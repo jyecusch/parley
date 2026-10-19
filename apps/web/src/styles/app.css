@@ -1987,3 +1987,220 @@ body {
 .unsub-topics .hint {
   display: block;
 }
+
+/* Email: segments, templates and campaigns. */
+.sb-collapsed .side .glabel {
+  visibility: hidden;
+  height: 8px;
+}
+.c-warn {
+  color: var(--danger);
+}
+.w-kind {
+  width: 110px;
+}
+.crumb-inp {
+  font: inherit;
+  color: inherit;
+  border: 0;
+  outline: 0;
+  padding: 0 4px;
+  margin: 0 -4px;
+  border-radius: 4px;
+  background: var(--fill);
+  min-width: 0;
+  width: 260px;
+}
+.hd1 > .pill {
+  margin-left: 8px;
+}
+
+/* The composer: content on the left, the email as received on the right. */
+.composer {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  border-top: 1px solid var(--line);
+}
+.cmp-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  overflow: auto;
+  border-right: 1px solid var(--line);
+}
+.cmp-f {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.cmp-f.grow {
+  flex: 1;
+  min-height: 260px;
+}
+.cmp-f .flabel {
+  color: var(--fg-subtle);
+}
+.cmp-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.cmp-bodyhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.tags {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.tagbtn {
+  border: 0;
+  border-radius: 10px;
+  padding: 1px 8px;
+  background: var(--fill);
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+.tagbtn:hover {
+  color: var(--fg);
+}
+.inp.cmp-body {
+  flex: 1;
+  height: auto;
+  min-height: 220px;
+  padding: 10px;
+  resize: none;
+  font-size: 13px;
+  line-height: 20px;
+}
+.cmp-prev {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--bg-app);
+}
+.cmp-prevbar {
+  display: flex;
+  align-items: center;
+  height: 36px;
+  padding: 0 12px;
+  gap: 8px;
+}
+.cmp-inbox {
+  margin: 0 12px 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--bg);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.cmp-subject {
+  font-weight: 560;
+}
+.cmp-frame {
+  flex: 1;
+  width: calc(100% - 24px);
+  margin: 0 12px 12px;
+  min-height: 320px;
+  border: 0;
+  border-radius: 6px;
+  background: #f4f4f4;
+}
+.savestate {
+  margin-left: 10px;
+}
+.crumb-inp.plain {
+  background: transparent;
+  width: 320px;
+}
+.crumb-inp.plain:focus {
+  background: var(--fill);
+}
+.sendsum {
+  display: grid;
+  grid-template-columns: 70px 1fr;
+  gap: 6px 10px;
+  margin: 0;
+}
+.sendsum dt {
+  color: var(--fg-subtle);
+}
+.sendsum dd {
+  margin: 0;
+}
+
+/* A sent campaign's report. */
+.report {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  border-top: 1px solid var(--line);
+}
+.rep-main {
+  padding: 14px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-right: 1px solid var(--line);
+}
+.rep-meta {
+  margin: 0;
+}
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 8px;
+}
+.tilestat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--bg);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+.tilestat:disabled {
+  cursor: default;
+}
+.tilestat.on {
+  box-shadow: inset 0 0 0 1.5px var(--fg-muted);
+}
+.tilestat .v {
+  font-size: 18px;
+  font-weight: 560;
+}
+.tilestat .l {
+  color: var(--fg-subtle);
+}
+@container (max-width: 820px) {
+  .composer,
+  .report {
+    grid-template-columns: 1fr;
+  }
+  .cmp-edit,
+  .rep-main {
+    border-right: 0;
+  }
+  .cmp-prev {
+    min-height: 480px;
+  }
+  .cmp-row {
+    grid-template-columns: 1fr;
+  }
+}

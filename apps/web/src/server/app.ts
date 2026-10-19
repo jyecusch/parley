@@ -5,6 +5,7 @@ import {
   FailureResponsesLive,
   FileRoutesLive,
   UnsubscribeRoutesLive,
+  WebhookRoutesLive,
 } from "@parley/http"
 import { McpRoutesLive } from "@parley/mcp"
 import { Layer } from "effect"
@@ -19,6 +20,7 @@ const AppLive = Layer.mergeAll(
   AuthRoutesLive,
   FileRoutesLive,
   UnsubscribeRoutesLive,
+  WebhookRoutesLive,
   McpRoutesLive,
   FailureResponsesLive,
   BackgroundLive,

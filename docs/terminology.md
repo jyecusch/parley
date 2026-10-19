@@ -107,6 +107,7 @@ How to pick a name: choose the most common name for the concept. Reject anything
 | **Campaign** | One marketing email: its subject, content, segment and topic, and, once sent, its recipients and results. | broadcast, blast, newsletter (as a noun for the thing sent), mailing, send |
 | **Draft** | A campaign that hasn't been sent. A status of a campaign, not a separate thing. | unsent campaign, pending campaign |
 | **Template** | Reusable content (subject and body) that a new campaign starts from. The campaign takes a copy; editing the template later doesn't change it. | layout, design (for email content), theme |
+| **Preview text** | The line inbox apps show after a campaign's subject. | preheader, snippet, teaser |
 | **Merge tag** | A placeholder in a subject or body, like `{{first_name}}`, filled in per recipient. | variable, placeholder, token, personalization tag |
 | **Test send** | Sending a draft to members of the team (not contacts) to check it. | preview email, proof, test email |
 | **Recipient** | A contact a campaign was sent, or is being sent, to. | subscriber (as a noun for a contact), target |
@@ -133,5 +134,5 @@ How to pick a name: choose the most common name for the concept. Reject anything
 | 2026-10-20 | Added **CRT mode** (D102). |
 | 2026-10-20 | Added **invitation**. |
 | 2026-10-20 | Added **domain**, **free email domain** and **domain matching** (D105, D106). |
-| 2026-10-20 | Added the v2 email terms: campaign, draft, template, merge tag, test send, recipient, topic, subscription status, unsubscribe, unsubscribe link, footer, sender and sending domain. Claude's picks, open to veto (see `docs/review.md`). |
+| 2026-10-20 | Added the v2 email terms: campaign, draft, template, merge tag, test send, recipient, topic, subscription status, unsubscribe, unsubscribe link, footer, sender and sending domain. Claude's picks, open to veto (see `docs/review.md`). Later: **preview text**. |
 | 2026-10-20 | Added **access token**, and removed it from API key's banned synonyms (P5, D97). |

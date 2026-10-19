@@ -25,9 +25,12 @@ import {
   PlusIcon,
   RestoreIcon,
   SearchIcon,
+  SegmentIcon,
+  SendIcon,
   SettingsIcon,
   SidebarIcon,
   SwitchIcon,
+  TemplateIcon,
 } from "./icons.tsx"
 import { ContactAvatar } from "./images.tsx"
 
@@ -283,12 +286,52 @@ export function AppShell(props: {
               ))}
           </div>
 
+          <div className="group">
+            <h2 className="glabel sm-t">Email</h2>
+            <Link
+              className="nav tip tip-r"
+              activeProps={{ className: "nav tip tip-r on" }}
+              to="/t/$teamId/campaigns"
+              params={{ teamId: props.team.id }}
+              data-tip="Campaigns"
+            >
+              <span className="ic">
+                <SendIcon />
+              </span>
+              <span className="lbl">Campaigns</span>
+            </Link>
+            <Link
+              className="nav tip tip-r"
+              activeProps={{ className: "nav tip tip-r on" }}
+              to="/t/$teamId/templates"
+              params={{ teamId: props.team.id }}
+              data-tip="Templates"
+            >
+              <span className="ic">
+                <TemplateIcon />
+              </span>
+              <span className="lbl">Templates</span>
+            </Link>
+            <Link
+              className="nav tip tip-r"
+              activeProps={{ className: "nav tip tip-r on" }}
+              to="/t/$teamId/segments"
+              params={{ teamId: props.team.id }}
+              data-tip="Segments"
+            >
+              <span className="ic">
+                <SegmentIcon />
+              </span>
+              <span className="lbl">Segments</span>
+            </Link>
+          </div>
+
           <div className="spacer" />
 
           <div className="group">
             <Link
               className="nav tip tip-r"
-              to="/t/$teamId/settings/connections"
+              to="/t/$teamId/settings/general"
               params={{ teamId: props.team.id }}
               data-tip="Settings"
             >

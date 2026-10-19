@@ -53,3 +53,24 @@ export const proveContactRestorable = <P, T, C>(
     ...ContactRestorableProver.prove(contact, team),
     ...located,
   }))
+
+const ContactsInTeamProver = defineProof("ContactsInTeam")
+
+/** Every contact in a list exists in team T and isn't deleted, for changes to many at once. */
+export interface ContactsInTeam<T> extends Proof<"ContactsInTeam", [T]> {
+  readonly team: Named<T, TeamId>
+  readonly contactIds: ReadonlyArray<ContactId>
+}
+
+export const proveContactsInTeam = <P, T>(
+  team: Named<T, TeamId>,
+  contactIds: ReadonlyArray<ContactId>,
+  read: CanReadRecords<P, T>,
+): Effect.Effect<ContactsInTeam<T>, ContactNotFound | DatabaseUnavailable, Contacts> =>
+  Effect.gen(function* () {
+    const contacts = yield* Contacts
+    const found = yield* contacts.locateMany(team, contactIds, read)
+    const missing = contactIds.find((id) => !found.has(id))
+    if (missing) return yield* new ContactNotFound({ team: read.member.teamName, contactId: missing })
+    return { ...ContactsInTeamProver.prove(team), team, contactIds: [...new Set(contactIds)] }
+  })

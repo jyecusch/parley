@@ -688,7 +688,6 @@ function TopicDialog(props: {
           className="inp"
           maxLength={60}
           placeholder="Product updates"
-          // biome-ignore lint/a11y/noAutofocus: the dialog opens to name the topic
           autoFocus
           value={name}
           onChange={(event) => setName(event.target.value)}

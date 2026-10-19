@@ -38,6 +38,7 @@ import {
   toE164,
   toggle,
 } from "../components/record.tsx"
+import { AddToSegmentDialog } from "../components/segments.tsx"
 import { isTyping, useShell } from "../components/shell.tsx"
 import { SubscriptionSection } from "../components/subscriptions.tsx"
 import { Timeline } from "../components/timeline.tsx"
@@ -86,7 +87,7 @@ function ContactsScreen() {
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
   const [cursor, setCursor] = useState<string>()
   const [toast, setToast] = useState<Toast>()
-  const [dialog, setDialog] = useState<"save-view" | "import" | "set-field" | "affiliate">()
+  const [dialog, setDialog] = useState<"save-view" | "import" | "set-field" | "affiliate" | "segment">()
   const { fields } = useFields(teamId, "contact")
   const indexView = useIndexView(teamId, "contact", search.view)
   const filterInfo = useMemo(() => filterFields("contact", fields), [fields])
@@ -95,6 +96,7 @@ function ContactsScreen() {
   )
   const { userId } = teamRoute.useRouteContext()
   const canWrite = ROLE_PERMISSIONS[team.role].has("records:write")
+  const canWriteEmail = ROLE_PERMISSIONS[team.role].has("email:write")
   const companyCollection = companiesCollection(teamId, queryClient)
   const companyLive = useLiveQuery((q) => q.from({ company: companyCollection }), [companyCollection])
   const companyOptions = useMemo(
@@ -411,6 +413,11 @@ function ContactsScreen() {
             <button className="btn ghost sm" type="button" onClick={() => setDialog("affiliate")}>
               Add to company
             </button>
+            {canWriteEmail ? (
+              <button className="btn ghost sm" type="button" onClick={() => setDialog("segment")}>
+                Add to segment
+              </button>
+            ) : null}
             <button className="btn ghost sm" type="button" onClick={() => void exportCsv([...selected])}>
               Export
             </button>
@@ -503,6 +510,17 @@ function ContactsScreen() {
             setSelected(new Set())
             showToast({ text: `${field.name} is set on ${ids.length} ${ids.length === 1 ? "contact" : "contacts"}.` })
             transaction.isPersisted.promise.catch((failure: unknown) => showToast({ text: messageOf(failure) }))
+          }}
+        />
+      ) : dialog === "segment" ? (
+        <AddToSegmentDialog
+          teamId={teamId}
+          contactIds={[...selected] as Array<ContactId>}
+          onClose={() => setDialog(undefined)}
+          onDone={(text) => {
+            setDialog(undefined)
+            setSelected(new Set())
+            showToast({ text })
           }}
         />
       ) : dialog === "affiliate" ? (

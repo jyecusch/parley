@@ -21,3 +21,9 @@ export const relative = (iso: string, now = Date.now()): string => {
 
 export const absolute = (iso: string): string =>
   new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })
+
+/** "2h ago", or "just now". */
+export const ago = (iso: string, now = Date.now()): string => {
+  const short = relative(iso, now)
+  return short === "now" ? "just now" : `${short} ago`
+}

@@ -74,7 +74,7 @@ export function AffiliationTags(props: { readonly affiliations: ReadonlyArray<Co
   )
 }
 
-interface PickerItem {
+export interface PickerItem {
   readonly id: string
   readonly name: string
   readonly sub: string | undefined
@@ -82,7 +82,7 @@ interface PickerItem {
 }
 
 /** A searchable list in a popover. Arrow keys move, Enter picks, Escape closes. */
-function Picker(props: {
+export function Picker(props: {
   readonly label: string
   readonly placeholder: string
   readonly heading: string
