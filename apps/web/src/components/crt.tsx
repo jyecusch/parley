@@ -91,6 +91,34 @@ const shaderSupported = () =>
   typeof WebGL2RenderingContext !== "undefined" &&
   "texElementImage2D" in WebGL2RenderingContext.prototype
 
+/**
+ * The glass, tunable per browser in localStorage (D102): `parley.crt.curvature` (0 flat to 1 very round,
+ * default 0.5) and `parley.crt.aberration` (colour fringing at the edges in CSS pixels, 0 to 4, default 1).
+ * Read on every draw, so a change shows on the next repaint.
+ */
+const readSetting = (key: string, fallback: number, max: number) => {
+  try {
+    const raw = localStorage.getItem(key)
+    const value = raw === null ? Number.NaN : Number(raw)
+    return Number.isFinite(value) ? Math.min(Math.max(value, 0), max) : fallback
+  } catch {
+    return fallback
+  }
+}
+const glassSettings = () => ({
+  /** The barrel factor: 0.5 bows the screen edges in by about 1.5% of the width. */
+  curvature: readSetting("parley.crt.curvature", 0.5, 1) * 0.24,
+  aberration: readSetting("parley.crt.aberration", 1, 4),
+})
+
+/** Where the shader samples the app for a point on the glass: the same barrel mapping as the fragment shader. */
+const barrel = (x: number, y: number, width: number, height: number, curvature: number) => {
+  const cx = x / width - 0.5
+  const cy = y / height - 0.5
+  const bulge = 1 + curvature * (cx * cx + cy * cy)
+  return { x: (0.5 + cx * bulge) * width, y: (0.5 + cy * bulge) * height }
+}
+
 /** How long the app may stay undrawn after it moves into the canvas before the CSS layer takes over. */
 const FIRST_PAINT_TIMEOUT_MS = 1500
 
@@ -115,6 +143,8 @@ function mountShader(screen: HTMLElement, options: { readonly still: boolean; re
   const uSize = uniform("u_size")
   const uExtent = uniform("u_extent")
   const uFlicker = uniform("u_flicker")
+  const uCurvature = uniform("u_curvature")
+  const uAberration = uniform("u_aberration")
   // biome-ignore lint/correctness/useHookAtTopLevel: WebGL's useProgram, not a React hook
   gl.useProgram(program)
   gl.uniform1i(uniform("u_screen"), 0)
@@ -139,6 +169,9 @@ function mountShader(screen: HTMLElement, options: { readonly still: boolean; re
       screen.offsetHeight / Math.max(canvas.clientHeight, 1),
     )
     gl.uniform1f(uFlicker, options.still ? 1 : flickerAt(performance.now()))
+    const glass = glassSettings()
+    gl.uniform1f(uCurvature, glass.curvature)
+    gl.uniform1f(uAberration, glass.aberration)
     gl.drawArrays(gl.TRIANGLES, 0, 3)
   }
 
@@ -147,12 +180,34 @@ function mountShader(screen: HTMLElement, options: { readonly still: boolean; re
     options.onFail()
   }
 
+  /*
+   * The glass bends the picture but the browser hit-tests the flat app. Hit-testing can only be moved by a
+   * matrix, so on every pointer move the app's hit geometry is shifted by how far the bend moves the point
+   * under the pointer. Near the pointer, what you see is then what you click.
+   */
+  let hitShift = { x: 0, y: 0 }
+  const hitGeometry = () => new DOMMatrix().translate(hitShift.x, hitShift.y)
+  const onPointer = (event: PointerEvent) => {
+    const box = canvas.getBoundingClientRect()
+    const x = event.clientX - box.left
+    const y = event.clientY - box.top
+    const seen = barrel(x, y, box.width, box.height, glassSettings().curvature)
+    const next = { x: x - seen.x, y: y - seen.y }
+    if (Math.abs(next.x - hitShift.x) < 0.5 && Math.abs(next.y - hitShift.y) < 0.5) return
+    hitShift = next
+    try {
+      canvas.updateElementGeometry(screen, hitGeometry())
+    } catch {
+      fail()
+    }
+  }
+
   const onPaint = () => {
     try {
       gl.bindTexture(gl.TEXTURE_2D, texture)
       elementGl.texElementImage2D(gl.TEXTURE_2D, gl.RGBA8, screen)
       gl.generateMipmap(gl.TEXTURE_2D)
-      canvas.updateElementGeometry(screen)
+      canvas.updateElementGeometry(screen, hitGeometry())
     } catch {
       fail()
       return
@@ -184,6 +239,8 @@ function mountShader(screen: HTMLElement, options: { readonly still: boolean; re
     clearTimeout(flickerTimer)
     resizer.disconnect()
     canvas.removeEventListener("paint", onPaint)
+    window.removeEventListener("pointermove", onPointer, true)
+    window.removeEventListener("pointerdown", onPointer, true)
     canvas.removeEventListener("webglcontextlost", fail)
     const canvasParent = canvas.parentNode
     if (canvasParent) moveInto(canvasParent, screen, canvas)
@@ -194,6 +251,9 @@ function mountShader(screen: HTMLElement, options: { readonly still: boolean; re
 
   canvas.addEventListener("paint", onPaint)
   canvas.addEventListener("webglcontextlost", fail)
+  // Capture phase, so the shift is in place before the next event is hit-tested.
+  window.addEventListener("pointermove", onPointer, { capture: true, passive: true })
+  window.addEventListener("pointerdown", onPointer, { capture: true, passive: true })
   parent.insertBefore(canvas, screen)
   moveInto(canvas, screen, null)
   resizer.observe(canvas, { box: "device-pixel-content-box" })
@@ -243,9 +303,9 @@ void main() {
 }`
 
 /*
- * The CRT shader, amber phosphor. Every value mirrors the CSS layer in app.css so both look the same:
- * curvature and rounded glass, bloom, aperture mask, scanlines, flicker wash, vignette and the edge light.
- * There is no rolling band (D81).
+ * The CRT shader, amber phosphor. Mask, scanlines, flicker, vignette and edge light mirror the CSS layer in
+ * app.css. The shader adds what CSS can't: the convex glass (barrel curvature, a curved bezel and a soft
+ * reflection), chromatic aberration towards the edges, and bloom. There is no rolling band (D81).
  */
 const FRAGMENT_SHADER = `#version 300 es
 precision highp float;
@@ -253,10 +313,11 @@ uniform sampler2D u_screen;
 uniform vec2 u_size;    // canvas size in CSS pixels
 uniform vec2 u_extent;  // app size over canvas size; above 1 when the app overflows the viewport
 uniform float u_flicker;
+uniform float u_curvature;   // barrel factor; 0 is flat
+uniform float u_aberration;  // colour fringing at the edges, in CSS pixels
 in vec2 v_uv;
 out vec4 frag;
 
-const float CURVATURE = 0.032;  // 0.8% shift at the corners, so pointers stay on what they point at
 const float RADIUS = 22.0;
 const vec3 GLASS = vec3(0.012, 0.009, 0.006);
 const vec3 AMBER = vec3(1.0, 0.76, 0.36);
@@ -272,7 +333,8 @@ float luma(vec3 color) {
 
 void main() {
   vec2 centered = v_uv - 0.5;
-  vec2 uv = 0.5 + centered * (1.0 + CURVATURE * dot(centered, centered));
+  // Barrel: the glass bulges, so the picture bows in and the bezel shows at the edges.
+  vec2 uv = 0.5 + centered * (1.0 + u_curvature * dot(centered, centered));
   vec2 px = uv * u_size;
 
   // Rounded glass: signed distance to the screen edge in CSS pixels, negative inside.
@@ -284,7 +346,13 @@ void main() {
   }
 
   vec2 texel = uv / u_extent;
-  vec3 color = texture(u_screen, texel).rgb;
+  // Chromatic aberration: red and blue land slightly apart, more towards the edges, none in the middle.
+  vec2 fringe = (uv - 0.5) * 2.0 * u_aberration / u_size / u_extent;
+  vec3 color = vec3(
+    texture(u_screen, texel + fringe).r,
+    texture(u_screen, texel).g,
+    texture(u_screen, texel - fringe).b
+  );
 
   // Bloom: phosphor light spilling from the brightest strokes.
   vec3 glow = textureLod(u_screen, texel, 2.5).rgb * 0.6 + textureLod(u_screen, texel, 4.5).rgb * 0.4;
@@ -311,6 +379,10 @@ void main() {
   vec2 inset = min(px, u_size - px);
   vec2 shadow = 0.65 * (0.5 - 0.5 * tanh(0.8 * inset / 45.0));
   color *= (1.0 - shadow.x) * (1.0 - shadow.y);
+
+  // Reflection: the convex glass catches a soft light from the upper left.
+  vec2 light = (v_uv - vec2(0.3, 0.22)) / vec2(0.55, 0.4);
+  color = screenBlend(color, WASH * 0.035 * (1.0 - smoothstep(0.0, 1.0, length(light))) * (0.5 + 2.0 * u_curvature));
 
   // Edge light: a 1px amber line along the glass.
   color = mix(color, AMBER, 0.08 * smoothstep(-2.0, -1.0, edge));
