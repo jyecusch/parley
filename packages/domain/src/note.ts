@@ -1,6 +1,6 @@
 import { Schema } from "effect"
-import { RecordType } from "./contact.ts"
 import { NoteId, UserId } from "./ids.ts"
+import { RecordType } from "./record-type.ts"
 
 const Timestamp = Schema.String.annotate({ description: "ISO 8601 timestamp" })
 

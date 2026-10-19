@@ -21,6 +21,7 @@ import type { CanDeleteRecords, CanReadRecords, CanWriteRecords } from "../proof
 import type { Named } from "../proofs/proof.ts"
 import { activityRow, toActivityEntry } from "./activity.ts"
 import { Affiliations } from "./affiliations.ts"
+import { CustomFields } from "./custom-fields.ts"
 import { classifySqlError, isUniqueViolation } from "./sql-errors.ts"
 
 /** Deleted contacts can be restored for this long, then they're purged (D30). */
@@ -159,6 +160,7 @@ export class Contacts extends Context.Service<
     Effect.gen(function* () {
       const db = yield* Database
       const affiliations = yield* Affiliations
+      const customFields = yield* CustomFields
       const run = <A>(effect: Effect.Effect<A, SqlError.SqlError>) =>
         effect.pipe(Effect.catchTag("SqlError", classifySqlError))
 
@@ -223,6 +225,7 @@ export class Contacts extends Context.Service<
                     label: phone.label,
                   })),
                 affiliations: companies.get(id) ?? [],
+                custom: row.custom as Contact["custom"],
                 createdAt: row.createdAt.toISOString(),
                 updatedAt: row.updatedAt.toISOString(),
                 deletedAt: row.deletedAt?.toISOString() ?? null,
@@ -445,6 +448,9 @@ export class Contacts extends Context.Service<
       const create = <P, T>(team: Named<T, TeamId>, fields: ContactFields, access: CanWriteRecords<P, T>) =>
         Effect.gen(function* () {
           const normalized = yield* normalize(fields, true)
+          const custom = fields.custom
+            ? yield* customFields.apply(team.value, "contact", {}, fields.custom)
+            : { values: {}, changed: [] }
           const addresses = normalized.emails?.map((email) => email.address) ?? []
           if (addresses.length > 0) yield* emailTaken(access.member.teamName, team.value, addresses)
           const id = crypto.randomUUID()
@@ -460,12 +466,16 @@ export class Contacts extends Context.Service<
                   teamId: team.value,
                   firstName: normalized.firstName ?? null,
                   lastName: normalized.lastName ?? null,
+                  custom: custom.values,
                 }),
               )
               yield* replaceEmails(team.value, id, normalized.emails)
               yield* replacePhones(team.value, id, normalized.phones)
               const principal = access.member.principal.value
-              yield* recordActivity(principal, team.value, id, "created", Object.keys(normalized))
+              yield* recordActivity(principal, team.value, id, "created", [
+                ...Object.keys(normalized),
+                ...custom.changed,
+              ])
               const name = displayNameOf(
                 normalized.firstName ?? null,
                 normalized.lastName ?? null,
@@ -484,9 +494,12 @@ export class Contacts extends Context.Service<
           const id = target.contact.value
           const addresses = normalized.emails?.map((email) => email.address) ?? []
           if (addresses.length > 0) yield* emailTaken(target.teamName, teamId, addresses, id)
-          const changed = Object.keys(normalized)
+          const current = yield* loadOne(teamId, id)
+          const custom = fields.custom
+            ? yield* customFields.apply(teamId, "contact", current.custom, fields.custom)
+            : undefined
+          const changed = [...Object.keys(normalized), ...(custom?.changed ?? [])]
           if (changed.length > 0) {
-            const current = yield* loadOne(teamId, id)
             const before = new Set(current.emails.map((email) => email.address as string))
             const added = addresses.filter((address) => !before.has(address))
             const principal = access.member.principal.value
@@ -507,6 +520,7 @@ export class Contacts extends Context.Service<
                     .set({
                       ...("firstName" in normalized ? { firstName: normalized.firstName ?? null } : {}),
                       ...("lastName" in normalized ? { lastName: normalized.lastName ?? null } : {}),
+                      ...(custom ? { custom: custom.values } : {}),
                       updatedAt: sql`now()`,
                     })
                     .where(and(eq(schema.contacts.teamId, teamId), eq(schema.contacts.id, id))),

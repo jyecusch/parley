@@ -26,6 +26,7 @@ import type { Named } from "../proofs/proof.ts"
 import { activityRow, toActivityEntry } from "./activity.ts"
 import { Affiliations } from "./affiliations.ts"
 import { RESTORE_WINDOW_DAYS } from "./contacts.ts"
+import { CustomFields } from "./custom-fields.ts"
 import { classifySqlError, isUniqueViolation } from "./sql-errors.ts"
 
 export interface CompanyQuery {
@@ -167,6 +168,7 @@ export class Companies extends Context.Service<
     Effect.gen(function* () {
       const db = yield* Database
       const affiliations = yield* Affiliations
+      const customFields = yield* CustomFields
       const run = <A>(effect: Effect.Effect<A, SqlError.SqlError>) =>
         effect.pipe(Effect.catchTag("SqlError", classifySqlError))
 
@@ -223,6 +225,7 @@ export class Companies extends Context.Service<
                 phone: row.phone as Company["phone"],
                 address,
                 contactCount,
+                custom: row.custom as Company["custom"],
                 createdAt: row.createdAt.toISOString(),
                 updatedAt: row.updatedAt.toISOString(),
                 deletedAt: row.deletedAt?.toISOString() ?? null,
@@ -422,6 +425,9 @@ export class Companies extends Context.Service<
       ) =>
         Effect.gen(function* () {
           const normalized = yield* normalize(fields)
+          const custom = fields.custom
+            ? yield* customFields.apply(team.value, "company", {}, fields.custom)
+            : { values: {}, changed: [] }
           const domains = normalized.domains?.map((entry) => entry.domain) ?? []
           if (domains.length > 0) yield* domainTaken(access.member.teamName, team.value, domains)
           const id = crypto.randomUUID()
@@ -440,10 +446,14 @@ export class Companies extends Context.Service<
                   website: normalized.website ?? null,
                   phone: normalized.phone ?? null,
                   ...addressColumns(normalized.address ?? null),
+                  custom: custom.values,
                 }),
               )
               yield* replaceDomains(team.value, id, normalized.domains)
-              yield* recordActivity(principal, team.value, id, "created", Object.keys(normalized))
+              yield* recordActivity(principal, team.value, id, "created", [
+                ...Object.keys(normalized),
+                ...custom.changed,
+              ])
               yield* affiliations.matchCompany(principal, team.value, { id, name: fields.name }, domains)
             }),
           )
@@ -457,9 +467,12 @@ export class Companies extends Context.Service<
           const id = target.company.value
           const domains = normalized.domains?.map((entry) => entry.domain) ?? []
           if (domains.length > 0) yield* domainTaken(target.teamName, teamId, domains, id)
-          const changed = Object.keys(normalized)
+          const current = yield* loadOne(teamId, id)
+          const custom = fields.custom
+            ? yield* customFields.apply(teamId, "company", current.custom, fields.custom)
+            : undefined
+          const changed = [...Object.keys(normalized), ...(custom?.changed ?? [])]
           if (changed.length > 0) {
-            const current = yield* loadOne(teamId, id)
             const before = new Set(current.domains.map((entry) => entry.domain as string))
             const added = domains.filter((domain) => !before.has(domain))
             const principal = access.member.principal.value
@@ -477,6 +490,7 @@ export class Companies extends Context.Service<
                       ...("website" in normalized ? { website: normalized.website ?? null } : {}),
                       ...("phone" in normalized ? { phone: normalized.phone ?? null } : {}),
                       ...("address" in normalized ? addressColumns(normalized.address ?? null) : {}),
+                      ...(custom ? { custom: custom.values } : {}),
                       updatedAt: sql`now()`,
                     })
                     .where(and(eq(schema.companies.teamId, teamId), eq(schema.companies.id, id))),

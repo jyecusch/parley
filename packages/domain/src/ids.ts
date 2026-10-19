@@ -26,3 +26,6 @@ export type AffiliationId = typeof AffiliationId.Type
 
 export const NoteId = Schema.String.pipe(Schema.brand("NoteId"))
 export type NoteId = typeof NoteId.Type
+
+export const CustomFieldId = Schema.String.pipe(Schema.brand("CustomFieldId"))
+export type CustomFieldId = typeof CustomFieldId.Type

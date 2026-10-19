@@ -19,6 +19,7 @@ import {
   restoreContact,
   updateContact,
 } from "./contacts.ts"
+import { createField, deleteField, listFields, updateField } from "./custom-fields.ts"
 import { createNote, deleteNote, listNotes, updateNote } from "./notes.ts"
 import { createServiceAccount, listServiceAccounts } from "./service-accounts.ts"
 import { createTeam, listTeams } from "./teams.ts"
@@ -28,6 +29,7 @@ export * from "./api-keys.ts"
 export * from "./companies.ts"
 export * from "./connections.ts"
 export * from "./contacts.ts"
+export * from "./custom-fields.ts"
 export * from "./notes.ts"
 export * from "./service-accounts.ts"
 export * from "./teams.ts"
@@ -54,6 +56,10 @@ export const operations = {
   "affiliations.create": createAffiliation,
   "affiliations.update": updateAffiliation,
   "affiliations.delete": deleteAffiliation,
+  "fields.list": listFields,
+  "fields.create": createField,
+  "fields.update": updateField,
+  "fields.delete": deleteField,
   "notes.list": listNotes,
   "notes.create": createNote,
   "notes.update": updateNote,

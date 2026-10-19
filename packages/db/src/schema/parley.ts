@@ -4,6 +4,7 @@ import {
   foreignKey,
   index,
   integer,
+  jsonb,
   pgTable,
   text,
   timestamp,
@@ -31,6 +32,8 @@ export const contacts = pgTable(
     teamId: teamId(),
     firstName: text("first_name"),
     lastName: text("last_name"),
+    /** Custom field values by field id (D31). */
+    custom: jsonb("custom").$type<Record<string, unknown>>().notNull().default({}),
     ...timestamps,
     /** Soft delete: hidden at once, restorable for 30 days, then purged (D30). */
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
@@ -177,6 +180,8 @@ export const companies = pgTable(
     region: text("region"),
     postcode: text("postcode"),
     country: text("country"),
+    /** Custom field values by field id (D31). */
+    custom: jsonb("custom").$type<Record<string, unknown>>().notNull().default({}),
     ...timestamps,
     /** Soft delete, like contacts (D30, D109). */
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
@@ -256,4 +261,23 @@ export const notes = pgTable(
     ...timestamps,
   },
   (t) => [index("notes_record_idx").on(t.teamId, t.recordId, t.createdAt)],
+)
+
+/** A team's custom field on contacts or companies (D31, D68). Values live on the records. */
+export const customFields = pgTable(
+  "custom_fields",
+  {
+    id: uuid("id").primaryKey(),
+    teamId: teamId(),
+    recordType: text("record_type", { enum: ["contact", "company"] }).notNull(),
+    name: text("name").notNull(),
+    type: text("type").notNull(),
+    options: jsonb("options").$type<Array<{ id: string; label: string }>>().notNull().default([]),
+    position: integer("position").notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex("custom_fields_team_id_record_type_name_key").on(t.teamId, t.recordType, sql`lower(${t.name})`),
+    index("custom_fields_team_id_idx").on(t.teamId, t.recordType, t.position),
+  ],
 )

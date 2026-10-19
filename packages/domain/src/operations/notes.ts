@@ -1,11 +1,11 @@
 import { Schema } from "effect"
-import { RecordType } from "../contact.ts"
 import { CompanyNotFound } from "../errors/companies.ts"
 import { ContactNotFound } from "../errors/contacts.ts"
 import { CannotDeleteOthersNote, NoteNotFound, NotNoteAuthor } from "../errors/notes.ts"
 import { NoteId, TeamId } from "../ids.ts"
 import { Note, NoteBody } from "../note.ts"
 import { defineTeamOperation } from "../operation.ts"
+import { RecordType } from "../record-type.ts"
 
 const InTeam = { teamId: TeamId.annotate({ description: "The team, from teams.list." }) }
 const OnRecord = {

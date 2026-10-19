@@ -6,6 +6,7 @@ import { ApiKeys } from "./services/api-keys.ts"
 import { Companies } from "./services/companies.ts"
 import { Connections } from "./services/connections.ts"
 import { Contacts } from "./services/contacts.ts"
+import { CustomFields } from "./services/custom-fields.ts"
 import { Members } from "./services/members.ts"
 import { Notes } from "./services/notes.ts"
 import { ServiceAccounts } from "./services/service-accounts.ts"
@@ -19,7 +20,9 @@ export { type Implementation, implementations, type OperationServices } from "./
 export type { Principal } from "./principal.ts"
 
 /** Contacts and companies both do domain matching through Affiliations. */
-const Records = Layer.mergeAll(Contacts.layer, Companies.layer).pipe(Layer.provideMerge(Affiliations.layer))
+const Records = Layer.mergeAll(Contacts.layer, Companies.layer).pipe(
+  Layer.provideMerge(Layer.mergeAll(Affiliations.layer, CustomFields.layer)),
+)
 
 const Services = Layer.mergeAll(
   Records,

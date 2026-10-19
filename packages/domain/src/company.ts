@@ -1,5 +1,6 @@
 import { Schema } from "effect"
 import { PhoneNumber } from "./contact.ts"
+import { CustomValues, CustomValuesPatch } from "./custom-field.ts"
 import { AffiliationId, CompanyId, ContactId, TeamId } from "./ids.ts"
 
 const Timestamp = Schema.String.annotate({ description: "ISO 8601 timestamp" })
@@ -54,6 +55,8 @@ export const Company = Schema.Struct({
   address: Schema.NullOr(PostalAddress),
   /** Contacts affiliated with it that aren't deleted. */
   contactCount: Schema.Number,
+  /** Custom field values by field id (D31). */
+  custom: CustomValues,
   createdAt: Timestamp,
   updatedAt: Timestamp,
   deletedAt: Schema.NullOr(Timestamp),
@@ -76,6 +79,7 @@ export const CompanyFields = Schema.Struct({
   website: Schema.optional(Schema.NullOr(Website.annotate({ title: "Website" }))),
   phone: Schema.optional(Schema.NullOr(PhoneNumber.annotate({ title: "Phone" }))),
   address: Schema.optional(Schema.NullOr(PostalAddress)),
+  custom: Schema.optional(CustomValuesPatch),
 })
 export type CompanyFields = typeof CompanyFields.Type
 

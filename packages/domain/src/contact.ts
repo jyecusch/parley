@@ -1,5 +1,7 @@
 import { Schema } from "effect"
+import { CustomValues, CustomValuesPatch } from "./custom-field.ts"
 import { AffiliationId, CompanyId, ContactId, TeamId } from "./ids.ts"
+import { RecordType } from "./record-type.ts"
 
 const Timestamp = Schema.String.annotate({ description: "ISO 8601 timestamp" })
 
@@ -48,6 +50,8 @@ export const Contact = Schema.Struct({
   phones: Schema.Array(ContactPhone),
   /** Its companies that aren't deleted, oldest first. */
   affiliations: Schema.Array(ContactAffiliation),
+  /** Custom field values by field id (D31). */
+  custom: CustomValues,
   createdAt: Timestamp,
   updatedAt: Timestamp,
   deletedAt: Schema.NullOr(Timestamp),
@@ -74,6 +78,7 @@ export const ContactFields = Schema.Struct({
       }),
     ).check(Schema.isMaxLength(20)),
   ),
+  custom: Schema.optional(CustomValuesPatch),
 })
 export type ContactFields = typeof ContactFields.Type
 
@@ -82,9 +87,6 @@ export const ContactPage = Schema.Struct({
   nextCursor: Schema.NullOr(Schema.String),
 })
 export type ContactPage = typeof ContactPage.Type
-
-export const RecordType = Schema.Literals(["contact", "company"])
-export type RecordType = typeof RecordType.Type
 
 export const ActivityEntry = Schema.Struct({
   id: Schema.String,

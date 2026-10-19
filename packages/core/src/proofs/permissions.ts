@@ -55,6 +55,7 @@ export const requirePermission = <P, T>(
 }
 
 const CanManageServiceAccountsProver = defineProof("CanManageServiceAccounts")
+const CanManageFieldsProver = defineProof("CanManageFields")
 const CanReadRecordsProver = defineProof("CanReadRecords")
 const CanWriteRecordsProver = defineProof("CanWriteRecords")
 const CanDeleteRecordsProver = defineProof("CanDeleteRecords")
@@ -106,5 +107,18 @@ export const proveCanManageServiceAccounts = <P, T>(
 ): Effect.Effect<CanManageServiceAccounts<P, T>, PermissionError> =>
   Effect.as(requirePermission(member, "service-accounts:manage"), {
     ...CanManageServiceAccountsProver.prove(member.principal, member.team),
+    member,
+  })
+
+/** P may define custom fields in team T (D32). */
+export interface CanManageFields<P, T> extends Proof<"CanManageFields", [P, T]> {
+  readonly member: MemberOf<P, T>
+}
+
+export const proveCanManageFields = <P, T>(
+  member: MemberOf<P, T>,
+): Effect.Effect<CanManageFields<P, T>, PermissionError> =>
+  Effect.as(requirePermission(member, "fields:manage"), {
+    ...CanManageFieldsProver.prove(member.principal, member.team),
     member,
   })
