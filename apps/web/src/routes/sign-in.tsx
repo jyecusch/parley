@@ -4,9 +4,22 @@ import { useState } from "react"
 import { AuthForm, Field } from "../components/auth-form.tsx"
 import { agentRequest, signIn, withAgentRequest } from "../lib/auth.ts"
 
-/** Only same-site paths, so a link can't send someone elsewhere after signing in. */
-export const safeRedirect = (value: unknown): string | undefined =>
-  typeof value === "string" && value.startsWith("/") && !value.startsWith("//") ? value : undefined
+const SAME_SITE = "https://parley.invalid"
+
+/**
+ * Only paths on this site, so a link can't send someone elsewhere after signing in. Resolved the
+ * way a browser would, so `//evil.com`, `/\evil.com` and the like are refused, not just spotted.
+ */
+export const safeRedirect = (value: unknown): string | undefined => {
+  if (typeof value !== "string" || !value.startsWith("/") || /[\\\s]/.test(value)) return undefined
+  if ([...value].some((char) => char.charCodeAt(0) < 0x20)) return undefined
+  try {
+    const url = new URL(value, SAME_SITE)
+    return url.origin === SAME_SITE ? `${url.pathname}${url.search}${url.hash}` : undefined
+  } catch {
+    return undefined
+  }
+}
 
 export const Route = createFileRoute("/sign-in")({
   ssr: false,
