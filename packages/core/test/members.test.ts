@@ -168,4 +168,20 @@ describe("members and invitations", () => {
       expect(refused._tag).toBe("EmailNotVerified")
     }).pipe(Effect.provide(CoreLive)),
   )
+
+  it.effect("an API key or agent can't make its person leave, or revoke their other credentials", () =>
+    Effect.gen(function* () {
+      const f = yield* Fixture
+      const leave = yield* run["members.remove"](f.janeReadOnlyKey, {
+        teamId: f.acme,
+        userId: f.jane.userId,
+      }).pipe(Effect.flip)
+      expect(leave).toMatchObject({ _tag: "SignInRequired", action: "leave a team" })
+      const revoke = yield* run["apiKeys.revoke"](f.janeReadOnlyKey, {
+        teamId: f.acme,
+        apiKeyId: "some-other-key" as never,
+      }).pipe(Effect.flip)
+      expect(revoke).toMatchObject({ _tag: "SignInRequired", action: "revoke an API key" })
+    }).pipe(Effect.provide(CoreLive)),
+  )
 })

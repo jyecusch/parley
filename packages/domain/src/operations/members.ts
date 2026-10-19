@@ -51,7 +51,7 @@ export const removeMember = defineTeamOperation({
     "Remove someone from a team, or leave it yourself. Their notes and activity stay. Needs members:manage to remove someone else; a team always keeps at least one owner.",
   input: Schema.Struct(OneMember),
   output: Member,
-  errors: [MemberNotFound, LastOwner, OwnerChangeNeedsOwner],
+  errors: [SignInRequired, MemberNotFound, LastOwner, OwnerChangeNeedsOwner],
   http: { method: "DELETE", path: "/teams/:teamId/members/:userId" },
   hints: { readOnly: false, destructive: true, idempotent: false },
   permissions: [],

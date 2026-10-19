@@ -82,10 +82,17 @@ export const create = (principal: Principal, input: OperationInput<typeof create
     }),
   )
 
+/** A connection may revoke itself; revoking any other takes the person, signed in. */
 export const revoke = (principal: Principal, input: OperationInput<typeof revokeConnection>) =>
   named(principal, input.teamId, input.connectionId, (principal, team, connection) =>
     Effect.gen(function* () {
       const connections = yield* Connections
+      const self =
+        (principal.value._tag === "UserConnection" || principal.value._tag === "ServiceAccountConnection") &&
+        principal.value.connectionId === input.connectionId
+      if (principal.value._tag !== "UserSession" && !self) {
+        return yield* new SignInRequired({ action: "revoke a connection" })
+      }
       const member = yield* proveMemberOf(principal, team)
       const target = yield* proveOwnConnection(member, connection)
       return yield* connections.revoke(target)

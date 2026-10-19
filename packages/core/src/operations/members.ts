@@ -42,13 +42,18 @@ export const update = (principal: Principal, input: OperationInput<typeof update
     }),
   )
 
-/** Removing someone else needs members:manage; leaving needs only membership. */
+/**
+ * Removing someone else needs members:manage. Leaving needs only membership, but only the person,
+ * signed in: never an API key or agent acting for them, which could be talked into it.
+ */
 export const remove = (principal: Principal, input: OperationInput<typeof removeMember>) =>
   named(principal, input.teamId, input.userId, (principal, team, user) =>
     Effect.gen(function* () {
       const members = yield* Members
       const member = yield* proveMemberOf(principal, team)
       const leaving = input.userId === principal.value.userId
+      if (leaving && principal.value._tag !== "UserSession")
+        return yield* new SignInRequired({ action: "leave a team" })
       const canManage = leaving ? undefined : yield* proveCanManageMembers(member)
       const target = yield* proveMemberRemovable(member, canManage, user)
       return yield* members.remove(target)

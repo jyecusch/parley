@@ -54,7 +54,7 @@ export const revokeApiKey = defineTeamOperation({
     apiKeyId: ApiKeyId.annotate({ description: "The API key's id, from apiKeys.list." }),
   }),
   output: ApiKey,
-  errors: [ApiKeyNotFound],
+  errors: [SignInRequired, ApiKeyNotFound],
   http: { method: "POST", path: "/teams/:teamId/api-keys/:apiKeyId/revoke" },
   hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: [],

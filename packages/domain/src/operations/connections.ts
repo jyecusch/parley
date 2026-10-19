@@ -59,7 +59,7 @@ export const revokeConnection = defineTeamOperation({
     connectionId: ConnectionId.annotate({ description: "The connection's id, from connections.list." }),
   }),
   output: Connection,
-  errors: [ConnectionNotFound],
+  errors: [SignInRequired, ConnectionNotFound],
   http: { method: "POST", path: "/teams/:teamId/connections/:connectionId/revoke" },
   hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: [],

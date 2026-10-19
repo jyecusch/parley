@@ -44,10 +44,15 @@ export const create = (principal: Principal, input: OperationInput<typeof create
     }),
   )
 
+/** A key may revoke itself; revoking any other key takes the person, signed in. */
 export const revoke = (principal: Principal, input: OperationInput<typeof revokeApiKey>) =>
   named(principal, input.teamId, input.apiKeyId, (principal, team, apiKey) =>
     Effect.gen(function* () {
       const keys = yield* ApiKeys
+      const self = principal.value._tag === "UserApiKey" && principal.value.apiKeyId === input.apiKeyId
+      if (principal.value._tag !== "UserSession" && !self) {
+        return yield* new SignInRequired({ action: "revoke an API key" })
+      }
       const member = yield* proveMemberOf(principal, team)
       const target = yield* proveOwnApiKey(member, apiKey)
       return yield* keys.revoke(target)
