@@ -17,7 +17,7 @@ import { createFileRoute, getRouteApi, Link, useNavigate } from "@tanstack/react
 import { useEffect, useMemo, useState } from "react"
 import { Picker, type PickerItem } from "../components/affiliations.tsx"
 import { FilterBar } from "../components/filters.tsx"
-import { CloseIcon, PlusIcon, SegmentIcon } from "../components/icons.tsx"
+import { CloseIcon, DownloadIcon, PlusIcon, SegmentIcon } from "../components/icons.tsx"
 import { ContactAvatar } from "../components/images.tsx"
 import { LoadFailed } from "../components/record.tsx"
 import { NameText, nameLinkClass, TitleInput, wideColumnClass } from "../components/ui/email.tsx"
@@ -47,7 +47,7 @@ import { call, messageOf } from "../lib/client.ts"
 import { companiesCollection } from "../lib/companies.ts"
 import { contactsCollection } from "../lib/contacts.ts"
 import { useFields } from "../lib/custom-fields.ts"
-import { EMPTY_FILTER } from "../lib/index-view.ts"
+import { download, EMPTY_FILTER } from "../lib/index-view.ts"
 
 export const Route = createFileRoute("/t/$teamId/segments/$segmentId")({ component: SegmentScreen })
 
@@ -182,6 +182,21 @@ function SegmentView(props: {
     }
   }
 
+  /** Downloads the segment's contacts as CSV (a dynamic segment's as saved, not an unsaved filter). */
+  const exportCsv = async () => {
+    try {
+      const result = await call("contacts.export", { teamId, segmentId: segment.id })
+      const slug = segment.name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "")
+      download(`contacts-${slug || "segment"}-${new Date().toISOString().slice(0, 10)}.csv`, result.csv)
+      props.onToast(`Exported ${result.count} ${result.count === 1 ? "contact" : "contacts"}.`)
+    } catch (failure) {
+      props.onToast(messageOf(failure))
+    }
+  }
+
   const pickable: ReadonlyArray<PickerItem> = useMemo(
     () =>
       ([...(live.data ?? [])] as Array<Contact>)
@@ -233,6 +248,12 @@ function SegmentView(props: {
         </Breadcrumb>
         <Badge className="ml-2">{segment.kind === "dynamic" ? "Dynamic" : "Fixed"}</Badge>
         <Spacer />
+        {dirty ? null : (
+          <Button variant="ghost" onClick={() => void exportCsv()}>
+            <DownloadIcon className="size-4" />
+            Export
+          </Button>
+        )}
         {dirty ? (
           <>
             <Button variant="ghost" onClick={() => setFilter(segment.filter ?? EMPTY_FILTER)}>

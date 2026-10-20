@@ -13,7 +13,7 @@ import type { UserText } from "@parley/errors"
 import { useEffect, useRef, useState } from "react"
 import { messageOf } from "../lib/client.ts"
 import { CustomFieldsSection } from "./custom-fields.tsx"
-import { DisplayIcon } from "./icons.tsx"
+import { DisplayIcon, DownloadIcon } from "./icons.tsx"
 import { Dialog } from "./settings.tsx"
 import {
   Box,
@@ -56,8 +56,6 @@ export function DisplayMenu(props: {
   readonly onColumns: (columns: ReadonlyArray<string>) => void
   readonly showingDeleted: boolean
   readonly onToggleDeleted: () => void
-  readonly onExport: () => void
-  readonly onImport: () => void
 }) {
   const [open, setOpen] = useState(false)
   const ref = useDismiss(open, () => setOpen(false))
@@ -141,22 +139,67 @@ export function DisplayMenu(props: {
             Show deleted {props.plural}
             {props.showingDeleted ? <span className="ml-auto text-subtle">✓</span> : null}
           </MenuItem>
+        </Menu>
+      ) : null}
+    </div>
+  )
+}
+
+/**
+ * Export as CSV: what the list is showing (its filter, quick filter and all), or, for contacts, a
+ * segment's contacts.
+ */
+export function ExportMenu(props: {
+  readonly singular: string
+  readonly plural: string
+  readonly showing: number
+  readonly filtered: boolean
+  readonly onExportShowing: () => void
+  readonly segments?: ReadonlyArray<{ readonly id: string; readonly name: string; readonly contactCount: number }>
+  readonly onExportSegment?: (segmentId: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useDismiss(open, () => setOpen(false))
+  const segments = props.segments ?? []
+  return (
+    <div className="relative" ref={ref}>
+      <Button variant="ghost" size="sm" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+        <DownloadIcon className="size-4" />
+        Export
+      </Button>
+      {open ? (
+        <Menu className="top-full right-0 mt-1 w-72">
+          <MenuHeading>Download as CSV</MenuHeading>
           <MenuItem
             onClick={() => {
               setOpen(false)
-              props.onExport()
+              props.onExportShowing()
             }}
           >
-            Export CSV
+            {props.showing === 1
+              ? `The 1 ${props.singular} showing`
+              : props.filtered
+                ? `The ${props.showing} ${props.plural} showing`
+                : `All ${props.showing} ${props.plural}`}
           </MenuItem>
-          <MenuItem
-            onClick={() => {
-              setOpen(false)
-              props.onImport()
-            }}
-          >
-            Import CSV…
-          </MenuItem>
+          {segments.length > 0 && props.onExportSegment ? (
+            <>
+              <MenuSeparator />
+              <MenuHeading>A segment</MenuHeading>
+              {segments.map((segment) => (
+                <MenuItem
+                  key={segment.id}
+                  onClick={() => {
+                    setOpen(false)
+                    props.onExportSegment?.(segment.id)
+                  }}
+                >
+                  <span className="truncate">{segment.name}</span>
+                  <span className="ml-auto text-subtle tabular-nums">{segment.contactCount}</span>
+                </MenuItem>
+              ))}
+            </>
+          ) : null}
         </Menu>
       ) : null}
     </div>

@@ -26,9 +26,16 @@ import {
 } from "../components/company-panel.tsx"
 import { CustomCell } from "../components/custom-fields.tsx"
 import { FilterBar } from "../components/filters.tsx"
-import { CloseIcon, CompaniesIcon, PlusIcon, RestoreIcon, TrashIcon } from "../components/icons.tsx"
+import { CloseIcon, CompaniesIcon, PlusIcon, RestoreIcon, TrashIcon, UploadIcon } from "../components/icons.tsx"
 import { CompanyLogo } from "../components/images.tsx"
-import { DisplayMenu, ImportDialog, SaveViewDialog, SetFieldDialog, ViewActions } from "../components/index-view.tsx"
+import {
+  DisplayMenu,
+  ExportMenu,
+  ImportDialog,
+  SaveViewDialog,
+  SetFieldDialog,
+  ViewActions,
+} from "../components/index-view.tsx"
 import { initialsOfName, LoadFailed, problemFor, problemsOf, toE164, toggle } from "../components/record.tsx"
 import { isTyping, useShell } from "../components/shell.tsx"
 import {
@@ -129,12 +136,15 @@ function CompaniesScreen() {
   const { userId } = teamRoute.useRouteContext()
   const canWrite = ROLE_PERMISSIONS[team.role].has("records:write")
 
-  /** Exports what's showing (D62): the view's filter, or just the selection. */
-  const exportCsv = async (ids: ReadonlyArray<string> | undefined) => {
+  /**
+   * Exports as CSV (D62): the given companies, what's showing or a selection. More than the export
+   * takes by id falls back to the view's filter.
+   */
+  const exportCsv = async (ids: ReadonlyArray<string>) => {
     try {
       const result = await call("companies.export", {
         teamId,
-        ...(ids ? { ids: [...ids] } : { filter: indexView.state.filter }),
+        ...(ids.length <= 10_000 ? { ids: [...ids] } : { filter: indexView.state.filter }),
       })
       download(`companies-${new Date().toISOString().slice(0, 10)}.csv`, result.csv)
       showToast({ text: `Exported ${result.count} ${result.count === 1 ? "company" : "companies"}.` })
@@ -332,8 +342,19 @@ function CompaniesScreen() {
               onColumns={(columns) => void indexView.setColumns(columns)}
               showingDeleted={search.deleted === true}
               onToggleDeleted={() => void setSearch(search.deleted ? {} : { deleted: true })}
-              onExport={() => void exportCsv(undefined)}
-              onImport={() => setDialog("import")}
+            />
+            {canWrite ? (
+              <Button variant="ghost" size="sm" onClick={() => setDialog("import")}>
+                <UploadIcon className="size-4" />
+                Import
+              </Button>
+            ) : null}
+            <ExportMenu
+              singular="company"
+              plural="companies"
+              showing={companies.length}
+              filtered={filter.trim() !== "" || indexView.state.filter.conditions.length > 0}
+              onExportShowing={() => void exportCsv(companies.map((company) => company.id))}
             />
           </Toolbar>
         )}

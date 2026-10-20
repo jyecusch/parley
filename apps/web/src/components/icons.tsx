@@ -272,3 +272,13 @@ export const StackedIcon = ({ className }: P) => (
     <path d="M3.5 12h17" />
   </Icon>
 )
+export const DownloadIcon = ({ className }: P) => (
+  <Icon className={className}>
+    <path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14" />
+  </Icon>
+)
+export const UploadIcon = ({ className }: P) => (
+  <Icon className={className}>
+    <path d="M12 15V4M7.5 8.5 12 4l4.5 4.5M5 19.5h14" />
+  </Icon>
+)

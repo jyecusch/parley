@@ -88,4 +88,22 @@ describe("CSV", () => {
       ])
     }).pipe(Effect.provide(CoreLive)),
   )
+
+  it.effect("exports a segment's contacts, and only from the team's own segments", () =>
+    Effect.gen(function* () {
+      const f = yield* Fixture
+      const ada = yield* run["contacts.create"](f.jane, { teamId: f.acme, firstName: "Ada" })
+      yield* run["contacts.create"](f.jane, { teamId: f.acme, firstName: "Cy" })
+      const segment = yield* run["segments.create"](f.jane, { teamId: f.acme, name: "VIPs", kind: "fixed" })
+      yield* run["segments.addContacts"](f.jane, { teamId: f.acme, segmentId: segment.id, contactIds: [ada.id] })
+
+      const exported = yield* run["contacts.export"](f.jane, { teamId: f.acme, segmentId: segment.id })
+      expect(exported.count).toBe(1)
+      expect(parseCsv(exported.csv)[1]).toEqual(expect.arrayContaining(["Ada"]))
+
+      const theirs = yield* run["segments.create"](f.bob, { teamId: f.globex, name: "Theirs", kind: "fixed" })
+      const refused = yield* run["contacts.export"](f.jane, { teamId: f.acme, segmentId: theirs.id }).pipe(Effect.flip)
+      expect(refused._tag).toBe("SegmentNotFound")
+    }).pipe(Effect.provide(CoreLive)),
+  )
 })

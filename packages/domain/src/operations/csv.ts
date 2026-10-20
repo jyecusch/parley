@@ -1,7 +1,8 @@
 import { Schema } from "effect"
+import { SegmentNotFound } from "../errors/campaigns.ts"
 import { FieldProblem } from "../errors/input.ts"
 import { Filter } from "../filter.ts"
-import { TeamId } from "../ids.ts"
+import { SegmentId, TeamId } from "../ids.ts"
 import { defineTeamOperation } from "../operation.ts"
 
 const InTeam = { teamId: TeamId.annotate({ description: "The team, from teams.list." }) }
@@ -48,10 +49,18 @@ const importInput = Schema.Struct({
 export const exportContacts = defineTeamOperation({
   name: "contacts.export",
   description:
-    "Export contacts as CSV: all of them, those matching a filter, or a given list. Custom fields are included as columns.",
-  input: exportInput,
+    "Export contacts as CSV: all of them, those matching a filter, a segment's contacts, or a given list. Custom fields are included as columns.",
+  input: Schema.Struct({
+    ...exportInput.fields,
+    segmentId: Schema.optional(
+      SegmentId.annotate({
+        title: "Segment",
+        description: "Export only this segment's contacts (from segments.list). Combines with filter and ids.",
+      }),
+    ),
+  }),
   output: ExportResult,
-  errors: [],
+  errors: [SegmentNotFound],
   http: { method: "POST", path: "/teams/:teamId/contacts/export" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: ["records:read"],

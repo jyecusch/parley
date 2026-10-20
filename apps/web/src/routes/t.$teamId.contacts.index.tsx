@@ -8,6 +8,7 @@ import {
   filterFields,
   matchesFilter,
   ROLE_PERMISSIONS,
+  type SegmentId,
   type TeamId,
 } from "@parley/domain"
 import type { UserText } from "@parley/errors"
@@ -19,9 +20,16 @@ import { AffiliateDialog, AffiliationChips } from "../components/affiliations.ts
 import { ContactPanel, type Toast } from "../components/contact-panel.tsx"
 import { CustomCell } from "../components/custom-fields.tsx"
 import { FilterBar } from "../components/filters.tsx"
-import { CloseIcon, ContactsIcon, RestoreIcon, TrashIcon } from "../components/icons.tsx"
+import { CloseIcon, ContactsIcon, RestoreIcon, TrashIcon, UploadIcon } from "../components/icons.tsx"
 import { ContactAvatar } from "../components/images.tsx"
-import { DisplayMenu, ImportDialog, SaveViewDialog, SetFieldDialog, ViewActions } from "../components/index-view.tsx"
+import {
+  DisplayMenu,
+  ExportMenu,
+  ImportDialog,
+  SaveViewDialog,
+  SetFieldDialog,
+  ViewActions,
+} from "../components/index-view.tsx"
 import { LoadFailed, problemFor, problemsOf, toE164, toggle } from "../components/record.tsx"
 import { AddToSegmentDialog } from "../components/segments.tsx"
 import { isTyping, useShell } from "../components/shell.tsx"
@@ -131,14 +139,30 @@ function ContactsScreen() {
     [companyLive.data],
   )
 
-  /** Exports what's showing (D62): the view's filter, or just the selection. */
-  const exportCsv = async (ids: ReadonlyArray<string> | undefined) => {
+  const segments = useQuery({ queryKey: ["segments", teamId], queryFn: () => call("segments.list", { teamId }) })
+
+  /**
+   * Exports as CSV (D62): the given contacts (what's showing, or a selection), or a segment's. More
+   * than the export takes by id falls back to the view's filter.
+   */
+  const exportCsv = async (what: { readonly ids: ReadonlyArray<string> } | { readonly segmentId: string }) => {
+    const segment = "segmentId" in what ? segments.data?.find((entry) => entry.id === what.segmentId) : undefined
     try {
       const result = await call("contacts.export", {
         teamId,
-        ...(ids ? { ids: [...ids] } : { filter: indexView.state.filter }),
+        ...("segmentId" in what
+          ? { segmentId: what.segmentId as SegmentId }
+          : what.ids.length <= 10_000
+            ? { ids: [...what.ids] }
+            : { filter: indexView.state.filter }),
       })
-      download(`contacts-${new Date().toISOString().slice(0, 10)}.csv`, result.csv)
+      const slug = segment
+        ? `-${segment.name
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-|-$/g, "")}`
+        : ""
+      download(`contacts${slug}-${new Date().toISOString().slice(0, 10)}.csv`, result.csv)
       showToast({ text: `Exported ${result.count} ${result.count === 1 ? "contact" : "contacts"}.` })
     } catch (failure) {
       showToast({ text: messageOf(failure) })
@@ -343,8 +367,21 @@ function ContactsScreen() {
               onColumns={(columns) => void indexView.setColumns(columns)}
               showingDeleted={search.deleted === true}
               onToggleDeleted={() => void setSearch(search.deleted ? {} : { deleted: true })}
-              onExport={() => void exportCsv(undefined)}
-              onImport={() => setDialog("import")}
+            />
+            {canWrite ? (
+              <Button variant="ghost" size="sm" onClick={() => setDialog("import")}>
+                <UploadIcon className="size-4" />
+                Import
+              </Button>
+            ) : null}
+            <ExportMenu
+              singular="contact"
+              plural="contacts"
+              showing={contacts.length}
+              filtered={filter.trim() !== "" || indexView.state.filter.conditions.length > 0}
+              onExportShowing={() => void exportCsv({ ids: contacts.map((contact) => contact.id) })}
+              segments={segments.data ?? []}
+              onExportSegment={(segmentId) => void exportCsv({ segmentId })}
             />
           </Toolbar>
         )}
@@ -440,7 +477,7 @@ function ContactsScreen() {
                 Add to segment
               </Button>
             ) : null}
-            <Button variant="ghost" size="sm" onClick={() => void exportCsv([...selected])}>
+            <Button variant="ghost" size="sm" onClick={() => void exportCsv({ ids: [...selected] })}>
               Export
             </Button>
             <Tooltip text="Delete  ⌫">

@@ -23,6 +23,7 @@ import {
   PhoneNumber,
   parseCsv,
   type RecordType,
+  type SegmentId,
   SUBSCRIPTION_STATUS_LABELS,
   toCsv,
   Website,
@@ -32,13 +33,15 @@ import { Effect, Schema } from "effect"
 import type { Principal } from "../principal.ts"
 import { proveCompanyInTeam } from "../proofs/company-in-team.ts"
 import { proveContactInTeam } from "../proofs/contact-in-team.ts"
-import { proveMemberOf } from "../proofs/member-of.ts"
+import { type MemberOf, proveMemberOf } from "../proofs/member-of.ts"
 import { type CanReadRecords, proveCanReadRecords, proveCanWriteRecords } from "../proofs/permissions.ts"
 import { type Named, named } from "../proofs/proof.ts"
+import { proveSegmentInTeam } from "../proofs/segment-in-team.ts"
 import { Affiliations } from "../services/affiliations.ts"
 import { Companies } from "../services/companies.ts"
 import { Contacts } from "../services/contacts.ts"
 import { CustomFields } from "../services/custom-fields.ts"
+import { Segments } from "../services/segments.ts"
 
 /**
  * CSV import and export (D62), composed from the proven record services: every row goes through the
@@ -130,6 +133,18 @@ const allCompanies = <P, T>(team: Named<T, Parameters<typeof proveMemberOf>[1]["
     return items
   })
 
+/** A segment's contacts, as the scope contacts.list narrows to; none when no segment is asked for. */
+const segmentScope = <P, T>(member: MemberOf<P, T>, segmentId: SegmentId | undefined) =>
+  segmentId === undefined
+    ? Effect.succeed(undefined)
+    : named(segmentId, (segment) =>
+        Effect.gen(function* () {
+          const segments = yield* Segments
+          const target = yield* proveSegmentInTeam(member, segment)
+          return yield* segments.scope(target)
+        }),
+      )
+
 export const exportContactsCsv = (principal: Principal, input: OperationInput<typeof exportContacts>) =>
   named(principal, input.teamId, (principal, team) =>
     Effect.gen(function* () {
@@ -137,6 +152,7 @@ export const exportContactsCsv = (principal: Principal, input: OperationInput<ty
       const customFields = yield* CustomFields
       const member = yield* proveMemberOf(principal, team)
       const canRead = yield* proveCanReadRecords(member)
+      const scope = yield* segmentScope(member, input.segmentId)
       const fields = yield* customFields.list(team, "contact", canRead)
       const items: Array<Contact> = []
       let cursor: string | undefined
@@ -145,6 +161,7 @@ export const exportContactsCsv = (principal: Principal, input: OperationInput<ty
           team,
           { limit: 200, ...(input.filter ? { filter: input.filter } : {}), ...(cursor ? { cursor } : {}) },
           canRead,
+          scope,
         )
         items.push(...result.items)
         if (!result.nextCursor) break
