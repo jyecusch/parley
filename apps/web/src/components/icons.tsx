@@ -212,3 +212,10 @@ export const CollapseIcon = ({ className }: P) => (
     <path d="M19.5 10H14V4.5M4.5 14H10v5.5M14 10l5.5-5.5M10 14l-5.5 5.5" />
   </Icon>
 )
+export const TuneIcon = ({ className }: P) => (
+  <Icon className={className}>
+    <path d="M4 7h9M17 7h3M4 17h3M11 17h9" />
+    <circle cx="15" cy="7" r="2" />
+    <circle cx="9" cy="17" r="2" />
+  </Icon>
+)

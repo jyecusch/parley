@@ -79,31 +79,34 @@
 
 :root[data-crt="amber"] {
   --h: 72;
-  --ink-canvas: oklch(0.09 0.012 var(--h));
-  --ink-surface: oklch(0.115 0.018 var(--h));
-  --ink-raised: oklch(0.15 0.025 var(--h));
-  --ink-hover: oklch(0.8 0.15 var(--h) / 0.06);
-  --ink-active: oklch(0.8 0.15 var(--h) / 0.12);
-  --ink-fg: oklch(0.88 0.16 var(--h));
-  --ink-muted: oklch(0.74 0.13 var(--h));
-  --ink-subtle: oklch(0.62 0.11 var(--h));
-  --ink-line: oklch(0.8 0.15 var(--h) / 0.12);
-  --ink-line-strong: oklch(0.8 0.15 var(--h) / 0.2);
-  --ink-control: oklch(0.8 0.15 var(--h) / 0.45);
-  --ink-primary: oklch(0.86 0.16 var(--h));
-  --ink-on-primary: oklch(0.12 0.02 var(--h));
-  --ink-primary-hover: oklch(0.92 0.14 var(--h));
-  --ink-focus: oklch(0.9 0.16 var(--h));
-  --ink-selected: oklch(0.8 0.15 var(--h) / 0.1);
-  --ink-mark: oklch(0.88 0.16 var(--h));
-  --ink-fill: oklch(0.8 0.15 var(--h) / 0.12);
+  --crt-saturation: 1;
+  --ink-canvas: oklch(0.09 calc(0.012 * var(--crt-saturation)) var(--h));
+  --ink-surface: oklch(0.115 calc(0.018 * var(--crt-saturation)) var(--h));
+  --ink-raised: oklch(0.15 calc(0.025 * var(--crt-saturation)) var(--h));
+  --ink-hover: oklch(0.8 calc(0.15 * var(--crt-saturation)) var(--h) / 0.06);
+  --ink-active: oklch(0.8 calc(0.15 * var(--crt-saturation)) var(--h) / 0.12);
+  --ink-fg: oklch(0.88 calc(0.16 * var(--crt-saturation)) var(--h));
+  --ink-muted: oklch(0.74 calc(0.13 * var(--crt-saturation)) var(--h));
+  --ink-subtle: oklch(0.62 calc(0.11 * var(--crt-saturation)) var(--h));
+  --ink-line: oklch(0.8 calc(0.15 * var(--crt-saturation)) var(--h) / 0.12);
+  --ink-line-strong: oklch(0.8 calc(0.15 * var(--crt-saturation)) var(--h) / 0.2);
+  --ink-control: oklch(0.8 calc(0.15 * var(--crt-saturation)) var(--h) / 0.45);
+  --ink-primary: oklch(0.86 calc(0.16 * var(--crt-saturation)) var(--h));
+  --ink-on-primary: oklch(0.12 calc(0.02 * var(--crt-saturation)) var(--h));
+  --ink-primary-hover: oklch(0.92 calc(0.14 * var(--crt-saturation)) var(--h));
+  --ink-focus: oklch(0.9 calc(0.16 * var(--crt-saturation)) var(--h));
+  --ink-selected: oklch(0.8 calc(0.15 * var(--crt-saturation)) var(--h) / 0.1);
+  --ink-mark: oklch(0.88 calc(0.16 * var(--crt-saturation)) var(--h));
+  --ink-fill: oklch(0.8 calc(0.15 * var(--crt-saturation)) var(--h) / 0.12);
   --ink-danger: oklch(0.75 0.17 30);
   --ink-warn: var(--ink-fg);
   --ink-warn-soft: var(--ink-fill);
   --ink-ok: var(--ink-fg);
   --ink-ok-soft: var(--ink-fill);
-  --ink-shadow-card: 0 0 0 1px oklch(0.8 0.15 var(--h) / 0.14);
-  --ink-shadow-pop: 0 0 0 1px oklch(0.8 0.15 var(--h) / 0.25), 0 0 40px oklch(0.8 0.15 var(--h) / 0.12);
+  --ink-shadow-card: 0 0 0 1px oklch(0.8 calc(0.15 * var(--crt-saturation)) var(--h) / 0.14);
+  --ink-shadow-pop:
+    0 0 0 1px oklch(0.8 calc(0.15 * var(--crt-saturation)) var(--h) / 0.25),
+    0 0 40px oklch(0.8 calc(0.15 * var(--crt-saturation)) var(--h) / 0.12);
   color-scheme: dark;
 }
 
@@ -196,8 +199,8 @@
   :root[data-crt] body {
     font-family: var(--font-mono);
     text-shadow:
-      0 0 1px oklch(0.88 0.16 var(--h) / 0.6),
-      0 0 7px oklch(0.88 0.16 var(--h) / 0.35);
+      0 0 1px oklch(0.88 calc(0.16 * var(--crt-saturation, 1)) var(--h) / calc(1.2 * var(--crt-glow, 0.5))),
+      0 0 7px oklch(0.88 calc(0.16 * var(--crt-saturation, 1)) var(--h) / calc(0.7 * var(--crt-glow, 0.5)));
   }
   :focus-visible {
     outline: 2px solid var(--color-focus);
@@ -239,6 +242,7 @@
   inset: 0;
 }
 .crt-scan {
+  opacity: var(--crt-scanlines, 1);
   background: repeating-linear-gradient(to bottom, transparent 0 2px, oklch(0 0 0 / 0.32) 2px 3px);
 }
 .crt-mask {
@@ -251,11 +255,12 @@
   mix-blend-mode: screen;
 }
 .crt-vig {
+  opacity: var(--crt-vignette, 1);
   background: radial-gradient(ellipse 75% 70% at 50% 50%, transparent 60%, oklch(0 0 0 / 0.55) 100%);
   box-shadow: inset 0 0 90px oklch(0 0 0 / 0.65);
 }
 .crt-flicker {
-  background: oklch(0.9 0.1 var(--h) / 0.015);
+  background: oklch(0.9 calc(0.1 * var(--crt-saturation, 1)) var(--h) / calc(0.015 * var(--crt-flicker, 1)));
   animation: crt-flicker 5s steps(1) infinite;
 }
 @keyframes crt-flicker {

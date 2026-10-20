@@ -6,6 +6,7 @@ import {
   type SelectHTMLAttributes,
   type TextareaHTMLAttributes,
   useEffect,
+  useId,
   useRef,
 } from "react"
 import { ChevronDown } from "../icons.tsx"
@@ -261,4 +262,47 @@ export function ErrorText({ children, className }: { children: ReactNode; classN
 export function FieldLabel({ className, ...props }: LabelHTMLAttributes<HTMLLabelElement>) {
   // biome-ignore lint/a11y/noLabelWithoutControl: htmlFor is passed by the caller
   return <label className={cn("block pb-1.5 text-sm text-subtle", className)} {...props} />
+}
+
+/** A slider with its label and current value, such as a strength from 0 to 100%. */
+export function Slider({
+  label,
+  value,
+  min = 0,
+  max = 1,
+  step = 0.01,
+  format = (n) => `${Math.round(n * 100)}%`,
+  onChange,
+  className,
+}: {
+  label: ReactNode
+  value: number
+  min?: number | undefined
+  max?: number | undefined
+  step?: number | undefined
+  format?: ((value: number) => string) | undefined
+  onChange: (value: number) => void
+  className?: string | undefined
+}) {
+  const id = useId()
+  return (
+    <div className={cn("grid grid-cols-[12rem_minmax(0,1fr)_3.5rem] items-center gap-3", className)}>
+      <label htmlFor={id} className="text-muted">
+        {label}
+      </label>
+      <input
+        id={id}
+        type="range"
+        className="h-5 w-full cursor-pointer accent-primary"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(event) => onChange(Number(event.target.value))}
+      />
+      <output htmlFor={id} className="text-right text-sm text-subtle tabular-nums">
+        {format(value)}
+      </output>
+    </div>
+  )
 }

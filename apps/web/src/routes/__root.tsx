@@ -1,9 +1,10 @@
 import { type QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { createRootRouteWithContext, HeadContent, Outlet, Scripts } from "@tanstack/react-router"
 import type { ReactNode } from "react"
+import { CRT_SETTINGS_SCRIPT } from "../lib/crt-settings.ts"
 import appCss from "../styles/app.css?url"
 
-/** Applies the saved theme and CRT mode before first paint, so there's no flash. */
+/** Applies the saved theme, CRT mode and CRT settings before first paint, so there's no flash. */
 const THEME_SCRIPT = `try{var t=localStorage.getItem("parley.theme")||"system";var d=t==="dark"||(t==="system"&&matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.dataset.theme=d?"dark":"light";var c=localStorage.getItem("parley.crt");if(c==="amber")document.documentElement.dataset.crt="amber"}catch(e){}`
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
@@ -35,7 +36,7 @@ function RootDocument({ children }: { readonly children: ReactNode }) {
     <html lang="en" suppressHydrationWarning>
       <head>
         {/* biome-ignore lint/security/noDangerouslySetInnerHtml: a fixed, authored script */}
-        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT + CRT_SETTINGS_SCRIPT }} />
         <HeadContent />
       </head>
       <body>

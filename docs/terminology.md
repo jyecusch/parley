@@ -44,7 +44,9 @@ How to pick a name: choose the most common name for the concept. Reject anything
 | **Agent** | External AI software (Claude, ChatGPT, opencode, …) that calls Parley through the MCP server or the HTTP API. An agent is never a principal: it authenticates with an API key that belongs to a user or a service account. | assistant, AI, bot |
 | **Session** | A user's sign-in to the web app (a Better-Auth session cookie). | login, auth cookie |
 | **API key** | A secret credential used by an agent or script. It belongs to either a user (it acts as that user, is limited by its scopes, and is bound to one team) or a service account. | token, PAT, secret, credential (as a noun for this) |
-| **CRT mode** | The optional amber old-monitor look (D81, D102), drawn by a WebGL shader where the browser can, otherwise by the CSS layer. Its tunable parts are **curvature** and **chromatic aberration**. | retro mode, terminal theme, CRT filter |
+| **CRT mode** | The optional old-monitor look (D81, D102), drawn by a WebGL shader where the browser can, otherwise by the CSS layer. Amber by default. | retro mode, terminal theme, CRT filter |
+| **CRT settings** | How CRT mode looks, kept per browser (D114): the **phosphor** colour (hue and saturation), text glow, **curvature**, **chromatic aberration**, scanlines, bloom, vignette and flicker. | CRT config, CRT options, CRT preferences |
+| **Phosphor** | The colour CRT mode draws in, named after a monitor's phosphor coating: Amber, Green, Cyan, White, or any hue. | tint, accent colour (for this) |
 | **Invitation** | An emailed link to join a team with a role, good for 7 days. | invite (as a noun), join link, team invite |
 | **Access token** | The short-lived OAuth token an agent gets for a connection and sends to `/mcp`. It names the connection and nothing else. In UI copy, say "the agent's sign-in". | token (alone), bearer, JWT (outside code about its format) |
 | **Connection** | An agent someone authorized over OAuth (MCP sign-in), bound to one team, acting as that person or as a service account, limited to its scopes. Listed and revoked in Settings. | grant, authorization, integration, connected app, OAuth app |
@@ -133,6 +135,7 @@ How to pick a name: choose the most common name for the concept. Reject anything
 | 2026-10-20 | Added **connection** (D95). |
 | 2026-10-20 | Added **CRT mode** (D102). |
 | 2026-10-20 | Added **invitation**. |
+| 2026-10-20 | Added **CRT settings** and **phosphor** (D114). |
 | 2026-10-20 | Added **domain**, **free email domain** and **domain matching** (D105, D106). |
 | 2026-10-20 | Added the v2 email terms: campaign, draft, template, merge tag, test send, recipient, topic, subscription status, unsubscribe, unsubscribe link, footer, sender and sending domain. Claude's picks, open to veto (see `docs/review.md`). Later: **preview text**. |
 | 2026-10-20 | Added **access token**, and removed it from API key's banned synonyms (P5, D97). |

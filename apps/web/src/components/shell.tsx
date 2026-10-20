@@ -17,6 +17,7 @@ import { companiesCollection, primaryDomainOf } from "../lib/companies.ts"
 import { contactsCollection } from "../lib/contacts.ts"
 import { useSavedViews } from "../lib/index-view.ts"
 import { useCrt } from "./crt.tsx"
+import { CrtSettingsDialog } from "./crt-settings.tsx"
 import {
   ChevronDown,
   CloseIcon,
@@ -31,6 +32,7 @@ import {
   SidebarIcon,
   SwitchIcon,
   TemplateIcon,
+  TuneIcon,
 } from "./icons.tsx"
 import { ContactAvatar } from "./images.tsx"
 import {
@@ -107,6 +109,7 @@ export function AppShell(props: {
   const [commandOpen, setCommandOpen] = useState(false)
   const [teamMenu, setTeamMenu] = useState(false)
   const [accountMenu, setAccountMenu] = useState(false)
+  const [crtSettingsOpen, setCrtSettingsOpen] = useState(false)
   const crt = useCrt()
   const closeTeamMenu = useCallback(() => setTeamMenu(false), [])
   const closeAccountMenu = useCallback(() => setAccountMenu(false), [])
@@ -341,6 +344,10 @@ export function AppShell(props: {
               {accountMenu ? (
                 <AccountMenu
                   onClose={closeAccountMenu}
+                  onCrtSettings={() => {
+                    closeAccountMenu()
+                    setCrtSettingsOpen(true)
+                  }}
                   onSignOut={async () => {
                     await signOut()
                     await navigate({ to: "/sign-in" })
@@ -373,6 +380,7 @@ export function AppShell(props: {
         </div>
 
         {commandOpen ? <CommandMenu onClose={() => setCommandOpen(false)} /> : null}
+        {crtSettingsOpen ? <CrtSettingsDialog crtOn={crtEnabled()} onClose={() => setCrtSettingsOpen(false)} /> : null}
       </div>
       {crt.overlay}
     </ShellContext.Provider>
@@ -391,7 +399,11 @@ function TeamLogo(props: { readonly name: string }) {
   )
 }
 
-function AccountMenu(props: { readonly onClose: () => void; readonly onSignOut: () => void }) {
+function AccountMenu(props: {
+  readonly onClose: () => void
+  readonly onSignOut: () => void
+  readonly onCrtSettings: () => void
+}) {
   const [theme, setTheme] = useState<ThemeChoice>(themeChoice)
   const [crt, setCrtState] = useState(crtEnabled)
   const choose = (choice: ThemeChoice) => {
@@ -407,15 +419,21 @@ function AccountMenu(props: { readonly onClose: () => void; readonly onSignOut: 
           {theme === choice ? <span className="ml-auto text-subtle">✓</span> : null}
         </MenuItem>
       ))}
-      <MenuItem
-        onClick={() => {
-          setCrt(!crt)
-          setCrtState(!crt)
-        }}
-      >
-        CRT mode
-        <span className="ml-auto text-subtle">{crt ? "On" : "Off"}</span>
-      </MenuItem>
+      <div className="flex items-center gap-px">
+        <MenuItem
+          className="flex-1"
+          onClick={() => {
+            setCrt(!crt)
+            setCrtState(!crt)
+          }}
+        >
+          CRT mode
+          <span className="ml-auto text-subtle">{crt ? "On" : "Off"}</span>
+        </MenuItem>
+        <IconButton label="CRT settings" tip="CRT settings" size="md" onClick={props.onCrtSettings}>
+          <TuneIcon />
+        </IconButton>
+      </div>
       <MenuSeparator />
       <MenuItem
         onClick={() => {

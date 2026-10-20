@@ -1,4 +1,5 @@
 import { type ReactNode, type RefCallback, useCallback, useEffect, useRef, useState } from "react"
+import { crtSettings } from "../lib/crt-settings.ts"
 
 /**
  * CRT mode (D81). Where the browser can draw HTML into a canvas (HTML-in-Canvas) and has WebGL 2, the app is
@@ -91,25 +92,32 @@ const shaderSupported = () =>
   typeof WebGL2RenderingContext !== "undefined" &&
   "texElementImage2D" in WebGL2RenderingContext.prototype
 
-/**
- * The glass, tunable per browser in localStorage (D102): `parley.crt.curvature` (0 flat to 1 very round,
- * default 0.5) and `parley.crt.aberration` (colour fringing at the edges in CSS pixels, 0 to 4, default 1).
- * Read on every draw, so a change shows on the next repaint.
- */
-const readSetting = (key: string, fallback: number, max: number) => {
-  try {
-    const raw = localStorage.getItem(key)
-    const value = raw === null ? Number.NaN : Number(raw)
-    return Number.isFinite(value) ? Math.min(Math.max(value, 0), max) : fallback
-  } catch {
-    return fallback
-  }
+/** The barrel factor for a curvature setting: 0.5 bows the screen edges in by about 1.5% of the width. */
+const barrelFactor = (curvature: number) => curvature * 0.24
+
+/** A theme colour as the browser computes it, with the CRT variables and any calc() worked out. */
+const computedColor = (token: string) => {
+  const probe = document.createElement("span")
+  probe.style.color = `var(${token})`
+  probe.hidden = true
+  document.documentElement.append(probe)
+  const color = getComputedStyle(probe).color
+  probe.remove()
+  return color
 }
-const glassSettings = () => ({
-  /** The barrel factor: 0.5 bows the screen edges in by about 1.5% of the width. */
-  curvature: readSetting("parley.crt.curvature", 0.5, 1) * 0.24,
-  aberration: readSetting("parley.crt.aberration", 1, 4),
-})
+
+/**
+ * A theme colour as 0–1 RGB for the shader, so it matches the UI exactly.
+ */
+const resolveColor = (token: string): readonly [number, number, number] => {
+  const color = computedColor(token)
+  const context = document.createElement("canvas").getContext("2d", { willReadFrequently: true })
+  if (!context) return [1, 0.76, 0.36]
+  context.fillStyle = color
+  context.fillRect(0, 0, 1, 1)
+  const [r = 255, g = 194, b = 92] = context.getImageData(0, 0, 1, 1).data
+  return [r / 255, g / 255, b / 255]
+}
 
 /** Where the shader samples the app for a point on the glass: the same barrel mapping as the fragment shader. */
 const barrel = (x: number, y: number, width: number, height: number, curvature: number) => {
@@ -137,9 +145,8 @@ const cursorShapeAt = (target: EventTarget | null): CursorShape => {
 
 /** Draws a cursor shape, tip at the top-left, in the theme's colours. */
 const paintCursor = (context: CanvasRenderingContext2D, shape: CursorShape, scale: number) => {
-  const styles = getComputedStyle(document.documentElement)
-  const fill = styles.getPropertyValue("--fg").trim() || "#ffb000"
-  const outline = styles.getPropertyValue("--bg-app").trim() || "#000"
+  const fill = computedColor("--ink-fg")
+  const outline = computedColor("--ink-canvas")
   context.setTransform(1, 0, 0, 1, 0, 0)
   context.clearRect(0, 0, context.canvas.width, context.canvas.height)
   context.setTransform(scale, 0, 0, scale, 0, 0)
@@ -201,6 +208,10 @@ function mountShader(screen: HTMLElement, options: { readonly still: boolean; re
   const uFlicker = uniform("u_flicker")
   const uCurvature = uniform("u_curvature")
   const uAberration = uniform("u_aberration")
+  const uPhosphor = uniform("u_phosphor")
+  const uScanlines = uniform("u_scanlines")
+  const uBloom = uniform("u_bloom")
+  const uVignette = uniform("u_vignette")
   const uCursorAt = uniform("u_cursor_at")
   const uCursorSize = uniform("u_cursor_size")
   const uCursorOn = uniform("u_cursor_on")
@@ -228,6 +239,8 @@ function mountShader(screen: HTMLElement, options: { readonly still: boolean; re
   /** The cursor in app coordinates (where the shader samples the app under the pointer), or null when hidden. */
   let cursor: { x: number; y: number; shape: CursorShape } | null = null
   let cursorShape: CursorShape | null = null
+  /** The phosphor colour, and the hue and saturation it was resolved for (the cursor is painted in it too). */
+  let phosphor: { key: string; rgb: readonly [number, number, number] } | null = null
   const uploadCursor = (shape: CursorShape) => {
     if (!cursorContext || shape === cursorShape) return
     cursorShape = shape
@@ -253,10 +266,22 @@ function mountShader(screen: HTMLElement, options: { readonly still: boolean; re
       screen.offsetWidth / Math.max(canvas.clientWidth, 1),
       screen.offsetHeight / Math.max(canvas.clientHeight, 1),
     )
-    gl.uniform1f(uFlicker, options.still ? 1 : flickerAt(performance.now()))
-    const glass = glassSettings()
-    gl.uniform1f(uCurvature, glass.curvature)
-    gl.uniform1f(uAberration, glass.aberration)
+    const settings = crtSettings()
+    const key = `${settings.hue} ${settings.saturation}`
+    if (phosphor?.key !== key) {
+      phosphor = { key, rgb: resolveColor("--ink-fg") }
+      // Repaint the cursor in the new colour.
+      const shape = cursorShape
+      cursorShape = null
+      if (shape) uploadCursor(shape)
+    }
+    gl.uniform3f(uPhosphor, ...phosphor.rgb)
+    gl.uniform1f(uFlicker, options.still || !settings.flicker ? 0 : flickerAt(performance.now()))
+    gl.uniform1f(uCurvature, barrelFactor(settings.curvature))
+    gl.uniform1f(uAberration, settings.aberration)
+    gl.uniform1f(uScanlines, settings.scanlines)
+    gl.uniform1f(uBloom, settings.bloom)
+    gl.uniform1f(uVignette, settings.vignette)
     gl.uniform1f(uCursorOn, cursor ? 1 : 0)
     if (cursor) {
       const [hotX, hotY] = HOT_SPOT[cursor.shape]
@@ -284,7 +309,7 @@ function mountShader(screen: HTMLElement, options: { readonly still: boolean; re
     const box = canvas.getBoundingClientRect()
     const x = event.clientX - box.left
     const y = event.clientY - box.top
-    const seen = barrel(x, y, box.width, box.height, glassSettings().curvature)
+    const seen = barrel(x, y, box.width, box.height, barrelFactor(crtSettings().curvature))
     if (event.pointerType === "mouse") {
       root.classList.add("crt-cursor")
       const shape = cursorShapeAt(event.target)
@@ -411,7 +436,7 @@ void main() {
 }`
 
 /*
- * The CRT shader, amber phosphor. Mask, scanlines, flicker, vignette and edge light mirror the CSS layer in
+ * The CRT shader, in the phosphor colour of the CRT settings. Mask, scanlines, flicker, vignette and edge light mirror the CSS layer in
  * app.css. The shader adds what CSS can't: the convex glass (barrel curvature, a curved bezel and a soft
  * reflection), chromatic aberration towards the edges, and bloom. There is no rolling band (D81).
  */
@@ -423,6 +448,10 @@ uniform vec2 u_extent;  // app size over canvas size; above 1 when the app overf
 uniform float u_flicker;
 uniform float u_curvature;   // barrel factor; 0 is flat
 uniform float u_aberration;  // colour fringing at the edges, in CSS pixels
+uniform vec3 u_phosphor;     // the phosphor colour (the theme's foreground)
+uniform float u_scanlines;   // how dark the gaps between scanlines are
+uniform float u_bloom;
+uniform float u_vignette;
 uniform sampler2D u_cursor;
 uniform vec2 u_cursor_at;    // the cursor picture's top-left, in app CSS pixels
 uniform float u_cursor_size; // the cursor picture's size, in CSS pixels
@@ -431,9 +460,6 @@ in vec2 v_uv;
 out vec4 frag;
 
 const float RADIUS = 22.0;
-const vec3 GLASS = vec3(0.012, 0.009, 0.006);
-const vec3 AMBER = vec3(1.0, 0.76, 0.36);
-const vec3 WASH = vec3(0.98, 0.86, 0.64);
 
 vec3 screenBlend(vec3 base, vec3 light) {
   return 1.0 - (1.0 - base) * (1.0 - light);
@@ -455,6 +481,9 @@ float luma(vec3 color) {
 }
 
 void main() {
+  // The dark glass of the bezel, and the light washing over the screen, both tinted by the phosphor.
+  vec3 GLASS = u_phosphor * 0.012;
+  vec3 WASH = mix(u_phosphor, vec3(1.0), 0.45);
   vec2 centered = v_uv - 0.5;
   // Barrel: the glass bulges, so the picture bows in and the bezel shows at the edges.
   vec2 uv = 0.5 + centered * (1.0 + u_curvature * dot(centered, centered));
@@ -483,7 +512,7 @@ void main() {
 
   // Bloom: phosphor light spilling from the brightest strokes.
   vec3 glow = textureLod(u_screen, texel, 2.5).rgb * 0.6 + textureLod(u_screen, texel, 4.5).rgb * 0.4;
-  color = screenBlend(color, glow * 0.22);
+  color = screenBlend(color, glow * u_bloom);
 
   // Aperture mask: a 3px red, green, blue triad.
   float column = mod(floor(px.x), 3.0);
@@ -495,24 +524,24 @@ void main() {
   // Scanlines: every third pixel row darkens; bright phosphor bleeds into the gap.
   float row = fract(px.y / 3.0);
   float gap = smoothstep(0.6, 0.7, row) * (1.0 - smoothstep(0.96, 1.0, row));
-  color *= 1.0 - 0.32 * gap * (1.0 - 0.35 * luma(color));
+  color *= 1.0 - u_scanlines * gap * (1.0 - 0.35 * luma(color));
 
-  // Flicker: a faint amber wash that dips twice every five seconds.
+  // Flicker: a faint phosphor wash that dips twice every five seconds (0 when flicker is off).
   color = mix(color, WASH, 0.015 * u_flicker);
 
   // Vignette: the elliptical falloff plus the soft inner shadow of the CSS layer.
   float ellipse = length(centered / vec2(0.75, 0.7));
-  color *= 1.0 - 0.55 * clamp((ellipse - 0.6) / 0.4, 0.0, 1.0);
+  color *= 1.0 - u_vignette * clamp((ellipse - 0.6) / 0.4, 0.0, 1.0);
   vec2 inset = min(px, u_size - px);
-  vec2 shadow = 0.65 * (0.5 - 0.5 * tanh(0.8 * inset / 45.0));
+  vec2 shadow = u_vignette * 1.18 * (0.5 - 0.5 * tanh(0.8 * inset / 45.0));
   color *= (1.0 - shadow.x) * (1.0 - shadow.y);
 
   // Reflection: the convex glass catches a soft light from the upper left.
   vec2 light = (v_uv - vec2(0.3, 0.22)) / vec2(0.55, 0.4);
   color = screenBlend(color, WASH * 0.035 * (1.0 - smoothstep(0.0, 1.0, length(light))) * (0.5 + 2.0 * u_curvature));
 
-  // Edge light: a 1px amber line along the glass.
-  color = mix(color, AMBER, 0.08 * smoothstep(-2.0, -1.0, edge));
+  // Edge light: a 1px phosphor line along the glass.
+  color = mix(color, u_phosphor, 0.08 * smoothstep(-2.0, -1.0, edge));
   color = mix(color, GLASS, smoothstep(0.0, 1.0, edge));
 
   frag = vec4(color, 1.0);
