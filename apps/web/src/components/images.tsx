@@ -39,7 +39,15 @@ function RecordImage(props: {
       shape={props.shape}
       image={
         showImage ? (
-          <img src={props.src ?? undefined} alt="" loading="lazy" onError={() => setFailed(props.src)} />
+          // Requested with CORS so CRT mode can draw it: the shader only draws images from other
+          // sites (Gravatar) that allow it. Gravatar does; uploaded files are Parley's own.
+          <img
+            src={props.src ?? undefined}
+            alt=""
+            loading="lazy"
+            crossOrigin="anonymous"
+            onError={() => setFailed(props.src)}
+          />
         ) : undefined
       }
     >
