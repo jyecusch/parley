@@ -219,6 +219,10 @@ const contactCondition = (condition: FilterCondition, info: FilterFieldInfo): SQ
       return textSetCondition(sql`"contact_emails" e where e.contact_id = "contacts"."id"`, sql`e.address`, condition)
     case "phone":
       return textSetCondition(sql`"contact_phones" p where p.contact_id = "contacts"."id"`, sql`p.number`, condition)
+    case "city":
+      return textCondition(sql`"contacts"."city"`, condition)
+    case "country":
+      return textCondition(sql`"contacts"."country"`, condition)
     case "company": {
       const live = (extra: SQL) =>
         sql`exists (select 1 from "affiliations" a join "companies" co on co.id = a.company_id
@@ -318,6 +322,8 @@ export const sortSql = (recordType: RecordType, sort: Sort, fields: ReadonlyArra
   } else if (sort.field === "owner") {
     // By the owner's name; records without one sort last.
     expr = sql`lower((select u.name from "user" u where u.id = ${table}."owner_id"))`
+  } else if (sort.field === "city" || sort.field === "country") {
+    expr = sql`lower(${table}.${sql.identifier(sort.field)})`
   } else if (sort.field === "createdAt") {
     expr = sql`${table}."created_at"`
   } else if (sort.field === "name") {

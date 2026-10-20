@@ -2,7 +2,7 @@ import { Schema } from "effect"
 import { SegmentNotFound } from "../errors/campaigns.ts"
 import { FieldProblem } from "../errors/input.ts"
 import { Filter } from "../filter.ts"
-import { SegmentId, TeamId } from "../ids.ts"
+import { SegmentId, TeamId, UserId } from "../ids.ts"
 import { defineTeamOperation } from "../operation.ts"
 
 const InTeam = { teamId: TeamId.annotate({ description: "The team, from teams.list." }) }
@@ -18,6 +18,8 @@ export const ImportResult = Schema.Struct({
   updated: Schema.Number,
   /** Rows that weren't imported, by their line in the file (the header is line 1), and why. */
   failed: Schema.Array(Schema.Struct({ line: Schema.Number, problems: Schema.Array(FieldProblem) })),
+  /** Rows imported without a value that couldn't be used, such as an unknown owner (D126). */
+  warnings: Schema.Array(Schema.Struct({ line: Schema.Number, problems: Schema.Array(FieldProblem) })),
 })
 export type ImportResult = typeof ImportResult.Type
 
@@ -41,7 +43,7 @@ const importInput = Schema.Struct({
     Schema.Record(Schema.String, Schema.String).annotate({
       title: "Column mapping",
       description:
-        'Which field each column (by header) fills, like {"Work email":"email","Plan":"custom:<field id>"}. Columns left out are skipped. Without a mapping, Parley guesses from the headers.',
+        'Which field each column (by header) fills, like {"Work email":"email","Plan":"custom:<field id>"}, or "topic:<topic id>" for a column that\'s true when the contact left that topic (D127). Columns left out are skipped. Without a mapping, Parley guesses from the headers.',
     }),
   ),
   set: Schema.optional(
@@ -49,6 +51,13 @@ const importInput = Schema.Struct({
       title: "Set on every row",
       description:
         'Values for every imported row, keyed like mapping targets and written as a cell would be, like {"custom:<field id>":"Suga Cloud"}. A row\'s own value wins, except for multi-select fields, where both are kept.',
+    }),
+  ),
+  owners: Schema.optional(
+    Schema.Record(Schema.String, Schema.NullOr(UserId)).annotate({
+      title: "Record owners",
+      description:
+        'Who an owner cell means, by its text, like {"Matt Stoll (Deactivated User)":"<userId>"}, or null for no one. Cells not listed match a member by email or unique name; otherwise the row is imported without an owner, with a warning (D126, D127).',
     }),
   ),
   multiSelect: Schema.optional(

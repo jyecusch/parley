@@ -8,10 +8,14 @@ import {
   parseCsv,
   type RecordType,
   type Sort,
+  type TeamId,
+  type UserId,
 } from "@parley/domain"
-import type { UserText } from "@parley/errors"
-import { useEffect, useRef, useState } from "react"
-import { messageOf } from "../lib/client.ts"
+import { type UserText, userText } from "@parley/errors"
+import { useQuery } from "@tanstack/react-query"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { call, messageOf } from "../lib/client.ts"
+import { type Person, personLabel, usePeople } from "../lib/people.ts"
 import { CustomFieldsSection } from "./custom-fields.tsx"
 import { CloseIcon, DisplayIcon, DownloadIcon } from "./icons.tsx"
 import { Dialog } from "./settings.tsx"
@@ -29,8 +33,10 @@ import {
   MenuHeading,
   MenuItem,
   MenuSeparator,
+  Notice,
   Option,
   Select,
+  TextButton,
 } from "./ui/index.ts"
 
 const useDismiss = (open: boolean, close: () => void) => {
@@ -321,15 +327,96 @@ export function SaveViewDialog(props: {
 }
 
 /** Picks a CSV, shows how its columns map to fields, imports, and reports what happened (D62). */
+/** Rows per import request: well under the server's limit, and quick enough never to time out. */
+const IMPORT_PART_ROWS = 1_000
+
+/**
+ * Rows as CSV text, quoting only where needed. Unlike export's toCsv it doesn't guard cells that
+ * look like formulas, which would change values such as "+61 400 812 337" on their way back in.
+ */
+const plainCsv = (rows: ReadonlyArray<ReadonlyArray<string>>) =>
+  rows
+    .map((row) => row.map((cell) => (/[",\r\n]/.test(cell) ? `"${cell.replaceAll('"', '""')}"` : cell)).join(","))
+    .join("\r\n")
+
+/** HubSpot's per-type opt-out columns, "Opted out of email: Product updates" (D127). */
+const OPT_OUT = /^opted out of email:\s*(.+)$/i
+
+/** A cell that says yes, as consent columns write it. */
+const isTrue = (cell: string) => ["true", "yes", "y", "1"].includes(cell.trim().toLowerCase())
+/** A bounce column: a yes, or any reason that isn't a no (D125). */
+const isBounce = (cell: string) => {
+  const value = cell.trim().toLowerCase()
+  return value !== "" && !["false", "no", "n", "0"].includes(value)
+}
+
+/** The indexes of the columns mapped to a field. */
+const columnsMappedTo = (headers: ReadonlyArray<string>, mapping: Record<string, string>, field: string) =>
+  headers.map((header, index) => (mapping[header] === field ? index : -1)).filter((index) => index >= 0)
+
+/**
+ * Owner cells that don't match a person the way the server matches them (D123): an email, or a
+ * name only one person has. Most common first, with how many rows each is on.
+ */
+const unknownOwnersIn = (
+  table: ReadonlyArray<ReadonlyArray<string>>,
+  mapping: Record<string, string>,
+  people: ReadonlyArray<Person>,
+): ReadonlyArray<readonly [string, number]> => {
+  const [headers = [], ...body] = table
+  const columns = columnsMappedTo(headers, mapping, "owner")
+  if (columns.length === 0) return []
+  const counts = new Map<string, number>()
+  for (const row of body) {
+    for (const column of columns) {
+      const cell = row[column]?.trim() ?? ""
+      if (cell) counts.set(cell, (counts.get(cell) ?? 0) + 1)
+    }
+  }
+  const known = (cell: string) => {
+    const value = cell.toLowerCase()
+    if (people.some((person) => person.email?.toLowerCase() === value)) return true
+    return people.filter((person) => person.name.toLowerCase() === value).length === 1
+  }
+  return [...counts.entries()].filter(([cell]) => !known(cell)).sort((a, b) => b[1] - a[1])
+}
+
+/** How many rows the consent columns unsubscribe or mark bounced (D125); undefined with none mapped. */
+const consentIn = (table: ReadonlyArray<ReadonlyArray<string>>, mapping: Record<string, string>) => {
+  const [headers = [], ...body] = table
+  const statusColumns = columnsMappedTo(headers, mapping, "subscriptionStatus")
+  const unsubscribeColumns = columnsMappedTo(headers, mapping, "unsubscribed")
+  const bounceColumns = columnsMappedTo(headers, mapping, "bounced")
+  if (statusColumns.length + unsubscribeColumns.length + bounceColumns.length === 0) return undefined
+  const says = (row: ReadonlyArray<string>, column: number, values: ReadonlyArray<string>) =>
+    values.includes((row[column] ?? "").trim().toLowerCase())
+  let unsubscribed = 0
+  let bounced = 0
+  for (const row of body) {
+    if (bounceColumns.some((column) => isBounce(row[column] ?? ""))) bounced++
+    else if (
+      unsubscribeColumns.some((column) => isTrue(row[column] ?? "")) ||
+      statusColumns.some((column) => says(row, column, ["unsubscribed", "no", "n", "false", "0"]))
+    )
+      unsubscribed++
+  }
+  return { unsubscribed, bounced }
+}
+
+type ImportOptions = {
+  readonly set: Record<string, string>
+  readonly multiSelect: "add" | "replace"
+  readonly owners: Record<string, UserId | null>
+}
+
 export function ImportDialog(props: {
+  readonly teamId: TeamId
   readonly recordType: RecordType
   readonly plural: string
   readonly customFields: ReadonlyArray<CustomField>
-  readonly onImport: (
-    csv: string,
-    mapping: Record<string, string>,
-    options: { readonly set: Record<string, string>; readonly multiSelect: "add" | "replace" },
-  ) => Promise<ImportResult>
+  /** Whether the person may create topics (email:manage), for opt-out columns (D127). */
+  readonly canCreateTopics: boolean
+  readonly onImport: (csv: string, mapping: Record<string, string>, options: ImportOptions) => Promise<ImportResult>
   readonly onClose: () => void
 }) {
   const [csv, setCsv] = useState<string>()
@@ -337,6 +424,11 @@ export function ImportDialog(props: {
   /** Values for every row, by custom field: what a cell would say (option labels, joined by "; "). */
   const [set, setSet] = useState<Record<string, string>>({})
   const [replaceMulti, setReplaceMulti] = useState(false)
+  /** Who each unrecognised owner cell means (D127): a person, or no one. */
+  const [owners, setOwners] = useState<Record<string, UserId | null>>({})
+  /** Opt-out columns whose topic doesn't exist yet, by header, and whether to create it. */
+  const [newTopics, setNewTopics] = useState<Record<string, { readonly name: string; readonly create: boolean }>>({})
+  const [showSkipped, setShowSkipped] = useState(false)
   const multiFields = props.customFields.filter((field) => field.type === "multi-select")
   const touchesMulti = multiFields.some(
     (field) => Object.values(mapping).includes(`custom:${field.id}`) || set[`custom:${field.id}`],
@@ -344,38 +436,167 @@ export function ImportDialog(props: {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<UserText>()
   const [result, setResult] = useState<ImportResult>()
-  const headers = csv ? (parseCsv(csv)[0] ?? []) : []
-  const rows = csv ? Math.max(0, parseCsv(csv).length - 1) : 0
+  /** How many rows have been sent so far, while a large file goes in parts. */
+  const [progress, setProgress] = useState<number>()
+  const people = usePeople(props.teamId).data ?? []
+  const topics = useQuery({
+    queryKey: ["topics", props.teamId],
+    enabled: props.recordType === "contact",
+    queryFn: () => call("topics.list", { teamId: props.teamId }),
+  })
+  const table = useMemo(() => (csv ? parseCsv(csv) : []), [csv])
+  const headers = table[0] ?? []
+  const body = table.slice(1)
+  const rows = body.length
   const targets = [
     ...IMPORT_FIELDS[props.recordType].map((entry) => ({ field: entry.field as string, label: entry.label as string })),
     ...props.customFields.map((field) => ({ field: `custom:${field.id}`, label: field.name })),
+    ...(topics.data ?? []).map((topic) => ({ field: `topic:${topic.id}`, label: `Left topic: ${topic.name}` })),
   ]
 
   const read = async (file: File | undefined) => {
     if (!file) return
-    const text = await file.text()
+    load(await file.text())
+  }
+
+  /** Takes a file's text: guesses its columns, and finds opt-out columns for existing or new topics. */
+  const load = (text: string) => {
+    const [fileHeaders = []] = parseCsv(text)
+    const guessed = guessMapping(fileHeaders, props.recordType, props.customFields)
+    const pending: Record<string, { name: string; create: boolean }> = {}
+    if (props.recordType === "contact") {
+      for (const header of fileHeaders) {
+        const name = OPT_OUT.exec(header.trim())?.[1]?.trim()
+        if (!name || guessed[header]) continue
+        const topic = topics.data?.find((entry) => entry.name.toLowerCase() === name.toLowerCase())
+        if (topic) guessed[header] = `topic:${topic.id}`
+        else pending[header] = { name, create: props.canCreateTopics }
+      }
+    }
     setCsv(text)
     setResult(undefined)
-    setMapping(guessMapping(parseCsv(text)[0] ?? [], props.recordType, props.customFields))
+    setOwners({})
+    setNewTopics(pending)
+    setMapping(guessed)
   }
+
+  // Topics that load after the file was read: opt-out columns for them map to them, not to new ones.
+  useEffect(() => {
+    const known = topics.data ?? []
+    const matched = Object.entries(newTopics).flatMap(([header, pending]) => {
+      const topic = known.find((entry) => entry.name.toLowerCase() === pending.name.toLowerCase())
+      return topic ? [[header, topic.id] as const] : []
+    })
+    if (matched.length === 0) return
+    setMapping((current) => ({
+      ...current,
+      ...Object.fromEntries(matched.map(([header, id]) => [header, `topic:${id}`])),
+    }))
+    setNewTopics((current) => {
+      const next = { ...current }
+      for (const [header] of matched) delete next[header]
+      return next
+    })
+  }, [topics.data, newTopics])
+
+  const unknownOwners = unknownOwnersIn(table, mapping, people)
+  const consent = props.recordType === "contact" ? consentIn(table, mapping) : undefined
 
   const run = async () => {
     if (!csv) return
     setBusy(true)
     setError(undefined)
+    // Topics for opt-out columns are made first, so the columns can name them (D127).
+    const finalMapping = { ...mapping }
     try {
-      const filled = Object.fromEntries(Object.entries(set).filter(([, value]) => value.trim() !== ""))
-      setResult(await props.onImport(csv, mapping, { set: filled, multiSelect: replaceMulti ? "replace" : "add" }))
+      for (const [header, pending] of Object.entries(newTopics)) {
+        if (!pending.create || !props.canCreateTopics) continue
+        const existing = (await call("topics.list", { teamId: props.teamId })).find(
+          (topic) => topic.name.toLowerCase() === pending.name.toLowerCase(),
+        )
+        const topic = existing ?? (await call("topics.create", { teamId: props.teamId, name: pending.name as never }))
+        finalMapping[header] = `topic:${topic.id}`
+      }
     } catch (failure) {
       setError(messageOf(failure))
+      setBusy(false)
+      return
     }
+    const filled = Object.fromEntries(Object.entries(set).filter(([, value]) => value.trim() !== ""))
+    const options: ImportOptions = {
+      set: filled,
+      multiSelect: replaceMulti ? "replace" : "add",
+      owners: Object.fromEntries(unknownOwners.map(([cell]) => [cell, owners[cell] ?? null])),
+    }
+    // A large file goes in parts, each a request of its own, so no request runs long enough to
+    // time out. Rows match existing records, so a part sent again only updates what it created.
+    const [header = []] = table
+    const total: {
+      created: number
+      updated: number
+      failed: Array<ImportResult["failed"][number]>
+      warnings: Array<ImportResult["warnings"][number]>
+    } = { created: 0, updated: 0, failed: [], warnings: [] }
+    let sent = 0
+    try {
+      while (sent < body.length) {
+        setProgress(sent)
+        const part = body.slice(sent, sent + IMPORT_PART_ROWS)
+        const partResult = await props.onImport(plainCsv([header, ...part]), finalMapping, options)
+        total.created += partResult.created
+        total.updated += partResult.updated
+        // Line numbers count from the part's own header; shift them back to the file's.
+        total.failed.push(...partResult.failed.map((failure) => ({ ...failure, line: failure.line + sent })))
+        total.warnings.push(...partResult.warnings.map((warning) => ({ ...warning, line: warning.line + sent })))
+        sent += part.length
+      }
+      setResult(total)
+    } catch (failure) {
+      if (sent > 0) setResult(total)
+      setError(
+        sent > 0
+          ? userText`Stopped after ${sent} of ${body.length} rows: ${messageOf(failure)} Import the file again to finish; rows already imported are only updated.`
+          : messageOf(failure),
+      )
+    }
+    setProgress(undefined)
     setBusy(false)
   }
+
+  const mappedHeaders = headers.filter((header) => mapping[header])
+  const skippedHeaders = headers.filter((header) => !mapping[header])
+  const columnRow = (header: string) => (
+    <div key={header} className="grid grid-cols-2 items-center gap-2.5">
+      <span className="truncate text-sm" title={header}>
+        {header}
+      </span>
+      <Select
+        className="h-9"
+        aria-label={`Field for ${header}`}
+        value={mapping[header] ?? ""}
+        onChange={(event) => {
+          const next = { ...mapping }
+          if (event.target.value) next[header] = event.target.value
+          else delete next[header]
+          setMapping(next)
+        }}
+      >
+        <option value="">Skip</option>
+        {targets.map((target) => (
+          <option key={target.field} value={target.field}>
+            {target.label}
+          </option>
+        ))}
+      </Select>
+    </div>
+  )
+  const pendingTopics = Object.entries(newTopics)
 
   return (
     <Dialog
       title={`Import ${props.plural}`}
       onClose={props.onClose}
+      className="w-[min(46rem,calc(100%-2rem))]"
       footer={
         result ? (
           <Button variant="primary" onClick={props.onClose}>
@@ -391,30 +612,26 @@ export function ImportDialog(props: {
               disabled={busy || !csv || Object.keys(mapping).length === 0}
               onClick={() => void run()}
             >
-              {busy ? "Importing…" : `Import ${rows} ${rows === 1 ? "row" : "rows"}`}
+              {busy
+                ? rows > IMPORT_PART_ROWS && progress !== undefined
+                  ? `Importing… ${progress.toLocaleString()} of ${rows.toLocaleString()}`
+                  : "Importing…"
+                : `Import ${rows.toLocaleString()} ${rows === 1 ? "row" : "rows"}`}
             </Button>
           </>
         )
       }
     >
       {result ? (
-        <div className="flex flex-col gap-1.5">
+        <div className="flex flex-col gap-3">
           <p className="m-0">
             {result.created} created, {result.updated} updated
-            {result.failed.length > 0 ? `, ${result.failed.length} not imported` : ""}.
+            {result.failed.length > 0 ? `, ${result.failed.length} not imported` : ""}
+            {result.warnings.length > 0 ? `, ${result.warnings.length} imported with warnings` : ""}.
           </p>
-          {result.failed.length > 0 ? (
-            <Box className="max-h-64 overflow-auto px-3 py-1.5">
-              {result.failed.map((failure) => (
-                <p key={failure.line} className="my-1 text-sm">
-                  <b className="font-medium">Line {failure.line}:</b>{" "}
-                  <span className="text-subtle">
-                    {failure.problems.map((problem) => problem.userMessage).join(" ")}
-                  </span>
-                </p>
-              ))}
-            </Box>
-          ) : null}
+          <LineProblems title="Not imported" lines={result.failed} />
+          <LineProblems title="Imported with warnings" lines={result.warnings} />
+          {error ? <ErrorText>{error}</ErrorText> : null}
         </div>
       ) : (
         <>
@@ -426,7 +643,7 @@ export function ImportDialog(props: {
                 {props.recordType === "contact"
                   ? "Rows with an email that's already in Parley update that contact. A Company column links each contact to its company."
                   : "Rows with a domain or name that's already in Parley update that company."}{" "}
-                Up to 5,000 rows.
+                Large files are imported in parts of {IMPORT_PART_ROWS.toLocaleString()} rows.
               </>
             }
           >
@@ -439,29 +656,18 @@ export function ImportDialog(props: {
           </Field>
           {headers.length > 0 ? (
             <Fieldset legend="Columns">
-              {headers.map((header) => (
-                <div key={header} className="grid grid-cols-2 items-center gap-2.5">
-                  <span className="truncate text-sm">{header}</span>
-                  <Select
-                    className="h-9"
-                    aria-label={`Field for ${header}`}
-                    value={mapping[header] ?? ""}
-                    onChange={(event) => {
-                      const next = { ...mapping }
-                      if (event.target.value) next[header] = event.target.value
-                      else delete next[header]
-                      setMapping(next)
-                    }}
-                  >
-                    <option value="">Skip</option>
-                    {targets.map((target) => (
-                      <option key={target.field} value={target.field}>
-                        {target.label}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-              ))}
+              {mappedHeaders.length === 0 ? (
+                <Hint>No columns are imported yet. Choose a field for each one you want.</Hint>
+              ) : null}
+              {mappedHeaders.map(columnRow)}
+              {skippedHeaders.length > 0 ? (
+                <TextButton className="mt-1 text-sm" onClick={() => setShowSkipped((open) => !open)}>
+                  {showSkipped
+                    ? "Hide skipped columns"
+                    : `${skippedHeaders.length} ${skippedHeaders.length === 1 ? "column" : "columns"} skipped. Show them`}
+                </TextButton>
+              ) : null}
+              {showSkipped ? skippedHeaders.map(columnRow) : null}
             </Fieldset>
           ) : null}
           {headers.length > 0 && props.customFields.length > 0 ? (
@@ -478,10 +684,108 @@ export function ImportDialog(props: {
               </span>
             </Option>
           ) : null}
+          {headers.length > 0 && unknownOwners.length > 0 ? (
+            <Fieldset legend={props.recordType === "contact" ? "Contact owners" : "Company owners"}>
+              <Hint>
+                These aren't anyone in the team, such as people who've left. Choose who gets their {props.plural}, or no
+                one.
+              </Hint>
+              {unknownOwners.map(([cell, count]) => (
+                <div key={cell} className="grid grid-cols-2 items-center gap-2.5">
+                  <span className="truncate text-sm" title={cell}>
+                    {cell} <span className="text-subtle tabular-nums">· {count.toLocaleString()}</span>
+                  </span>
+                  <Select
+                    className="h-9"
+                    aria-label={`Owner for ${cell}`}
+                    value={owners[cell] ?? ""}
+                    onChange={(event) =>
+                      setOwners({ ...owners, [cell]: (event.target.value || null) as UserId | null })
+                    }
+                  >
+                    <option value="">No one</option>
+                    {people.map((person) => (
+                      <option key={person.userId} value={person.userId}>
+                        {personLabel(person)}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+              ))}
+            </Fieldset>
+          ) : null}
+          {headers.length > 0 && pendingTopics.length > 0 ? (
+            <Fieldset legend="Topics">
+              {props.canCreateTopics ? (
+                <Hint>
+                  These columns say who left a kind of email. Parley can make a topic for each, so they stay
+                  unsubscribed from just that.
+                </Hint>
+              ) : (
+                <Notice tone="warn">
+                  Some columns say who left a kind of email, but there's no topic for them, and making topics takes
+                  permission to manage email. Those columns are skipped; ask an admin to add the topics first.
+                </Notice>
+              )}
+              {props.canCreateTopics
+                ? pendingTopics.map(([header, pending]) => (
+                    <Option key={header}>
+                      <Checkbox
+                        checked={pending.create}
+                        onChange={(event) =>
+                          setNewTopics({ ...newTopics, [header]: { ...pending, create: event.target.checked } })
+                        }
+                      />
+                      <span>
+                        Create topic <b className="font-medium">{pending.name}</b>
+                      </span>
+                    </Option>
+                  ))
+                : null}
+            </Fieldset>
+          ) : null}
+          {headers.length > 0 && props.recordType === "contact" ? (
+            consent ? (
+              <Notice tone="info" title="Email consent">
+                {consent.unsubscribed.toLocaleString()} {consent.unsubscribed === 1 ? "row is" : "rows are"}{" "}
+                unsubscribed and {consent.bounced.toLocaleString()} bounced. The rest are imported as subscribed. An
+                import never subscribes anyone again who left.
+              </Notice>
+            ) : (
+              <Notice tone="warn" title="Everyone new will be subscribed">
+                No column says who unsubscribed or bounced, so new contacts are imported as subscribed. Only import
+                people who agreed to get your email, or map a consent column above.
+              </Notice>
+            )
+          ) : null}
           {error ? <ErrorText>{error}</ErrorText> : null}
         </>
       )}
     </Dialog>
+  )
+}
+
+/** Rows listed by their line in the file, with what went wrong. */
+function LineProblems(props: {
+  readonly title: string
+  readonly lines: ReadonlyArray<{
+    readonly line: number
+    readonly problems: ReadonlyArray<{ readonly userMessage: string }>
+  }>
+}) {
+  if (props.lines.length === 0) return null
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="font-medium">{props.title}</span>
+      <Box className="max-h-64 overflow-auto px-3 py-1.5">
+        {props.lines.map((entry) => (
+          <p key={entry.line} className="my-1 text-sm">
+            <b className="font-medium">Line {entry.line}:</b>{" "}
+            <span className="text-subtle">{entry.problems.map((problem) => problem.userMessage).join(" ")}</span>
+          </p>
+        ))}
+      </Box>
+    </div>
   )
 }
 

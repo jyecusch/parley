@@ -5,6 +5,7 @@ import { call, messageOf } from "../lib/client.ts"
 import { type contactsCollection, displayNameOf } from "../lib/contacts.ts"
 import { useFields } from "../lib/custom-fields.ts"
 import { AffiliationTags, ContactCompanies } from "./affiliations.tsx"
+import { EditableAddress } from "./company-panel.tsx"
 import { CustomFieldsSection } from "./custom-fields.tsx"
 import { TrashIcon } from "./icons.tsx"
 import { ContactAvatar, ImageEditor } from "./images.tsx"
@@ -178,6 +179,15 @@ export function ContactPanel(props: {
                   number: toE164(value) as Contact["phones"][number]["number"],
                   label: contact.phones[index]?.label ?? null,
                 }))
+              })
+            }
+          />
+          <EditableAddress
+            idPrefix="ect"
+            value={contact.address}
+            onSave={(address) =>
+              save((draft) => {
+                draft.address = address
               })
             }
           />

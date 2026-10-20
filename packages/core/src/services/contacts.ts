@@ -11,6 +11,7 @@ import {
   type Filter,
   filterFields,
   InputRejected,
+  type PostalAddress,
   type Sort,
   type TeamId,
   type UserId,
@@ -25,6 +26,7 @@ import type { CanDeleteRecords, CanManageEmail, CanReadRecords, CanWriteRecords 
 import type { Named } from "../proofs/proof.ts"
 import type { RecordOwnerChange } from "../proofs/record-owner.ts"
 import { activityRow, toActivityEntry } from "./activity.ts"
+import { addressColumns, addressOfRow, normalizeAddress } from "./addresses.ts"
 import { Affiliations } from "./affiliations.ts"
 import { CustomFields } from "./custom-fields.ts"
 import { FileStore, fileUrl } from "./file-store.ts"
@@ -94,6 +96,16 @@ interface NormalizedFields {
   readonly lastName?: string | null
   readonly emails?: ReadonlyArray<{ readonly address: string; readonly isPrimary: boolean }>
   readonly phones?: ReadonlyArray<{ readonly number: string; readonly label: string | null }>
+  readonly address?: PostalAddress | null
+}
+
+/**
+ * What only an import may set (D125, D129): a new record's original created date, and a
+ * subscription status a CRM export reports. Never used to subscribe someone again.
+ */
+export interface ImportedContact {
+  readonly createdAt?: Date | undefined
+  readonly status?: "unsubscribed" | "bounced" | undefined
 }
 
 /** Rules that span fields. Each problem names its field and never echoes the value (D26). */
@@ -143,6 +155,7 @@ const normalize = (fields: ContactFields, creating: boolean): Effect.Effect<Norm
     ...(fields.phones !== undefined
       ? { phones: fields.phones.map((phone) => ({ number: phone.number, label: phone.label ?? null })) }
       : {}),
+    ...(fields.address !== undefined ? { address: normalizeAddress(fields.address) } : {}),
   })
 }
 
@@ -175,6 +188,7 @@ export class Contacts extends Context.Service<
       access: CanWriteRecords<P, T>,
       /** The record owner (D123), already proven a member; undefined leaves none. `fields.ownerId` is ignored. */
       owner?: RecordOwnerChange<T>,
+      imported?: ImportedContact,
     ) => Effect.Effect<Contact, InputRejected | ContactEmailTaken | DatabaseUnavailable>
     /**
      * Subscribing someone again who unsubscribed, bounced or marked mail as spam also takes
@@ -187,6 +201,8 @@ export class Contacts extends Context.Service<
       resubscribe?: CanManageEmail<P, T>,
       /** Undefined leaves the record owner as it is, null clears it (D123). `fields.ownerId` is ignored. */
       owner?: RecordOwnerChange<T>,
+      /** Only for imports: a status from a CRM export (D125). Its createdAt is ignored here. */
+      imported?: ImportedContact,
     ) => Effect.Effect<Contact, InputRejected | ContactEmailTaken | DatabaseUnavailable>
     readonly delete: <P, T, C>(
       target: ContactInTeam<C, T>,
@@ -281,6 +297,7 @@ export class Contacts extends Context.Service<
                   })),
                 affiliations: companies.get(id) ?? [],
                 custom: row.custom as Contact["custom"],
+                address: addressOfRow(row),
                 avatarUrl: fileUrl(row.avatarKey),
                 subscriptionStatus: row.subscriptionStatus,
                 ownerId: row.ownerId as UserId | null,
@@ -405,13 +422,14 @@ export class Contacts extends Context.Service<
         contactId: string,
         kind: ActivityEntry["kind"],
         changedFields: ReadonlyArray<string>,
+        /** When it happened, if not now: an imported record's original created date (D129). */
+        at?: Date,
       ) =>
         db.query((d) =>
-          d
-            .insert(schema.activity)
-            .values(
-              activityRow(principal, { teamId, recordType: "contact", recordId: contactId, kind, changedFields }),
-            ),
+          d.insert(schema.activity).values({
+            ...activityRow(principal, { teamId, recordType: "contact", recordId: contactId, kind, changedFields }),
+            ...(at ? { at } : {}),
+          }),
         )
 
       const list = <P, T>(
@@ -539,9 +557,11 @@ export class Contacts extends Context.Service<
         fields: ContactFields,
         access: CanWriteRecords<P, T>,
         owner?: RecordOwnerChange<T>,
+        imported?: ImportedContact,
       ) =>
         Effect.gen(function* () {
           const normalized = yield* normalize(fields, true)
+          const createdAt = imported?.createdAt
           const custom = fields.custom
             ? yield* customFields.apply(team.value, "contact", {}, fields.custom)
             : { values: {}, changed: [] }
@@ -561,18 +581,27 @@ export class Contacts extends Context.Service<
                   firstName: normalized.firstName ?? null,
                   lastName: normalized.lastName ?? null,
                   custom: custom.values,
-                  ...(fields.subscriptionStatus ? { subscriptionStatus: fields.subscriptionStatus } : {}),
+                  ...addressColumns(normalized.address ?? null),
+                  ...(imported?.status
+                    ? { subscriptionStatus: imported.status }
+                    : fields.subscriptionStatus
+                      ? { subscriptionStatus: fields.subscriptionStatus }
+                      : {}),
                   ...(owner ? { ownerId: owner.userId } : {}),
+                  ...(createdAt ? { createdAt } : {}),
                 }),
               )
               yield* replaceEmails(team.value, id, normalized.emails)
               yield* replacePhones(team.value, id, normalized.phones)
               const principal = access.member.principal.value
-              yield* recordActivity(principal, team.value, id, "created", [
-                ...Object.keys(normalized),
-                ...custom.changed,
-                ...(owner ? ["ownerId"] : []),
-              ])
+              yield* recordActivity(
+                principal,
+                team.value,
+                id,
+                "created",
+                [...Object.keys(normalized), ...custom.changed, ...(owner ? ["ownerId"] : [])],
+                createdAt,
+              )
               const name = displayNameOf(
                 normalized.firstName ?? null,
                 normalized.lastName ?? null,
@@ -590,6 +619,7 @@ export class Contacts extends Context.Service<
         access: CanWriteRecords<P, T>,
         resubscribe?: CanManageEmail<P, T>,
         owner?: RecordOwnerChange<T>,
+        imported?: ImportedContact,
       ) =>
         Effect.gen(function* () {
           const normalized = yield* normalize(fields, false)
@@ -604,10 +634,9 @@ export class Contacts extends Context.Service<
           const ownerId = owner === undefined ? undefined : (owner?.userId ?? null)
           const ownerChanged = ownerId !== undefined && ownerId !== current.ownerId
           const changed = [...Object.keys(normalized), ...(custom?.changed ?? []), ...(ownerChanged ? ["ownerId"] : [])]
-          const status =
-            fields.subscriptionStatus !== undefined && fields.subscriptionStatus !== current.subscriptionStatus
-              ? fields.subscriptionStatus
-              : undefined
+          // An import may report a contact as unsubscribed or bounced (D125); it never subscribes anyone.
+          const wanted = imported?.status ?? fields.subscriptionStatus
+          const status = wanted !== undefined && wanted !== current.subscriptionStatus ? wanted : undefined
           if (status === "subscribed" && !resubscribe) {
             return yield* Effect.die(new Error("resubscribing a contact needs email:manage, proven by the caller"))
           }
@@ -633,6 +662,7 @@ export class Contacts extends Context.Service<
                       ...("firstName" in normalized ? { firstName: normalized.firstName ?? null } : {}),
                       ...("lastName" in normalized ? { lastName: normalized.lastName ?? null } : {}),
                       ...(custom ? { custom: custom.values } : {}),
+                      ...("address" in normalized ? addressColumns(normalized.address ?? null) : {}),
                       ...(status ? { subscriptionStatus: status } : {}),
                       ...(ownerChanged ? { ownerId } : {}),
                       updatedAt: sql`now()`,
@@ -648,7 +678,7 @@ export class Contacts extends Context.Service<
                     principal,
                     teamId,
                     id,
-                    status === "subscribed" ? "resubscribed" : "unsubscribed",
+                    status === "subscribed" ? "resubscribed" : status === "bounced" ? "bounced" : "unsubscribed",
                     [],
                   )
                 }

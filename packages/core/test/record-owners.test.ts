@@ -114,10 +114,14 @@ describe("record owners (D123)", () => {
         teamId: f.acme,
         csv: "First name,Email,Contact owner\nDee,dee@x.io,Jane\nEd,ed@x.io,nobody@nowhere.io\n",
       })
-      expect(imported.created).toBe(1)
-      expect(imported.failed).toMatchObject([{ line: 3, problems: [{ field: "owner" }] }])
+      // An owner no one in the team is: the contact is still imported, without one (D126).
+      expect(imported.created).toBe(2)
+      expect(imported.failed).toEqual([])
+      expect(imported.warnings).toMatchObject([{ line: 3, problems: [{ field: "owner" }] }])
       const dee = (yield* run["contacts.list"](f.jane, { teamId: f.acme, search: "Dee" })).items[0]
       expect(dee).toMatchObject({ ownerId: f.jane.userId })
+      const ed = (yield* run["contacts.list"](f.jane, { teamId: f.acme, search: "Ed" })).items[0]
+      expect(ed).toMatchObject({ ownerId: null })
     }).pipe(Effect.provide(CoreLive)),
   )
 })

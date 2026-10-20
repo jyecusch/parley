@@ -60,6 +60,7 @@ describe("filters", () => {
         lastName: "Lopez",
         emails: [email("ana@acme.io")],
         ownerId: f.sam.userId,
+        address: { line1: null, line2: null, city: "Sydney", region: null, postcode: null, country: "AU" },
         custom: {
           [plan.id]: "pro",
           [tags.id]: ["vip", "beta"],
@@ -89,6 +90,10 @@ describe("filters", () => {
         { match: "all", conditions: [{ field: "owner", operator: "is-any-of", value: [f.sam.userId] }] },
         { match: "all", conditions: [{ field: "owner", operator: "is-none-of", value: [f.sam.userId] }] },
         { match: "all", conditions: [{ field: "owner", operator: "is-empty" }] },
+        { match: "all", conditions: [{ field: "city", operator: "is", value: "sydney" }] },
+        { match: "all", conditions: [{ field: "city", operator: "is-empty" }] },
+        { match: "all", conditions: [{ field: "country", operator: "is-not", value: "AU" }] },
+        { match: "all", conditions: [{ field: "country", operator: "is-not-empty" }] },
         { match: "all", conditions: [{ field: `custom:${plan.id}`, operator: "is-any-of", value: ["pro"] }] },
         { match: "all", conditions: [{ field: `custom:${plan.id}`, operator: "is-none-of", value: ["pro"] }] },
         { match: "all", conditions: [{ field: `custom:${tags.id}`, operator: "has-all-of", value: ["vip", "beta"] }] },

@@ -42,6 +42,13 @@ export const contacts = pgTable(
     })
       .notNull()
       .default("subscribed"),
+    /** Where the contact is (D128), as a company's address. Country is an ISO 3166-1 alpha-2 code. */
+    addressLine1: text("address_line1"),
+    addressLine2: text("address_line2"),
+    city: text("city"),
+    region: text("region"),
+    postcode: text("postcode"),
+    country: text("country"),
     /** The record owner (D123): a member responsible for it. Cleared when they leave the team. */
     ownerId: text("owner_id").references(() => user.id, { onDelete: "set null" }),
     ...timestamps,

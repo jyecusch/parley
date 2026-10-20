@@ -20,6 +20,10 @@ export const contactFieldReader =
         return contact.subscriptionStatus
       case "owner":
         return contact.ownerId
+      case "city":
+        return contact.address?.city ?? null
+      case "country":
+        return contact.address?.country ?? null
       case "createdAt":
         return contact.createdAt
       case "updatedAt":

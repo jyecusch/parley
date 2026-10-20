@@ -7,6 +7,8 @@ export interface Person {
   readonly userId: UserId
   readonly name: string
   readonly kind: "member" | "service-account"
+  /** A member's email address; service accounts have none worth matching on. */
+  readonly email: string | null
 }
 
 /** How a person reads in a picker: service accounts are marked, so they aren't mistaken for people. */
@@ -27,12 +29,12 @@ export const usePeople = (teamId: TeamId) =>
       ])
       const byName = (a: Person, b: Person) => a.name.localeCompare(b.name)
       const people: Array<Person> = members
-        .map((member): Person => ({ userId: member.userId, name: member.name, kind: "member" }))
+        .map((member): Person => ({ userId: member.userId, name: member.name, kind: "member", email: member.email }))
         .sort(byName)
       const seen = new Set(people.map((person) => person.userId))
       const bots = accounts
         .filter((account) => !seen.has(account.id))
-        .map((account): Person => ({ userId: account.id, name: account.name, kind: "service-account" }))
+        .map((account): Person => ({ userId: account.id, name: account.name, kind: "service-account", email: null }))
         .sort(byName)
       return [...people, ...bots]
     },

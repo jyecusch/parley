@@ -7,6 +7,7 @@ import {
   type ContactId,
   type CustomField,
   type CustomValue,
+  countryCodeOf,
   Domain,
   domainOfEmail,
   EmailAddress,
@@ -22,10 +23,12 @@ import {
   normalizeDomain,
   type OperationInput,
   PhoneNumber,
+  type PostalAddress,
   parseCsv,
   type RecordType,
   type SegmentId,
   SUBSCRIPTION_STATUS_LABELS,
+  type TopicId,
   toCsv,
   type UserId,
   Website,
@@ -40,12 +43,14 @@ import { type CanReadRecords, proveCanReadRecords, proveCanWriteRecords } from "
 import { type Named, named } from "../proofs/proof.ts"
 import { proveRecordOwner, type RecordOwner } from "../proofs/record-owner.ts"
 import { proveSegmentInTeam } from "../proofs/segment-in-team.ts"
+import { proveTopicsInTeam } from "../proofs/topic-in-team.ts"
 import { Affiliations } from "../services/affiliations.ts"
 import { Companies } from "../services/companies.ts"
 import { Contacts } from "../services/contacts.ts"
 import { CustomFields } from "../services/custom-fields.ts"
 import { Members } from "../services/members.ts"
 import { Segments } from "../services/segments.ts"
+import { Subscriptions } from "../services/subscriptions.ts"
 
 /**
  * CSV import and export (D62), composed from the proven record services: every row goes through the
@@ -180,6 +185,12 @@ export const exportContactsCsv = (principal: Principal, input: OperationInput<ty
         "Other emails",
         "Phones",
         "Companies",
+        "Street",
+        "Street, line 2",
+        "City",
+        "State or region",
+        "Postcode",
+        "Country",
         "Subscription status",
         "Contact owner",
         "Created",
@@ -204,6 +215,12 @@ export const exportContactsCsv = (principal: Principal, input: OperationInput<ty
                 affiliation.title ? `${affiliation.companyName} (${affiliation.title})` : affiliation.companyName,
               )
               .join("; "),
+            contact.address?.line1 ?? "",
+            contact.address?.line2 ?? "",
+            contact.address?.city ?? "",
+            contact.address?.region ?? "",
+            contact.address?.postcode ?? "",
+            contact.address?.country ?? "",
             SUBSCRIPTION_STATUS_LABELS[contact.subscriptionStatus],
             contact.ownerName ?? "",
             isoDay(contact.createdAt),
@@ -473,8 +490,161 @@ const ownerMatcher = <P, T>(member: MemberOf<P, T>) =>
 const unknownOwner = (): FieldProblem => ({
   field: "owner",
   problem: "invalid-format",
-  userMessage: userText`No one in the team has this name or email. Use a team member's email address.`,
+  userMessage: userText`No one in the team has this name or email, so this row has no owner. Choose who it is when you import.`,
 })
+
+const TRUE = new Set(["true", "yes", "y", "1"])
+const FALSE = new Set(["", "false", "no", "n", "0", "0.0"])
+
+/** An "Unsubscribed" cell (D125): true when any of its parts says so. Several columns may feed it. */
+const unsubscribedOf = (cell: string | undefined) => split(cell).some((part) => TRUE.has(part.toLowerCase()))
+
+/** A "Bounced" cell (D125): true, or any reason (HubSpot's hard bounce reason), means bounced. */
+const bouncedOf = (cell: string | undefined) => split(cell).some((part) => !FALSE.has(part.toLowerCase()))
+
+/** A topic column (D127): true means the contact left that topic. */
+const leftTopic = (cell: string | undefined) => unsubscribedOf(cell)
+
+const SIMPLE_DATE = /^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?$/
+const ISO_WITH_ZONE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})$/
+
+/**
+ * A "Created" cell (D129): 2021-06-15, 2021-06-15 14:50 or ISO 8601. Dates without a time zone are
+ * read as UTC; HubSpot writes them in the portal's time zone, so they may be off by those hours.
+ */
+const createdAtOf = (cell: string | undefined): Date | "invalid" | undefined => {
+  const text = cell?.trim()
+  if (!text) return undefined
+  const simple = SIMPLE_DATE.exec(text)
+  const date = simple
+    ? new Date(
+        Date.UTC(
+          Number(simple[1]),
+          Number(simple[2]) - 1,
+          Number(simple[3]),
+          Number(simple[4] ?? 0),
+          Number(simple[5] ?? 0),
+          Number(simple[6] ?? 0),
+        ),
+      )
+    : ISO_WITH_ZONE.test(text)
+      ? new Date(text)
+      : undefined
+  if (!date || Number.isNaN(date.getTime())) return "invalid"
+  // A date in the future, or before there was email, is a mistake in the file.
+  if (date.getTime() > Date.now() + 86_400_000 || date.getUTCFullYear() < 1971) return "invalid"
+  return date
+}
+
+const badCreatedAt = (): FieldProblem => ({
+  field: "createdAt",
+  problem: "invalid-format",
+  userMessage: userText`This created date isn't a date like 2021-06-15, so the record gets today's date.`,
+})
+
+/** A row's address, with the country as a code from a code or a name (D128). Unknown countries are left out. */
+const addressOfCells = (cells: Record<string, string>, warnings: Array<FieldProblem>): PostalAddress | undefined => {
+  const text = (value: string | undefined) => {
+    const trimmed = value?.trim()
+    return trimmed ? trimmed.slice(0, 200) : null
+  }
+  let country: string | null = null
+  const countryCell = cells.country?.split(";")[0]?.trim()
+  if (countryCell) {
+    country = countryCodeOf(countryCell) ?? null
+    if (!country) {
+      warnings.push({
+        field: "address.country",
+        problem: "invalid-format",
+        userMessage: userText`Parley doesn't know this country, so it was left out. Use a country's name or two-letter code, like Australia or AU.`,
+      })
+    }
+  }
+  const address = {
+    line1: text(cells.line1),
+    line2: text(cells.line2),
+    city: text(cells.city),
+    region: text(cells.region),
+    postcode: text(cells.postcode)?.slice(0, 20) ?? null,
+    country,
+  }
+  return Object.values(address).some(Boolean) ? address : undefined
+}
+
+/**
+ * Who each owner cell means (D127): the import's own choices first, each proven a member up front,
+ * then the usual match by email or unique name. Unknown names are imported without an owner (D126).
+ */
+const ownerResolver = <P, T>(member: MemberOf<P, T>, chosen: Readonly<Record<string, UserId | null>> | undefined) =>
+  Effect.gen(function* () {
+    const matcher = yield* ownerMatcher(member)
+    const choices = new Map<string, UserId | null>()
+    for (const [cell, userId] of Object.entries(chosen ?? {})) {
+      if (userId !== null) {
+        yield* matcher.prove(userId).pipe(
+          Effect.catchTag("MemberNotFound", () =>
+            Effect.fail(
+              new InputRejected({
+                problems: [
+                  {
+                    field: "owners",
+                    problem: "invalid-format",
+                    userMessage: userText`One of the people chosen as an owner isn't a member of this team any more. Choose someone else.`,
+                  },
+                ],
+              }),
+            ),
+          ),
+        )
+      }
+      choices.set(cell.trim().toLowerCase(), userId)
+    }
+    /** null clears the owner, undefined leaves it, "unknown" is a name no one has. */
+    const resolve = (cell: string | undefined): UserId | null | "unknown" | undefined => {
+      const key = cell?.trim().toLowerCase()
+      if (!key) return undefined
+      if (choices.has(key)) return choices.get(key) ?? null
+      return matcher.match(cell)
+    }
+    const prove = (resolved: UserId | null | "unknown" | undefined) =>
+      resolved === null ? Effect.succeed(null) : matcher.prove(resolved === "unknown" ? undefined : resolved)
+    return { resolve, prove }
+  })
+
+/** The topic columns of a mapping (D127), each proven to be one of the team's topics before any row. */
+const topicColumns = <P, T>(member: MemberOf<P, T>, mapping: Readonly<Record<string, string>>) =>
+  Effect.gen(function* () {
+    const ids = [
+      ...new Set(
+        Object.values(mapping)
+          .filter((target) => target.startsWith("topic:"))
+          .map((target) => target.slice(6) as TopicId),
+      ),
+    ]
+    if (ids.length === 0) return undefined
+    return yield* proveTopicsInTeam(member, ids).pipe(
+      Effect.catchTag("TopicNotFound", () =>
+        Effect.fail(
+          new InputRejected({
+            problems: [
+              {
+                field: "mapping",
+                problem: "invalid-format",
+                userMessage: userText`A column is matched to a topic that doesn't exist. Create the topic, or skip the column.`,
+              },
+            ],
+          }),
+        ),
+      ),
+    )
+  })
+
+type Outcome = {
+  created: number
+  updated: number
+  failed: Array<ImportResult["failed"][number]>
+  warnings: Array<ImportResult["warnings"][number]>
+}
 
 export const importContactsCsv = (principal: Principal, input: OperationInput<typeof importContacts>) =>
   named(principal, input.teamId, (principal, team) =>
@@ -483,13 +653,15 @@ export const importContactsCsv = (principal: Principal, input: OperationInput<ty
       const companies = yield* Companies
       const affiliations = yield* Affiliations
       const customFields = yield* CustomFields
+      const subscriptions = yield* Subscriptions
       const member = yield* proveMemberOf(principal, team)
       const canRead = yield* proveCanReadRecords(member)
       const canWrite = yield* proveCanWriteRecords(member)
       const fields = yield* customFields.list(team, "contact", canRead)
       const parsed = yield* parse(input.csv, input.mapping, "contact", fields)
       yield* checkSet(input.set, "contact", fields)
-      const owners = yield* ownerMatcher(member)
+      const owners = yield* ownerResolver(member, input.owners)
+      const topics = yield* topicColumns(member, parsed.mapping)
 
       // Rows match existing contacts by email, and companies by name.
       const byEmail = new Map<string, ContactId>()
@@ -500,19 +672,18 @@ export const importContactsCsv = (principal: Principal, input: OperationInput<ty
       for (const company of yield* allCompanies(team, canRead))
         companyByName.set(company.name.toLowerCase(), company.id)
 
-      const result: { created: number; updated: number; failed: Array<ImportResult["failed"][number]> } = {
-        created: 0,
-        updated: 0,
-        failed: [],
-      }
+      const result: Outcome = { created: 0, updated: 0, failed: [], warnings: [] }
       for (const [index, row] of parsed.rows.entries()) {
         const line = index + 2
         const cells = withSet(cellsOf(parsed, row), input.set, fields)
         const problems: Array<FieldProblem> = []
-        const custom = customOf(cells, fields, problems)
+        // Values that can't be used are left out and the row is still imported (D126).
+        const warnings: Array<FieldProblem> = []
+        const custom = customOf(cells, fields, warnings)
         const [first, ...rest] = (cells.name ?? "").split(/\s+/).filter(Boolean)
-        const emails = [...split(cells.email), ...split(cells.emails)].map((email) => email.toLowerCase())
-        const phones = split(cells.phone).map((phone) => phone.replace(/[\s().-]/g, ""))
+        const emails = [...new Set([...split(cells.email), ...split(cells.emails)].map((email) => email.toLowerCase()))]
+        const allPhones = split(cells.phone).map((phone) => phone.replace(/[\s().-]/g, ""))
+        const phones = [...new Set(allPhones.filter((phone) => Schema.is(PhoneNumber)(phone)))]
         // Rows skip the request's schema, so each cell is checked here as an operation's input would be.
         if (emails.some((email) => !Schema.is(EmailAddress)(email))) {
           problems.push({
@@ -521,23 +692,32 @@ export const importContactsCsv = (principal: Principal, input: OperationInput<ty
             userMessage: userText`This isn't a full email address.`,
           })
         }
-        if (phones.some((phone) => !Schema.is(PhoneNumber)(phone))) {
-          problems.push({
+        if (phones.length < allPhones.length) {
+          warnings.push({
             field: "phone",
             problem: "invalid-format",
-            userMessage: userText`Phone numbers need their country code, like +61 400 812 337.`,
+            userMessage: userText`A phone number without its country code was left out. Numbers need it, like +61 400 812 337.`,
           })
         }
-        const ownerId = owners.match(cells.owner)
-        if (ownerId === "unknown") problems.push(unknownOwner())
+        const owner = owners.resolve(cells.owner)
+        if (owner === "unknown") warnings.push(unknownOwner())
         const subscription = subscriptionOf(cells.subscriptionStatus)
         if (subscription === "invalid") {
-          problems.push({
+          warnings.push({
             field: "subscriptionStatus",
             problem: "invalid-format",
-            userMessage: userText`Subscription status should be Subscribed or Unsubscribed (or yes or no).`,
+            userMessage: userText`Subscription status should be Subscribed or Unsubscribed (or yes or no), so it was left as it was.`,
           })
         }
+        // Bounced beats unsubscribed beats a subscription status column (D125).
+        const reported = bouncedOf(cells.bounced)
+          ? "bounced"
+          : unsubscribedOf(cells.unsubscribed)
+            ? "unsubscribed"
+            : undefined
+        const createdAt = createdAtOf(cells.createdAt)
+        if (createdAt === "invalid") warnings.push(badCreatedAt())
+        const address = addressOfCells(cells, warnings)
         if (problems.length > 0) {
           result.failed.push({ line, problems })
           continue
@@ -548,49 +728,64 @@ export const importContactsCsv = (principal: Principal, input: OperationInput<ty
             ? { lastName: cells.lastName ?? rest.join(" ") }
             : {}),
           ...(phones.length > 0 ? { phones: phones.map((number) => ({ number: number as never })) } : {}),
+          ...(address ? { address } : {}),
           ...(Object.keys(custom).length > 0 ? { custom } : {}),
           ...(subscription && subscription !== "invalid" ? { subscriptionStatus: subscription } : {}),
         }
+        const leftTopics = new Map<TopicId, boolean>()
+        for (const [header, target] of Object.entries(parsed.mapping)) {
+          if (!target.startsWith("topic:")) continue
+          const cell = row[parsed.headers.indexOf(header)]
+          if (leftTopic(cell)) leftTopics.set(target.slice(6) as TopicId, false)
+        }
         const existing = emails.map((email) => byEmail.get(email)).find(Boolean)
-        const outcome = yield* Effect.matchEffect(
+        yield* Effect.matchEffect(
           Effect.gen(function* () {
             // An empty owner cell leaves a contact's owner as it is.
-            const owner = yield* owners.prove(ownerId === "unknown" ? undefined : ownerId)
+            const ownerChange = yield* owners.prove(owner)
             let contactId: ContactId
             if (existing) {
               // Updating keeps the contact's other emails, adding any new ones from the row.
-              const target = yield* named(existing, (contact) =>
+              contactId = yield* named(existing, (contact) =>
                 Effect.gen(function* () {
                   const proof = yield* proveContactInTeam(team, contact, canRead)
                   const current = yield* contacts.get(proof)
                   const known = new Set(current.emails.map((email) => email.address as string))
                   const added = emails.filter((email) => !known.has(email))
                   // An import never subscribes someone again who opted out: that takes a person
-                  // with email:manage, one contact at a time.
+                  // with email:manage, one contact at a time. It may report them unsubscribed or bounced.
                   const { subscriptionStatus, custom: rowCustom, ...otherFields } = fieldsForRow
                   const custom = rowCustom
                     ? mergeCustom(rowCustom, current.custom, fields, input.multiSelect ?? "add")
                     : undefined
                   const keepStatus =
                     subscriptionStatus === "unsubscribed" || current.subscriptionStatus === "subscribed"
+                  const downgrade =
+                    reported === "bounced"
+                      ? current.subscriptionStatus === "bounced"
+                        ? undefined
+                        : "bounced"
+                      : reported === "unsubscribed" && current.subscriptionStatus === "subscribed"
+                        ? "unsubscribed"
+                        : undefined
                   const updated = yield* contacts.update(
                     proof,
                     {
                       ...otherFields,
                       ...(custom ? { custom } : {}),
-                      ...(subscriptionStatus && keepStatus ? { subscriptionStatus } : {}),
+                      ...(subscriptionStatus && keepStatus && !reported ? { subscriptionStatus } : {}),
                       ...(added.length > 0
                         ? { emails: [...current.emails, ...added.map((address) => ({ address: address as never }))] }
                         : {}),
                     },
                     canWrite,
                     undefined,
-                    owner,
+                    ownerChange,
+                    downgrade ? { status: downgrade } : undefined,
                   )
                   return updated.id
                 }),
               )
-              contactId = target
               result.updated++
             } else {
               const created = yield* contacts.create(
@@ -600,21 +795,33 @@ export const importContactsCsv = (principal: Principal, input: OperationInput<ty
                   ...(emails.length > 0 ? { emails: emails.map((address) => ({ address: address as never })) } : {}),
                 },
                 canWrite,
-                owner,
+                ownerChange ?? undefined,
+                {
+                  ...(createdAt instanceof Date ? { createdAt } : {}),
+                  ...(reported ? { status: reported } : {}),
+                },
               )
               contactId = created.id
               for (const email of emails) byEmail.set(email, created.id)
               result.created++
             }
+            if (topics && leftTopics.size > 0) {
+              yield* named(contactId, (contact) =>
+                Effect.gen(function* () {
+                  const proof = yield* proveContactInTeam(team, contact, canRead)
+                  yield* subscriptions.updateTopics(proof, topics, leftTopics, canWrite)
+                }),
+              )
+            }
             const companyName = cells.company?.split(";")[0]?.trim()
             if (companyName) {
               let companyId = companyByName.get(companyName.toLowerCase())
               if (!companyId) {
-                const company = yield* companies.create(team, { name: companyName }, canWrite)
+                const company = yield* companies.create(team, { name: companyName.slice(0, 200) }, canWrite)
                 companyId = company.id
                 companyByName.set(companyName.toLowerCase(), companyId)
               }
-              const title = cells.title?.trim() || undefined
+              const title = cells.title?.trim().slice(0, 100) || undefined
               yield* named(contactId, companyId, (contact, company) =>
                 Effect.gen(function* () {
                   const contactProof = yield* proveContactInTeam(team, contact, canRead)
@@ -623,6 +830,7 @@ export const importContactsCsv = (principal: Principal, input: OperationInput<ty
                 }),
               )
             }
+            if (warnings.length > 0) result.warnings.push({ line, problems: warnings })
           }),
           {
             onSuccess: () => Effect.void,
@@ -634,7 +842,6 @@ export const importContactsCsv = (principal: Principal, input: OperationInput<ty
                   }),
           },
         )
-        void outcome
       }
       return result
     }),
@@ -651,7 +858,7 @@ export const importCompaniesCsv = (principal: Principal, input: OperationInput<t
       const fields = yield* customFields.list(team, "company", canRead)
       const parsed = yield* parse(input.csv, input.mapping, "company", fields)
       yield* checkSet(input.set, "company", fields)
-      const owners = yield* ownerMatcher(member)
+      const owners = yield* ownerResolver(member, input.owners)
 
       // Rows match existing companies by domain, then by exact name.
       const byDomain = new Map<string, CompanyId>()
@@ -661,81 +868,60 @@ export const importCompaniesCsv = (principal: Principal, input: OperationInput<t
         byName.set(company.name.toLowerCase(), company.id)
       }
 
-      const result: { created: number; updated: number; failed: Array<ImportResult["failed"][number]> } = {
-        created: 0,
-        updated: 0,
-        failed: [],
-      }
+      const result: Outcome = { created: 0, updated: 0, failed: [], warnings: [] }
       for (const [index, row] of parsed.rows.entries()) {
         const line = index + 2
         const cells = withSet(cellsOf(parsed, row), input.set, fields)
-        const problems: Array<FieldProblem> = []
-        const custom = customOf(cells, fields, problems)
+        // Values that can't be used are left out and the row is still imported (D126).
+        const warnings: Array<FieldProblem> = []
+        const custom = customOf(cells, fields, warnings)
         // A "domain" may come as a website or an email address; keep just the domain.
-        const domains = split(cells.domains).map((value) =>
+        const allDomains = split(cells.domains).map((value) =>
           normalizeDomain(
             value.includes("@") ? domainOfEmail(value) : (value.replace(/^https?:\/\//i, "").split("/")[0] ?? ""),
           ),
         )
-        const name = cells.name?.trim()
-        const country = cells.country?.trim().toUpperCase()
-        if (country && !/^[A-Z]{2}$/.test(country)) {
-          problems.push({
-            field: "address.country",
-            problem: "invalid-format",
-            userMessage: userText`Countries need their two-letter code, like AU or US.`,
-          })
-        }
-        if (problems.length > 0) {
-          result.failed.push({ line, problems })
-          continue
-        }
-        const address = {
-          line1: cells.line1 ?? null,
-          line2: cells.line2 ?? null,
-          city: cells.city ?? null,
-          region: cells.region ?? null,
-          postcode: cells.postcode ?? null,
-          country: country ?? null,
-        }
-        const hasAddress = Object.values(address).some(Boolean)
-        const website = cells.website
-          ? /^https?:\/\//i.test(cells.website)
-            ? cells.website
-            : `https://${cells.website}`
-          : undefined
-        const phone = cells.phone?.replace(/[\s().-]/g, "")
-        if (phone && !Schema.is(PhoneNumber)(phone)) {
-          problems.push({
-            field: "phone",
-            problem: "invalid-format",
-            userMessage: userText`Phone numbers need their country code, like +61 2 9000 1234.`,
-          })
-        }
-        if (website && !Schema.is(Website)(website)) {
-          problems.push({
-            field: "website",
-            problem: "invalid-format",
-            userMessage: userText`This isn't a web address.`,
-          })
-        }
-        const ownerId = owners.match(cells.owner)
-        if (ownerId === "unknown") problems.push(unknownOwner())
-        if (domains.some((domain) => !Schema.is(Domain)(domain))) {
-          problems.push({
+        const domains = [...new Set(allDomains.filter((domain) => Schema.is(Domain)(domain)))]
+        if (domains.length < allDomains.length) {
+          warnings.push({
             field: "domains",
             problem: "invalid-format",
-            userMessage: userText`This isn't a domain, like acme.com.`,
+            userMessage: userText`Something that isn't a domain, like acme.com, was left out.`,
           })
         }
-        if (problems.length > 0) {
-          result.failed.push({ line, problems })
-          continue
+        const name = cells.name?.trim().slice(0, 200)
+        const address = addressOfCells(cells, warnings)
+        const websiteCell = cells.website?.split(";")[0]?.trim()
+        const website = websiteCell
+          ? /^https?:\/\//i.test(websiteCell)
+            ? websiteCell
+            : `https://${websiteCell}`
+          : undefined
+        const phoneCell = cells.phone?.split(";")[0]?.replace(/[\s().-]/g, "")
+        const phone = phoneCell && Schema.is(PhoneNumber)(phoneCell) ? phoneCell : undefined
+        if (phoneCell && !phone) {
+          warnings.push({
+            field: "phone",
+            problem: "invalid-format",
+            userMessage: userText`A phone number without its country code was left out. Numbers need it, like +61 2 9000 1234.`,
+          })
         }
+        const goodWebsite = website && Schema.is(Website)(website) ? website : undefined
+        if (website && !goodWebsite) {
+          warnings.push({
+            field: "website",
+            problem: "invalid-format",
+            userMessage: userText`This isn't a web address, so it was left out.`,
+          })
+        }
+        const owner = owners.resolve(cells.owner)
+        if (owner === "unknown") warnings.push(unknownOwner())
+        const createdAt = createdAtOf(cells.createdAt)
+        if (createdAt === "invalid") warnings.push(badCreatedAt())
         const fieldsForRow: CompanyFields = {
-          ...(website ? { website: website as never } : {}),
+          ...(goodWebsite ? { website: goodWebsite as never } : {}),
           ...(phone ? { phone: phone as never } : {}),
-          ...(hasAddress ? { address } : {}),
+          ...(address ? { address } : {}),
           ...(Object.keys(custom).length > 0 ? { custom } : {}),
         }
         const existing =
@@ -744,7 +930,7 @@ export const importCompaniesCsv = (principal: Principal, input: OperationInput<t
         yield* Effect.matchEffect(
           Effect.gen(function* () {
             // An empty owner cell leaves a company's owner as it is.
-            const owner = yield* owners.prove(ownerId === "unknown" ? undefined : ownerId)
+            const ownerChange = yield* owners.prove(owner)
             if (existing) {
               yield* named(existing, (company) =>
                 Effect.gen(function* () {
@@ -767,7 +953,7 @@ export const importCompaniesCsv = (principal: Principal, input: OperationInput<t
                         : {}),
                     },
                     canWrite,
-                    owner,
+                    ownerChange,
                   )
                 }),
               )
@@ -788,12 +974,14 @@ export const importCompaniesCsv = (principal: Principal, input: OperationInput<t
                   ...(domains.length > 0 ? { domains: domains.map((domain) => ({ domain: domain as never })) } : {}),
                 },
                 canWrite,
-                owner,
+                ownerChange ?? undefined,
+                createdAt instanceof Date ? { createdAt } : undefined,
               )
               for (const domain of domains) byDomain.set(domain, created.id)
               byName.set(name.toLowerCase(), created.id)
               result.created++
             }
+            if (warnings.length > 0) result.warnings.push({ line, problems: warnings })
           }),
           {
             onSuccess: () => Effect.void,

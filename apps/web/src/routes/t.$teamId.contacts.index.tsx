@@ -542,6 +542,8 @@ function ContactsScreen() {
         />
       ) : dialog === "import" ? (
         <ImportDialog
+          teamId={teamId}
+          canCreateTopics={ROLE_PERMISSIONS[team.role].has("email:manage")}
           recordType="contact"
           plural="contacts"
           customFields={fields}

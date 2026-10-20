@@ -1,4 +1,5 @@
 import { Schema } from "effect"
+import { PostalAddress } from "./address.ts"
 import { PhoneNumber } from "./contact.ts"
 import { CustomValues, CustomValuesPatch } from "./custom-field.ts"
 import { AffiliationId, CompanyId, ContactId, TeamId, UserId } from "./ids.ts"
@@ -17,26 +18,6 @@ export const Website = Schema.String.check(Schema.isMaxLength(2000), Schema.isPa
   Schema.brand("Website"),
 )
 export type Website = typeof Website.Type
-
-const Line = Schema.String.check(Schema.isTrimmed(), Schema.isMaxLength(200))
-
-/** A postal address (D104). Country is an ISO 3166-1 alpha-2 code, such as "AU". */
-export const PostalAddress = Schema.Struct({
-  line1: Schema.NullOr(Line.annotate({ title: "Street" })),
-  line2: Schema.NullOr(Line.annotate({ title: "Street, line 2" })),
-  city: Schema.NullOr(Line.annotate({ title: "City" })),
-  region: Schema.NullOr(Line.annotate({ title: "State or region" })),
-  postcode: Schema.NullOr(
-    Schema.String.check(Schema.isTrimmed(), Schema.isMaxLength(20)).annotate({ title: "Postcode" }),
-  ),
-  country: Schema.NullOr(
-    Schema.String.check(Schema.isPattern(/^[A-Z]{2}$/)).annotate({
-      title: "Country",
-      description: "ISO 3166-1 alpha-2 code, such as AU or US.",
-    }),
-  ),
-})
-export type PostalAddress = typeof PostalAddress.Type
 
 export const CompanyDomain = Schema.Struct({
   domain: Domain.annotate({ title: "Domain" }),

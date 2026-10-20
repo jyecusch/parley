@@ -23,6 +23,7 @@ const EDITABLE: ReadonlyArray<keyof ContactFields> = [
   "lastName",
   "emails",
   "phones",
+  "address",
   "subscriptionStatus",
   "ownerId",
 ]

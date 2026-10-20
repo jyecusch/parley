@@ -571,6 +571,8 @@ function CompaniesScreen() {
         />
       ) : dialog === "import" ? (
         <ImportDialog
+          teamId={teamId}
+          canCreateTopics={ROLE_PERMISSIONS[team.role].has("email:manage")}
           recordType="company"
           plural="companies"
           customFields={fields}

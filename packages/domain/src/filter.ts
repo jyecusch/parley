@@ -26,6 +26,8 @@ export const BUILT_IN_FILTER_FIELDS: Readonly<
     { field: "phone", label: "Phone", kind: "text" },
     { field: "company", label: "Company", kind: "company" },
     { field: "owner", label: "Contact owner", kind: "member" },
+    { field: "city", label: "City", kind: "text" },
+    { field: "country", label: "Country", kind: "text" },
     {
       field: "subscriptionStatus",
       label: "Subscription status",

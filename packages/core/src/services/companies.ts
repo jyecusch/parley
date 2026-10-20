@@ -30,6 +30,7 @@ import type { CanDeleteRecords, CanReadRecords, CanWriteRecords } from "../proof
 import type { Named } from "../proofs/proof.ts"
 import type { RecordOwnerChange } from "../proofs/record-owner.ts"
 import { activityRow, toActivityEntry } from "./activity.ts"
+import { addressColumns, addressOfRow, normalizeAddress } from "./addresses.ts"
 import { Affiliations } from "./affiliations.ts"
 import { RESTORE_WINDOW_DAYS } from "./contacts.ts"
 import { CustomFields } from "./custom-fields.ts"
@@ -92,12 +93,6 @@ interface NormalizedFields {
   readonly address?: PostalAddress | null
 }
 
-const ADDRESS_KEYS = ["line1", "line2", "city", "region", "postcode", "country"] as const
-
-/** An address with nothing in it is no address. */
-const normalizeAddress = (address: PostalAddress | null): PostalAddress | null =>
-  address && ADDRESS_KEYS.some((key) => address[key]) ? address : null
-
 /** Rules that span fields. Each problem names its field and never echoes the value (D26). */
 const normalize = (fields: CompanyFields): Effect.Effect<NormalizedFields, InputRejected | FreeEmailDomain> => {
   const problems: Array<FieldProblem> = []
@@ -134,15 +129,6 @@ const normalize = (fields: CompanyFields): Effect.Effect<NormalizedFields, Input
   })
 }
 
-const addressColumns = (address: PostalAddress | null) => ({
-  addressLine1: address?.line1 ?? null,
-  addressLine2: address?.line2 ?? null,
-  city: address?.city ?? null,
-  region: address?.region ?? null,
-  postcode: address?.postcode ?? null,
-  country: address?.country ?? null,
-})
-
 /** Contacts affiliated with the company that aren't deleted (D108, D109). */
 const contactCountSql = sql<number>`(
   select count(*)::int from "affiliations" a
@@ -172,6 +158,8 @@ export class Companies extends Context.Service<
       access: CanWriteRecords<P, T>,
       /** The record owner (D123), already proven a member; undefined leaves none. `fields.ownerId` is ignored. */
       owner?: RecordOwnerChange<T>,
+      /** Only for imports: the record's original created date (D129). */
+      imported?: { readonly createdAt?: Date | undefined },
     ) => Effect.Effect<Company, InputRejected | FreeEmailDomain | CompanyDomainTaken | DatabaseUnavailable>
     readonly update: <P, T, K>(
       target: CompanyInTeam<K, T>,
@@ -282,14 +270,7 @@ export class Companies extends Context.Service<
             const found = byId.get(id)
             if (!found) return []
             const { company: row, contactCount, ownerName } = found
-            const address = normalizeAddress({
-              line1: row.addressLine1,
-              line2: row.addressLine2,
-              city: row.city,
-              region: row.region,
-              postcode: row.postcode,
-              country: row.country,
-            })
+            const address = addressOfRow(row)
             return [
               {
                 id: row.id as CompanyId,
@@ -405,13 +386,14 @@ export class Companies extends Context.Service<
         companyId: string,
         kind: ActivityEntry["kind"],
         changedFields: ReadonlyArray<string>,
+        /** When it happened, if not now: an imported record's original created date (D129). */
+        at?: Date,
       ) =>
         db.query((d) =>
-          d
-            .insert(schema.activity)
-            .values(
-              activityRow(principal, { teamId, recordType: "company", recordId: companyId, kind, changedFields }),
-            ),
+          d.insert(schema.activity).values({
+            ...activityRow(principal, { teamId, recordType: "company", recordId: companyId, kind, changedFields }),
+            ...(at ? { at } : {}),
+          }),
         )
 
       const list = <P, T>(team: Named<T, TeamId>, query: CompanyQuery, _access: CanReadRecords<P, T>) =>
@@ -530,9 +512,11 @@ export class Companies extends Context.Service<
         fields: CompanyFields & { readonly name: string },
         access: CanWriteRecords<P, T>,
         owner?: RecordOwnerChange<T>,
+        imported?: { readonly createdAt?: Date | undefined },
       ) =>
         Effect.gen(function* () {
           const normalized = yield* normalize(fields)
+          const createdAt = imported?.createdAt
           const custom = fields.custom
             ? yield* customFields.apply(team.value, "company", {}, fields.custom)
             : { values: {}, changed: [] }
@@ -556,14 +540,18 @@ export class Companies extends Context.Service<
                   ...addressColumns(normalized.address ?? null),
                   custom: custom.values,
                   ...(owner ? { ownerId: owner.userId } : {}),
+                  ...(createdAt ? { createdAt } : {}),
                 }),
               )
               yield* replaceDomains(team.value, id, normalized.domains)
-              yield* recordActivity(principal, team.value, id, "created", [
-                ...Object.keys(normalized),
-                ...custom.changed,
-                ...(owner ? ["ownerId"] : []),
-              ])
+              yield* recordActivity(
+                principal,
+                team.value,
+                id,
+                "created",
+                [...Object.keys(normalized), ...custom.changed, ...(owner ? ["ownerId"] : [])],
+                createdAt,
+              )
               yield* affiliations.matchCompany(principal, team.value, { id, name: fields.name }, domains)
             }),
           )

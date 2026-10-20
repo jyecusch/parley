@@ -13,7 +13,7 @@ describe("CSV", () => {
     expect(toCsv([["=SUM(A1)", "plain", "a,b"]])).toBe(`'=SUM(A1),plain,"a,b"\r\n`)
   })
 
-  it.effect("imports contacts: creates, updates by email, affiliates by company, reports bad rows", () =>
+  it.effect("imports contacts: creates, updates by email, affiliates by company, reports bad rows and values", () =>
     Effect.gen(function* () {
       const f = yield* Fixture
       const plan = yield* run["fields.create"](f.jane, {
@@ -39,10 +39,13 @@ describe("CSV", () => {
         "Di,,di@kumo.jp,,,Enterprise",
       ].join("\n")
       const result = yield* run["contacts.import"](f.jane, { teamId: f.acme, csv })
-      expect(result.created).toBe(1)
+      // A bad email still skips the row; a value a field can't take is left out, with a warning (D126).
+      expect(result.created).toBe(2)
       expect(result.updated).toBe(1)
-      expect(result.failed.map((failure) => failure.line)).toEqual([4, 5])
-      expect(result.failed[1]?.problems[0]?.field).toBe(`custom.${plan.id}`)
+      expect(result.failed.map((failure) => failure.line)).toEqual([4])
+      expect(result.warnings.map((warning) => [warning.line, warning.problems[0]?.field])).toEqual([
+        [5, `custom.${plan.id}`],
+      ])
 
       const ana = yield* run["contacts.get"](f.jane, { teamId: f.acme, contactId: existing.id })
       expect(ana).toMatchObject({ lastName: "Lopez", custom: { [plan.id]: "pro" } })
@@ -73,18 +76,22 @@ describe("CSV", () => {
         "Kumo,kumo.jp,,Tokyo,JP",
         "Gmail fans,gmail.com,,,",
         "Nowhere,,,,Australia",
+        "Elsewhere,,,,Narnia",
       ].join("\n")
       const result = yield* run["companies.import"](f.jane, { teamId: f.acme, csv })
-      expect([result.created, result.updated]).toEqual([1, 1])
-      expect(result.failed.map((failure) => [failure.line, failure.problems[0]?.field])).toEqual([
-        [4, "row"],
-        [5, "address.country"],
+      // Countries come as a code or a name (D128); one Parley doesn't know is left out, with a warning.
+      expect([result.created, result.updated]).toEqual([3, 1])
+      expect(result.failed.map((failure) => [failure.line, failure.problems[0]?.field])).toEqual([[4, "row"]])
+      expect(result.warnings.map((warning) => [warning.line, warning.problems[0]?.field])).toEqual([
+        [6, "address.country"],
       ])
       const exported = yield* run["companies.export"](f.jane, { teamId: f.acme })
       const rows = parseCsv(exported.csv).slice(1)
       expect(rows.map((row) => [row[0], row[1], row[6], row[9]]).sort()).toEqual([
+        ["Elsewhere", "", "", ""],
         ["Helio", "helio.co", "Sydney", "AU"],
         ["Kumo", "kumo.jp", "Tokyo", "JP"],
+        ["Nowhere", "", "", "AU"],
       ])
     }).pipe(Effect.provide(CoreLive)),
   )

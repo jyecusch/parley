@@ -297,9 +297,12 @@ export function CompanyPanel(props: {
   )
 }
 
-function EditableAddress(props: {
+/** A record's postal address (D104, D128): a summary, and the fields to edit it in place. */
+export function EditableAddress(props: {
   readonly value: PostalAddress | null
   readonly onSave: (address: PostalAddress | null) => void
+  /** Prefixes the inputs' ids, so a company's and a contact's never clash. */
+  readonly idPrefix?: string
 }) {
   const [editing, setEditing] = useState(false)
   const formRef = useRef<HTMLFieldSetElement>(null)
@@ -328,7 +331,7 @@ function EditableAddress(props: {
           }}
         >
           <legend className="sr-only">Address</legend>
-          <AddressInputs idPrefix="eco" value={value} />
+          <AddressInputs idPrefix={props.idPrefix ?? "eco"} value={value} />
           <div className="mt-2 mb-1 flex gap-1.5">
             <Button size="sm" variant="primary" onClick={save}>
               Save
