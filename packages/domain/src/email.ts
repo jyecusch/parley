@@ -1,6 +1,16 @@
 import { Schema } from "effect"
 import { Filter } from "./filter.ts"
-import { CampaignId, ContactId, SegmentId, SendingDomainId, TemplateId, TopicId, UserId } from "./ids.ts"
+import {
+  CampaignId,
+  ContactId,
+  EmailImageId,
+  EmailStyleId,
+  SegmentId,
+  SendingDomainId,
+  TemplateId,
+  TopicId,
+  UserId,
+} from "./ids.ts"
 
 const Timestamp = Schema.String.annotate({ description: "ISO 8601 timestamp" })
 
@@ -147,6 +157,8 @@ export const Template = Schema.Struct({
   subject: Schema.String,
   previewText: Schema.String,
   body: Schema.String,
+  /** The email style it uses; null means the team's default (D117). */
+  styleId: Schema.NullOr(EmailStyleId),
   createdAt: Timestamp,
   updatedAt: Timestamp,
 })
@@ -166,6 +178,8 @@ export const CampaignCounts = Schema.Struct({
   bounced: Schema.Number,
   markedAsSpam: Schema.Number,
   cancelled: Schema.Number,
+  /** Recipients who unsubscribed through this campaign's link, from everything or from its topic (D119). */
+  unsubscribed: Schema.Number,
 })
 export type CampaignCounts = typeof CampaignCounts.Type
 
@@ -177,6 +191,8 @@ export const Campaign = Schema.Struct({
   previewText: Schema.String,
   body: Schema.String,
   status: CampaignStatus,
+  /** The email style it uses; null means the team's default (D117). A sent campaign keeps the look it was sent with. */
+  styleId: Schema.NullOr(EmailStyleId),
   segmentId: Schema.NullOr(SegmentId),
   /** The segment's name, as it was when sent for a sent campaign. */
   segmentName: Schema.NullOr(Schema.String),
@@ -224,6 +240,8 @@ export const Recipient = Schema.Struct({
   /** Why sending failed, in our words. */
   error: Schema.NullOr(Schema.String),
   sentAt: Schema.NullOr(Timestamp),
+  /** Whether they unsubscribed through this campaign's link: from everything, or from its topic (D119). */
+  unsubscribed: Schema.NullOr(Schema.Literals(["everything", "topic"])),
 })
 export type Recipient = typeof Recipient.Type
 
@@ -274,3 +292,79 @@ export const UnsubscribeChange = Schema.Union([
   Schema.Struct({ kind: Schema.Literal("topic"), topicId: TopicId, subscribed: Schema.Boolean }),
 ])
 export type UnsubscribeChange = typeof UnsubscribeChange.Type
+
+// Email styles (D116) and images (D120)
+
+export const EmailStyleName = Schema.String.check(Schema.isTrimmed(), Schema.isMinLength(1), Schema.isMaxLength(80))
+export const HexColor = Schema.String.check(Schema.isPattern(/^#[0-9a-fA-F]{6}$/)).annotate({
+  title: "Colour",
+  description: "A hex colour like #1F2430.",
+})
+export const EmailStyleLayout = Schema.Literals(["plain", "card", "custom"]).annotate({
+  title: "Layout",
+  description:
+    "plain: like a personal email. card: the content on a white card over the background colour. custom: your own HTML (customHtml) around the content.",
+})
+export type EmailStyleLayout = typeof EmailStyleLayout.Type
+export const EmailFont = Schema.Literals(["sans", "serif", "default"]).annotate({
+  title: "Font",
+  description: "sans (Helvetica, Arial), serif (Georgia, Times), or default: the reader's own font.",
+})
+export type EmailFont = typeof EmailFont.Type
+export const EmailStyleColors = Schema.Struct({
+  text: HexColor,
+  background: HexColor,
+  link: HexColor,
+  button: HexColor,
+  buttonText: HexColor,
+})
+export type EmailStyleColors = typeof EmailStyleColors.Type
+export const HeaderText = Schema.String.check(Schema.isTrimmed(), Schema.isMaxLength(120))
+export const CustomHtml = Schema.String.check(Schema.isMaxLength(100_000)).annotate({
+  title: "Custom HTML",
+  description:
+    "Your own HTML around the content, for layout custom. It must contain {{content}} where the email's body goes. Scripts, forms and iframes are removed, and Parley's footer is always added after it.",
+})
+
+/** A reusable look for emails (D116): logo and header, colours, font, plain or card, or custom HTML. */
+export const EmailStyle = Schema.Struct({
+  id: EmailStyleId,
+  name: Schema.String,
+  /** The team's default: templates and campaigns without a style of their own use it. Exactly one per team. */
+  isDefault: Schema.Boolean,
+  layout: EmailStyleLayout,
+  /** The logo's public address, or null for none. */
+  logoUrl: Schema.NullOr(Schema.String),
+  logoAlign: Schema.Literals(["left", "center"]),
+  headerText: Schema.NullOr(Schema.String),
+  /** Where the footer's lines sit, inside the same column or card as the content. */
+  footerAlign: Schema.Literals(["left", "center", "right"]),
+  colors: EmailStyleColors,
+  font: EmailFont,
+  customHtml: Schema.NullOr(Schema.String),
+  /** How many templates and draft campaigns name this style. A style in use can't be deleted. */
+  usedBy: Schema.Struct({ templates: Schema.Number, campaigns: Schema.Number }),
+  createdAt: Timestamp,
+  updatedAt: Timestamp,
+})
+export type EmailStyle = typeof EmailStyle.Type
+
+/** The plain look's colours (D115): what a new style starts with. */
+export const PLAIN_COLORS: EmailStyleColors = {
+  text: "#1A1A1A",
+  background: "#FFFFFF",
+  link: "#1A0DAB",
+  button: "#1A1A1A",
+  buttonText: "#FFFFFF",
+}
+
+/** An image hosted by Parley for use in emails (D120). Public, at an unguessable address. */
+export const EmailImage = Schema.Struct({
+  id: EmailImageId,
+  /** The absolute public address to put in an email, e.g. in Markdown ![description](url). */
+  url: Schema.String,
+  width: Schema.Number,
+  height: Schema.Number,
+  createdAt: Timestamp,
+})
+export type EmailImage = typeof EmailImage.Type

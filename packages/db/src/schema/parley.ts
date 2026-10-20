@@ -442,6 +442,59 @@ export const segmentContacts = pgTable(
   ],
 )
 
+/** A reusable look for emails (D116). Every team has at least one, and exactly one is its default. */
+export const emailStyles = pgTable(
+  "email_styles",
+  {
+    id: uuid("id").primaryKey(),
+    teamId: teamId(),
+    name: text("name").notNull(),
+    isDefault: boolean("is_default").notNull().default(false),
+    layout: text("layout", { enum: ["plain", "card", "custom"] })
+      .notNull()
+      .default("plain"),
+    /** The logo's file key (an email image), or null for none. */
+    logoKey: text("logo_key"),
+    logoAlign: text("logo_align", { enum: ["left", "center"] })
+      .notNull()
+      .default("left"),
+    headerText: text("header_text"),
+    footerAlign: text("footer_align", { enum: ["left", "center", "right"] })
+      .notNull()
+      .default("left"),
+    colors: jsonb("colors")
+      .$type<{ text: string; background: string; link: string; button: string; buttonText: string }>()
+      .notNull(),
+    font: text("font", { enum: ["sans", "serif", "default"] })
+      .notNull()
+      .default("default"),
+    customHtml: text("custom_html"),
+    ...timestamps,
+  },
+  (t) => [
+    index("email_styles_team_idx").on(t.teamId),
+    // At most one default per team; the service keeps it at exactly one.
+    uniqueIndex("email_styles_default_key").on(t.teamId).where(sql`${t.isDefault}`),
+  ],
+)
+
+/** An image hosted for emails (D120): served publicly at /i/<id>, an unguessable id. */
+export const emailImages = pgTable(
+  "email_images",
+  {
+    id: uuid("id").primaryKey(),
+    teamId: teamId(),
+    /** Where the bytes are, in the file store. */
+    fileKey: text("file_key").notNull(),
+    width: integer("width").notNull(),
+    height: integer("height").notNull(),
+    /** The address it was copied from, for emailImages.import. */
+    sourceUrl: text("source_url"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [index("email_images_team_idx").on(t.teamId)],
+)
+
 /** Reusable content a campaign starts from (R41). */
 export const templates = pgTable(
   "templates",
@@ -452,6 +505,8 @@ export const templates = pgTable(
     subject: text("subject").notNull().default(""),
     previewText: text("preview_text").notNull().default(""),
     body: text("body").notNull().default(""),
+    /** Null uses the team's default style (D117). */
+    styleId: uuid("style_id").references(() => emailStyles.id, { onDelete: "set null" }),
     ...timestamps,
   },
   (t) => [index("templates_team_idx").on(t.teamId)],
@@ -467,6 +522,8 @@ export const campaigns = pgTable(
     subject: text("subject").notNull().default(""),
     previewText: text("preview_text").notNull().default(""),
     body: text("body").notNull().default(""),
+    /** Null uses the team's default style (D117). A sent campaign's look is in sent_as. */
+    styleId: uuid("style_id").references(() => emailStyles.id, { onDelete: "set null" }),
     segmentId: uuid("segment_id").references(() => segments.id, { onDelete: "set null" }),
     topicId: uuid("topic_id").references(() => topics.id, { onDelete: "set null" }),
     status: text("status", { enum: ["draft", "sending", "sent", "cancelled"] })

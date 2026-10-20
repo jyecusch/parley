@@ -3,6 +3,7 @@ import {
   type CampaignId,
   type Contact,
   type ContactId,
+  type EmailStyleId,
   type RecipientStatus,
   ROLE_PERMISSIONS,
   type SegmentId,
@@ -13,9 +14,10 @@ import {
 import { useLiveQuery } from "@tanstack/react-db"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { createFileRoute, getRouteApi, Link, useNavigate } from "@tanstack/react-router"
-import { useMemo, useState } from "react"
+import { type ReactNode, useMemo, useState } from "react"
 import { Composer, type Content, SaveState, useAutosave } from "../components/composer.tsx"
 import { EMAIL_FRAME_CLASS, EmailPreview } from "../components/email-preview.tsx"
+import { EmailStyleSelect } from "../components/email-style-select.tsx"
 import { LoadFailed } from "../components/record.tsx"
 import { TitleInput } from "../components/ui/email.tsx"
 import {
@@ -97,6 +99,7 @@ interface DraftFields extends Content {
   readonly name: string
   readonly segmentId: SegmentId | null
   readonly topicId: TopicId | null
+  readonly styleId: EmailStyleId | null
 }
 
 const fieldsOf = (campaign: Campaign): DraftFields => ({
@@ -106,6 +109,7 @@ const fieldsOf = (campaign: Campaign): DraftFields => ({
   body: campaign.body,
   segmentId: campaign.segmentId,
   topicId: campaign.topicId,
+  styleId: campaign.styleId,
 })
 
 /** A draft in the composer (R42), with its segment and topic. Edits save once typing pauses. */
@@ -172,7 +176,7 @@ function DraftEditor(props: {
             maxLength={120}
             readOnly={readOnly}
             value={draft.name}
-            onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+            onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
           />
         </Breadcrumb>
         <Badge className="ml-2">Draft</Badge>
@@ -220,20 +224,22 @@ function DraftEditor(props: {
       </PageHeader>
       {error ? <ErrorText className="px-4 pt-2.5">{error}</ErrorText> : null}
       <Composer
+        teamId={teamId}
         content={draft}
         readOnly={readOnly}
-        onChange={(content) => setDraft({ ...draft, ...content })}
-        previewKey={previewAs}
+        onChange={(change) => setDraft((current) => ({ ...current, ...change }))}
+        previewKey={`${previewAs}:${draft.styleId ?? ""}`}
         preview={(content) =>
           call("campaigns.preview", {
             teamId,
             campaignId: saved.id,
             ...content,
+            styleId: draft.styleId,
             ...(previewAs ? { contactId: previewAs } : {}),
           })
         }
         settings={
-          <div className="grid grid-cols-2 gap-3.5 @max-xl/content:grid-cols-1">
+          <div className="grid grid-cols-3 gap-3.5 @max-3xl/content:grid-cols-2 @max-xl/content:grid-cols-1">
             <div className="flex min-w-0 flex-col">
               <FieldLabel htmlFor="cmp-segment">To</FieldLabel>
               <Select
@@ -241,7 +247,7 @@ function DraftEditor(props: {
                 disabled={readOnly}
                 value={draft.segmentId ?? ""}
                 onChange={(event) =>
-                  setDraft({ ...draft, segmentId: (event.target.value || null) as SegmentId | null })
+                  setDraft((current) => ({ ...current, segmentId: (event.target.value || null) as SegmentId | null }))
                 }
               >
                 <option value="">Choose a segment…</option>
@@ -274,7 +280,9 @@ function DraftEditor(props: {
                 id="cmp-topic"
                 disabled={readOnly}
                 value={draft.topicId ?? ""}
-                onChange={(event) => setDraft({ ...draft, topicId: (event.target.value || null) as TopicId | null })}
+                onChange={(event) =>
+                  setDraft((current) => ({ ...current, topicId: (event.target.value || null) as TopicId | null }))
+                }
               >
                 <option value="">No topic</option>
                 {(topics.data ?? []).map((topic) => (
@@ -285,6 +293,12 @@ function DraftEditor(props: {
               </Select>
               <Hint className="mt-1.5">Unsubscribing from this email leaves only its topic.</Hint>
             </div>
+            <EmailStyleSelect
+              teamId={teamId}
+              value={draft.styleId}
+              disabled={readOnly}
+              onChange={(styleId) => setDraft((current) => ({ ...current, styleId }))}
+            />
           </div>
         }
         previewBar={
@@ -533,7 +547,8 @@ function Report(props: { readonly teamId: TeamId; readonly campaign: Campaign; r
   const { teamId, campaign } = props
   const queryClient = useQueryClient()
   const navigate = useNavigate()
-  const [status, setStatus] = useState<RecipientStatus | "">("")
+  /** Which recipients to list: one status, those who unsubscribed through this campaign, or everyone. */
+  const [status, setStatus] = useState<RecipientStatus | "unsubscribed" | "">("")
   const [error, setError] = useState<string>()
   const counts = campaign.counts
   const recipients = useQuery({
@@ -543,29 +558,50 @@ function Report(props: { readonly teamId: TeamId; readonly campaign: Campaign; r
         teamId,
         campaignId: campaign.id,
         limit: 500,
-        ...(status ? { status } : {}),
+        ...(status === "unsubscribed" ? { unsubscribed: true } : status ? { status } : {}),
       }),
   })
+  const listed = recipients.data?.items ?? []
   const preview = useQuery({
     queryKey: ["campaign-preview", teamId, campaign.id],
     queryFn: () => call("campaigns.preview", { teamId, campaignId: campaign.id }),
   })
-  const tiles: ReadonlyArray<{ readonly label: string; readonly value: number; readonly status?: RecipientStatus }> =
-    counts
-      ? [
-          { label: "Recipients", value: counts.recipients },
-          { label: "Sent", value: counts.sent + counts.delivered, status: "sent" },
-          { label: "Delivered", value: counts.delivered, status: "delivered" },
-          { label: "Queued", value: counts.queued, status: "queued" },
-          { label: "Skipped", value: counts.skipped, status: "skipped" },
-          { label: "Failed", value: counts.failed, status: "failed" },
-          { label: "Bounced", value: counts.bounced, status: "bounced" },
-          { label: "Marked as spam", value: counts.markedAsSpam, status: "marked-as-spam" },
-          ...(counts.cancelled > 0
-            ? [{ label: "Cancelled", value: counts.cancelled, status: "cancelled" as const }]
-            : []),
-        ]
-      : []
+  const reached = counts ? counts.delivered || counts.sent + counts.delivered : 0
+  /** Tiles for what happened. Queued, skipped, failed and cancelled show only when there are some. */
+  const tiles: ReadonlyArray<{
+    readonly label: string
+    readonly value: ReactNode
+    readonly status?: RecipientStatus | "unsubscribed"
+  }> = counts
+    ? [
+        { label: "Recipients", value: counts.recipients },
+        { label: "Sent", value: counts.sent + counts.delivered, status: "sent" as const },
+        { label: "Delivered", value: counts.delivered, status: "delivered" as const },
+        {
+          label: "Unsubscribed",
+          value: (
+            <>
+              {counts.unsubscribed}
+              {reached > 0 ? (
+                <span className="text-sm font-normal text-subtle">
+                  {" "}
+                  · {Math.round((counts.unsubscribed / reached) * 100)}%
+                </span>
+              ) : null}
+            </>
+          ),
+          status: "unsubscribed" as const,
+        },
+        ...(counts.queued > 0 ? [{ label: "Queued", value: counts.queued, status: "queued" as const }] : []),
+        ...(counts.skipped > 0 ? [{ label: "Skipped", value: counts.skipped, status: "skipped" as const }] : []),
+        ...(counts.failed > 0 ? [{ label: "Failed", value: counts.failed, status: "failed" as const }] : []),
+        { label: "Bounced", value: counts.bounced, status: "bounced" as const },
+        { label: "Marked as spam", value: counts.markedAsSpam, status: "marked-as-spam" as const },
+        ...(counts.cancelled > 0
+          ? [{ label: "Cancelled", value: counts.cancelled, status: "cancelled" as const }]
+          : []),
+      ]
+    : []
 
   const act = async (work: () => Promise<unknown>) => {
     try {
@@ -643,7 +679,7 @@ function Report(props: { readonly teamId: TeamId; readonly campaign: Campaign; r
                 </tr>
               </thead>
               <tbody>
-                {(recipients.data?.items ?? []).map((recipient, index) => (
+                {listed.map((recipient, index) => (
                   // biome-ignore lint/suspicious/noArrayIndexKey: a purged contact leaves no id
                   <Tr key={`${recipient.contactId ?? "gone"}-${index}`}>
                     <Td>
@@ -666,9 +702,12 @@ function Report(props: { readonly teamId: TeamId; readonly campaign: Campaign; r
                         ["failed", "bounced", "marked-as-spam"].includes(recipient.status) ? "text-danger" : undefined
                       }
                     >
-                      {RECIPIENT_LABELS[recipient.status]}
+                      {recipient.unsubscribed ? "Unsubscribed" : RECIPIENT_LABELS[recipient.status]}
                     </Td>
                     <Td className="text-subtle">
+                      {recipient.unsubscribed
+                        ? `${recipient.unsubscribed === "topic" ? "From this topic" : "From everything"} · `
+                        : null}
                       {recipient.skipReason ? SKIP_LABELS[recipient.skipReason] : (recipient.error ?? "")}
                       {recipient.sentAt ? (
                         <span title={absolute(recipient.sentAt)}>{ago(recipient.sentAt)}</span>

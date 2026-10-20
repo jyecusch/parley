@@ -9,6 +9,8 @@ import type { Companies } from "../services/companies.ts"
 import type { Connections } from "../services/connections.ts"
 import type { Contacts } from "../services/contacts.ts"
 import type { CustomFields } from "../services/custom-fields.ts"
+import type { EmailImages } from "../services/email-images.ts"
+import type { EmailStyles } from "../services/email-styles.ts"
 import type { Invitations } from "../services/invitations.ts"
 import type { Members } from "../services/members.ts"
 import type { Notes } from "../services/notes.ts"
@@ -31,7 +33,9 @@ import * as connections from "./connections.ts"
 import * as contacts from "./contacts.ts"
 import * as csv from "./csv.ts"
 import * as customFields from "./custom-fields.ts"
+import * as emailImages from "./email-images.ts"
 import * as emailSetup from "./email-setup.ts"
+import * as emailStyles from "./email-styles.ts"
 import * as images from "./images.ts"
 import * as members from "./members.ts"
 import * as notes from "./notes.ts"
@@ -64,6 +68,8 @@ export type OperationServices =
   | Mailer
   | UnsubscribeLinks
   | RateLimiter
+  | EmailImages
+  | EmailStyles
 
 export type Implementation<Name extends OperationName> = (
   principal: Principal,
@@ -138,6 +144,15 @@ export const implementations: { readonly [Name in OperationName]: Implementation
   "serviceAccounts.delete": serviceAccounts.remove,
   "emailSettings.get": emailSetup.getSettings,
   "emailSettings.update": emailSetup.updateSettings,
+  "emailStyles.list": emailStyles.list,
+  "emailStyles.get": emailStyles.get,
+  "emailStyles.create": emailStyles.create,
+  "emailStyles.update": emailStyles.update,
+  "emailStyles.setDefault": emailStyles.setDefault,
+  "emailStyles.delete": emailStyles.remove,
+  "emailStyles.preview": emailStyles.preview,
+  "emailImages.upload": emailImages.upload,
+  "emailImages.import": emailImages.importFromUrl,
   "sendingDomains.list": emailSetup.listDomains,
   "sendingDomains.create": emailSetup.createDomain,
   "sendingDomains.verify": emailSetup.verifyDomain,

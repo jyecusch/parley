@@ -219,3 +219,56 @@ export const TuneIcon = ({ className }: P) => (
     <circle cx="9" cy="17" r="2" />
   </Icon>
 )
+export const LinkIcon = ({ className }: P) => (
+  <Icon className={className}>
+    <path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1" />
+    <path d="M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1" />
+  </Icon>
+)
+export const ListIcon = ({ className }: P) => (
+  <Icon className={className}>
+    <path d="M9 6h11M9 12h11M9 18h11" />
+    <circle cx="4.5" cy="6" r="1" />
+    <circle cx="4.5" cy="12" r="1" />
+    <circle cx="4.5" cy="18" r="1" />
+  </Icon>
+)
+export const ImageIcon = ({ className }: P) => (
+  <Icon className={className}>
+    <rect x="3" y="4" width="18" height="16" rx="2" />
+    <circle cx="9" cy="10" r="2" />
+    <path d="M21 16l-5-5-8 8" />
+  </Icon>
+)
+export const ButtonShapeIcon = ({ className }: P) => (
+  <Icon className={className}>
+    <rect x="3" y="7" width="18" height="10" rx="3" />
+  </Icon>
+)
+export const DividerIcon = ({ className }: P) => (
+  <Icon className={className}>
+    <path d="M3 12h18" />
+  </Icon>
+)
+export const PaletteIcon = ({ className }: P) => (
+  <Icon className={className}>
+    <path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.7-.9 1.4-1.9-.3-1 .4-2.1 1.5-2.1H17a4 4 0 0 0 4-4c0-5.5-4-10-9-10z" />
+    <circle cx="7.5" cy="11" r="1" />
+    <circle cx="10" cy="7" r="1" />
+    <circle cx="14.5" cy="7" r="1" />
+  </Icon>
+)
+/** Two panes side by side, for a layout toggle. */
+export const SideBySideIcon = ({ className }: P) => (
+  <Icon className={className}>
+    <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
+    <path d="M12 4.5v15" />
+  </Icon>
+)
+/** Two panes stacked, for a layout toggle. */
+export const StackedIcon = ({ className }: P) => (
+  <Icon className={className}>
+    <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
+    <path d="M3.5 12h17" />
+  </Icon>
+)

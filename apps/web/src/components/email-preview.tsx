@@ -1,8 +1,12 @@
 import DOMPurify from "dompurify"
 import { useEffect, useRef } from "react"
+import { cn } from "./ui/cn.ts"
 
-/** Where an email shows: a light page, whatever the app's theme, as an inbox shows it. */
-export const EMAIL_FRAME_CLASS = "mx-3.5 mb-3.5 min-h-96 flex-1 rounded-md bg-[#f4f4f4]"
+/**
+ * Where an email shows: white, whatever the app's theme, as an inbox shows it. The email paints any
+ * background of its own (a card style's colour); a plain one stays white (D115).
+ */
+export const EMAIL_FRAME_CLASS = "mx-3.5 mb-3.5 min-h-96 flex-1 rounded-md bg-white"
 
 /** CSS that could load something or escape the preview: imports, remote images and old IE scripting. */
 const UNSAFE_CSS = /@import|url\s*\(|expression\s*\(|behavio(u)?r\s*:|-moz-binding/i
@@ -17,7 +21,12 @@ const UNSAFE_CSS = /@import|url\s*\(|expression\s*\(|behavio(u)?r\s*:|-moz-bindi
  * host contains layout and paint, so even `position: fixed` stays inside the preview. Parley's
  * renderer already escapes what people type; this is the second line.
  */
-export function EmailPreview(props: { readonly html: string; readonly label: string }) {
+export function EmailPreview(props: {
+  readonly html: string
+  readonly label: string
+  /** Grow to the email's height instead of scrolling inside, as when the preview is stacked under content. */
+  readonly grow?: boolean
+}) {
   const host = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -45,8 +54,8 @@ export function EmailPreview(props: { readonly html: string; readonly label: str
       link.setAttribute("rel", "noopener noreferrer")
     }
     const style = document.createElement("style")
-    style.textContent = `:host { display: block; overflow: auto; contain: layout paint; color: #111111; color-scheme: light; }
-.email-body { margin: 0; background: #f4f4f4; min-height: 100%; }
+    style.textContent = `:host { display: block; overflow: auto; contain: layout paint; color: #111111; color-scheme: light; scrollbar-width: thin; scrollbar-color: rgba(0, 0, 0, 0.25) transparent; }
+.email-body { margin: 0; background: #ffffff; min-height: 100%; }
 ${css.replace(/(^|[\s,}])body\b/g, "$1.email-body")}`
     const wrapper = document.createElement("div")
     wrapper.className = "email-body"
@@ -54,5 +63,12 @@ ${css.replace(/(^|[\s,}])body\b/g, "$1.email-body")}`
     root.replaceChildren(style, wrapper)
   }, [props.html])
 
-  return <div ref={host} className={EMAIL_FRAME_CLASS} role="document" aria-label={props.label} />
+  return (
+    <div
+      ref={host}
+      className={cn(EMAIL_FRAME_CLASS, props.grow && "flex-none overflow-visible")}
+      role="document"
+      aria-label={props.label}
+    />
+  )
 }

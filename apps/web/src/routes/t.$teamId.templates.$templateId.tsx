@@ -2,7 +2,8 @@ import { ROLE_PERMISSIONS, type TeamId, type Template, type TemplateId } from "@
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { createFileRoute, getRouteApi, Link, useNavigate } from "@tanstack/react-router"
 import { useState } from "react"
-import { Composer, type Content, SaveState, useAutosave } from "../components/composer.tsx"
+import { Composer, SaveState, useAutosave } from "../components/composer.tsx"
+import { EmailStyleSelect } from "../components/email-style-select.tsx"
 import { LoadFailed } from "../components/record.tsx"
 import { TitleInput } from "../components/ui/email.tsx"
 import {
@@ -65,10 +66,17 @@ function TemplateEditor(props: { readonly teamId: TeamId; readonly template: Tem
     subject: saved.subject,
     previewText: saved.previewText,
     body: saved.body,
+    styleId: saved.styleId,
   })
   const [error, setError] = useState<string>()
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const savedFields = { name: saved.name, subject: saved.subject, previewText: saved.previewText, body: saved.body }
+  const savedFields = {
+    name: saved.name,
+    subject: saved.subject,
+    previewText: saved.previewText,
+    body: saved.body,
+    styleId: saved.styleId,
+  }
 
   const state = useAutosave(draft, savedFields, async (value) => {
     try {
@@ -113,7 +121,7 @@ function TemplateEditor(props: { readonly teamId: TeamId; readonly template: Tem
             maxLength={120}
             readOnly={!props.canWrite}
             value={draft.name}
-            onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+            onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
           />
         </Breadcrumb>
         <SaveState state={state} />
@@ -150,10 +158,23 @@ function TemplateEditor(props: { readonly teamId: TeamId; readonly template: Tem
       </PageHeader>
       {error ? <ErrorText className="px-4 pt-2.5">{error}</ErrorText> : null}
       <Composer
+        teamId={teamId}
         content={draft}
         readOnly={!props.canWrite}
-        onChange={(content: Content) => setDraft({ ...draft, ...content })}
-        preview={(content) => call("templates.preview", { teamId, templateId: saved.id, ...content })}
+        onChange={(change) => setDraft((current) => ({ ...current, ...change }))}
+        previewKey={draft.styleId ?? ""}
+        preview={(content) =>
+          call("templates.preview", { teamId, templateId: saved.id, ...content, styleId: draft.styleId })
+        }
+        settings={
+          <EmailStyleSelect
+            teamId={teamId}
+            value={draft.styleId}
+            disabled={!props.canWrite}
+            onChange={(styleId) => setDraft((current) => ({ ...current, styleId }))}
+            hint="Campaigns made from this template start with this style."
+          />
+        }
       />
     </Card>
   )

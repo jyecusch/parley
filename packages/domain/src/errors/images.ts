@@ -43,3 +43,18 @@ export class FileNotFound extends Schema.TaggedError<FileNotFound>()("FileNotFou
     return userText`This file doesn't exist, or you don't have access to it.`
   }
 }
+
+/** Parley couldn't fetch an image from the address given: it didn't answer, refused, or isn't public. */
+export class ImageUrlUnreachable
+  extends Schema.TaggedError<ImageUrlUnreachable>()("ImageUrlUnreachable", { status: Schema.NullOr(Schema.Number) })
+  implements DomainError
+{
+  readonly isRetryable = true
+  override readonly [ErrorReporter.severity] = "Info" as const
+  override get message() {
+    return `image url unreachable (status ${this.status ?? "none"})`
+  }
+  get userMessage() {
+    return userText`Parley couldn't fetch an image from that address. Check it opens in a browser and is public, or upload the image instead.`
+  }
+}

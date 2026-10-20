@@ -15,6 +15,7 @@ import {
   KeyIcon,
   MailIcon,
   MembersIcon,
+  PaletteIcon,
   ServiceAccountIcon,
   SettingsIcon,
 } from "./icons.tsx"
@@ -83,6 +84,7 @@ const SETTINGS_PAGES = [
   { group: "team", to: "/t/$teamId/settings/members", label: "Members", icon: <MembersIcon /> },
   { group: "team", to: "/t/$teamId/settings/fields", label: "Fields", icon: <DisplayIcon className="size-5" /> },
   { group: "team", to: "/t/$teamId/settings/email", label: "Email", icon: <MailIcon /> },
+  { group: "team", to: "/t/$teamId/settings/email-styles", label: "Email styles", icon: <PaletteIcon /> },
   {
     group: "team",
     to: "/t/$teamId/settings/service-accounts",

@@ -50,3 +50,9 @@ export type CampaignId = typeof CampaignId.Type
 
 export const SendingDomainId = Schema.String.pipe(Schema.brand("SendingDomainId"))
 export type SendingDomainId = typeof SendingDomainId.Type
+
+export const EmailStyleId = Schema.String.pipe(Schema.brand("EmailStyleId"))
+export type EmailStyleId = typeof EmailStyleId.Type
+
+export const EmailImageId = Schema.String.pipe(Schema.brand("EmailImageId"))
+export type EmailImageId = typeof EmailImageId.Type

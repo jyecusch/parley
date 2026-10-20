@@ -11,6 +11,8 @@ import { Connections } from "./services/connections.ts"
 import { Contacts } from "./services/contacts.ts"
 import { CustomFields } from "./services/custom-fields.ts"
 import { DeliveryEvents } from "./services/delivery-events.ts"
+import { EmailImages } from "./services/email-images.ts"
+import { EmailStyles } from "./services/email-styles.ts"
 import { FileStore } from "./services/file-store.ts"
 import { Invitations } from "./services/invitations.ts"
 import { Members } from "./services/members.ts"
@@ -39,6 +41,7 @@ export { Mailer, type OutgoingEmail } from "./mail/mailer.ts"
 export { type Implementation, implementations, type OperationServices } from "./operations/registry.ts"
 export type { Principal } from "./principal.ts"
 export type { DeliveryEvents } from "./services/delivery-events.ts"
+export { EmailImages } from "./services/email-images.ts"
 export { FileStore } from "./services/file-store.ts"
 export type { Members } from "./services/members.ts"
 export { RateLimiter } from "./services/rate-limiter.ts"
@@ -46,8 +49,17 @@ export type { Subscriptions } from "./services/subscriptions.ts"
 export { UnsubscribeLinks } from "./services/unsubscribe-links.ts"
 
 /** Contacts and companies both do domain matching through Affiliations. */
-const Records = Layer.mergeAll(Contacts.layer, Companies.layer, SavedViews.layer, Segments.layer, Templates.layer).pipe(
-  Layer.provideMerge(Layer.mergeAll(Affiliations.layer, CustomFields.layer, FileStore.layer)),
+const Records = Layer.mergeAll(
+  Contacts.layer,
+  Companies.layer,
+  SavedViews.layer,
+  Segments.layer,
+  Templates.layer,
+  EmailStyles.layer,
+).pipe(
+  Layer.provideMerge(
+    Layer.mergeAll(Affiliations.layer, CustomFields.layer, EmailImages.layer).pipe(Layer.provideMerge(FileStore.layer)),
+  ),
 )
 
 const Services = Layer.mergeAll(

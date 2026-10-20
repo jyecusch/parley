@@ -1,7 +1,11 @@
-import type { RenderedEmail } from "@parley/domain"
+import type { RenderedEmail, TeamId } from "@parley/domain"
 import { type ReactNode, useEffect, useRef, useState } from "react"
+import { call, messageOf } from "../lib/client.ts"
+import { useComposerLayout } from "./composer-layout.ts"
 import { EMAIL_FRAME_CLASS, EmailPreview } from "./email-preview.tsx"
-import { cn, ErrorText, FieldLabel, Hint, Input, Notice, Spacer, Textarea } from "./ui/index.ts"
+import { SideBySideIcon, StackedIcon } from "./icons.tsx"
+import { type BodyTransform, imageMarkdown, insertBlock, MarkdownToolbar, readAsDataUrl } from "./markdown-toolbar.tsx"
+import { cn, ErrorText, FieldLabel, Hint, IconButton, Input, Notice, Spacer, Textarea } from "./ui/index.ts"
 
 /** Subject, preview text and body: what a template and a campaign both hold (R41). */
 export interface Content {
@@ -57,10 +61,17 @@ export function SaveState(props: { readonly state: "saved" | "saving" | "unsaved
 /**
  * The composer (05-ux view types): content on the left, the email as a recipient gets it on the
  * right. The preview is rendered by the server, so it matches what's sent.
+ *
+ * The text fields hold their own text (defaultValue) and report each change, rather than React
+ * writing the value back on every keystroke: on this busy screen that write-back could land after
+ * the next keystroke and drop it. Toolbar edits set the field's text directly.
  */
 export function Composer(props: {
+  /** The team images are uploaded to. */
+  readonly teamId: TeamId
   readonly content: Content
-  readonly onChange: (content: Content) => void
+  /** Only the fields that changed, so quick typing never overwrites a keystroke with a stale copy. */
+  readonly onChange: (change: Partial<Content>) => void
   readonly readOnly: boolean
   readonly preview: (content: Content) => Promise<RenderedEmail>
   /** Fields above the content, such as a campaign's segment and topic. */
@@ -71,6 +82,8 @@ export function Composer(props: {
   readonly previewKey?: string
 }) {
   const body = useRef<HTMLTextAreaElement>(null)
+  const frame = useRef<HTMLDivElement>(null)
+  const layout = useComposerLayout(frame)
   const [rendered, setRendered] = useState<RenderedEmail>()
   const [previewError, setPreviewError] = useState<string>()
   const { content, preview } = props
@@ -96,22 +109,57 @@ export function Composer(props: {
     }
   }, [content, props.previewKey])
 
+  const [pasteError, setPasteError] = useState<string>()
+
+  /** Applies a toolbar edit to the body, then puts the selection where the edit says. */
+  const edit = (transform: BodyTransform) => {
+    const area = body.current
+    if (!area || props.readOnly) return
+    const next = transform(area.value, area.selectionStart, area.selectionEnd)
+    area.value = next.text
+    props.onChange({ body: next.text })
+    window.requestAnimationFrame(() => {
+      area.focus()
+      area.setSelectionRange(next.start, next.end)
+    })
+  }
+
+  /** A pasted image is uploaded and its Markdown inserted where the cursor was. */
+  const onPaste = (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const pasted = [...event.clipboardData.files].find((file) => file.type.startsWith("image/"))
+    if (!pasted || props.readOnly) return
+    event.preventDefault()
+    setPasteError(undefined)
+    void readAsDataUrl(pasted)
+      .then((image) => call("emailImages.upload", { teamId: props.teamId, image }))
+      .then((uploaded) => edit(insertBlock(imageMarkdown(uploaded, ""))))
+      .catch((failure: unknown) => setPasteError(messageOf(failure)))
+  }
+
   const insert = (tag: string) => {
     const area = body.current
     if (!area || props.readOnly) return
     const start = area.selectionStart
     const end = area.selectionEnd
-    const next = `${content.body.slice(0, start)}${tag}${content.body.slice(end)}`
-    props.onChange({ ...content, body: next })
+    const next = `${area.value.slice(0, start)}${tag}${area.value.slice(end)}`
+    area.value = next
+    props.onChange({ body: next })
     window.requestAnimationFrame(() => {
       area.focus()
       area.setSelectionRange(start + tag.length, start + tag.length)
     })
   }
 
+  // Side by side, the content and the preview scroll on their own, split by a handle that can be
+  // dragged. Stacked, only the whole composer scrolls: the panes, the preview and the body grow to fit.
+  const stacked = layout.stacked
   return (
-    <div className="grid min-h-0 flex-1 grid-cols-2 overflow-auto border-t border-line @max-4xl/content:grid-cols-1">
-      <div className="flex flex-col gap-3.5 overflow-auto border-r border-line p-4 @max-4xl/content:border-r-0">
+    <div
+      ref={frame}
+      className={cn("grid min-h-0 flex-1 overflow-auto border-t border-line", stacked && "grid-cols-1")}
+      style={stacked ? undefined : { gridTemplateColumns: `${layout.split}% auto minmax(0, 1fr)` }}
+    >
+      <div className={cn("flex min-w-0 flex-col gap-3.5 p-4", stacked ? "overflow-visible" : "overflow-auto")}>
         {props.settings}
         <div className="flex min-w-0 flex-col">
           <FieldLabel htmlFor="cmp-subject">Subject</FieldLabel>
@@ -120,8 +168,8 @@ export function Composer(props: {
             maxLength={200}
             readOnly={props.readOnly}
             placeholder="What's this email about?"
-            value={content.subject}
-            onChange={(event) => props.onChange({ ...content, subject: event.target.value })}
+            defaultValue={content.subject}
+            onChange={(event) => props.onChange({ subject: event.target.value })}
           />
         </div>
         <div className="flex min-w-0 flex-col">
@@ -133,8 +181,8 @@ export function Composer(props: {
             maxLength={200}
             readOnly={props.readOnly}
             placeholder="Shown after the subject in most inboxes"
-            value={content.previewText}
-            onChange={(event) => props.onChange({ ...content, previewText: event.target.value })}
+            defaultValue={content.previewText}
+            onChange={(event) => props.onChange({ previewText: event.target.value })}
           />
         </div>
         <div className="flex min-h-80 min-w-0 flex-1 flex-col gap-1.5">
@@ -158,25 +206,42 @@ export function Composer(props: {
               </span>
             )}
           </div>
+          {props.readOnly ? null : <MarkdownToolbar teamId={props.teamId} disabled={props.readOnly} onEdit={edit} />}
           <Textarea
             id="cmp-body"
+            onPaste={onPaste}
             ref={body}
-            className="min-h-64 flex-1 resize-none py-2.5 font-mono"
+            className={cn("min-h-64 flex-1 resize-none py-2.5 font-mono", stacked && "[field-sizing:content]")}
             readOnly={props.readOnly}
             placeholder={
               "# A heading\n\nWrite in Markdown: **bold**, _italic_, [links](https://example.com) and lists.\n\nHi {{first_name|there}},"
             }
-            value={content.body}
-            onChange={(event) => props.onChange({ ...content, body: event.target.value })}
+            defaultValue={content.body}
+            onChange={(event) => props.onChange({ body: event.target.value })}
           />
+          {pasteError ? <ErrorText>{pasteError}</ErrorText> : null}
           <Hint>Parley adds your footer, with the unsubscribe link, to the end of every email.</Hint>
         </div>
       </div>
-      <div className="flex min-h-0 flex-col bg-canvas">
+      {stacked ? null : (
+        <div
+          {...layout.separator}
+          className="relative w-3 cursor-col-resize touch-none bg-canvas before:absolute before:inset-y-0 before:left-1/2 before:w-px before:-translate-x-1/2 before:bg-line before:transition-colors hover:before:w-0.5 hover:before:bg-control focus-visible:outline-none focus-visible:before:w-0.5 focus-visible:before:bg-focus motion-reduce:before:transition-none"
+        />
+      )}
+      <div className={cn("flex min-h-0 min-w-0 flex-col bg-canvas", stacked && "border-t border-line")}>
         <div className="flex h-11 shrink-0 items-center gap-2 px-3.5">
           <span className="text-sm text-subtle">Preview</span>
           <Spacer />
           {props.previewBar}
+          <IconButton
+            label={stacked ? "Show the preview beside the content" : "Show the preview under the content"}
+            tip={stacked ? "Side by side" : "Stacked"}
+            size="xs"
+            onClick={layout.toggle}
+          >
+            {stacked ? <SideBySideIcon className="size-4" /> : <StackedIcon className="size-4" />}
+          </IconButton>
         </div>
         {rendered ? (
           <div className="mx-3.5 mb-2.5 rounded-md bg-surface px-3 py-2.5 inset-ring inset-ring-line">
@@ -191,7 +256,11 @@ export function Composer(props: {
           </Notice>
         ) : null}
         {previewError ? <ErrorText className="mx-3.5 mb-2.5">{previewError}</ErrorText> : null}
-        {rendered ? <EmailPreview html={rendered.html} label="Email preview" /> : <div className={EMAIL_FRAME_CLASS} />}
+        {rendered ? (
+          <EmailPreview html={rendered.html} label="Email preview" grow={stacked} />
+        ) : (
+          <div className={EMAIL_FRAME_CLASS} />
+        )}
       </div>
     </div>
   )

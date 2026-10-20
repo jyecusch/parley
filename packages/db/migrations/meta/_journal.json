@@ -78,6 +78,20 @@
       "when": 1792447403137,
       "tag": "0010_email",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1792467978405,
+      "tag": "0011_email_styles",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1792474240451,
+      "tag": "0012_footer_align",
+      "breakpoints": true
     }
   ]
 }

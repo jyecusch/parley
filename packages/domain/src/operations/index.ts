@@ -54,6 +54,17 @@ import {
   updateTopic,
   verifySendingDomain,
 } from "./email-setup.ts"
+import {
+  createEmailStyle,
+  deleteEmailStyle,
+  getEmailStyle,
+  importEmailImage,
+  listEmailStyles,
+  previewEmailStyle,
+  setDefaultEmailStyle,
+  updateEmailStyle,
+  uploadEmailImage,
+} from "./email-styles.ts"
 import { removeCompanyLogo, removeContactAvatar, setCompanyLogo, setContactAvatar } from "./images.ts"
 import {
   acceptInvitation,
@@ -94,6 +105,7 @@ export * from "./contacts.ts"
 export * from "./csv.ts"
 export * from "./custom-fields.ts"
 export * from "./email-setup.ts"
+export * from "./email-styles.ts"
 export * from "./images.ts"
 export * from "./members.ts"
 export * from "./notes.ts"
@@ -167,6 +179,15 @@ export const operations = {
   "serviceAccounts.delete": deleteServiceAccount,
   "emailSettings.get": getEmailSettings,
   "emailSettings.update": updateEmailSettings,
+  "emailStyles.list": listEmailStyles,
+  "emailStyles.get": getEmailStyle,
+  "emailStyles.create": createEmailStyle,
+  "emailStyles.update": updateEmailStyle,
+  "emailStyles.setDefault": setDefaultEmailStyle,
+  "emailStyles.delete": deleteEmailStyle,
+  "emailStyles.preview": previewEmailStyle,
+  "emailImages.upload": uploadEmailImage,
+  "emailImages.import": importEmailImage,
   "sendingDomains.list": listSendingDomains,
   "sendingDomains.create": createSendingDomain,
   "sendingDomains.verify": verifySendingDomain,

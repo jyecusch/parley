@@ -4,6 +4,7 @@ import { eq, inArray, sql } from "drizzle-orm"
 import { Config, Context, Duration, Effect, Layer, Ref } from "effect"
 import { type MergeValues, renderEmail } from "../email/render.ts"
 import { Mailer, type OutgoingEmail } from "../mail/mailer.ts"
+import { styleSentWith } from "./campaigns.ts"
 import type { Sender } from "./sending.ts"
 import { UnsubscribeLinks } from "./unsubscribe-links.ts"
 
@@ -180,12 +181,17 @@ export class CampaignSender extends Context.Service<
             email: merge.email ?? row.address,
             company: merge.company ?? "",
           }
-          const rendered = renderEmail(campaign, values, {
-            legalName: sender.legalName,
-            postalAddress: sender.postalAddress,
-            reason: sender.footerReason,
-            unsubscribeUrl: urls.page,
-          })
+          const rendered = renderEmail(
+            campaign,
+            values,
+            {
+              legalName: sender.legalName,
+              postalAddress: sender.postalAddress,
+              reason: sender.footerReason,
+              unsubscribeUrl: urls.page,
+            },
+            styleSentWith(campaign.sentAs),
+          )
           ready.push({
             row,
             email: {

@@ -1,0 +1,1 @@
+ALTER TABLE "email_styles" ADD COLUMN "footer_align" text DEFAULT 'left' NOT NULL;

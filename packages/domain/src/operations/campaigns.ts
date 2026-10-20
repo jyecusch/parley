@@ -26,8 +26,9 @@ import {
 } from "../errors/campaigns.ts"
 import { ContactNotFound } from "../errors/contacts.ts"
 import { EmailErrors } from "../errors/email.ts"
+import { EmailStyleNotFound } from "../errors/email-styles.ts"
 import { RequestsTooFrequent } from "../errors/infrastructure.ts"
-import { CampaignId, ContactId, SegmentId, TeamId, TemplateId, TopicId } from "../ids.ts"
+import { CampaignId, ContactId, EmailStyleId, SegmentId, TeamId, TemplateId, TopicId } from "../ids.ts"
 import { defineTeamOperation } from "../operation.ts"
 
 const InTeam = { teamId: TeamId.annotate({ description: "The team, from teams.list." }) }
@@ -43,6 +44,17 @@ const Content = {
   subject: Schema.optional(Subject),
   previewText: Schema.optional(PreviewText),
   body: Schema.optional(Body),
+}
+/** Which email style to use; null means the team's default (D117). */
+const Style = {
+  styleId: Schema.optional(
+    Schema.NullOr(
+      EmailStyleId.annotate({
+        title: "Email style",
+        description: "An email style's id, from emailStyles.list. Null uses the team's default style.",
+      }),
+    ),
+  ),
 }
 const PreviewContact = Schema.optional(
   ContactId.annotate({
@@ -76,9 +88,9 @@ export const getTemplate = defineTeamOperation({
 export const createTemplate = defineTeamOperation({
   name: "templates.create",
   description: "Save content as a template. The body is Markdown with merge tags.",
-  input: Schema.Struct({ ...InTeam, name: ContentName.annotate({ title: "Name" }), ...Content }),
+  input: Schema.Struct({ ...InTeam, name: ContentName.annotate({ title: "Name" }), ...Content, ...Style }),
   output: Template,
-  errors: [],
+  errors: [EmailStyleNotFound],
   http: { method: "POST", path: "/teams/:teamId/templates" },
   hints: { readOnly: false, destructive: false, idempotent: false },
   permissions: ["records:read", "email:write"],
@@ -87,9 +99,14 @@ export const createTemplate = defineTeamOperation({
 export const updateTemplate = defineTeamOperation({
   name: "templates.update",
   description: "Change a template. Campaigns made from it earlier keep their own copy.",
-  input: Schema.Struct({ ...OneTemplate, name: Schema.optional(ContentName.annotate({ title: "Name" })), ...Content }),
+  input: Schema.Struct({
+    ...OneTemplate,
+    name: Schema.optional(ContentName.annotate({ title: "Name" })),
+    ...Content,
+    ...Style,
+  }),
   output: Template,
-  errors: [TemplateNotFound],
+  errors: [TemplateNotFound, EmailStyleNotFound],
   http: { method: "PATCH", path: "/teams/:teamId/templates/:templateId" },
   hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: ["records:read", "email:write"],
@@ -110,9 +127,9 @@ export const previewTemplate = defineTeamOperation({
   name: "templates.preview",
   description:
     "Render a template as a recipient would get it, with the team's footer. Pass subject, previewText or body to preview unsaved changes.",
-  input: Schema.Struct({ ...OneTemplate, ...Content, contactId: PreviewContact }),
+  input: Schema.Struct({ ...OneTemplate, ...Content, ...Style, contactId: PreviewContact }),
   output: RenderedEmail,
-  errors: [TemplateNotFound, ContactNotFound],
+  errors: [TemplateNotFound, ContactNotFound, EmailStyleNotFound],
   http: { method: "POST", path: "/teams/:teamId/templates/:templateId/preview" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: ["records:read"],
@@ -143,7 +160,7 @@ export const getCampaign = defineTeamOperation({
 export const createCampaign = defineTeamOperation({
   name: "campaigns.create",
   description:
-    "Start a draft campaign, empty or from a template (its content is copied). Set its segment and, optionally, its topic.",
+    "Start a draft campaign, empty or from a template (its content and email style are copied). Set its segment and, optionally, its topic and email style.",
   input: Schema.Struct({
     ...InTeam,
     name: ContentName.annotate({ title: "Name", description: "For your team; recipients don't see it." }),
@@ -151,9 +168,10 @@ export const createCampaign = defineTeamOperation({
     segmentId: Schema.optional(Schema.NullOr(SegmentId)),
     topicId: Schema.optional(Schema.NullOr(TopicId)),
     ...Content,
+    ...Style,
   }),
   output: Campaign,
-  errors: [TemplateNotFound, SegmentNotFound, TopicNotFound],
+  errors: [TemplateNotFound, SegmentNotFound, TopicNotFound, EmailStyleNotFound],
   http: { method: "POST", path: "/teams/:teamId/campaigns" },
   hints: { readOnly: false, destructive: false, idempotent: false },
   permissions: ["records:read", "email:write"],
@@ -168,9 +186,10 @@ export const updateCampaign = defineTeamOperation({
     segmentId: Schema.optional(Schema.NullOr(SegmentId)),
     topicId: Schema.optional(Schema.NullOr(TopicId)),
     ...Content,
+    ...Style,
   }),
   output: Campaign,
-  errors: [CampaignNotFound, CampaignNotDraft, SegmentNotFound, TopicNotFound],
+  errors: [CampaignNotFound, CampaignNotDraft, SegmentNotFound, TopicNotFound, EmailStyleNotFound],
   http: { method: "PATCH", path: "/teams/:teamId/campaigns/:campaignId" },
   hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: ["records:read", "email:write"],
@@ -202,9 +221,9 @@ export const previewCampaign = defineTeamOperation({
   name: "campaigns.preview",
   description:
     "Render a campaign as a recipient would get it, with the footer. Pass subject, previewText or body to preview unsaved changes.",
-  input: Schema.Struct({ ...OneCampaign, ...Content, contactId: PreviewContact }),
+  input: Schema.Struct({ ...OneCampaign, ...Content, ...Style, contactId: PreviewContact }),
   output: RenderedEmail,
-  errors: [CampaignNotFound, ContactNotFound],
+  errors: [CampaignNotFound, ContactNotFound, EmailStyleNotFound],
   http: { method: "POST", path: "/teams/:teamId/campaigns/:campaignId/preview" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: ["records:read"],
@@ -266,10 +285,16 @@ export const cancelCampaign = defineTeamOperation({
 export const listCampaignRecipients = defineTeamOperation({
   name: "campaigns.recipients",
   description:
-    "Who a campaign went to, and what happened for each: sent, delivered, skipped (and why), failed, bounced.",
+    "Who a campaign went to, and what happened for each: sent, delivered, skipped (and why), failed, bounced, and whether they unsubscribed through it.",
   input: Schema.Struct({
     ...OneCampaign,
     status: Schema.optional(RecipientStatus),
+    unsubscribed: Schema.optional(
+      Schema.Boolean.annotate({
+        title: "Unsubscribed",
+        description: "true: only recipients who unsubscribed through this campaign's link (D119).",
+      }),
+    ),
     limit: Schema.optional(Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 500 }))),
     cursor: Schema.optional(Schema.String),
   }),

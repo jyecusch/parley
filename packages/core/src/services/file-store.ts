@@ -104,10 +104,12 @@ export class FileStore extends Context.Service<
 }
 
 /**
- * Every key Parley makes: `<team id>/avatars|logos/<record id>-<random>.webp`. Reads accept nothing
- * else, so a key can't climb out of its team (`a/../b`) in an S3 path.
+ * Every key Parley makes: `<team id>/avatars|logos/<record id>-<random>.webp`, and email images as
+ * `<team id>/email-images/<id>.png|jpg` (D120). Reads accept nothing else, so a key can't climb out
+ * of its team (`a/../b`) in an S3 path.
  */
-const KEY = /^[A-Za-z0-9_-]{1,64}\/(avatars|logos)\/[A-Za-z0-9-]{1,80}\.webp$/
+const KEY =
+  /^[A-Za-z0-9_-]{1,64}\/(?:(?:avatars|logos)\/[A-Za-z0-9-]{1,80}\.webp|email-images\/[A-Za-z0-9-]{1,80}\.(?:png|jpg))$/
 export const isFileKey = (key: string) => KEY.test(key)
 
 /** The URL the web app and agents fetch a file from. Access is checked when it's read. */

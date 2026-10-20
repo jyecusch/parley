@@ -6,6 +6,7 @@ import {
   CampaignNotSending,
   type CampaignStatus,
   type DatabaseUnavailable,
+  type EmailStyleId,
   type Recipient,
   type RecipientStatus,
   SegmentHasNoRecipients,
@@ -19,6 +20,7 @@ import { DisplayName } from "@parley/errors"
 import { and, desc, eq, inArray, sql } from "drizzle-orm"
 import { Context, Effect, Layer } from "effect"
 import type { SqlError } from "effect/sql"
+import { PLAIN_STYLE, type RenderStyle } from "../email/render.ts"
 import type { CampaignInTeam, CampaignIsDraft } from "../proofs/campaign-in-team.ts"
 import type { CanSendEmail, CanWriteEmail, MemberOf } from "../proofs/permissions.ts"
 import type { SegmentInTeam, SegmentOfTeam } from "../proofs/segment-in-team.ts"
@@ -27,7 +29,7 @@ import type { TopicsInTeam } from "../proofs/topic-in-team.ts"
 import type { ContactScope } from "./contacts.ts"
 import type { Sender } from "./sending.ts"
 import { classifySqlError } from "./sql-errors.ts"
-import type { ContentInput } from "./templates.ts"
+import { type ContentInput, type StyleChoice, styleColumnOf } from "./templates.ts"
 
 type Row = typeof schema.campaigns.$inferSelect
 
@@ -45,7 +47,23 @@ const ZERO: CampaignCounts = {
   bounced: 0,
   markedAsSpam: 0,
   cancelled: 0,
+  unsubscribed: 0,
 }
+
+/**
+ * What a campaign was sent as, copied when sending starts (R42): the sender, footer and email
+ * style. Campaigns sent before email styles have no style and render plain.
+ */
+export interface SentAs extends Sender {
+  readonly style?: RenderStyle | undefined
+}
+
+/** The look a sent campaign was sent with. */
+export const styleSentWith = (sentAs: unknown): RenderStyle => ({
+  ...PLAIN_STYLE,
+  // Older snapshots predate settings added since (such as footerAlign); the plain look fills them in.
+  ...(sentAs as SentAs | null | undefined)?.style,
+})
 
 const COUNT_KEY: Readonly<Record<RecipientStatus, keyof CampaignCounts>> = {
   queued: "queued",
@@ -59,7 +77,7 @@ const COUNT_KEY: Readonly<Record<RecipientStatus, keyof CampaignCounts>> = {
 }
 
 /** What changes on a draft. Undefined leaves a field; null clears the segment or topic. */
-export interface DraftChanges<T> extends ContentInput {
+export interface DraftChanges<T> extends ContentInput, StyleChoice<T> {
   readonly name?: string | undefined
   readonly segment?: SegmentOfTeam<T> | null | undefined
   /** At most one topic: a campaign has one or none. */
@@ -107,9 +125,11 @@ export class Campaigns extends Context.Service<
       draft: CampaignIsDraft<C>,
       segment: SegmentInTeam<S, T>,
       scope: ContactScope,
-      sender: Sender,
+      sentAs: SentAs,
       access: CanSendEmail<P, T>,
     ) => Effect.Effect<Campaign, SegmentHasNoRecipients | DatabaseUnavailable>
+    /** The look a campaign that's no longer a draft was sent with. */
+    readonly sentStyle: <C, T>(target: CampaignInTeam<C, T>) => Effect.Effect<RenderStyle, DatabaseUnavailable>
     readonly cancel: <P, T, C>(
       target: CampaignInTeam<C, T>,
       access: CanSendEmail<P, T>,
@@ -118,6 +138,7 @@ export class Campaigns extends Context.Service<
       target: CampaignInTeam<C, T>,
       query: {
         readonly status?: RecipientStatus | undefined
+        readonly unsubscribed?: boolean | undefined
         readonly limit?: number | undefined
         readonly cursor?: string | undefined
       },
@@ -133,6 +154,44 @@ export class Campaigns extends Context.Service<
       const db = yield* Database
       const run = <A>(effect: Effect.Effect<A, SqlError.SqlError>) =>
         effect.pipe(Effect.catchTag("SqlError", classifySqlError))
+
+      /**
+       * Who unsubscribed through each campaign's link (D119), by contact: "everything" when they
+       * left all marketing email, "topic" when they left only the campaign's topic.
+       */
+      const unsubscribesOf = (ids: ReadonlyArray<string>) =>
+        ids.length === 0
+          ? Effect.succeed(new Map<string, Map<string, "everything" | "topic">>())
+          : run(
+              db.query((d) =>
+                d
+                  .select({
+                    campaignId: schema.activity.relatedRecordId,
+                    contactId: schema.activity.recordId,
+                    everything: sql<boolean>`bool_or(${schema.activity.topicName} is null)`,
+                  })
+                  .from(schema.activity)
+                  .where(
+                    and(
+                      eq(schema.activity.kind, "unsubscribed"),
+                      eq(schema.activity.relatedRecordType, "campaign"),
+                      inArray(schema.activity.relatedRecordId, [...ids]),
+                    ),
+                  )
+                  .groupBy(schema.activity.relatedRecordId, schema.activity.recordId),
+              ),
+            ).pipe(
+              Effect.map((rows) => {
+                const byCampaign = new Map<string, Map<string, "everything" | "topic">>()
+                for (const row of rows) {
+                  if (!row.campaignId) continue
+                  const contacts = byCampaign.get(row.campaignId) ?? new Map<string, "everything" | "topic">()
+                  contacts.set(row.contactId, row.everything ? "everything" : "topic")
+                  byCampaign.set(row.campaignId, contacts)
+                }
+                return byCampaign
+              }),
+            )
 
       const countsOf = (ids: ReadonlyArray<string>) =>
         ids.length === 0
@@ -163,6 +222,14 @@ export class Campaigns extends Context.Service<
                 }
                 return byCampaign
               }),
+              Effect.flatMap((byCampaign) =>
+                Effect.map(unsubscribesOf(ids), (unsubscribes) => {
+                  for (const [campaignId, contacts] of unsubscribes) {
+                    byCampaign.set(campaignId, { ...(byCampaign.get(campaignId) ?? ZERO), unsubscribed: contacts.size })
+                  }
+                  return byCampaign
+                }),
+              ),
             )
 
       const toCampaign = (row: Row, counts: Map<string, CampaignCounts>, names: Map<string, string>): Campaign => ({
@@ -172,6 +239,7 @@ export class Campaigns extends Context.Service<
         previewText: row.previewText,
         body: row.body,
         status: row.status,
+        styleId: row.styleId as EmailStyleId | null,
         segmentId: row.segmentId as SegmentId | null,
         segmentName:
           row.status === "draft" ? (row.segmentId ? (names.get(row.segmentId) ?? null) : null) : row.segmentName,
@@ -241,6 +309,7 @@ export class Campaigns extends Context.Service<
         ...(input.body !== undefined ? { body: input.body } : {}),
         ...(input.segment !== undefined ? { segmentId: input.segment?.found.id ?? null } : {}),
         ...(input.topic !== undefined ? { topicId: input.topic?.found[0]?.id ?? null } : {}),
+        ...styleColumnOf(input),
       })
 
       const insertDraft = (teamId: string, values: Partial<typeof schema.campaigns.$inferInsert> & { name: string }) =>
@@ -255,7 +324,7 @@ export class Campaigns extends Context.Service<
         _draft: CampaignIsDraft<C>,
         segment: SegmentInTeam<S, T>,
         scope: ContactScope,
-        sender: Sender,
+        sentAs: SentAs,
         access: CanSendEmail<P, T>,
       ) =>
         Effect.gen(function* () {
@@ -333,7 +402,7 @@ export class Campaigns extends Context.Service<
                     .update(schema.campaigns)
                     .set({
                       status: "sending",
-                      sentAs: sender,
+                      sentAs,
                       segmentName: segment.found.name,
                       topicName: target.found.topicName,
                       sentByUserId: principal.userId,
@@ -395,6 +464,7 @@ export class Campaigns extends Context.Service<
         target: CampaignInTeam<C, T>,
         query: {
           readonly status?: RecipientStatus | undefined
+          readonly unsubscribed?: boolean | undefined
           readonly limit?: number | undefined
           readonly cursor?: string | undefined
         },
@@ -402,6 +472,9 @@ export class Campaigns extends Context.Service<
         Effect.gen(function* () {
           const limit = query.limit ?? 100
           const offset = query.cursor ? Number(Buffer.from(query.cursor, "base64url").toString()) || 0 : 0
+          const unsubscribed = (yield* unsubscribesOf([target.campaign.value])).get(target.campaign.value)
+          const unsubscribedIds = [...(unsubscribed?.keys() ?? [])]
+          if (query.unsubscribed && unsubscribedIds.length === 0) return { items: [], nextCursor: null }
           const rows = yield* run(
             db.query((d) =>
               d
@@ -412,6 +485,7 @@ export class Campaigns extends Context.Service<
                     eq(schema.campaignRecipients.campaignId, target.campaign.value),
                     eq(schema.campaignRecipients.teamId, target.team.value),
                     query.status ? eq(schema.campaignRecipients.status, query.status) : undefined,
+                    query.unsubscribed ? inArray(schema.campaignRecipients.contactId, unsubscribedIds) : undefined,
                   ),
                 )
                 .orderBy(schema.campaignRecipients.name, schema.campaignRecipients.id)
@@ -428,6 +502,7 @@ export class Campaigns extends Context.Service<
               skipReason: row.skipReason as SkipReason | null,
               error: row.error,
               sentAt: row.sentAt?.toISOString() ?? null,
+              unsubscribed: (row.contactId ? unsubscribed?.get(row.contactId) : undefined) ?? null,
             }),
           )
           return {
@@ -465,7 +540,9 @@ export class Campaigns extends Context.Service<
         create: (access, input) => {
           const from = input.template?.found
           return insertDraft(access.member.team.value, {
-            ...(from ? { subject: from.subject, previewText: from.previewText, body: from.body } : {}),
+            ...(from
+              ? { subject: from.subject, previewText: from.previewText, body: from.body, styleId: from.styleId }
+              : {}),
             ...changesOf(input),
             name: input.name,
           }).pipe(Effect.withSpan("Campaigns.create"))
@@ -516,9 +593,12 @@ export class Campaigns extends Context.Service<
               body: source.body,
               segmentId: source.segmentId,
               topicId: source.topicId,
+              styleId: source.styleId,
             })
           }).pipe(Effect.withSpan("Campaigns.duplicate")),
         queue,
+        sentStyle: (target) =>
+          Effect.map(rowOf(target.team.value, target.campaign.value), (row) => styleSentWith(row?.sentAs)),
         cancel,
         recipients,
       }

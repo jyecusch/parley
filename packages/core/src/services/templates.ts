@@ -1,8 +1,9 @@
 import { Database, schema } from "@parley/db"
-import type { DatabaseUnavailable, TeamId, Template, TemplateId } from "@parley/domain"
+import type { DatabaseUnavailable, EmailStyleId, TeamId, Template, TemplateId } from "@parley/domain"
 import { and, desc, eq, sql } from "drizzle-orm"
 import { Context, Effect, Layer } from "effect"
 import type { SqlError } from "effect/sql"
+import type { EmailStyleOfTeam } from "../proofs/email-style-in-team.ts"
 import type { CanWriteEmail, MemberOf } from "../proofs/permissions.ts"
 import type { TemplateInTeam } from "../proofs/template-in-team.ts"
 import { classifySqlError } from "./sql-errors.ts"
@@ -13,12 +14,22 @@ export interface ContentInput {
   readonly body?: string | undefined
 }
 
+/** A template's or campaign's email style: undefined leaves it, null means the team's default (D117). */
+export interface StyleChoice<T> {
+  readonly style?: EmailStyleOfTeam<T> | null | undefined
+}
+
+/** The column value for a style choice, when one was made. */
+export const styleColumnOf = <T>(choice: StyleChoice<T>) =>
+  choice.style === undefined ? {} : { styleId: choice.style?.found.id ?? null }
+
 const toTemplate = (row: typeof schema.templates.$inferSelect): Template => ({
   id: row.id as TemplateId,
   name: row.name,
   subject: row.subject,
   previewText: row.previewText,
   body: row.body,
+  styleId: row.styleId as EmailStyleId | null,
   createdAt: row.createdAt.toISOString(),
   updatedAt: row.updatedAt.toISOString(),
 })
@@ -32,11 +43,11 @@ export class Templates extends Context.Service<
     readonly locate: (teamId: TeamId, id: TemplateId) => Effect.Effect<Template | undefined, DatabaseUnavailable>
     readonly create: <P, T>(
       access: CanWriteEmail<P, T>,
-      input: ContentInput & { readonly name: string },
+      input: ContentInput & StyleChoice<T> & { readonly name: string },
     ) => Effect.Effect<Template, DatabaseUnavailable>
     readonly update: <P, T, K>(
       target: TemplateInTeam<K, T>,
-      input: ContentInput & { readonly name?: string | undefined },
+      input: ContentInput & StyleChoice<T> & { readonly name?: string | undefined },
       access: CanWriteEmail<P, T>,
     ) => Effect.Effect<Template, DatabaseUnavailable>
     readonly delete: <P, T, K>(
@@ -88,6 +99,7 @@ export class Templates extends Context.Service<
                   subject: input.subject ?? "",
                   previewText: input.previewText ?? "",
                   body: input.body ?? "",
+                  ...styleColumnOf(input),
                 }),
               ),
             )
@@ -105,6 +117,7 @@ export class Templates extends Context.Service<
                     ...(input.subject !== undefined ? { subject: input.subject } : {}),
                     ...(input.previewText !== undefined ? { previewText: input.previewText } : {}),
                     ...(input.body !== undefined ? { body: input.body } : {}),
+                    ...styleColumnOf(input),
                     updatedAt: sql`now()`,
                   })
                   .where(and(eq(schema.templates.teamId, teamId), eq(schema.templates.id, target.template.value))),

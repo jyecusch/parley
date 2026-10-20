@@ -125,7 +125,7 @@ export function StatTile({
   className,
   type = "button",
   ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & { value: ReactNode; label: ReactNode; active?: boolean }) {
+}: Omit<ButtonHTMLAttributes<HTMLButtonElement>, "value"> & { value: ReactNode; label: ReactNode; active?: boolean }) {
   return (
     <button
       type={type}

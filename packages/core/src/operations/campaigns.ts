@@ -8,6 +8,7 @@ import {
   type deleteCampaign,
   type deleteTemplate,
   type duplicateCampaign,
+  type EmailStyleId,
   type getCampaign,
   type getTemplate,
   type listCampaignRecipients,
@@ -31,6 +32,7 @@ import { Mailer } from "../mail/mailer.ts"
 import type { Principal } from "../principal.ts"
 import { proveCampaignInTeam, proveCampaignIsDraft } from "../proofs/campaign-in-team.ts"
 import { proveContactInTeam } from "../proofs/contact-in-team.ts"
+import { proveStyleChoice } from "../proofs/email-style-in-team.ts"
 import { type MemberOf, proveMemberOf } from "../proofs/member-of.ts"
 import {
   type CanReadRecords,
@@ -44,6 +46,7 @@ import { proveTemplateInTeam, proveTemplateOfTeam } from "../proofs/template-in-
 import { proveTopicsInTeam } from "../proofs/topic-in-team.ts"
 import { Campaigns } from "../services/campaigns.ts"
 import { Contacts } from "../services/contacts.ts"
+import { EmailStyles } from "../services/email-styles.ts"
 import { Members } from "../services/members.ts"
 import { RateLimiter } from "../services/rate-limiter.ts"
 import { Segments } from "../services/segments.ts"
@@ -79,7 +82,8 @@ export const addTemplate = (principal: Principal, input: OperationInput<typeof c
       const member = yield* proveMemberOf(principal, team)
       yield* proveCanReadRecords(member)
       const access = yield* proveCanWriteEmail(member)
-      return yield* templates.create(access, input)
+      const style = yield* proveStyleChoice(member, input.styleId)
+      return yield* templates.create(access, { ...input, style })
     }),
   )
 
@@ -91,7 +95,8 @@ export const changeTemplate = (principal: Principal, input: OperationInput<typeo
       yield* proveCanReadRecords(member)
       const access = yield* proveCanWriteEmail(member)
       const target = yield* proveTemplateInTeam(member, template)
-      return yield* templates.update(target, input, access)
+      const style = yield* proveStyleChoice(member, input.styleId)
+      return yield* templates.update(target, { ...input, style }, access)
     }),
   )
 
@@ -126,8 +131,19 @@ const valuesFor = <P, T>(member: MemberOf<P, T>, canRead: CanReadRecords<P, T>, 
         }),
       )
 
+/**
+ * The look to render with: the style given for an unsaved choice (null is the team's default),
+ * else the one saved on the template or campaign, else the team's default (D117).
+ */
+const lookFor = <P, T>(member: MemberOf<P, T>, given: EmailStyleId | null | undefined, saved: EmailStyleId | null) =>
+  Effect.gen(function* () {
+    const styles = yield* EmailStyles
+    const choice = yield* proveStyleChoice(member, given)
+    return yield* styles.renderStyle(member.team.value, choice === undefined ? saved : (choice?.found.id ?? null))
+  })
+
 /** The team's footer for a preview, with placeholders for what isn't set up yet. */
-const previewFooter = <P, T>(member: MemberOf<P, T>): Effect.Effect<Footer, DatabaseUnavailable, Sending> =>
+export const previewFooter = <P, T>(member: MemberOf<P, T>): Effect.Effect<Footer, DatabaseUnavailable, Sending> =>
   Effect.gen(function* () {
     const sending = yield* Sending
     const settings = yield* sending.settings(member)
@@ -147,6 +163,7 @@ export const previewOneTemplate = (principal: Principal, input: OperationInput<t
       const found = (yield* proveTemplateInTeam(member, template)).found
       const values = yield* valuesFor(member, canRead, input.contactId)
       const footer = yield* previewFooter(member)
+      const look = yield* lookFor(member, input.styleId, found.styleId)
       return renderEmail(
         {
           subject: input.subject ?? found.subject,
@@ -155,6 +172,7 @@ export const previewOneTemplate = (principal: Principal, input: OperationInput<t
         },
         values,
         footer,
+        look,
       )
     }),
   )
@@ -200,7 +218,8 @@ export const addCampaign = (principal: Principal, input: OperationInput<typeof c
       const access = yield* proveCanWriteEmail(member)
       const links = yield* proveLinks(member, input.segmentId, input.topicId)
       const template = input.templateId === undefined ? undefined : yield* proveTemplateOfTeam(member, input.templateId)
-      return yield* campaigns.create(access, { ...input, ...links, template })
+      const style = yield* proveStyleChoice(member, input.styleId)
+      return yield* campaigns.create(access, { ...input, ...links, template, style })
     }),
   )
 
@@ -214,7 +233,8 @@ export const changeCampaign = (principal: Principal, input: OperationInput<typeo
       const target = yield* proveCampaignInTeam(member, campaign)
       const draft = yield* proveCampaignIsDraft(target)
       const links = yield* proveLinks(member, input.segmentId, input.topicId)
-      return yield* campaigns.update(target, draft, { ...input, ...links }, access)
+      const style = yield* proveStyleChoice(member, input.styleId)
+      return yield* campaigns.update(target, draft, { ...input, ...links, style }, access)
     }),
   )
 
@@ -248,9 +268,15 @@ export const previewOneCampaign = (principal: Principal, input: OperationInput<t
     Effect.gen(function* () {
       const member = yield* proveMemberOf(principal, team)
       const canRead = yield* proveCanReadRecords(member)
-      const found = (yield* proveCampaignInTeam(member, campaign)).found
+      const target = yield* proveCampaignInTeam(member, campaign)
+      const found = target.found
       const values = yield* valuesFor(member, canRead, input.contactId)
       const footer = yield* previewFooter(member)
+      // A sent campaign shows the look it was sent with, unless another is asked for.
+      const look =
+        found.status !== "draft" && input.styleId === undefined
+          ? yield* (yield* Campaigns).sentStyle(target)
+          : yield* lookFor(member, input.styleId, found.styleId)
       return renderEmail(
         {
           subject: input.subject ?? found.subject,
@@ -259,6 +285,7 @@ export const previewOneCampaign = (principal: Principal, input: OperationInput<t
         },
         values,
         footer,
+        look,
       )
     }),
   )
@@ -295,12 +322,18 @@ export const testSend = (principal: Principal, input: OperationInput<typeof test
         test: true,
       })
       const urls = links.urls(token)
-      const rendered = renderEmail(found, values, {
-        legalName: sender.legalName,
-        postalAddress: sender.postalAddress,
-        reason: sender.footerReason,
-        unsubscribeUrl: urls.page,
-      })
+      const look = yield* (yield* EmailStyles).renderStyle(team.value, found.styleId)
+      const rendered = renderEmail(
+        found,
+        values,
+        {
+          legalName: sender.legalName,
+          postalAddress: sender.postalAddress,
+          reason: sender.footerReason,
+          unsubscribeUrl: urls.page,
+        },
+        look,
+      )
       yield* mailer.sendBatch(
         to.map((address) => ({
           to: address,
@@ -337,11 +370,13 @@ export const send = (principal: Principal, input: OperationInput<typeof sendCamp
         return yield* new CampaignIncomplete({ campaign: DisplayName.fromRecord(found.name), missing })
       }
       const sender = yield* sending.sender(member)
+      // The look is copied with the sender, so editing the style later doesn't change what went out.
+      const style = yield* (yield* EmailStyles).renderStyle(team.value, found.styleId)
       return yield* named(found.segmentId, (segmentId) =>
         Effect.gen(function* () {
           const segment = yield* proveSegmentInTeam(member, segmentId)
           const scope = yield* segments.scope(segment)
-          return yield* campaigns.queue(target, draft, segment, scope, sender, access)
+          return yield* campaigns.queue(target, draft, segment, scope, { ...sender, style }, access)
         }),
       )
     }),

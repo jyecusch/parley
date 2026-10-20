@@ -210,6 +210,25 @@ describe("files", () => {
   })
 })
 
+describe("email images", () => {
+  it("serves an uploaded email image to anyone, cached for good, and 404s unknown ids", async () => {
+    // A 1x1 PNG with an alpha channel, so it stays a PNG.
+    const image = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="
+    const uploaded = await call("POST", `/api/v1/teams/${teamId}/email-images`, { body: { image } })
+    expect(uploaded.status).toBe(200)
+    const path = new URL(uploaded.body.url as string).pathname
+    expect(path).toMatch(/^\/i\/[0-9a-f-]{36}$/)
+    const file = await handler(new Request(`${base}${path}`))
+    expect(file.status).toBe(200)
+    expect(file.headers.get("content-type")).toBe("image/png")
+    expect(file.headers.get("cache-control")).toBe("public, max-age=31536000, immutable")
+    expect(file.headers.get("x-content-type-options")).toBe("nosniff")
+    for (const unknown of [`/i/${crypto.randomUUID()}`, "/i/not-an-id", "/i/..%2F..%2Fapi"]) {
+      expect((await handler(new Request(`${base}${unknown}`))).status, unknown).toBe(404)
+    }
+  })
+})
+
 describe("Better-Auth endpoints", () => {
   it("serves only the ones Parley uses", async () => {
     const closed = [

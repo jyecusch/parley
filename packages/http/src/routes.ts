@@ -3,6 +3,7 @@ import {
   Authenticator,
   BetterAuth,
   type DeliveryEvents,
+  EmailImages,
   type FileStore,
   implementations,
   type Members,
@@ -161,7 +162,8 @@ export const AuthRoutesLive = HttpRouter.use((router) =>
 
 /**
  * Avatars and logos (D76), under the same authentication as the API. Keys are unguessable and
- * change on every upload, so a file can be cached for good.
+ * change on every upload, so a file can be cached for good. Also email images at /i/<id>, which are
+ * public.
  */
 export const FileRoutesLive = HttpRouter.use((router) =>
   Effect.gen(function* () {
@@ -191,6 +193,31 @@ export const FileRoutesLive = HttpRouter.use((router) =>
           Effect.succeed(HttpServerResponse.jsonUnsafe(errorBody(error), { status: ERROR_STATUS[error._tag] })),
         ),
         Effect.provide(services),
+      ),
+    )
+
+    // Email images (D120) are public: recipients aren't signed in. The id is unguessable, and an
+    // image never changes once uploaded, so it can be cached for good.
+    const images = yield* Effect.context<EmailImages>()
+    yield* router.add("GET", "/i/:id", (request) =>
+      Effect.gen(function* () {
+        const emailImages = yield* EmailImages
+        const id = new URL(request.url, "http://parley").pathname.replace(/^\/i\//, "")
+        const file = yield* emailImages.read(id)
+        if (!file) return HttpServerResponse.text("Not found", { status: 404 })
+        return HttpServerResponse.uint8Array(file.bytes, {
+          contentType: file.contentType,
+          headers: {
+            "cache-control": "public, max-age=31536000, immutable",
+            "x-content-type-options": "nosniff",
+            "content-security-policy": "default-src 'none'",
+          },
+        })
+      }).pipe(
+        Effect.catchTag("DatabaseUnavailable", () =>
+          Effect.succeed(HttpServerResponse.text("Unavailable", { status: 503 })),
+        ),
+        Effect.provide(images),
       ),
     )
   }),
