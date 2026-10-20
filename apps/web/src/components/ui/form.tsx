@@ -8,6 +8,7 @@ import {
   useEffect,
   useId,
   useRef,
+  useState,
 } from "react"
 import { ChevronDown } from "../icons.tsx"
 import { cn } from "./cn.ts"
@@ -304,5 +305,72 @@ export function Slider({
         {format(value)}
       </output>
     </div>
+  )
+}
+
+/**
+ * Choosing a file: a dashed area that reads as a button, with the chosen file's name. Click it,
+ * focus it and press Enter or Space, or drop a file on it. The file input itself is visually hidden.
+ */
+export function FilePicker({
+  id,
+  accept,
+  fileName,
+  prompt,
+  onFile,
+  className,
+}: {
+  id: string
+  accept?: string | undefined
+  fileName?: string | undefined
+  prompt: string
+  onFile: (file: File) => void
+  className?: string | undefined
+}) {
+  const [over, setOver] = useState(false)
+  return (
+    <label
+      htmlFor={id}
+      onDragOver={(event) => {
+        event.preventDefault()
+        setOver(true)
+      }}
+      onDragLeave={() => setOver(false)}
+      onDrop={(event) => {
+        event.preventDefault()
+        setOver(false)
+        const file = event.dataTransfer.files[0]
+        if (file) onFile(file)
+      }}
+      className={cn(
+        "flex min-h-20 cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-control px-4 py-3 text-center transition-colors hover:bg-hover has-focus-visible:outline-2 has-focus-visible:outline-focus motion-reduce:transition-none",
+        over && "border-focus bg-hover",
+        className,
+      )}
+    >
+      <input
+        id={id}
+        type="file"
+        accept={accept}
+        className="sr-only"
+        onChange={(event) => {
+          const file = event.target.files?.[0]
+          if (file) onFile(file)
+          // Choosing the same file again should still read it.
+          event.target.value = ""
+        }}
+      />
+      {fileName ? (
+        <>
+          <span className="max-w-full truncate font-medium">{fileName}</span>
+          <span className="text-sm text-subtle">Choose a different file, or drop one here</span>
+        </>
+      ) : (
+        <>
+          <span className="font-medium">{prompt}</span>
+          <span className="text-sm text-subtle">or drop it here</span>
+        </>
+      )}
+    </label>
   )
 }

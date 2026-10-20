@@ -26,6 +26,7 @@ import {
   ErrorText,
   Field,
   Fieldset,
+  FilePicker,
   Hint,
   IconButton,
   Input,
@@ -420,6 +421,7 @@ export function ImportDialog(props: {
   readonly onClose: () => void
 }) {
   const [csv, setCsv] = useState<string>()
+  const [fileName, setFileName] = useState<string>()
   const [mapping, setMapping] = useState<Record<string, string>>({})
   /** Values for every row, by custom field: what a cell would say (option labels, joined by "; "). */
   const [set, setSet] = useState<Record<string, string>>({})
@@ -456,6 +458,7 @@ export function ImportDialog(props: {
 
   const read = async (file: File | undefined) => {
     if (!file) return
+    setFileName(file.name)
     load(await file.text())
   }
 
@@ -647,11 +650,12 @@ export function ImportDialog(props: {
               </>
             }
           >
-            <input
+            <FilePicker
               id="import-file"
-              type="file"
               accept=".csv,text/csv"
-              onChange={(event) => void read(event.target.files?.[0])}
+              prompt="Choose a CSV file"
+              fileName={fileName}
+              onFile={(file) => void read(file)}
             />
           </Field>
           {headers.length > 0 ? (
