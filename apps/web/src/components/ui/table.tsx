@@ -23,7 +23,7 @@ export function Th({ className, ...props }: ThHTMLAttributes<HTMLTableCellElemen
       className={cn(
         "h-9 border-b border-line bg-surface px-2.5 text-left text-sm font-medium whitespace-nowrap text-subtle",
         "group-data-[kind=list]/table:sticky group-data-[kind=list]/table:top-0 group-data-[kind=list]/table:z-1",
-        "group-data-[kind=settings]/table:h-10 group-data-[kind=settings]/table:first:pl-4",
+        "group-data-[kind=settings]/table:h-10 group-data-[kind=settings]/table:bg-transparent group-data-[kind=settings]/table:first:pl-4",
         className,
       )}
       {...props}
@@ -64,6 +64,8 @@ export function Tr({
       className={cn(
         "group/row [&>td]:transition-colors hover:[&>td]:bg-hover",
         "group-data-[kind=settings]/table:last:[&>td]:border-b-0",
+        // The box's rounded corners, so a hovered last row doesn't poke out of them.
+        "group-data-[kind=settings]/table:last:[&>td:first-child]:rounded-bl-[calc(var(--radius-lg)-1px)] group-data-[kind=settings]/table:last:[&>td:last-child]:rounded-br-[calc(var(--radius-lg)-1px)]",
         cursor && "[&>td]:bg-hover [&>td:first-child]:shadow-[inset_0.125rem_0_0_var(--color-subtle)]",
         (checked || open) && "[&>td]:bg-selected hover:[&>td]:bg-selected",
         open && "[&>td:first-child]:shadow-[inset_0.125rem_0_0_var(--color-mark)]",
@@ -85,5 +87,5 @@ export function TableScroll({
 
 /** A bordered box around a settings table, list or empty state. */
 export function Box({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("rounded-lg inset-ring inset-ring-line-strong", className)} {...props} />
+  return <div className={cn("rounded-lg border border-line-strong", className)} {...props} />
 }

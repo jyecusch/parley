@@ -5,7 +5,7 @@ import { cn } from "./cn.ts"
 export function SettingsPanel({ className, ...props }: HTMLAttributes<HTMLElement>) {
   return (
     <section
-      className={cn("flex flex-col gap-3 rounded-lg px-5 py-4 inset-ring inset-ring-line-strong", className)}
+      className={cn("flex flex-col gap-3 rounded-lg border border-line-strong px-5 py-4", className)}
       {...props}
     />
   )
