@@ -1,7 +1,10 @@
-import { type Contact, SUBSCRIPTION_STATUS_LABELS, type TeamId, type TopicId } from "@parley/domain"
+import { type Contact, ROLE_PERMISSIONS, SUBSCRIPTION_STATUS_LABELS, type TeamId, type TopicId } from "@parley/domain"
 import type { UserText } from "@parley/errors"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { getRouteApi } from "@tanstack/react-router"
 import { call, messageOf } from "../lib/client.ts"
+
+const teamRoute = getRouteApi("/t/$teamId")
 
 /**
  * A contact's marketing email (R37, R38): their subscription status and the topics they get.
@@ -16,6 +19,9 @@ export function SubscriptionSection(props: {
 }) {
   const { contact, teamId } = props
   const queryClient = useQueryClient()
+  const { team } = teamRoute.useLoaderData()
+  // Subscribing someone again after they opted out takes email:manage (admins and owners).
+  const canResubscribe = ROLE_PERMISSIONS[team.role].has("email:manage")
   const key = ["subscriptions", teamId, contact.id, contact.subscriptionStatus, contact.updatedAt]
   const subscriptions = useQuery({
     queryKey: key,
@@ -50,7 +56,9 @@ export function SubscriptionSection(props: {
             value={status}
             onChange={(event) => props.onStatus(event.target.value as "subscribed" | "unsubscribed")}
           >
-            <option value="subscribed">Subscribed</option>
+            <option value="subscribed" disabled={contact.subscriptionStatus !== "subscribed" && !canResubscribe}>
+              Subscribed
+            </option>
             <option value="unsubscribed">Unsubscribed</option>
             {status === "bounced" || status === "marked-as-spam" ? (
               <option value={status} disabled>
@@ -74,7 +82,7 @@ export function SubscriptionSection(props: {
               <input
                 className="cb shown"
                 type="checkbox"
-                disabled={!props.canWrite}
+                disabled={!props.canWrite || (!topic.subscribed && !canResubscribe)}
                 checked={topic.subscribed}
                 onChange={(event) => void setTopic(topic.topicId, event.target.checked)}
               />

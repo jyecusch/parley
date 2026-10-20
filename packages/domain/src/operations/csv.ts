@@ -60,7 +60,7 @@ export const exportContacts = defineTeamOperation({
 export const importContacts = defineTeamOperation({
   name: "contacts.import",
   description:
-    "Import contacts from CSV. A row whose email belongs to a contact updates that contact; other rows create contacts. A Company column affiliates each contact (creating the company if needed), with Title as the title. Bad rows are reported and skipped; the rest are imported.",
+    "Import contacts from CSV. A row whose email belongs to a contact updates that contact; other rows create contacts. A Company column affiliates each contact (creating the company if needed), with Title as the title. Bad rows are reported and skipped; the rest are imported. Import never subscribes an existing contact again who unsubscribed, bounced or marked mail as spam.",
   input: importInput,
   output: ImportResult,
   errors: [],

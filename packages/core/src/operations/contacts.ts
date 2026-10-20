@@ -12,7 +12,12 @@ import { Effect } from "effect"
 import type { Principal } from "../principal.ts"
 import { proveContactInTeam, proveContactRestorable } from "../proofs/contact-in-team.ts"
 import { proveMemberOf } from "../proofs/member-of.ts"
-import { proveCanDeleteRecords, proveCanReadRecords, proveCanWriteRecords } from "../proofs/permissions.ts"
+import {
+  proveCanDeleteRecords,
+  proveCanManageEmail,
+  proveCanReadRecords,
+  proveCanWriteRecords,
+} from "../proofs/permissions.ts"
 import { named } from "../proofs/proof.ts"
 import { Contacts } from "../services/contacts.ts"
 
@@ -55,7 +60,11 @@ export const update = (principal: Principal, input: OperationInput<typeof update
       const canRead = yield* proveCanReadRecords(member)
       const canWrite = yield* proveCanWriteRecords(member)
       const target = yield* proveContactInTeam(team, contact, canRead)
-      return yield* contacts.update(target, input, canWrite)
+      // Subscribing someone again after they opted out takes email:manage, not just records:write.
+      const resubscribing =
+        input.subscriptionStatus === "subscribed" && (yield* contacts.get(target)).subscriptionStatus !== "subscribed"
+      const resubscribe = resubscribing ? yield* proveCanManageEmail(member) : undefined
+      return yield* contacts.update(target, input, canWrite, resubscribe)
     }),
   )
 

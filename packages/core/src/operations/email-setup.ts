@@ -158,6 +158,10 @@ export const updateSubscriptions = (principal: Principal, input: OperationInput<
         input.topics.map((change) => change.topicId),
       )
       const wanted = new Map(input.topics.map((change) => [change.topicId, change.subscribed]))
-      return yield* subscriptions.updateTopics(target, topics, wanted, canWrite)
+      // Rejoining a topic someone left takes email:manage, like resubscribing them to everything.
+      const current = yield* subscriptions.ofContact(target, canRead)
+      const rejoining = current.topics.some((topic) => !topic.subscribed && wanted.get(topic.topicId) === true)
+      const resubscribe = rejoining ? yield* proveCanManageEmail(member) : undefined
+      return yield* subscriptions.updateTopics(target, topics, wanted, canWrite, resubscribe)
     }),
   )

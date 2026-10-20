@@ -20,7 +20,7 @@ import { Context, Effect, Layer } from "effect"
 import type { SqlError } from "effect/sql"
 import type { Principal } from "../principal.ts"
 import type { ContactInTeam, ContactRestorable } from "../proofs/contact-in-team.ts"
-import type { CanDeleteRecords, CanReadRecords, CanWriteRecords } from "../proofs/permissions.ts"
+import type { CanDeleteRecords, CanManageEmail, CanReadRecords, CanWriteRecords } from "../proofs/permissions.ts"
 import type { Named } from "../proofs/proof.ts"
 import { activityRow, toActivityEntry } from "./activity.ts"
 import { Affiliations } from "./affiliations.ts"
@@ -168,10 +168,15 @@ export class Contacts extends Context.Service<
       fields: ContactFields,
       access: CanWriteRecords<P, T>,
     ) => Effect.Effect<Contact, InputRejected | ContactEmailTaken | DatabaseUnavailable>
+    /**
+     * Subscribing someone again who unsubscribed, bounced or marked mail as spam also takes
+     * `resubscribe`: email:manage, not just records:write (opt-outs are a legal matter).
+     */
     readonly update: <P, T, C>(
       target: ContactInTeam<C, T>,
       fields: ContactFields,
       access: CanWriteRecords<P, T>,
+      resubscribe?: CanManageEmail<P, T>,
     ) => Effect.Effect<Contact, InputRejected | ContactEmailTaken | DatabaseUnavailable>
     readonly delete: <P, T, C>(
       target: ContactInTeam<C, T>,
@@ -558,7 +563,12 @@ export class Contacts extends Context.Service<
           return yield* loadOne(team.value, id as ContactId)
         }).pipe(Effect.withSpan("Contacts.create"))
 
-      const update = <P, T, C>(target: ContactInTeam<C, T>, fields: ContactFields, access: CanWriteRecords<P, T>) =>
+      const update = <P, T, C>(
+        target: ContactInTeam<C, T>,
+        fields: ContactFields,
+        access: CanWriteRecords<P, T>,
+        resubscribe?: CanManageEmail<P, T>,
+      ) =>
         Effect.gen(function* () {
           const normalized = yield* normalize(fields, false)
           const teamId = target.team.value
@@ -574,6 +584,9 @@ export class Contacts extends Context.Service<
             fields.subscriptionStatus !== undefined && fields.subscriptionStatus !== current.subscriptionStatus
               ? fields.subscriptionStatus
               : undefined
+          if (status === "subscribed" && !resubscribe) {
+            return yield* Effect.die(new Error("resubscribing a contact needs email:manage, proven by the caller"))
+          }
           if (changed.length > 0 || status) {
             const before = new Set(current.emails.map((email) => email.address as string))
             const added = addresses.filter((address) => !before.has(address))

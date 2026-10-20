@@ -13,7 +13,7 @@ import { and, asc, eq, inArray, sql } from "drizzle-orm"
 import { Context, Effect, Layer } from "effect"
 import type { SqlError } from "effect/sql"
 import type { ContactInTeam } from "../proofs/contact-in-team.ts"
-import type { CanReadRecords, CanWriteRecords } from "../proofs/permissions.ts"
+import type { CanManageEmail, CanReadRecords, CanWriteRecords } from "../proofs/permissions.ts"
 import type { TopicsInTeam } from "../proofs/topic-in-team.ts"
 import type { UnsubscribeLinkValid } from "../proofs/unsubscribe-link.ts"
 import { activityRow } from "./activity.ts"
@@ -50,6 +50,8 @@ export class Subscriptions extends Context.Service<
       topics: TopicsInTeam<T>,
       subscribed: ReadonlyMap<TopicId, boolean>,
       access: CanWriteRecords<P, T>,
+      /** Needed to put someone back on a topic they left. */
+      resubscribe?: CanManageEmail<P, T>,
     ) => Effect.Effect<ContactSubscriptions, DatabaseUnavailable>
     readonly page: <L>(link: UnsubscribeLinkValid<L>) => Effect.Effect<UnsubscribePage, DatabaseUnavailable>
     readonly apply: <L>(
@@ -148,6 +150,7 @@ export class Subscriptions extends Context.Service<
         topics: TopicsInTeam<T>,
         wanted: ReadonlyMap<TopicId, boolean>,
         access: CanWriteRecords<P, T>,
+        resubscribe?: CanManageEmail<P, T>,
       ) =>
         Effect.gen(function* () {
           const teamId = target.team.value
@@ -158,6 +161,20 @@ export class Subscriptions extends Context.Service<
                 Effect.gen(function* () {
                   const subscribed = wanted.get(topic.id)
                   if (subscribed === undefined) return
+                  if (subscribed && !resubscribe) {
+                    const [left] = yield* db.query((d) =>
+                      d
+                        .select({ topicId: schema.topicUnsubscribes.topicId })
+                        .from(schema.topicUnsubscribes)
+                        .where(
+                          and(
+                            eq(schema.topicUnsubscribes.contactId, contactId),
+                            eq(schema.topicUnsubscribes.topicId, topic.id),
+                          ),
+                        ),
+                    )
+                    if (left) return yield* Effect.die(new Error("rejoining a topic needs email:manage"))
+                  }
                   const changed = yield* setTopic(teamId, contactId, topic.id, subscribed)
                   if (!changed) return
                   yield* db.query((d) =>
@@ -233,8 +250,9 @@ export class Subscriptions extends Context.Service<
           const setStatus = (status: SubscriptionStatus) =>
             Effect.gen(function* () {
               if (status === contact.status) return
-              // A bounced address can't be fixed from the page: it needs a new address.
-              if (status === "subscribed" && contact.status === "bounced") return
+              // From the page, only an unsubscribe can be undone. A bounce needs a new address, and a
+              // spam report shouldn't be reversible by whoever a link was forwarded to.
+              if (status === "subscribed" && contact.status !== "unsubscribed") return
               yield* db.query((d) =>
                 d
                   .update(schema.contacts)

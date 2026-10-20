@@ -152,4 +152,38 @@ describe("email setup", () => {
       expect((yield* unsubscribeApply(test, { kind: "one-click" })).test).toBe(true)
     }).pipe(Effect.provide(CoreLive)),
   )
+
+  it.effect("subscribing someone again after they opted out takes email:manage, and import never does it", () =>
+    Effect.gen(function* () {
+      const f = yield* Fixture
+      const address = `optout-${unique()}@example.com`
+      const contact = yield* run["contacts.create"](f.jane, {
+        teamId: f.acme,
+        firstName: "Opal",
+        emails: [{ address: address as never }],
+        subscriptionStatus: "unsubscribed",
+      })
+      const member = yield* run["contacts.update"](f.sam, {
+        teamId: f.acme,
+        contactId: contact.id,
+        subscriptionStatus: "subscribed",
+      }).pipe(Effect.flip)
+      expect(member).toMatchObject({ _tag: "RoleLacksPermission", needed: "email:manage" })
+
+      const imported = yield* run["contacts.import"](f.jane, {
+        teamId: f.acme,
+        csv: `Email,Subscription status\n${address},Subscribed\n`,
+      })
+      expect(imported.updated).toBe(1)
+      const after = yield* run["contacts.get"](f.jane, { teamId: f.acme, contactId: contact.id })
+      expect(after.subscriptionStatus).toBe("unsubscribed")
+
+      const admin = yield* run["contacts.update"](f.jane, {
+        teamId: f.acme,
+        contactId: contact.id,
+        subscriptionStatus: "subscribed",
+      })
+      expect(admin.subscriptionStatus).toBe("subscribed")
+    }).pipe(Effect.provide(CoreLive)),
+  )
 })

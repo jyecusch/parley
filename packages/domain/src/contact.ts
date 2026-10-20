@@ -87,7 +87,7 @@ export const ContactFields = Schema.Struct({
     Schema.Literals(["subscribed", "unsubscribed"]).annotate({
       title: "Subscription status",
       description:
-        "Whether the contact receives marketing email. Only subscribe someone who has agreed to get it. Bounced and marked-as-spam are set by Parley.",
+        "Whether the contact receives marketing email. Only subscribe someone who has agreed to get it. Subscribing someone again who unsubscribed, bounced or marked mail as spam needs email:manage.",
     }),
   ),
 })

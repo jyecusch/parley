@@ -421,10 +421,16 @@ export const importContactsCsv = (principal: Principal, input: OperationInput<ty
                   const current = yield* contacts.get(proof)
                   const known = new Set(current.emails.map((email) => email.address as string))
                   const added = emails.filter((email) => !known.has(email))
+                  // An import never subscribes someone again who opted out: that takes a person
+                  // with email:manage, one contact at a time.
+                  const { subscriptionStatus, ...otherFields } = fieldsForRow
+                  const keepStatus =
+                    subscriptionStatus === "unsubscribed" || current.subscriptionStatus === "subscribed"
                   const updated = yield* contacts.update(
                     proof,
                     {
-                      ...fieldsForRow,
+                      ...otherFields,
+                      ...(subscriptionStatus && keepStatus ? { subscriptionStatus } : {}),
                       ...(added.length > 0
                         ? { emails: [...current.emails, ...added.map((address) => ({ address: address as never }))] }
                         : {}),
