@@ -4,6 +4,22 @@ import { createFileRoute, getRouteApi } from "@tanstack/react-router"
 import { useEffect, useState } from "react"
 import { CheckIcon, InfoIcon, MailIcon, WarnIcon } from "../components/icons.tsx"
 import { CopyField, Dialog, Empty, LoadFailed, LoadingRows, SettingsPage, useToast } from "../components/settings.tsx"
+import {
+  Badge,
+  Box,
+  Button,
+  ErrorText,
+  Field,
+  Hint,
+  Input,
+  Notice,
+  Table,
+  Td,
+  Textarea,
+  Th,
+  Tr,
+} from "../components/ui/index.ts"
+import { RowActions, SettingsPanel, SettingsSectionHeading } from "../components/ui/settings-extra.tsx"
 import { call, messageOf } from "../lib/client.ts"
 
 export const Route = createFileRoute("/t/$teamId/settings/email")({ component: Email })
@@ -46,14 +62,7 @@ function Email() {
       title="Email"
       intro={`Who ${current.name}'s campaigns come from, the footer every one of them ends with, and the topics people can unsubscribe from.`}
     >
-      {canManage ? null : (
-        <div className="notice">
-          <span className="ic">
-            <InfoIcon />
-          </span>
-          <span>Only admins and owners can change these.</span>
-        </div>
-      )}
+      {canManage ? null : <Notice icon={<InfoIcon />}>Only admins and owners can change these.</Notice>}
       {settings.isPending ? (
         <LoadingRows />
       ) : settings.isError ? (
@@ -65,7 +74,7 @@ function Email() {
       ) : (
         <>
           <Readiness settings={settings.data} />
-          <h3 className="sechead">Sending domains</h3>
+          <SettingsSectionHeading>Sending domains</SettingsSectionHeading>
           <Domains
             teamId={teamId}
             canManage={canManage}
@@ -74,7 +83,7 @@ function Email() {
             onChanged={refresh}
             onToast={showToast}
           />
-          <h3 className="sechead">Sender and footer</h3>
+          <SettingsSectionHeading>Sender and footer</SettingsSectionHeading>
           <SenderForm
             teamId={teamId}
             canManage={canManage}
@@ -86,7 +95,7 @@ function Email() {
             }}
             onToast={showToast}
           />
-          <h3 className="sechead">Topics</h3>
+          <SettingsSectionHeading>Topics</SettingsSectionHeading>
           <Topics teamId={teamId} canManage={canManage} onToast={showToast} />
         </>
       )}
@@ -99,21 +108,15 @@ function Readiness(props: { readonly settings: EmailSettings }) {
   const missing = props.settings.missing
   if (missing.length === 0) {
     return (
-      <div className="notice">
-        <span className="ic">
-          <CheckIcon />
-        </span>
-        <span>Ready to send. Campaigns go out from {props.settings.senderAddress}.</span>
-      </div>
+      <Notice tone="ok" icon={<CheckIcon />}>
+        Ready to send. Campaigns go out from {props.settings.senderAddress}.
+      </Notice>
     )
   }
   return (
-    <div className="warn">
-      <span className="ic">
-        <WarnIcon />
-      </span>
-      <span>Before your team can send, add {listOf(missing.map((item) => MISSING_LABELS[item]))}.</span>
-    </div>
+    <Notice tone="warn" icon={<WarnIcon />}>
+      Before your team can send, add {listOf(missing.map((item) => MISSING_LABELS[item]))}.
+    </Notice>
   )
 }
 
@@ -157,17 +160,17 @@ function Domains(props: {
           Campaigns are sent from your own domain, like news@acme.com, once its DNS records prove it's yours.
         </Empty>
       ) : (
-        <div className="box">
-          <table className="stable">
+        <Box>
+          <Table kind="settings">
             <thead>
               <tr>
-                <th scope="col">Domain</th>
-                <th scope="col" style={{ width: "24%" }}>
+                <Th scope="col">Domain</Th>
+                <Th scope="col" className="w-[24%]">
                   Status
-                </th>
-                <th scope="col" style={{ width: 230 }}>
-                  <span className="vh">Actions</span>
-                </th>
+                </Th>
+                <Th scope="col" className="w-72">
+                  <span className="sr-only">Actions</span>
+                </Th>
               </tr>
             </thead>
             <tbody>
@@ -203,12 +206,12 @@ function Domains(props: {
                 />
               ))}
             </tbody>
-          </table>
-        </div>
+          </Table>
+        </Box>
       )}
       {props.canManage ? (
         <form
-          className="addrow"
+          className="-mt-2 flex gap-1.5"
           onSubmit={(event) => {
             event.preventDefault()
             const domain = adding.trim()
@@ -223,17 +226,17 @@ function Domains(props: {
             })
           }}
         >
-          <input
-            className="inp"
+          <Input
+            className="max-w-80"
             type="text"
             placeholder="acme.com"
             aria-label="Domain to send from"
             value={adding}
             onChange={(event) => setAdding(event.target.value)}
           />
-          <button className="btn" type="submit" disabled={!adding.trim() || busy === "new"}>
+          <Button size="lg" type="submit" disabled={!adding.trim() || busy === "new"}>
             Add domain
-          </button>
+          </Button>
         </form>
       ) : null}
     </>
@@ -255,76 +258,74 @@ function DomainRow(props: {
   const { domain } = props
   return (
     <>
-      <tr>
-        <td>
-          <span className="who">
-            <span className="n">{domain.domain}</span>
-          </span>
-        </td>
-        <td>
-          <span className={`pill ${domain.status === "verified" ? "ok" : domain.status === "failed" ? "bad" : ""}`}>
+      <Tr>
+        <Td className="font-medium">{domain.domain}</Td>
+        <Td>
+          <Badge tone={domain.status === "verified" ? "strong" : domain.status === "failed" ? "danger" : "neutral"}>
             {STATUS_LABELS[domain.status]}
-          </span>
-        </td>
-        <td className="c-act">
+          </Badge>
+        </Td>
+        <Td className="text-right">
           {props.confirming ? (
-            <span className="confirm">
-              <button className="btn sm ghost" type="button" onClick={props.onCancel}>
+            <RowActions>
+              <Button size="sm" variant="ghost" onClick={props.onCancel}>
                 Cancel
-              </button>
-              <button
-                className="btn sm danger-solid"
-                type="button"
+              </Button>
+              <Button
+                size="sm"
+                variant="danger-solid"
                 aria-label={`Confirm: remove ${domain.domain}`}
                 disabled={props.busy}
                 onClick={props.onRemove}
               >
                 Remove
-              </button>
-            </span>
+              </Button>
+            </RowActions>
           ) : (
-            <span className="confirm">
+            <RowActions>
               {domain.records.length > 0 ? (
-                <button className="btn sm ghost" type="button" aria-expanded={props.open} onClick={props.onToggle}>
+                <Button size="sm" variant="ghost" aria-expanded={props.open} onClick={props.onToggle}>
                   DNS records
-                </button>
+                </Button>
               ) : null}
               {props.canManage && domain.status !== "verified" ? (
-                <button className="btn sm" type="button" disabled={props.busy} onClick={props.onVerify}>
+                <Button size="sm" disabled={props.busy} onClick={props.onVerify}>
                   Verify
-                </button>
+                </Button>
               ) : null}
               {props.canManage ? (
-                <button
-                  className="btn sm danger"
-                  type="button"
-                  aria-label={`Remove ${domain.domain}`}
-                  onClick={props.onConfirm}
-                >
+                <Button size="sm" variant="danger" aria-label={`Remove ${domain.domain}`} onClick={props.onConfirm}>
                   Remove
-                </button>
+                </Button>
               ) : null}
-            </span>
+            </RowActions>
           )}
-        </td>
-      </tr>
+        </Td>
+      </Tr>
       {props.open && domain.records.length > 0 ? (
-        <tr className="subrow">
-          <td colSpan={3}>
-            <p className="hint sm-t">Add these at your DNS host, then verify. It can take a while for DNS to update.</p>
-            <table className="dns">
+        <tr>
+          <td colSpan={3} className="border-b border-line/55 bg-hover px-3.5 pt-1 pb-4">
+            <Hint>Add these at your DNS host, then verify. It can take a while for DNS to update.</Hint>
+            <table className="mt-2 w-full table-fixed border-collapse">
               <thead>
-                <tr>
-                  <th scope="col">Type</th>
+                <tr className="[&>th]:px-2 [&>th]:py-1 [&>th]:text-left [&>th]:font-medium [&>th]:text-subtle">
+                  <th scope="col" className="w-20">
+                    Type
+                  </th>
                   <th scope="col">Name</th>
                   <th scope="col">Value</th>
-                  <th scope="col">Status</th>
+                  <th scope="col" className="w-32">
+                    Status
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {domain.records.map((record) => (
-                  <tr key={`${record.type}-${record.name}-${record.value}`}>
-                    <td className="mono">
+                  <tr
+                    key={`${record.type}-${record.name}-${record.value}`}
+                    className="[&>td]:px-2 [&>td]:py-1 [&>td]:align-middle"
+                  >
+                    <td className="font-mono text-sm">
                       {record.type}
                       {record.priority !== null ? ` ${record.priority}` : ""}
                     </td>
@@ -334,7 +335,7 @@ function DomainRow(props: {
                     <td>
                       <CopyField value={record.value} label={`${record.type} record value`} code />
                     </td>
-                    <td className="c-muted">{STATUS_LABELS[record.status]}</td>
+                    <td className="text-subtle">{STATUS_LABELS[record.status]}</td>
                   </tr>
                 ))}
               </tbody>
@@ -394,71 +395,57 @@ function SenderForm(props: {
 
   const disabled = !props.canManage
   return (
-    <section className="box urlcard formgrid">
-      <div className="fld">
-        <label className="fl" htmlFor="sender-name">
-          Sender name
-        </label>
-        <input
+    <SettingsPanel className="grid grid-cols-2 gap-x-5 gap-y-4 @max-3xl/content:grid-cols-1">
+      <Field label="Sender name" htmlFor="sender-name">
+        <Input
           id="sender-name"
-          className="inp"
           maxLength={80}
           disabled={disabled}
           placeholder="Acme"
           value={draft.senderName}
           onChange={set("senderName")}
         />
-      </div>
-      <div className="fld">
-        <label className="fl" htmlFor="sender-address">
-          Sender address
-        </label>
-        <input
+      </Field>
+      <Field label="Sender address" htmlFor="sender-address" hint="On one of your sending domains.">
+        <Input
           id="sender-address"
-          className="inp"
           type="email"
           disabled={disabled}
           placeholder={`news@${domainHint}`}
           value={draft.senderAddress}
           onChange={set("senderAddress")}
         />
-        <p className="hint sm-t">On one of your sending domains.</p>
-      </div>
-      <div className="fld">
-        <label className="fl" htmlFor="reply-to">
-          Reply-to address <span className="c-muted">(optional)</span>
-        </label>
-        <input
+      </Field>
+      <Field
+        label={
+          <>
+            Reply-to address <span className="font-normal text-subtle">(optional)</span>
+          </>
+        }
+        htmlFor="reply-to"
+      >
+        <Input
           id="reply-to"
-          className="inp"
           type="email"
           disabled={disabled}
           placeholder="hello@acme.com"
           value={draft.replyTo}
           onChange={set("replyTo")}
         />
-      </div>
-      <div className="fld">
-        <label className="fl" htmlFor="legal-name">
-          Legal name
-        </label>
-        <input
+      </Field>
+      <Field label="Legal name" htmlFor="legal-name">
+        <Input
           id="legal-name"
-          className="inp"
           maxLength={160}
           disabled={disabled}
           placeholder="Acme Pty Ltd"
           value={draft.legalName}
           onChange={set("legalName")}
         />
-      </div>
-      <div className="fld wide">
-        <label className="fl" htmlFor="postal-address">
-          Postal address
-        </label>
-        <textarea
+      </Field>
+      <Field label="Postal address" htmlFor="postal-address" className="col-span-full">
+        <Textarea
           id="postal-address"
-          className="inp"
           rows={2}
           maxLength={300}
           disabled={disabled}
@@ -466,14 +453,10 @@ function SenderForm(props: {
           value={draft.postalAddress}
           onChange={set("postalAddress")}
         />
-      </div>
-      <div className="fld wide">
-        <label className="fl" htmlFor="footer-reason">
-          Why recipients get your email
-        </label>
-        <textarea
+      </Field>
+      <Field label="Why recipients get your email" htmlFor="footer-reason" className="col-span-full">
+        <Textarea
           id="footer-reason"
-          className="inp"
           rows={2}
           maxLength={300}
           disabled={disabled}
@@ -481,10 +464,10 @@ function SenderForm(props: {
           value={draft.footerReason}
           onChange={set("footerReason")}
         />
-      </div>
-      <div className="fld wide">
-        <span className="fl">Footer preview</span>
-        <div className="footprev sm-t">
+      </Field>
+      <div className="col-span-full flex flex-col gap-1.5">
+        <span className="font-medium">Footer preview</span>
+        <div className="flex flex-col gap-1 border-t border-dashed border-line-strong pt-3 text-center text-sm text-subtle [&>p]:m-0">
           <p>{draft.footerReason || "Why recipients get your email."}</p>
           <p>
             {draft.legalName || "Legal name"} · {draft.postalAddress || "Postal address"}
@@ -493,21 +476,21 @@ function SenderForm(props: {
             <u>Unsubscribe</u> or choose which email you get.
           </p>
         </div>
-        <p className="hint sm-t">
+        <Hint>
           Anti-spam laws need every campaign to say who sent it and how to unsubscribe, so Parley adds this to each one.
-        </p>
+        </Hint>
       </div>
       {props.canManage ? (
-        <div className="fld wide formactions">
-          <button className="btn ghost" type="button" disabled={!dirty || busy} onClick={() => setDraft(initial)}>
+        <div className="col-span-full flex justify-end gap-1.5">
+          <Button variant="ghost" disabled={!dirty || busy} onClick={() => setDraft(initial)}>
             Reset
-          </button>
-          <button className="btn primary" type="button" disabled={!dirty || busy} onClick={() => void save()}>
+          </Button>
+          <Button variant="primary" disabled={!dirty || busy} onClick={() => void save()}>
             Save
-          </button>
+          </Button>
         </div>
       ) : null}
-    </section>
+    </SettingsPanel>
   )
 }
 
@@ -536,9 +519,9 @@ function Topics(props: {
 
   return (
     <>
-      <p className="hint sm-t" style={{ margin: "-4px 0 10px" }}>
+      <Hint className="-mt-1">
         A campaign can have a topic, and people can unsubscribe from one topic while still getting the rest.
-      </p>
+      </Hint>
       {topics.isPending ? (
         <LoadingRows />
       ) : topics.isError ? (
@@ -552,74 +535,68 @@ function Topics(props: {
           Without topics, unsubscribing stops all of your team's marketing email.
         </Empty>
       ) : (
-        <div className="box">
-          <table className="stable">
+        <Box>
+          <Table kind="settings">
             <thead>
               <tr>
-                <th scope="col" style={{ width: "30%" }}>
+                <Th scope="col" className="w-[30%]">
                   Name
-                </th>
-                <th scope="col">Description</th>
-                <th scope="col" style={{ width: "16%" }}>
+                </Th>
+                <Th scope="col">Description</Th>
+                <Th scope="col" className="w-[16%]">
                   Unsubscribed
-                </th>
-                <th scope="col" style={{ width: 150 }}>
-                  <span className="vh">Actions</span>
-                </th>
+                </Th>
+                <Th scope="col" className="w-44">
+                  <span className="sr-only">Actions</span>
+                </Th>
               </tr>
             </thead>
             <tbody>
               {topics.data.map((topic) => (
-                <tr key={topic.id}>
-                  <td>
-                    <span className="who">
-                      <span className="n">{topic.name}</span>
-                    </span>
-                  </td>
-                  <td className="c-muted">{topic.description ?? "—"}</td>
-                  <td className="c-muted tab">{topic.unsubscribedCount}</td>
-                  <td className="c-act">
+                <Tr key={topic.id}>
+                  <Td className="font-medium">{topic.name}</Td>
+                  <Td className="text-subtle">{topic.description ?? "—"}</Td>
+                  <Td className="text-subtle tabular-nums">{topic.unsubscribedCount}</Td>
+                  <Td className="text-right">
                     {!props.canManage ? null : confirming === topic.id ? (
-                      <span className="confirm">
-                        <button className="btn sm ghost" type="button" onClick={() => setConfirming(undefined)}>
+                      <RowActions>
+                        <Button size="sm" variant="ghost" onClick={() => setConfirming(undefined)}>
                           Cancel
-                        </button>
-                        <button
-                          className="btn sm danger-solid"
-                          type="button"
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="danger-solid"
                           aria-label={`Confirm: delete ${topic.name}`}
                           onClick={() => void remove(topic)}
                         >
                           Delete
-                        </button>
-                      </span>
+                        </Button>
+                      </RowActions>
                     ) : (
-                      <span className="confirm">
-                        <button className="btn sm ghost" type="button" onClick={() => setDialog(topic)}>
+                      <RowActions>
+                        <Button size="sm" variant="ghost" onClick={() => setDialog(topic)}>
                           Edit
-                        </button>
-                        <button
-                          className="btn sm danger"
-                          type="button"
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="danger"
                           aria-label={`Delete ${topic.name}`}
                           onClick={() => setConfirming(topic.id)}
                         >
                           Delete
-                        </button>
-                      </span>
+                        </Button>
+                      </RowActions>
                     )}
-                  </td>
-                </tr>
+                  </Td>
+                </Tr>
               ))}
             </tbody>
-          </table>
-        </div>
+          </Table>
+        </Box>
       )}
       {props.canManage ? (
-        <div className="addrow">
-          <button className="btn" type="button" onClick={() => setDialog("new")}>
-            New topic
-          </button>
+        <div className="-mt-2 flex gap-1.5">
+          <Button onClick={() => setDialog("new")}>New topic</Button>
         </div>
       ) : null}
       {dialog ? (
@@ -670,48 +647,43 @@ function TopicDialog(props: {
       onClose={props.onClose}
       footer={
         <>
-          <button className="btn ghost" type="button" onClick={props.onClose}>
+          <Button variant="ghost" onClick={props.onClose}>
             Cancel
-          </button>
-          <button className="btn primary" type="button" disabled={!name.trim() || busy} onClick={() => void save()}>
+          </Button>
+          <Button variant="primary" disabled={!name.trim() || busy} onClick={() => void save()}>
             {props.topic ? "Save" : "Add topic"}
-          </button>
+          </Button>
         </>
       }
     >
-      <div className="fld">
-        <label className="fl" htmlFor="topic-name">
-          Name
-        </label>
-        <input
+      <Field label="Name" htmlFor="topic-name">
+        <Input
           id="topic-name"
-          className="inp"
           maxLength={60}
           placeholder="Product updates"
           autoFocus
           value={name}
           onChange={(event) => setName(event.target.value)}
         />
-      </div>
-      <div className="fld">
-        <label className="fl" htmlFor="topic-description">
-          Description <span className="c-muted">(optional)</span>
-        </label>
-        <input
+      </Field>
+      <Field
+        label={
+          <>
+            Description <span className="font-normal text-subtle">(optional)</span>
+          </>
+        }
+        htmlFor="topic-description"
+        hint="Shown on the unsubscribe page."
+      >
+        <Input
           id="topic-description"
-          className="inp"
           maxLength={200}
           placeholder="New features, about once a month."
           value={description}
           onChange={(event) => setDescription(event.target.value)}
         />
-        <p className="hint sm-t">Shown on the unsubscribe page.</p>
-      </div>
-      {error ? (
-        <p className="err sm-t" role="alert">
-          {error}
-        </p>
-      ) : null}
+      </Field>
+      {error ? <ErrorText>{error}</ErrorText> : null}
     </Dialog>
   )
 }

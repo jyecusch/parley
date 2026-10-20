@@ -2,6 +2,7 @@ import {
   type InputHTMLAttributes,
   type LabelHTMLAttributes,
   type ReactNode,
+  type Ref,
   type SelectHTMLAttributes,
   type TextareaHTMLAttributes,
   useEffect,
@@ -14,16 +15,25 @@ const BOXED =
   "w-full rounded-md bg-transparent text-fg inset-ring inset-ring-control focus:outline-none focus:inset-ring-muted aria-invalid:inset-ring-danger disabled:opacity-60"
 
 /** A text box with an outline, for forms and dialogs. */
-export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
+export function Input({
+  className,
+  ...props
+}: InputHTMLAttributes<HTMLInputElement> & { ref?: Ref<HTMLInputElement> | undefined }) {
   return <input className={cn(BOXED, "h-10 px-3", className)} {...props} />
 }
 
 /** A small outlined text box, for editing inside a row (such as a title). */
-export function SmallInput({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
+export function SmallInput({
+  className,
+  ...props
+}: InputHTMLAttributes<HTMLInputElement> & { ref?: Ref<HTMLInputElement> | undefined }) {
   return <input className={cn(BOXED, "h-7 bg-surface px-2 text-sm", className)} {...props} />
 }
 
-export function Textarea({ className, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+export function Textarea({
+  className,
+  ...props
+}: TextareaHTMLAttributes<HTMLTextAreaElement> & { ref?: Ref<HTMLTextAreaElement> | undefined }) {
   return <textarea className={cn(BOXED, "resize-y px-3 py-2 leading-6", className)} {...props} />
 }
 
@@ -31,7 +41,10 @@ export function Textarea({ className, ...props }: TextareaHTMLAttributes<HTMLTex
  * A text box that looks like plain text until hovered or focused: how record panels edit a value
  * in place.
  */
-export function InlineInput({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
+export function InlineInput({
+  className,
+  ...props
+}: InputHTMLAttributes<HTMLInputElement> & { ref?: Ref<HTMLInputElement> | undefined }) {
   return (
     <input
       className={cn(
@@ -44,7 +57,10 @@ export function InlineInput({ className, ...props }: InputHTMLAttributes<HTMLInp
 }
 
 /** A filter-style text box on a tinted background, like "Filter by name or email". */
-export function SearchInput({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
+export function SearchInput({
+  className,
+  ...props
+}: InputHTMLAttributes<HTMLInputElement> & { ref?: Ref<HTMLInputElement> | undefined }) {
   return (
     <input
       className={cn(
@@ -142,13 +158,13 @@ export function Radio({ className, ...props }: InputHTMLAttributes<HTMLInputElem
 
 /** A choice as a bordered card: radio, title and a line of description. */
 export function RadioCard({
-  title,
+  label,
   description,
   children,
   className,
   ...props
 }: InputHTMLAttributes<HTMLInputElement> & {
-  title: ReactNode
+  label: ReactNode
   description?: ReactNode | undefined
   children?: ReactNode
 }) {
@@ -162,7 +178,7 @@ export function RadioCard({
     >
       <Radio {...props} />
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="flex items-center gap-2.5 font-medium">{title}</span>
+        <span className="flex items-center gap-2.5 font-medium">{label}</span>
         {description ? <span className="text-sm text-muted">{description}</span> : null}
         {children}
       </span>

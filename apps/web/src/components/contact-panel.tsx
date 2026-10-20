@@ -1,17 +1,26 @@
 import type { Contact, TeamId } from "@parley/domain"
 import type { UserText } from "@parley/errors"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { useState } from "react"
 import { call, messageOf } from "../lib/client.ts"
 import { type contactsCollection, displayNameOf } from "../lib/contacts.ts"
 import { useFields } from "../lib/custom-fields.ts"
 import { AffiliationTags, ContactCompanies } from "./affiliations.tsx"
 import { CustomFieldsSection } from "./custom-fields.tsx"
-import { ChevronDown, ChevronUp, CloseIcon, CollapseIcon, ExpandIcon, MoreIcon, TrashIcon } from "./icons.tsx"
+import { TrashIcon } from "./icons.tsx"
 import { ContactAvatar, ImageEditor } from "./images.tsx"
-import { EditableList, EditableText, toE164 } from "./record.tsx"
+import { EditableList, EditableText, PanelBar, PanelIdentity, PanelSubtitle, toE164 } from "./record.tsx"
 import { SubscriptionSection } from "./subscriptions.tsx"
 import { Timeline } from "./timeline.tsx"
+import {
+  cn,
+  MenuItem,
+  MenuSeparator,
+  PanelBody,
+  PanelHeader,
+  RecordPanel,
+  readableColumnClass,
+  Section,
+} from "./ui/index.ts"
 
 /** A toast the contacts screen shows, with an optional undo. */
 export interface Toast {
@@ -39,7 +48,6 @@ export function ContactPanel(props: {
   const { contact, collection } = props
   const queryClient = useQueryClient()
   const { fields } = useFields(props.teamId, "contact")
-  const [moreMenu, setMoreMenu] = useState(false)
   const activity = useQuery({
     queryKey: ["contact-activity", props.teamId, contact.id, contact.updatedAt, contact.affiliations.length],
     queryFn: () => call("contacts.activity", { teamId: props.teamId, contactId: contact.id }),
@@ -70,109 +78,59 @@ export function ContactPanel(props: {
     }
   }
 
+  const full = props.layout === "full"
   return (
-    <aside
-      className={`card panel ${props.layout === "full" ? "record" : ""}`}
-      aria-label={`Contact ${contact.displayName}`}
-    >
-      <div className="ph">
-        <div className="ph-bar">
-          <button
-            className="ibtn tip tip-b"
-            type="button"
-            aria-label="Previous contact"
-            data-tip="Previous  K"
-            onClick={() => props.onMove(-1)}
-          >
-            <ChevronUp />
-          </button>
-          <button
-            className="ibtn tip tip-b"
-            type="button"
-            aria-label="Next contact"
-            data-tip="Next  J"
-            onClick={() => props.onMove(1)}
-          >
-            <ChevronDown className="size-5" />
-          </button>
-          <span className="pos sm-t tab">
-            {props.position.index + 1} of {props.position.total}
-          </span>
-          <div className="spacer" />
-          {props.onToggleLayout ? (
-            <button
-              className="ibtn tip tip-b"
-              type="button"
-              aria-label={props.layout === "full" ? "Back to the panel" : "Open full page"}
-              data-tip={props.layout === "full" ? "Back to the list" : "Open full page"}
-              onClick={props.onToggleLayout}
+    <RecordPanel full={full} aria-label={`Contact ${contact.displayName}`}>
+      <PanelHeader className={cn(full && readableColumnClass)}>
+        <PanelBar
+          noun="contact"
+          position={props.position}
+          onMove={props.onMove}
+          layout={props.layout}
+          onToggleLayout={props.onToggleLayout}
+          onClose={props.onClose}
+          menu={(closeMenu) => (
+            <>
+              <MenuItem
+                onClick={() => {
+                  const email = contact.emails[0]?.address
+                  if (email) void navigator.clipboard?.writeText(email)
+                  closeMenu()
+                }}
+              >
+                Copy email
+              </MenuItem>
+              <MenuSeparator />
+              <MenuItem danger onClick={props.onDelete}>
+                <TrashIcon className="size-4" />
+                Delete contact
+              </MenuItem>
+            </>
+          )}
+        />
+        <PanelIdentity
+          name={contact.displayName}
+          mark={
+            <ImageEditor
+              label="avatar"
+              hasUpload={contact.avatarUrl !== null}
+              canEdit={props.canWrite}
+              onUpload={(image) => setAvatar(image)}
+              onRemove={() => setAvatar(null)}
             >
-              {props.layout === "full" ? <CollapseIcon /> : <ExpandIcon />}
-            </button>
-          ) : null}
-          <div style={{ position: "relative" }}>
-            <button
-              className="ibtn tip tip-b"
-              type="button"
-              aria-label="More actions"
-              data-tip="More"
-              onClick={() => setMoreMenu((v) => !v)}
-            >
-              <MoreIcon />
-            </button>
-            {moreMenu ? (
-              <div className="menu" style={{ right: 0, top: 30 }}>
-                <button
-                  className="menu-i"
-                  type="button"
-                  onClick={() => {
-                    const email = contact.emails[0]?.address
-                    if (email) void navigator.clipboard?.writeText(email)
-                    setMoreMenu(false)
-                  }}
-                >
-                  Copy email
-                </button>
-                <div className="menu-sep" />
-                <button className="menu-i" type="button" style={{ color: "var(--danger)" }} onClick={props.onDelete}>
-                  <TrashIcon className="size-4" />
-                  Delete contact
-                </button>
-              </div>
-            ) : null}
-          </div>
-          <button
-            className="ibtn tip tip-b"
-            type="button"
-            aria-label="Close panel"
-            data-tip="Close  Esc"
-            onClick={props.onClose}
-          >
-            <CloseIcon />
-          </button>
-        </div>
-        <div className="ph-id">
-          <ImageEditor
-            label="avatar"
-            hasUpload={contact.avatarUrl !== null}
-            canEdit={props.canWrite}
-            onUpload={(image) => setAvatar(image)}
-            onRemove={() => setAvatar(null)}
-          >
-            <ContactAvatar contact={contact} size="lg" />
-          </ImageEditor>
-          <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 6 }}>
-            <h2 className="pname">{contact.displayName}</h2>
-            {contact.affiliations.length > 0 ? (
-              <AffiliationTags affiliations={contact.affiliations} />
-            ) : (
-              <p className="paff sm-t">{contact.emails[0]?.address ?? "No email"}</p>
-            )}
-          </div>
-        </div>
-      </div>
-      <div className="pbody">
-        <section className="sec">
+              <ContactAvatar contact={contact} size="lg" />
+            </ImageEditor>
+          }
+        >
+          {contact.affiliations.length > 0 ? (
+            <AffiliationTags affiliations={contact.affiliations} />
+          ) : (
+            <PanelSubtitle>{contact.emails[0]?.address ?? "No email"}</PanelSubtitle>
+          )}
+        </PanelIdentity>
+      </PanelHeader>
+      <PanelBody className={cn(full && readableColumnClass)}>
+        <Section>
           <EditableText
             label="First name"
             value={contact.firstName}
@@ -222,7 +180,7 @@ export function ContactPanel(props: {
               })
             }
           />
-        </section>
+        </Section>
         <CustomFieldsSection
           fields={fields}
           values={contact.custom}
@@ -256,7 +214,7 @@ export function ContactPanel(props: {
           activityError={activity.isError ? messageOf(activity.error) : undefined}
           onError={(text) => props.onError(text)}
         />
-      </div>
-    </aside>
+      </PanelBody>
+    </RecordPanel>
   )
 }

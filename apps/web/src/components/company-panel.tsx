@@ -7,10 +7,33 @@ import { COUNTRIES, countryName } from "../lib/countries.ts"
 import { useFields } from "../lib/custom-fields.ts"
 import { CompanyContacts, type ToastRequest } from "./affiliations.tsx"
 import { CustomFieldsSection } from "./custom-fields.tsx"
-import { ChevronDown, ChevronUp, CloseIcon, CollapseIcon, ExpandIcon, MoreIcon, TrashIcon } from "./icons.tsx"
+import { TrashIcon } from "./icons.tsx"
 import { CompanyLogo, ImageEditor } from "./images.tsx"
-import { EditableList, EditableText, toE164 } from "./record.tsx"
+import {
+  EditableList,
+  EditableText,
+  EmptyValue,
+  PanelBar,
+  PanelIdentity,
+  PanelSubtitle,
+  propertyFieldsetClass,
+  toE164,
+} from "./record.tsx"
 import { Timeline } from "./timeline.tsx"
+import {
+  Button,
+  cn,
+  InlineInput,
+  MenuItem,
+  PanelBody,
+  PanelHeader,
+  PropertyRow,
+  propertyValueClass,
+  RecordPanel,
+  readableColumnClass,
+  Section,
+  Select,
+} from "./ui/index.ts"
 
 export type Draft = { -readonly [K in keyof Company]: Company[K] }
 export type Domain = Company["domains"][number]["domain"]
@@ -43,16 +66,13 @@ export const addressFrom = (read: (name: string) => string): PostalAddress | nul
 
 export function AddressInputs(props: { readonly idPrefix: string; readonly value: PostalAddress | null }) {
   return (
-    <div className="addr-grid">
+    <div className="grid grid-cols-2 gap-x-3">
       {ADDRESS_FIELDS.map((field) => (
-        <div key={field.key} className={field.full ? "full" : undefined}>
-          <label className="sublabel" htmlFor={`${props.idPrefix}-${field.key}`}>
-            {field.label}
-          </label>
-          <input
+        <div key={field.key} className={cn(field.full && "col-span-2")}>
+          <AddressLabel htmlFor={`${props.idPrefix}-${field.key}`}>{field.label}</AddressLabel>
+          <InlineInput
             id={`${props.idPrefix}-${field.key}`}
             name={field.key}
-            className="finp"
             type="text"
             autoComplete="off"
             placeholder="Empty"
@@ -62,13 +82,11 @@ export function AddressInputs(props: { readonly idPrefix: string; readonly value
         </div>
       ))}
       <div>
-        <label className="sublabel" htmlFor={`${props.idPrefix}-country`}>
-          Country
-        </label>
-        <select
+        <AddressLabel htmlFor={`${props.idPrefix}-country`}>Country</AddressLabel>
+        <Select
+          variant="inline"
           id={`${props.idPrefix}-country`}
           name="country"
-          className="fsel"
           defaultValue={props.value?.country ?? ""}
         >
           <option value="">Choose…</option>
@@ -77,9 +95,17 @@ export function AddressInputs(props: { readonly idPrefix: string; readonly value
               {country.name}
             </option>
           ))}
-        </select>
+        </Select>
       </div>
     </div>
+  )
+}
+
+function AddressLabel(props: { readonly htmlFor: string; readonly children: string }) {
+  return (
+    <label className="mt-1 block text-xs text-subtle" htmlFor={props.htmlFor}>
+      {props.children}
+    </label>
   )
 }
 
@@ -101,7 +127,6 @@ export function CompanyPanel(props: {
   const { company, collection } = props
   const queryClient = useQueryClient()
   const { fields } = useFields(props.teamId, "company")
-  const [moreMenu, setMoreMenu] = useState(false)
   const activity = useQuery({
     queryKey: ["company-activity", props.teamId, company.id, company.updatedAt, company.contactCount],
     queryFn: () => call("companies.activity", { teamId: props.teamId, companyId: company.id }),
@@ -135,94 +160,47 @@ export function CompanyPanel(props: {
     }
   }
 
+  const full = props.layout === "full"
   return (
-    <aside className={`card panel ${props.layout === "full" ? "record" : ""}`} aria-label={`Company ${company.name}`}>
-      <div className="ph">
-        <div className="ph-bar">
-          <button
-            className="ibtn tip tip-b"
-            type="button"
-            aria-label="Previous company"
-            data-tip="Previous  K"
-            onClick={() => props.onMove(-1)}
-          >
-            <ChevronUp />
-          </button>
-          <button
-            className="ibtn tip tip-b"
-            type="button"
-            aria-label="Next company"
-            data-tip="Next  J"
-            onClick={() => props.onMove(1)}
-          >
-            <ChevronDown className="size-5" />
-          </button>
-          <span className="pos sm-t tab">
-            {props.position.index + 1} of {props.position.total}
-          </span>
-          <div className="spacer" />
-          {props.onToggleLayout ? (
-            <button
-              className="ibtn tip tip-b"
-              type="button"
-              aria-label={props.layout === "full" ? "Back to the panel" : "Open full page"}
-              data-tip={props.layout === "full" ? "Back to the list" : "Open full page"}
-              onClick={props.onToggleLayout}
+    <RecordPanel full={full} aria-label={`Company ${company.name}`}>
+      <PanelHeader className={cn(full && readableColumnClass)}>
+        <PanelBar
+          noun="company"
+          position={props.position}
+          onMove={props.onMove}
+          layout={props.layout}
+          onToggleLayout={props.onToggleLayout}
+          onClose={props.onClose}
+          menu={() => (
+            <MenuItem danger onClick={props.onDelete}>
+              <TrashIcon className="size-4" />
+              Delete company
+            </MenuItem>
+          )}
+        />
+        <PanelIdentity
+          name={company.name}
+          mark={
+            <ImageEditor
+              label="logo"
+              hasUpload={company.logoUrl !== null}
+              canEdit={props.canWrite}
+              onUpload={(image) => setLogo(image)}
+              onRemove={() => setLogo(null)}
             >
-              {props.layout === "full" ? <CollapseIcon /> : <ExpandIcon />}
-            </button>
-          ) : null}
-          <div style={{ position: "relative" }}>
-            <button
-              className="ibtn tip tip-b"
-              type="button"
-              aria-label="More actions"
-              data-tip="More"
-              onClick={() => setMoreMenu((v) => !v)}
-            >
-              <MoreIcon />
-            </button>
-            {moreMenu ? (
-              <div className="menu" style={{ right: 0, top: 30 }}>
-                <button className="menu-i" type="button" style={{ color: "var(--danger)" }} onClick={props.onDelete}>
-                  <TrashIcon className="size-4" />
-                  Delete company
-                </button>
-              </div>
-            ) : null}
-          </div>
-          <button
-            className="ibtn tip tip-b"
-            type="button"
-            aria-label="Close panel"
-            data-tip="Close  Esc"
-            onClick={props.onClose}
-          >
-            <CloseIcon />
-          </button>
-        </div>
-        <div className="ph-id">
-          <ImageEditor
-            label="logo"
-            hasUpload={company.logoUrl !== null}
-            canEdit={props.canWrite}
-            onUpload={(image) => setLogo(image)}
-            onRemove={() => setLogo(null)}
-          >
-            <CompanyLogo company={company} size="lg" />
-          </ImageEditor>
-          <div style={{ minWidth: 0 }}>
-            <h2 className="pname">{company.name}</h2>
-            <p className="paff sm-t">
-              {[domain, `${company.contactCount} ${company.contactCount === 1 ? "contact" : "contacts"}`]
-                .filter(Boolean)
-                .join(" · ")}
-            </p>
-          </div>
-        </div>
-      </div>
-      <div className="pbody">
-        <section className="sec">
+              <CompanyLogo company={company} size="lg" />
+            </ImageEditor>
+          }
+        >
+          <PanelSubtitle>
+            {[domain, `${company.contactCount} ${company.contactCount === 1 ? "contact" : "contacts"}`]
+              .filter(Boolean)
+              .join(" · ")}
+          </PanelSubtitle>
+        </PanelIdentity>
+      </PanelHeader>
+      <PanelBody className={cn(full && readableColumnClass)}>
+        <Section>
           <EditableText
             label="Name"
             value={company.name}
@@ -277,7 +255,7 @@ export function CompanyPanel(props: {
               })
             }
           />
-        </section>
+        </Section>
         <CustomFieldsSection
           fields={fields}
           values={company.custom}
@@ -300,8 +278,8 @@ export function CompanyPanel(props: {
           activityError={activity.isError ? messageOf(activity.error) : undefined}
           onError={(text) => props.onToast({ text })}
         />
-      </div>
-    </aside>
+      </PanelBody>
+    </RecordPanel>
   )
 }
 
@@ -323,11 +301,9 @@ function EditableAddress(props: {
   }
   if (editing) {
     return (
-      <div className="field">
-        <span className="flabel sm-t">Address</span>
+      <PropertyRow label="Address">
         <fieldset
-          className="fval"
-          style={{ padding: "0 6px", cursor: "default", border: 0, minInlineSize: 0 }}
+          className={cn(propertyFieldsetClass, "cursor-default")}
           ref={formRef}
           onKeyDown={(event) => {
             if (event.key === "Enter" && (event.target as HTMLElement).tagName === "INPUT") save()
@@ -337,36 +313,35 @@ function EditableAddress(props: {
             }
           }}
         >
-          <legend className="vh">Address</legend>
+          <legend className="sr-only">Address</legend>
           <AddressInputs idPrefix="eco" value={value} />
-          <div style={{ display: "flex", gap: 6, margin: "8px 0 4px" }}>
-            <button className="btn sm primary" type="button" onClick={save}>
+          <div className="mt-2 mb-1 flex gap-1.5">
+            <Button size="sm" variant="primary" onClick={save}>
               Save
-            </button>
-            <button className="btn sm ghost" type="button" onClick={() => setEditing(false)}>
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>
               Cancel
-            </button>
+            </Button>
           </div>
         </fieldset>
-      </div>
+      </PropertyRow>
     )
   }
   const locality = value ? [value.city, value.region, value.postcode].filter(Boolean).join(" ") : ""
   return (
-    <div className="field">
-      <span className="flabel sm-t">Address</span>
-      <button className="fval" type="button" onClick={() => setEditing(true)}>
+    <PropertyRow label="Address">
+      <button className={propertyValueClass} type="button" onClick={() => setEditing(true)}>
         {value ? (
-          <span className="addr">
+          <span className="flex flex-col">
             {value.line1 ? <span>{value.line1}</span> : null}
             {value.line2 ? <span>{value.line2}</span> : null}
             {locality ? <span>{locality}</span> : null}
             {value.country ? <span>{countryName(value.country)}</span> : null}
           </span>
         ) : (
-          <span className="empty-v">Empty</span>
+          <EmptyValue />
         )}
       </button>
-    </div>
+    </PropertyRow>
   )
 }

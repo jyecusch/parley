@@ -25,6 +25,52 @@ import { DisplayMenu, ImportDialog, SaveViewDialog, SetFieldDialog, ViewActions 
 import { LoadFailed, problemFor, problemsOf, toE164, toggle } from "../components/record.tsx"
 import { AddToSegmentDialog } from "../components/segments.tsx"
 import { isTyping, useShell } from "../components/shell.tsx"
+import {
+  Avatar,
+  Breadcrumb,
+  BreadcrumbSeparator,
+  Button,
+  breadcrumbRootClass,
+  Card,
+  Centered,
+  Checkbox,
+  Count,
+  cn,
+  EmptyState,
+  FloatingBar,
+  FloatingBarDivider,
+  IconButton,
+  InlineInput,
+  Kbd,
+  PageHeader,
+  PanelFooter,
+  PanelHeader,
+  PropertyRow,
+  RecordPanel,
+  RecordTitle,
+  SearchInput,
+  Section,
+  Skeleton,
+  Spacer,
+  Table,
+  TableScroll,
+  Td,
+  TextButton,
+  Th,
+  Toolbar,
+  Tooltip,
+  Tr,
+  ViewBody,
+} from "../components/ui/index.ts"
+import {
+  checkCellClass,
+  customColumnClass,
+  dateCellClass,
+  dateColumnClass,
+  nameButtonClass,
+  nameTextClass,
+  wideColumnClass,
+} from "../components/ui/record-list.tsx"
 import { call, isApiFailure, messageOf } from "../lib/client.ts"
 import { companiesCollection } from "../lib/companies.ts"
 import { contactsCollection } from "../lib/contacts.ts"
@@ -206,25 +252,27 @@ function ContactsScreen() {
 
   return (
     <>
-      <main className={`card main ${selected.size > 0 ? "has-sel" : ""}`}>
-        <div className="hd1">
-          <h1 className="crumb">
+      <Card as="main" className="flex-[999_1_39rem]">
+        <PageHeader>
+          <Breadcrumb>
             {search.deleted ? (
               <>
-                <button className="root linkish" type="button" onClick={() => void setSearch({})}>
+                <button
+                  className={cn(breadcrumbRootClass, "cursor-pointer")}
+                  type="button"
+                  onClick={() => void setSearch({})}
+                >
                   Contacts
                 </button>
-                <span className="sep" aria-hidden="true">
-                  /
-                </span>
+                <BreadcrumbSeparator />
                 <span>Deleted</span>
               </>
             ) : (
               <span>{indexView.view?.name ?? "Contacts"}</span>
             )}
-          </h1>
-          {!search.deleted && !isLoading && !isEmpty ? <span className="count">{contacts.length}</span> : null}
-          <div className="spacer" />
+          </Breadcrumb>
+          {!search.deleted && !isLoading && !isEmpty ? <Count>{contacts.length}</Count> : null}
+          <Spacer />
           {search.deleted ? null : (
             <ViewActions
               viewName={indexView.view?.name}
@@ -245,27 +293,25 @@ function ContactsScreen() {
             />
           )}
           {isEmpty && !search.deleted ? null : (
-            <button className="btn primary" type="button" onClick={() => void setSearch({ new: true })}>
-              New contact <span className="kbd on-primary">C</span>
-            </button>
+            <Button variant="primary" onClick={() => void setSearch({ new: true })}>
+              New contact <Kbd onPrimary>C</Kbd>
+            </Button>
           )}
-        </div>
+        </PageHeader>
 
         {isEmpty && !search.deleted ? null : (
-          <div className="hd2">
+          <Toolbar>
             {search.deleted ? (
-              <span className="sm-t" style={{ color: "var(--fg-subtle)", marginLeft: 7 }}>
-                Deleted contacts can be restored for 30 days.
-              </span>
+              <span className="ml-2 text-sm text-subtle">Deleted contacts can be restored for 30 days.</span>
             ) : (
               <>
-                <label className="vh" htmlFor="contact-filter">
+                <label className="sr-only" htmlFor="contact-filter">
                   Filter contacts
                 </label>
-                <input
+                <SearchInput
+                  // SearchInput passes its props, ref included, to its input.
                   ref={filterRef}
                   id="contact-filter"
-                  className="search-inp"
                   placeholder="Filter by name or email  /"
                   value={filter}
                   onChange={(event) => setFilter(event.target.value)}
@@ -286,7 +332,7 @@ function ContactsScreen() {
                 companies={companyOptions}
               />
             )}
-            <div className="spacer" />
+            <Spacer />
             <DisplayMenu
               plural="contacts"
               fields={filterInfo}
@@ -300,10 +346,10 @@ function ContactsScreen() {
               onExport={() => void exportCsv(undefined)}
               onImport={() => setDialog("import")}
             />
-          </div>
+          </Toolbar>
         )}
 
-        <div className="body">
+        <ViewBody>
           {search.deleted ? (
             <DeletedContacts teamId={teamId} onRestore={restore} />
           ) : isLoading ? (
@@ -317,47 +363,44 @@ function ContactsScreen() {
           ) : isEmpty ? (
             <EmptyTeam onNew={() => void setSearch({ new: true })} onCommand={openCommand} />
           ) : contacts.length === 0 ? (
-            <div className="center">
-              <div className="empty">
-                <h2>No contacts match “{filter}”</h2>
-                <p>Try part of a name or an email address.</p>
-              </div>
-            </div>
+            <Centered>
+              <EmptyState title={`No contacts match “${filter}”`}>Try part of a name or an email address.</EmptyState>
+            </Centered>
           ) : (
-            <div className="tablewrap">
-              <table className="ctable">
-                <caption className="vh">Contacts</caption>
+            <TableScroll padForBar={selected.size > 0}>
+              <Table>
+                <caption className="sr-only">Contacts</caption>
                 <thead>
                   <tr>
-                    <th className="w-check c-check" scope="col">
-                      <input
-                        className={`cb ${someChecked ? "is-mixed" : ""}`}
-                        type="checkbox"
+                    <Th className={checkCellClass} scope="col">
+                      <Checkbox
+                        reveal={selected.size === 0}
+                        mixed={someChecked}
                         aria-label="Select all contacts"
                         checked={allChecked}
                         onChange={() => setSelected(allChecked ? new Set() : new Set(contacts.map((c) => c.id)))}
                       />
-                    </th>
-                    <th className="w-name" scope="col">
+                    </Th>
+                    <Th className={NAME_COLUMN} scope="col">
                       Name
-                    </th>
-                    <th className="w-email col-wide" scope="col">
+                    </Th>
+                    <Th className={cn(EMAIL_COLUMN, wideColumnClass)} scope="col">
                       Primary email
-                    </th>
-                    <th className="w-cos" scope="col">
+                    </Th>
+                    <Th className="w-[30%]" scope="col">
                       Companies
-                    </th>
+                    </Th>
                     {shownFields.map((field) => (
-                      <th key={field.id} className="w-custom col-wide" scope="col">
+                      <Th key={field.id} className={cn(customColumnClass, wideColumnClass)} scope="col">
                         {field.name}
-                      </th>
+                      </Th>
                     ))}
-                    <th className="w-date col-wide" scope="col">
+                    <Th className={cn(dateColumnClass, wideColumnClass)} scope="col">
                       Created
-                    </th>
-                    <th className="w-date col-wide" scope="col">
+                    </Th>
+                    <Th className={cn(dateColumnClass, wideColumnClass)} scope="col">
                       Updated
-                    </th>
+                    </Th>
                   </tr>
                 </thead>
                 <tbody>
@@ -366,6 +409,7 @@ function ContactsScreen() {
                       key={contact.id}
                       contact={contact}
                       checked={selected.has(contact.id)}
+                      revealCheckbox={selected.size === 0}
                       isOpen={open?.id === contact.id}
                       isCursor={!open && cursor === contact.id}
                       onToggle={() => setSelected((current) => toggle(current, contact.id))}
@@ -374,74 +418,67 @@ function ContactsScreen() {
                     />
                   ))}
                 </tbody>
-              </table>
-            </div>
+              </Table>
+            </TableScroll>
           )}
-        </div>
+        </ViewBody>
 
         {selected.size > 0 ? (
-          <div className="floatbar" role="toolbar" aria-label="Bulk actions">
-            <span className="n">
-              <b>{selected.size}</b> selected
+          <FloatingBar role="toolbar" aria-label="Bulk actions">
+            <span className="mr-1.5 text-muted tabular-nums">
+              <b className="font-medium text-fg">{selected.size}</b> selected
             </span>
-            <span className="div" />
-            <button className="btn ghost sm" type="button" onClick={() => setDialog("set-field")}>
+            <FloatingBarDivider />
+            <Button variant="ghost" size="sm" onClick={() => setDialog("set-field")}>
               Set field
-            </button>
-            <button className="btn ghost sm" type="button" onClick={() => setDialog("affiliate")}>
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setDialog("affiliate")}>
               Add to company
-            </button>
+            </Button>
             {canWriteEmail ? (
-              <button className="btn ghost sm" type="button" onClick={() => setDialog("segment")}>
+              <Button variant="ghost" size="sm" onClick={() => setDialog("segment")}>
                 Add to segment
-              </button>
+              </Button>
             ) : null}
-            <button className="btn ghost sm" type="button" onClick={() => void exportCsv([...selected])}>
+            <Button variant="ghost" size="sm" onClick={() => void exportCsv([...selected])}>
               Export
-            </button>
-            <button
-              className="btn ghost sm danger tip tip-b"
-              type="button"
-              data-tip="Delete  ⌫"
-              onClick={() => remove([...selected])}
-            >
-              Delete
-            </button>
-            <span className="div" />
-            <button
-              className="ibtn tip tip-b"
-              type="button"
-              aria-label="Clear selection"
-              data-tip="Clear selection  Esc"
-              style={{ width: 24, height: 24 }}
+            </Button>
+            <Tooltip text="Delete  ⌫">
+              <Button variant="danger" size="sm" onClick={() => remove([...selected])}>
+                Delete
+              </Button>
+            </Tooltip>
+            <FloatingBarDivider />
+            <IconButton
+              label="Clear selection"
+              tip="Clear selection  Esc"
+              size="xs"
               onClick={() => setSelected(new Set())}
             >
               <CloseIcon className="size-3.5" />
-            </button>
-          </div>
+            </IconButton>
+          </FloatingBar>
         ) : toast ? (
-          <div className="floatbar" role="status">
-            <span className="n" style={{ color: "var(--fg)" }}>
-              {toast.text}
-            </span>
+          <FloatingBar role="status">
+            <span className="mr-1.5 text-fg">{toast.text}</span>
             {toast.undo ? (
               <>
-                <span className="div" />
-                <button
-                  className="btn ghost sm"
-                  type="button"
+                <FloatingBarDivider />
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => {
                     toast.undo?.()
                     setToast(undefined)
                   }}
                 >
-                  Undo <span className="kbd">⌘Z</span>
-                </button>
+                  Undo <Kbd>⌘Z</Kbd>
+                </Button>
               </>
             ) : null}
-          </div>
+          </FloatingBar>
         ) : null}
-      </main>
+      </Card>
 
       {dialog === "save-view" ? (
         <SaveViewDialog
@@ -564,11 +601,14 @@ function ContactsScreen() {
   )
 }
 
-/** The shape TanStack DB hands to an update: the contact, writable. */
+/** Without the wide columns, the remaining text columns share the width. */
+const NAME_COLUMN = "w-[32%] @max-3xl/content:w-auto"
+const EMAIL_COLUMN = "w-[36%] @max-3xl/content:w-auto"
 
 function ContactRow(props: {
   readonly contact: Contact
   readonly checked: boolean
+  readonly revealCheckbox: boolean
   readonly isOpen: boolean
   readonly isCursor: boolean
   readonly onToggle: () => void
@@ -577,109 +617,106 @@ function ContactRow(props: {
 }) {
   const { contact } = props
   const email = contact.emails.find((e) => e.isPrimary)?.address ?? contact.emails[0]?.address
-  const className = [
-    props.checked ? "is-checked" : "",
-    props.isOpen ? "is-open" : "",
-    props.isCursor ? "is-cursor" : "",
-  ]
-    .join(" ")
-    .trim()
   return (
-    <tr className={className}>
-      <td className="c-check">
-        <input
-          className="cb"
-          type="checkbox"
+    <Tr checked={props.checked} open={props.isOpen} cursor={props.isCursor}>
+      <Td className={checkCellClass}>
+        <Checkbox
+          reveal={props.revealCheckbox}
           aria-label={`Select ${contact.displayName}`}
           checked={props.checked}
           onChange={props.onToggle}
         />
-      </td>
-      <td>
-        <button className="namebtn" type="button" onClick={props.onOpen}>
+      </Td>
+      <Td>
+        <button className={nameButtonClass} type="button" onClick={props.onOpen}>
           <ContactAvatar contact={contact} />
-          <span className="n">{contact.displayName}</span>
+          <span className={nameTextClass}>{contact.displayName}</span>
         </button>
-      </td>
-      <td className={`col-wide ${email ? "c-email" : "c-none"}`}>{email ?? "—"}</td>
-      <td>
+      </Td>
+      <Td className={cn(wideColumnClass, email ? "text-muted" : "text-subtle")}>{email ?? "—"}</Td>
+      <Td>
         <AffiliationChips affiliations={contact.affiliations} />
-      </td>
+      </Td>
       {props.fields.map((field) => (
-        <td key={field.id} className="col-wide c-muted">
+        <Td key={field.id} className={cn(wideColumnClass, "text-subtle")}>
           <CustomCell field={field} value={contact.custom[field.id]} />
-        </td>
+        </Td>
       ))}
-      <td className="col-wide c-date" title={`Created ${absolute(contact.createdAt)}`}>
+      <Td className={cn(wideColumnClass, dateCellClass)} title={`Created ${absolute(contact.createdAt)}`}>
         {relative(contact.createdAt)}
-      </td>
-      <td className="col-wide c-date" title={`Updated ${absolute(contact.updatedAt)}`}>
+      </Td>
+      <Td className={cn(wideColumnClass, dateCellClass)} title={`Updated ${absolute(contact.updatedAt)}`}>
         {relative(contact.updatedAt)}
-      </td>
-    </tr>
+      </Td>
+    </Tr>
   )
 }
 
 function LoadingRows() {
   const widths = [56, 72, 48, 64, 80, 52, 68, 60, 44, 76, 58, 66]
   return (
-    <div className="tablewrap" aria-busy="true">
-      <span className="vh" role="status">
+    <TableScroll aria-busy="true">
+      <span className="sr-only" role="status">
         Loading contacts
       </span>
-      <table className="ctable" aria-hidden="true">
+      <Table aria-hidden="true">
         <tbody>
           {widths.map((width) => (
-            <tr key={width}>
-              <td className="c-check w-check" />
-              <td className="w-name">
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <div className="sk r" />
-                  <div className="sk" style={{ width: `${width * 0.6}%` }} />
+            <Tr key={width}>
+              <Td className={checkCellClass} />
+              <Td className={NAME_COLUMN}>
+                <div className="flex items-center gap-2.5">
+                  <Skeleton round />
+                  <div style={{ width: `${width * 0.6}%` }}>
+                    <Skeleton />
+                  </div>
                 </div>
-              </td>
-              <td className="w-email col-wide">
-                <div className="sk" style={{ width: `${90 - width / 2}%` }} />
-              </td>
-              <td className="w-cos">
-                <div className="sk" style={{ width: `${width * 0.5}%` }} />
-              </td>
-              <td className="col-wide w-date">
-                <div className="sk" style={{ width: 28 }} />
-              </td>
-              <td className="col-wide w-date">
-                <div className="sk" style={{ width: 28 }} />
-              </td>
-            </tr>
+              </Td>
+              <Td className={cn(EMAIL_COLUMN, wideColumnClass)}>
+                <div style={{ width: `${90 - width / 2}%` }}>
+                  <Skeleton />
+                </div>
+              </Td>
+              <Td className="w-[30%]">
+                <div style={{ width: `${width * 0.5}%` }}>
+                  <Skeleton />
+                </div>
+              </Td>
+              <Td className={cn(dateColumnClass, wideColumnClass)}>
+                <Skeleton className="w-8" />
+              </Td>
+              <Td className={cn(dateColumnClass, wideColumnClass)}>
+                <Skeleton className="w-8" />
+              </Td>
+            </Tr>
           ))}
         </tbody>
-      </table>
-    </div>
+      </Table>
+    </TableScroll>
   )
 }
 
 function EmptyTeam(props: { readonly onNew: () => void; readonly onCommand: () => void }) {
   return (
-    <div className="center">
-      <div className="empty">
-        <div className="e-ic">
-          <ContactsIcon />
-        </div>
-        <h2>No contacts yet</h2>
-        <p>
-          Contacts are the people your team works with. Connect an agent over MCP and let it do the typing, or add them
-          yourself.
-        </p>
-        <div className="actions">
-          <button className="btn primary" type="button" onClick={props.onNew}>
-            New contact <span className="kbd on-primary">C</span>
-          </button>
-          <button className="btn" type="button" onClick={props.onCommand}>
-            Search <span className="kbd">⌘K</span>
-          </button>
-        </div>
-      </div>
-    </div>
+    <Centered>
+      <EmptyState
+        icon={<ContactsIcon />}
+        title="No contacts yet"
+        actions={
+          <>
+            <Button variant="primary" onClick={props.onNew}>
+              New contact <Kbd onPrimary>C</Kbd>
+            </Button>
+            <Button onClick={props.onCommand}>
+              Search <Kbd>⌘K</Kbd>
+            </Button>
+          </>
+        }
+      >
+        Contacts are the people your team works with. Connect an agent over MCP and let it do the typing, or add them
+        yourself.
+      </EmptyState>
+    </Centered>
   )
 }
 
@@ -704,61 +741,60 @@ function DeletedContacts(props: {
   const items = deleted.data?.items ?? []
   if (items.length === 0) {
     return (
-      <div className="center">
-        <div className="empty">
-          <div className="e-ic">
-            <TrashIcon />
-          </div>
-          <h2>Nothing deleted</h2>
-          <p>Contacts you delete stay here for 30 days, so you can restore them.</p>
-        </div>
-      </div>
+      <Centered>
+        <EmptyState icon={<TrashIcon />} title="Nothing deleted">
+          Contacts you delete stay here for 30 days, so you can restore them.
+        </EmptyState>
+      </Centered>
     )
   }
   return (
-    <div className="tablewrap">
-      <table className="ctable">
-        <caption className="vh">Deleted contacts</caption>
+    <TableScroll>
+      <Table>
+        <caption className="sr-only">Deleted contacts</caption>
         <thead>
           <tr>
-            <th className="w-name" scope="col" style={{ paddingLeft: 14 }}>
+            <Th className={cn(NAME_COLUMN, "pl-4")} scope="col">
               Name
-            </th>
-            <th className="w-email" scope="col">
+            </Th>
+            <Th className={EMAIL_COLUMN} scope="col">
               Primary email
-            </th>
-            <th className="w-date col-wide" scope="col">
+            </Th>
+            <Th className={cn(dateColumnClass, wideColumnClass)} scope="col">
               Deleted
-            </th>
-            <th style={{ width: 120 }} scope="col">
-              <span className="vh">Restore</span>
-            </th>
+            </Th>
+            <Th className="w-36" scope="col">
+              <span className="sr-only">Restore</span>
+            </Th>
           </tr>
         </thead>
         <tbody>
           {items.map((contact) => (
-            <tr key={contact.id}>
-              <td style={{ paddingLeft: 14 }}>
-                <span className="namebtn" style={{ cursor: "default" }}>
+            <Tr key={contact.id}>
+              <Td className="pl-4">
+                <span className="flex min-w-0 items-center gap-2.5 font-medium">
                   <ContactAvatar contact={contact} />
-                  <span className="n">{contact.displayName}</span>
+                  <span className="truncate">{contact.displayName}</span>
                 </span>
-              </td>
-              <td className="c-email">{contact.emails[0]?.address ?? "—"}</td>
-              <td className="col-wide c-date" title={contact.deletedAt ? absolute(contact.deletedAt) : undefined}>
+              </Td>
+              <Td className="text-muted">{contact.emails[0]?.address ?? "—"}</Td>
+              <Td
+                className={cn(wideColumnClass, dateCellClass)}
+                title={contact.deletedAt ? absolute(contact.deletedAt) : undefined}
+              >
                 {contact.deletedAt ? relative(contact.deletedAt) : ""}
-              </td>
-              <td style={{ textAlign: "right" }}>
-                <button className="btn sm" type="button" onClick={() => void props.onRestore([contact.id])}>
+              </Td>
+              <Td className="text-right">
+                <Button size="sm" onClick={() => void props.onRestore([contact.id])}>
                   <RestoreIcon className="size-3.5" />
                   Restore
-                </button>
-              </td>
-            </tr>
+                </Button>
+              </Td>
+            </Tr>
           ))}
         </tbody>
-      </table>
-    </div>
+      </Table>
+    </TableScroll>
   )
 }
 
@@ -813,102 +849,83 @@ function CreatePanel(props: {
   ]
 
   return (
-    <aside className="card panel" aria-label="New contact">
-      <div className="ph">
-        <div className="ph-bar">
-          <span className="pos sm-t" style={{ marginLeft: 6 }}>
-            New contact
-          </span>
-          <div className="spacer" />
-          <button
-            className="ibtn tip tip-b"
-            type="button"
-            aria-label="Close panel"
-            data-tip="Close  Esc"
-            onClick={props.onClose}
-          >
+    <RecordPanel aria-label="New contact">
+      <PanelHeader>
+        <div className="flex items-center">
+          <span className="text-sm text-subtle">New contact</span>
+          <Spacer />
+          <IconButton label="Close panel" tip="Close  Esc" onClick={props.onClose}>
             <CloseIcon />
-          </button>
+          </IconButton>
         </div>
-        <div className="ph-id">
-          <span className="av lg" aria-hidden="true" />
-          <div style={{ minWidth: 0 }}>
-            <h2 className="pname" style={{ color: "var(--fg-subtle)" }}>
-              Untitled contact
-            </h2>
-            <p className="paff sm-t">Only a name or an email is needed.</p>
+        <div className="flex items-center gap-3">
+          <Avatar size="lg" />
+          <div className="min-w-0">
+            <RecordTitle className="text-subtle">Untitled contact</RecordTitle>
+            <p className="m-0 text-sm text-muted">Only a name or an email is needed.</p>
           </div>
         </div>
-      </div>
+      </PanelHeader>
       <form
         ref={formRef}
-        className="pbody"
+        className="flex-1 overflow-auto"
         onSubmit={submit}
         onKeyDown={(event) => {
           if ((event.metaKey || event.ctrlKey) && event.key === "Enter") void submit()
           if (event.key === "Escape") props.onClose()
         }}
       >
-        <section className="sec">
+        <Section className="flex flex-col gap-0.5">
           {fields.map((f) => {
             const message = problemFor(problems, f.field) ?? (f.name === "email" ? emailTaken?.message : undefined)
             return (
-              <div className="field" key={f.name}>
-                <label className="flabel sm-t" htmlFor={`nc-${f.name}`}>
-                  {f.label}
-                </label>
-                <div className="fval" style={{ padding: "0 6px" }}>
-                  <input
+              <PropertyRow key={f.name} label={f.label} htmlFor={`nc-${f.name}`}>
+                <div className="flex min-w-0 flex-col px-1.5">
+                  <InlineInput
                     id={`nc-${f.name}`}
                     name={f.name}
-                    className="finp"
                     type={f.type ?? "text"}
                     autoComplete="off"
                     placeholder="Empty"
-                    // biome-ignore lint/a11y/noAutofocus: the create panel opens for typing, like a dialog
                     autoFocus={f.autoFocus}
                     aria-invalid={message ? true : undefined}
                     aria-describedby={message ? `nc-${f.name}-err` : undefined}
                   />
                   {message ? (
-                    <p id={`nc-${f.name}-err`} className="ferr sm-t">
+                    <p id={`nc-${f.name}-err`} className="my-1 text-sm text-danger">
                       {message}{" "}
                       {f.name === "email" && emailTaken?.existing ? (
-                        <button
-                          className="linkish sm-t"
-                          type="button"
-                          onClick={() => props.onOpenExisting(emailTaken.existing)}
-                        >
+                        <TextButton className="text-sm" onClick={() => props.onOpenExisting(emailTaken.existing)}>
                           Open contact
-                        </button>
+                        </TextButton>
                       ) : null}
                     </p>
                   ) : null}
                 </div>
-              </div>
+              </PropertyRow>
             )
           })}
           {problems && !fields.some((f) => problemFor(problems, f.field)) ? (
-            <p className="ferr sm-t">{problems[0]?.userMessage}</p>
+            <p className="my-1 text-sm text-danger">{problems[0]?.userMessage}</p>
           ) : null}
           {error ? (
-            <p className="ferr sm-t" role="alert">
+            <p className="my-1 text-sm text-danger" role="alert">
               {error}
             </p>
           ) : null}
-        </section>
-        <button type="submit" className="vh" tabIndex={-1}>
+        </Section>
+        <button type="submit" className="sr-only" tabIndex={-1}>
           Create contact
         </button>
       </form>
-      <div className="pfoot">
-        <button className="btn primary" type="button" disabled={busy} onClick={() => void submit()}>
-          Create contact <span className="kbd on-primary">⌘↵</span>
-        </button>
-        <button className="btn ghost" type="button" onClick={props.onClose}>
+      <PanelFooter>
+        <Button variant="primary" disabled={busy} onClick={() => void submit()}>
+          Create contact <Kbd onPrimary>⌘↵</Kbd>
+        </Button>
+        <Button variant="ghost" onClick={props.onClose}>
           Cancel
-        </button>
-      </div>
-    </aside>
+        </Button>
+      </PanelFooter>
+    </RecordPanel>
   )
 }

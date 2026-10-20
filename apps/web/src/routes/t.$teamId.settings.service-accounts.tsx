@@ -14,6 +14,28 @@ import {
   useToast,
   When,
 } from "../components/settings.tsx"
+import {
+  Avatar,
+  Box,
+  Button,
+  cn,
+  ErrorText,
+  Field,
+  Fieldset,
+  Hint,
+  IconButton,
+  Input,
+  Menu,
+  MenuItem,
+  MenuSeparator,
+  Notice,
+  RadioCard,
+  Table,
+  Td,
+  Th,
+  Tr,
+} from "../components/ui/index.ts"
+import { Byline, RowIdentity } from "../components/ui/settings-extra.tsx"
 import { call, messageOf } from "../lib/client.ts"
 
 export const Route = createFileRoute("/t/$teamId/settings/service-accounts")({ component: ServiceAccounts })
@@ -43,22 +65,17 @@ function ServiceAccounts() {
       intro={`Members of ${current.name} that aren't people. Connect an agent as a service account and its changes show up as that account, not as you.`}
       action={
         canManage ? (
-          <button className="btn primary sm" type="button" onClick={() => setCreating(true)}>
+          <Button variant="primary" size="sm" onClick={() => setCreating(true)}>
             New service account
-          </button>
+          </Button>
         ) : null
       }
     >
       {canManage ? null : (
-        <div className="notice">
-          <span className="ic">
-            <InfoIcon />
-          </span>
-          <span>
-            Only admins and owners can create service accounts. You can still connect an agent as one of these when you
-            approve it.
-          </span>
-        </div>
+        <Notice icon={<InfoIcon />}>
+          Only admins and owners can create service accounts. You can still connect an agent as one of these when you
+          approve it.
+        </Notice>
       )}
       {serviceAccounts.isPending ? (
         <LoadingRows />
@@ -75,68 +92,65 @@ function ServiceAccounts() {
             : "An admin can create one for an agent whose changes shouldn't show up as anyone's own."}
         </Empty>
       ) : (
-        <div className="box">
-          <table className="stable">
+        <Box>
+          <Table kind="settings">
             <thead>
               <tr>
-                <th scope="col" style={{ width: "32%" }}>
+                <Th scope="col" className="w-[32%]">
                   Name
-                </th>
-                <th scope="col" style={{ width: "14%" }}>
+                </Th>
+                <Th scope="col" className="w-[14%]">
                   Role
-                </th>
-                <th scope="col" style={{ width: "24%" }}>
+                </Th>
+                <Th scope="col" className="w-[24%]">
                   Created by
-                </th>
-                <th scope="col" style={{ width: 120 }}>
+                </Th>
+                <Th scope="col" className="w-36">
                   Connections
-                </th>
-                <th scope="col" style={{ width: 96 }}>
+                </Th>
+                <Th scope="col" className="w-28">
                   Created
-                </th>
+                </Th>
                 {canManage ? (
-                  <th scope="col" style={{ width: 56 }}>
-                    <span className="vh">Actions</span>
-                  </th>
+                  <Th scope="col" className="w-16">
+                    <span className="sr-only">Actions</span>
+                  </Th>
                 ) : null}
               </tr>
             </thead>
             <tbody>
               {serviceAccounts.data.map((serviceAccount) => (
-                <tr key={serviceAccount.id}>
-                  <td>
-                    <div className="who">
-                      <span className="av md bot" aria-hidden="true">
-                        {initialsOf(serviceAccount.name)}
-                      </span>
-                      <span className="stack">
-                        <span className="n">{serviceAccount.name}</span>
-                      </span>
-                    </div>
-                  </td>
-                  <td style={{ color: "var(--fg-muted)" }}>{roleLabel(serviceAccount.role)}</td>
-                  <td>
+                <Tr key={serviceAccount.id}>
+                  <Td>
+                    <RowIdentity
+                      mark={
+                        <Avatar size="md" shape="square">
+                          {initialsOf(serviceAccount.name)}
+                        </Avatar>
+                      }
+                      name={serviceAccount.name}
+                    />
+                  </Td>
+                  <Td className="text-muted">{roleLabel(serviceAccount.role)}</Td>
+                  <Td>
                     {serviceAccount.createdBy ? (
-                      <span className="as">
-                        <span className="av" aria-hidden="true">
-                          {initialsOf(serviceAccount.createdBy.name)}
-                        </span>
-                        <span className="lbl">{serviceAccount.createdBy.name}</span>
-                      </span>
+                      <Byline mark={<Avatar>{initialsOf(serviceAccount.createdBy.name)}</Avatar>}>
+                        {serviceAccount.createdBy.name}
+                      </Byline>
                     ) : (
-                      <span className="c-muted">—</span>
+                      <span className="text-subtle">—</span>
                     )}
-                  </td>
-                  <td className={serviceAccount.connectionCount === 0 ? "c-muted" : ""}>
+                  </Td>
+                  <Td className={cn(serviceAccount.connectionCount === 0 && "text-subtle")}>
                     {serviceAccount.connectionCount === 0
                       ? "None"
                       : `${serviceAccount.connectionCount} connection${serviceAccount.connectionCount === 1 ? "" : "s"}`}
-                  </td>
-                  <td>
+                  </Td>
+                  <Td>
                     <When at={serviceAccount.createdAt} />
-                  </td>
+                  </Td>
                   {canManage ? (
-                    <td className="c-act">
+                    <Td className="overflow-visible text-right">
                       <ServiceAccountMenu
                         serviceAccount={serviceAccount}
                         teamId={teamId}
@@ -145,13 +159,13 @@ function ServiceAccounts() {
                           await queryClient.invalidateQueries({ queryKey: key })
                         }}
                       />
-                    </td>
+                    </Td>
                   ) : null}
-                </tr>
+                </Tr>
               ))}
             </tbody>
-          </table>
-        </div>
+          </Table>
+        </Box>
       )}
 
       {creating ? (
@@ -199,26 +213,17 @@ function NewServiceAccount(props: {
       onClose={props.onClose}
       footer={
         <>
-          <button className="btn ghost" type="button" onClick={props.onClose}>
+          <Button variant="ghost" onClick={props.onClose}>
             Cancel
-          </button>
-          <button
-            className="btn primary"
-            type="button"
-            disabled={busy || name.trim() === ""}
-            onClick={() => void create()}
-          >
+          </Button>
+          <Button variant="primary" disabled={busy || name.trim() === ""} onClick={() => void create()}>
             Create service account
-          </button>
+          </Button>
         </>
       }
     >
-      <div className="fld">
-        <label className="fl" htmlFor="sa-name">
-          Name
-        </label>
-        <input
-          className="inp"
+      <Field label="Name" htmlFor="sa-name" hint="Changes made through it show as this name in record activity.">
+        <Input
           id="sa-name"
           type="text"
           placeholder="e.g. Support Bot"
@@ -230,36 +235,23 @@ function NewServiceAccount(props: {
             if (event.key === "Enter" && name.trim() !== "") void create()
           }}
         />
-        <p className="hint sm-t">Changes made through it show as this name in record activity.</p>
-      </div>
-      <fieldset className="fld">
-        <legend>Role</legend>
-        <div className="radios">
-          {ROLES.map((option) => (
-            <label key={option.role} className={`ropt ${role === option.role ? "on" : ""}`}>
-              <input
-                className="rd"
-                type="radio"
-                name="sa-role"
-                checked={role === option.role}
-                onChange={() => setRole(option.role)}
-              />
-              <span className="t">
-                <span className="n">{option.label}</span>
-                <span className="d sm-t">{option.description}</span>
-              </span>
-            </label>
-          ))}
-        </div>
-        <p className="hint sm-t" style={{ marginTop: 6 }}>
+      </Field>
+      <Fieldset legend="Role">
+        {ROLES.map((option) => (
+          <RadioCard
+            key={option.role}
+            name="sa-role"
+            label={option.label}
+            description={option.description}
+            checked={role === option.role}
+            onChange={() => setRole(option.role)}
+          />
+        ))}
+        <Hint className="mt-1.5">
           An agent acting as it gets the lower of this role and the role of whoever connects it.
-        </p>
-      </fieldset>
-      {error ? (
-        <p className="form-error" role="alert">
-          {error}
-        </p>
-      ) : null}
+        </Hint>
+      </Fieldset>
+      {error ? <ErrorText>{error}</ErrorText> : null}
     </Dialog>
   )
 }
@@ -288,21 +280,17 @@ function ServiceAccountMenu(props: {
   }
 
   return (
-    <span style={{ position: "relative" }}>
-      <button
-        className="ibtn"
-        type="button"
-        aria-label={`More actions for ${serviceAccount.name}`}
+    <span className="relative inline-flex">
+      <IconButton
+        label={`More actions for ${serviceAccount.name}`}
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
       >
         <MoreIcon />
-      </button>
+      </IconButton>
       {open ? (
-        <div className="menu" style={{ right: 0, top: 30 }}>
-          <button
-            className="menu-i"
-            type="button"
+        <Menu className="top-full right-0 mt-1 text-left">
+          <MenuItem
             onClick={() => {
               setOpen(false)
               setName(serviceAccount.name)
@@ -310,10 +298,8 @@ function ServiceAccountMenu(props: {
             }}
           >
             Rename
-          </button>
-          <button
-            className="menu-i"
-            type="button"
+          </MenuItem>
+          <MenuItem
             onClick={() => {
               setOpen(false)
               const role = serviceAccount.role === "admin" ? "member" : "admin"
@@ -324,20 +310,18 @@ function ServiceAccountMenu(props: {
             }}
           >
             {serviceAccount.role === "admin" ? "Make member" : "Make admin"}
-          </button>
-          <div className="menu-sep" />
-          <button
-            className="menu-i"
-            type="button"
-            style={{ color: "var(--danger)" }}
+          </MenuItem>
+          <MenuSeparator />
+          <MenuItem
+            danger
             onClick={() => {
               setOpen(false)
               setMode("delete")
             }}
           >
             Delete
-          </button>
-        </div>
+          </MenuItem>
+        </Menu>
       ) : null}
       {mode === "rename" ? (
         <Dialog
@@ -345,12 +329,11 @@ function ServiceAccountMenu(props: {
           onClose={() => setMode(undefined)}
           footer={
             <>
-              <button className="btn ghost" type="button" onClick={() => setMode(undefined)}>
+              <Button variant="ghost" onClick={() => setMode(undefined)}>
                 Cancel
-              </button>
-              <button
-                className="btn primary"
-                type="button"
+              </Button>
+              <Button
+                variant="primary"
                 disabled={!name.trim() || name.trim() === serviceAccount.name}
                 onClick={() =>
                   void act(
@@ -365,29 +348,20 @@ function ServiceAccountMenu(props: {
                 }
               >
                 Rename
-              </button>
+              </Button>
             </>
           }
         >
-          <div className="fld">
-            <label className="fl" htmlFor="sa-rename">
-              Name
-            </label>
-            <input
+          <Field label="Name" htmlFor="sa-rename" hint="Past activity keeps the name it had at the time.">
+            <Input
               id="sa-rename"
-              className="inp"
               type="text"
               maxLength={60}
               value={name}
               onChange={(event) => setName(event.target.value)}
             />
-            <p className="hint sm-t">Past activity keeps the name it had at the time.</p>
-          </div>
-          {error ? (
-            <p className="form-error" role="alert">
-              {error}
-            </p>
-          ) : null}
+          </Field>
+          {error ? <ErrorText>{error}</ErrorText> : null}
         </Dialog>
       ) : null}
       {mode === "delete" ? (
@@ -396,12 +370,11 @@ function ServiceAccountMenu(props: {
           onClose={() => setMode(undefined)}
           footer={
             <>
-              <button className="btn ghost" type="button" onClick={() => setMode(undefined)}>
+              <Button variant="ghost" onClick={() => setMode(undefined)}>
                 Cancel
-              </button>
-              <button
-                className="btn danger-solid"
-                type="button"
+              </Button>
+              <Button
+                variant="danger-solid"
                 onClick={() =>
                   void act(
                     () => call("serviceAccounts.delete", { teamId, serviceAccountId: serviceAccount.id }),
@@ -410,18 +383,14 @@ function ServiceAccountMenu(props: {
                 }
               >
                 Delete service account
-              </button>
+              </Button>
             </>
           }
         >
-          <p style={{ margin: 0, color: "var(--fg-muted)", lineHeight: "19px" }}>
+          <p className="m-0 text-muted">
             Its API keys and connected agents stop working at once. Its activity and notes stay, under its name.
           </p>
-          {error ? (
-            <p className="form-error" role="alert">
-              {error}
-            </p>
-          ) : null}
+          {error ? <ErrorText>{error}</ErrorText> : null}
         </Dialog>
       ) : null}
     </span>

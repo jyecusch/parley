@@ -4,6 +4,18 @@ import { createFileRoute, getRouteApi, Link, useNavigate } from "@tanstack/react
 import { useState } from "react"
 import { Composer, type Content, SaveState, useAutosave } from "../components/composer.tsx"
 import { LoadFailed } from "../components/record.tsx"
+import { TitleInput } from "../components/ui/email.tsx"
+import {
+  Breadcrumb,
+  BreadcrumbSeparator,
+  Button,
+  breadcrumbRootClass,
+  Card,
+  ErrorText,
+  PageHeader,
+  Spacer,
+  ViewBody,
+} from "../components/ui/index.ts"
 import { call, messageOf } from "../lib/client.ts"
 
 export const Route = createFileRoute("/t/$teamId/templates/$templateId")({ component: TemplateScreen })
@@ -18,18 +30,18 @@ function TemplateScreen() {
     queryKey: ["template", teamId, templateId],
     queryFn: () => call("templates.get", { teamId, templateId: templateId as TemplateId }),
   })
-  if (template.isPending) return <main className="card main" />
+  if (template.isPending) return <Card as="main" className="flex-[999_1_35rem]" />
   if (template.isError) {
     return (
-      <main className="card main">
-        <div className="body">
+      <Card as="main" className="flex-[999_1_35rem]">
+        <ViewBody>
           <LoadFailed
             title="This template didn't load"
             message={messageOf(template.error)}
             onRetry={() => void template.refetch()}
           />
-        </div>
-      </main>
+        </ViewBody>
+      </Card>
     )
   }
   return (
@@ -89,35 +101,31 @@ function TemplateEditor(props: { readonly teamId: TeamId; readonly template: Tem
   }
 
   return (
-    <main className="card main">
-      <div className="hd1">
-        <h1 className="crumb">
-          <Link className="root" to="/t/$teamId/templates" params={{ teamId }}>
+    <Card as="main" className="flex-[999_1_35rem]">
+      <PageHeader>
+        <Breadcrumb>
+          <Link className={breadcrumbRootClass} to="/t/$teamId/templates" params={{ teamId }}>
             Templates
           </Link>
-          <span className="sep" aria-hidden="true">
-            /
-          </span>
-          <input
-            className="crumb-inp plain"
+          <BreadcrumbSeparator />
+          <TitleInput
             aria-label="Template name"
             maxLength={120}
             readOnly={!props.canWrite}
             value={draft.name}
             onChange={(event) => setDraft({ ...draft, name: event.target.value })}
           />
-        </h1>
+        </Breadcrumb>
         <SaveState state={state} />
-        <div className="spacer" />
+        <Spacer />
         {props.canWrite ? (
           confirmDelete ? (
-            <span className="confirm">
-              <button className="btn ghost" type="button" onClick={() => setConfirmDelete(false)}>
+            <span className="inline-flex items-center gap-1">
+              <Button variant="ghost" onClick={() => setConfirmDelete(false)}>
                 Cancel
-              </button>
-              <button
-                className="btn danger-solid"
-                type="button"
+              </Button>
+              <Button
+                variant="danger-solid"
                 onClick={() =>
                   void call("templates.delete", { teamId, templateId: saved.id })
                     .then(() => queryClient.invalidateQueries({ queryKey: ["templates", teamId] }))
@@ -126,31 +134,27 @@ function TemplateEditor(props: { readonly teamId: TeamId; readonly template: Tem
                 }
               >
                 Delete template
-              </button>
+              </Button>
             </span>
           ) : (
             <>
-              <button className="btn ghost" type="button" onClick={() => setConfirmDelete(true)}>
+              <Button variant="ghost" onClick={() => setConfirmDelete(true)}>
                 Delete
-              </button>
-              <button className="btn primary" type="button" onClick={() => void startCampaign()}>
+              </Button>
+              <Button variant="primary" onClick={() => void startCampaign()}>
                 Use in a campaign
-              </button>
+              </Button>
             </>
           )
         ) : null}
-      </div>
-      {error ? (
-        <p className="err sm-t" role="alert" style={{ padding: "8px 14px 0" }}>
-          {error}
-        </p>
-      ) : null}
+      </PageHeader>
+      {error ? <ErrorText className="px-4 pt-2.5">{error}</ErrorText> : null}
       <Composer
         content={draft}
         readOnly={!props.canWrite}
         onChange={(content: Content) => setDraft({ ...draft, ...content })}
         preview={(content) => call("templates.preview", { teamId, templateId: saved.id, ...content })}
       />
-    </main>
+    </Card>
   )
 }

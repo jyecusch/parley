@@ -15,6 +15,22 @@ import { messageOf } from "../lib/client.ts"
 import { CustomFieldsSection } from "./custom-fields.tsx"
 import { DisplayIcon } from "./icons.tsx"
 import { Dialog } from "./settings.tsx"
+import {
+  Box,
+  Button,
+  Checkbox,
+  ErrorText,
+  Field,
+  Fieldset,
+  Hint,
+  Input,
+  Menu,
+  MenuHeading,
+  MenuItem,
+  MenuSeparator,
+  Option,
+  Select,
+} from "./ui/index.ts"
 
 const useDismiss = (open: boolean, close: () => void) => {
   const ref = useRef<HTMLDivElement>(null)
@@ -46,39 +62,42 @@ export function DisplayMenu(props: {
   const [open, setOpen] = useState(false)
   const ref = useDismiss(open, () => setOpen(false))
   return (
-    <div style={{ position: "relative" }} ref={ref}>
-      <button className="btn ghost sm trail-btn" type="button" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+    <div className="relative" ref={ref}>
+      <Button variant="ghost" size="sm" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
         <DisplayIcon />
         Display
-      </button>
+      </Button>
       {open ? (
-        <div className="menu" style={{ right: 0, top: 30, width: 240 }}>
-          <p className="menu-h sm-t">Sort</p>
-          <div style={{ display: "flex", gap: 4, padding: "0 6px 6px" }}>
-            <select
-              className="fsel"
-              aria-label="Sort by"
-              style={{ margin: 0, boxShadow: "inset 0 0 0 1px var(--control)" }}
-              value={props.sort?.field ?? ""}
-              onChange={(event) =>
-                props.onSort(
-                  event.target.value ? { field: event.target.value, direction: props.sort?.direction ?? "asc" } : null,
-                )
-              }
-            >
-              <option value="">Recently updated</option>
-              {props.fields
-                .filter((field) => field.kind !== "company" && field.kind !== "multi")
-                .map((field) => (
-                  <option key={field.field} value={field.field}>
-                    {field.label}
-                  </option>
-                ))}
-            </select>
+        <Menu className="top-full right-0 mt-1 w-72">
+          <MenuHeading>Sort</MenuHeading>
+          <div className="flex gap-1 px-1.5 pb-1.5">
+            <div className="min-w-0 flex-1">
+              <Select
+                className="h-8 text-sm"
+                aria-label="Sort by"
+                value={props.sort?.field ?? ""}
+                onChange={(event) =>
+                  props.onSort(
+                    event.target.value
+                      ? { field: event.target.value, direction: props.sort?.direction ?? "asc" }
+                      : null,
+                  )
+                }
+              >
+                <option value="">Recently updated</option>
+                {props.fields
+                  .filter((field) => field.kind !== "company" && field.kind !== "multi")
+                  .map((field) => (
+                    <option key={field.field} value={field.field}>
+                      {field.label}
+                    </option>
+                  ))}
+              </Select>
+            </div>
             {props.sort ? (
-              <button
-                className="btn sm"
-                type="button"
+              <Button
+                size="sm"
+                className="h-8"
                 aria-label={
                   props.sort.direction === "asc" ? "Ascending; switch to descending" : "Descending; switch to ascending"
                 }
@@ -88,65 +107,57 @@ export function DisplayMenu(props: {
                 }
               >
                 {props.sort.direction === "asc" ? "↑" : "↓"}
-              </button>
+              </Button>
             ) : null}
           </div>
           {props.customFields.length > 0 ? (
             <>
-              <div className="menu-sep" />
-              <p className="menu-h sm-t">Columns</p>
+              <MenuSeparator />
+              <MenuHeading>Columns</MenuHeading>
               {props.customFields.map((field) => {
                 const ref = `custom:${field.id}`
                 const on = props.columns.includes(ref)
                 return (
-                  <button
+                  <MenuItem
                     key={field.id}
-                    className="menu-i"
-                    type="button"
                     onClick={() =>
                       props.onColumns(on ? props.columns.filter((id) => id !== ref) : [...props.columns, ref])
                     }
                   >
                     {field.name}
-                    {on ? <span className="hint">✓</span> : null}
-                  </button>
+                    {on ? <span className="ml-auto text-subtle">✓</span> : null}
+                  </MenuItem>
                 )
               })}
             </>
           ) : null}
-          <div className="menu-sep" />
-          <button
-            className="menu-i"
-            type="button"
+          <MenuSeparator />
+          <MenuItem
             onClick={() => {
               setOpen(false)
               props.onToggleDeleted()
             }}
           >
             Show deleted {props.plural}
-            {props.showingDeleted ? <span className="hint">✓</span> : null}
-          </button>
-          <button
-            className="menu-i"
-            type="button"
+            {props.showingDeleted ? <span className="ml-auto text-subtle">✓</span> : null}
+          </MenuItem>
+          <MenuItem
             onClick={() => {
               setOpen(false)
               props.onExport()
             }}
           >
             Export CSV
-          </button>
-          <button
-            className="menu-i"
-            type="button"
+          </MenuItem>
+          <MenuItem
             onClick={() => {
               setOpen(false)
               props.onImport()
             }}
           >
             Import CSV…
-          </button>
-        </div>
+          </MenuItem>
+        </Menu>
       ) : null}
     </div>
   )
@@ -165,35 +176,35 @@ export function ViewActions(props: {
   const [confirming, setConfirming] = useState(false)
   if (props.dirty) {
     return (
-      <span className="view-actions">
-        <button className="btn ghost sm" type="button" onClick={props.onReset}>
+      <span className="flex shrink-0 gap-1">
+        <Button variant="ghost" size="sm" onClick={props.onReset}>
           Reset
-        </button>
+        </Button>
         {props.viewName ? (
-          <button className="btn sm" type="button" onClick={props.onSave}>
+          <Button size="sm" onClick={props.onSave}>
             Save
-          </button>
+          </Button>
         ) : null}
-        <button className="btn sm" type="button" onClick={props.onSaveAs}>
+        <Button size="sm" onClick={props.onSaveAs}>
           {props.viewName ? "Save as new view" : "Save view"}
-        </button>
+        </Button>
       </span>
     )
   }
   if (!props.viewName || !props.canDelete) return null
   return confirming ? (
-    <span className="view-actions">
-      <button className="btn ghost sm" type="button" onClick={() => setConfirming(false)}>
+    <span className="flex shrink-0 gap-1">
+      <Button variant="ghost" size="sm" onClick={() => setConfirming(false)}>
         Cancel
-      </button>
-      <button className="btn sm danger-solid" type="button" onClick={props.onDelete}>
+      </Button>
+      <Button variant="danger-solid" size="sm" onClick={props.onDelete}>
         Delete view
-      </button>
+      </Button>
     </span>
   ) : (
-    <button className="btn ghost sm" type="button" onClick={() => setConfirming(true)}>
+    <Button variant="ghost" size="sm" onClick={() => setConfirming(true)}>
       Delete view
-    </button>
+    </Button>
   )
 }
 
@@ -221,22 +232,22 @@ export function SaveViewDialog(props: {
       onClose={props.onClose}
       footer={
         <>
-          <button className="btn ghost" type="button" onClick={props.onClose}>
+          <Button variant="ghost" onClick={props.onClose}>
             Cancel
-          </button>
-          <button className="btn primary" type="button" disabled={busy || !name.trim()} onClick={() => void save()}>
+          </Button>
+          <Button variant="primary" disabled={busy || !name.trim()} onClick={() => void save()}>
             Save view
-          </button>
+          </Button>
         </>
       }
     >
-      <div className="fld">
-        <label className="fl" htmlFor="view-name">
-          Name
-        </label>
-        <input
+      <Field
+        label="Name"
+        htmlFor="view-name"
+        hint="It saves the filters, sort and columns, and appears in the sidebar."
+      >
+        <Input
           id="view-name"
-          className="inp"
           type="text"
           maxLength={60}
           placeholder="Renewals this quarter"
@@ -247,24 +258,14 @@ export function SaveViewDialog(props: {
             if (event.key === "Enter" && name.trim()) void save()
           }}
         />
-        <p className="hint sm-t">It saves the filters, sort and columns, and appears in the sidebar.</p>
-      </div>
+      </Field>
       {props.canShare ? (
-        <label className="opt">
-          <input
-            className="cb shown"
-            type="checkbox"
-            checked={shared}
-            onChange={(event) => setShared(event.target.checked)}
-          />
+        <Option>
+          <Checkbox checked={shared} onChange={(event) => setShared(event.target.checked)} />
           Share with the team
-        </label>
+        </Option>
       ) : null}
-      {error ? (
-        <p className="form-error" role="alert">
-          {error}
-        </p>
-      ) : null}
+      {error ? <ErrorText>{error}</ErrorText> : null}
     </Dialog>
   )
 }
@@ -315,77 +316,73 @@ export function ImportDialog(props: {
       onClose={props.onClose}
       footer={
         result ? (
-          <button className="btn primary" type="button" onClick={props.onClose}>
+          <Button variant="primary" onClick={props.onClose}>
             Done
-          </button>
+          </Button>
         ) : (
           <>
-            <button className="btn ghost" type="button" onClick={props.onClose}>
+            <Button variant="ghost" onClick={props.onClose}>
               Cancel
-            </button>
-            <button
-              className="btn primary"
-              type="button"
+            </Button>
+            <Button
+              variant="primary"
               disabled={busy || !csv || Object.keys(mapping).length === 0}
               onClick={() => void run()}
             >
               {busy ? "Importing…" : `Import ${rows} ${rows === 1 ? "row" : "rows"}`}
-            </button>
+            </Button>
           </>
         )
       }
     >
       {result ? (
-        <div className="fld">
-          <p style={{ margin: 0 }}>
+        <div className="flex flex-col gap-1.5">
+          <p className="m-0">
             {result.created} created, {result.updated} updated
             {result.failed.length > 0 ? `, ${result.failed.length} not imported` : ""}.
           </p>
           {result.failed.length > 0 ? (
-            <div className="box" style={{ maxHeight: 220, overflow: "auto", padding: "6px 10px" }}>
+            <Box className="max-h-64 overflow-auto px-3 py-1.5">
               {result.failed.map((failure) => (
-                <p key={failure.line} className="sm-t" style={{ margin: "4px 0" }}>
-                  <b style={{ fontWeight: 470 }}>Line {failure.line}:</b>{" "}
-                  <span className="c-muted">{failure.problems.map((problem) => problem.userMessage).join(" ")}</span>
+                <p key={failure.line} className="my-1 text-sm">
+                  <b className="font-medium">Line {failure.line}:</b>{" "}
+                  <span className="text-subtle">
+                    {failure.problems.map((problem) => problem.userMessage).join(" ")}
+                  </span>
                 </p>
               ))}
-            </div>
+            </Box>
           ) : null}
         </div>
       ) : (
         <>
-          <div className="fld">
-            <label className="fl" htmlFor="import-file">
-              CSV file
-            </label>
+          <Field
+            label="CSV file"
+            htmlFor="import-file"
+            hint={
+              <>
+                {props.recordType === "contact"
+                  ? "Rows with an email that's already in Parley update that contact. A Company column links each contact to its company."
+                  : "Rows with a domain or name that's already in Parley update that company."}{" "}
+                Up to 5,000 rows.
+              </>
+            }
+          >
             <input
               id="import-file"
               type="file"
               accept=".csv,text/csv"
               onChange={(event) => void read(event.target.files?.[0])}
             />
-            <p className="hint sm-t">
-              {props.recordType === "contact"
-                ? "Rows with an email that's already in Parley update that contact. A Company column links each contact to its company."
-                : "Rows with a domain or name that's already in Parley update that company."}{" "}
-              Up to 5,000 rows.
-            </p>
-          </div>
+          </Field>
           {headers.length > 0 ? (
-            <fieldset className="fld">
-              <legend>Columns</legend>
+            <Fieldset legend="Columns">
               {headers.map((header) => (
-                <div
-                  key={header}
-                  style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, alignItems: "center" }}
-                >
-                  <span className="sm-t" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {header}
-                  </span>
-                  <select
-                    className="fsel"
+                <div key={header} className="grid grid-cols-2 items-center gap-2.5">
+                  <span className="truncate text-sm">{header}</span>
+                  <Select
+                    className="h-9"
                     aria-label={`Field for ${header}`}
-                    style={{ margin: 0, boxShadow: "inset 0 0 0 1px var(--control)" }}
                     value={mapping[header] ?? ""}
                     onChange={(event) => {
                       const next = { ...mapping }
@@ -400,16 +397,12 @@ export function ImportDialog(props: {
                         {target.label}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
               ))}
-            </fieldset>
+            </Fieldset>
           ) : null}
-          {error ? (
-            <p className="form-error" role="alert">
-              {error}
-            </p>
-          ) : null}
+          {error ? <ErrorText>{error}</ErrorText> : null}
         </>
       )}
     </Dialog>
@@ -434,12 +427,11 @@ export function SetFieldDialog(props: {
       onClose={props.onClose}
       footer={
         <>
-          <button className="btn ghost" type="button" onClick={props.onClose}>
+          <Button variant="ghost" onClick={props.onClose}>
             Cancel
-          </button>
-          <button
-            className="btn primary"
-            type="button"
+          </Button>
+          <Button
+            variant="primary"
             disabled={busy || !field}
             onClick={async () => {
               if (!field) return
@@ -448,32 +440,23 @@ export function SetFieldDialog(props: {
             }}
           >
             {field && values[field.id] === undefined ? "Clear it" : "Set it"}
-          </button>
+          </Button>
         </>
       }
     >
       {props.fields.length === 0 ? (
-        <p className="hint">There are no custom fields yet. Add some in Settings → Fields.</p>
+        <Hint>There are no custom fields yet. Add some in Settings → Fields.</Hint>
       ) : (
         <>
-          <div className="fld">
-            <label className="fl" htmlFor="bulk-field">
-              Field
-            </label>
-            <select
-              id="bulk-field"
-              className="fsel"
-              style={{ margin: 0, boxShadow: "inset 0 0 0 1px var(--control)" }}
-              value={fieldId}
-              onChange={(event) => setFieldId(event.target.value)}
-            >
+          <Field label="Field" htmlFor="bulk-field">
+            <Select id="bulk-field" value={fieldId} onChange={(event) => setFieldId(event.target.value)}>
               {props.fields.map((candidate) => (
                 <option key={candidate.id} value={candidate.id}>
                   {candidate.name}
                 </option>
               ))}
-            </select>
-          </div>
+            </Select>
+          </Field>
           {field ? (
             <CustomFieldsSection
               fields={[field]}

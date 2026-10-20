@@ -20,6 +20,29 @@ import { FilterBar } from "../components/filters.tsx"
 import { CloseIcon, PlusIcon, SegmentIcon } from "../components/icons.tsx"
 import { ContactAvatar } from "../components/images.tsx"
 import { LoadFailed } from "../components/record.tsx"
+import { NameText, nameLinkClass, TitleInput, wideColumnClass } from "../components/ui/email.tsx"
+import {
+  Badge,
+  Breadcrumb,
+  BreadcrumbSeparator,
+  Button,
+  breadcrumbRootClass,
+  Card,
+  Centered,
+  EmptyState,
+  IconButton,
+  PageHeader,
+  Spacer,
+  Table,
+  TableScroll,
+  Td,
+  TextButton,
+  Th,
+  Toast,
+  Toolbar,
+  Tr,
+  ViewBody,
+} from "../components/ui/index.ts"
 import { call, messageOf } from "../lib/client.ts"
 import { companiesCollection } from "../lib/companies.ts"
 import { contactsCollection } from "../lib/contacts.ts"
@@ -58,18 +81,18 @@ function SegmentScreen() {
     await queryClient.invalidateQueries({ queryKey: ["segment-members", teamId, segmentId] })
   }
 
-  if (segment.isPending) return <main className="card main" />
+  if (segment.isPending) return <Card as="main" className="flex-[999_1_35rem]" />
   if (segment.isError) {
     return (
-      <main className="card main">
-        <div className="body">
+      <Card as="main" className="flex-[999_1_35rem]">
+        <ViewBody>
           <LoadFailed
             title="This segment didn't load"
             message={messageOf(segment.error)}
             onRetry={() => void segment.refetch()}
           />
-        </div>
-      </main>
+        </ViewBody>
+      </Card>
     )
   }
   return (
@@ -174,22 +197,19 @@ function SegmentView(props: {
   )
 
   return (
-    <main className="card main">
-      <div className="hd1">
-        <h1 className="crumb">
-          <Link className="root" to="/t/$teamId/segments" params={{ teamId }}>
+    <Card as="main" className="flex-[999_1_35rem]">
+      <PageHeader>
+        <Breadcrumb>
+          <Link className={breadcrumbRootClass} to="/t/$teamId/segments" params={{ teamId }}>
             Segments
           </Link>
-          <span className="sep" aria-hidden="true">
-            /
-          </span>
+          <BreadcrumbSeparator />
           {renaming ? (
-            <input
-              className="crumb-inp"
+            <TitleInput
+              className="w-80 bg-fill"
               aria-label="Segment name"
               defaultValue={segment.name}
               maxLength={80}
-              // biome-ignore lint/a11y/noAutofocus: the person just chose to rename
               autoFocus
               onBlur={(event) => {
                 setRenaming(false)
@@ -204,40 +224,38 @@ function SegmentView(props: {
               }}
             />
           ) : props.canWrite ? (
-            <button className="linkish" type="button" title="Rename" onClick={() => setRenaming(true)}>
+            <TextButton className="self-auto text-fg" title="Rename" onClick={() => setRenaming(true)}>
               {segment.name}
-            </button>
+            </TextButton>
           ) : (
             <span>{segment.name}</span>
           )}
-        </h1>
-        <span className="pill">{segment.kind === "dynamic" ? "Dynamic" : "Fixed"}</span>
-        <div className="spacer" />
+        </Breadcrumb>
+        <Badge className="ml-2">{segment.kind === "dynamic" ? "Dynamic" : "Fixed"}</Badge>
+        <Spacer />
         {dirty ? (
           <>
-            <button className="btn ghost" type="button" onClick={() => setFilter(segment.filter ?? EMPTY_FILTER)}>
+            <Button variant="ghost" onClick={() => setFilter(segment.filter ?? EMPTY_FILTER)}>
               Reset
-            </button>
-            <button
-              className="btn primary"
-              type="button"
+            </Button>
+            <Button
+              variant="primary"
               onClick={() =>
                 void run(() => call("segments.update", { teamId, segmentId: segment.id, filter }), "Filter saved.")
               }
             >
               Save filter
-            </button>
+            </Button>
           </>
         ) : null}
         {props.canWrite && !dirty ? (
           confirmDelete ? (
-            <span className="confirm">
-              <button className="btn ghost" type="button" onClick={() => setConfirmDelete(false)}>
+            <span className="inline-flex items-center gap-1">
+              <Button variant="ghost" onClick={() => setConfirmDelete(false)}>
                 Cancel
-              </button>
-              <button
-                className="btn danger-solid"
-                type="button"
+              </Button>
+              <Button
+                variant="danger-solid"
                 onClick={() =>
                   void run(async () => {
                     await call("segments.delete", { teamId, segmentId: segment.id })
@@ -247,31 +265,29 @@ function SegmentView(props: {
                 }
               >
                 Delete segment
-              </button>
+              </Button>
             </span>
           ) : (
-            <button className="btn ghost" type="button" onClick={() => setConfirmDelete(true)}>
+            <Button variant="ghost" onClick={() => setConfirmDelete(true)}>
               Delete
-            </button>
+            </Button>
           )
         ) : null}
-      </div>
+      </PageHeader>
 
-      <div className="hd2">
+      <Toolbar>
         {segment.kind === "dynamic" ? (
           props.canWrite ? (
             <FilterBar fields={filterInfo} filter={filter} onChange={setFilter} companies={companyOptions} />
           ) : (
-            <span className="sm-t c-muted" style={{ marginLeft: 7 }}>
-              Everyone matching this segment's filter.
-            </span>
+            <span className="ml-2 text-sm text-subtle">Everyone matching this segment's filter.</span>
           )
         ) : props.canWrite ? (
-          <span className="fchip-wrap">
-            <button className="btn ghost sm" type="button" onClick={() => setPicking(true)}>
+          <span className="relative inline-flex">
+            <Button variant="ghost" size="sm" onClick={() => setPicking(true)}>
               <PlusIcon className="size-3.5" />
               Add contacts
-            </button>
+            </Button>
             {picking ? (
               <Picker
                 label="Add a contact"
@@ -288,73 +304,69 @@ function SegmentView(props: {
             ) : null}
           </span>
         ) : null}
-        <div className="spacer" />
-        <span className="sm-t c-muted" style={{ marginRight: 7 }}>
+        <Spacer />
+        <span className="mr-2 text-sm text-subtle">
           {shown.length} {shown.length === 1 ? "contact" : "contacts"} · {sendable} can be sent campaigns
         </span>
-      </div>
+      </Toolbar>
 
-      <div className="body">
+      <ViewBody>
         {shown.length === 0 ? (
-          <div className="center">
-            <div className="empty">
-              <div className="e-ic">
-                <SegmentIcon />
-              </div>
-              <h2>{segment.kind === "dynamic" ? "Nobody matches yet" : "No contacts yet"}</h2>
-              <p>
-                {segment.kind === "dynamic"
-                  ? "Add a filter, or change it, to choose who this segment is."
-                  : "Add contacts here, or select them on Contacts and add them to this segment."}
-              </p>
-            </div>
-          </div>
+          <Centered>
+            <EmptyState
+              icon={<SegmentIcon />}
+              title={segment.kind === "dynamic" ? "Nobody matches yet" : "No contacts yet"}
+            >
+              {segment.kind === "dynamic"
+                ? "Add a filter, or change it, to choose who this segment is."
+                : "Add contacts here, or select them on Contacts and add them to this segment."}
+            </EmptyState>
+          </Centered>
         ) : (
-          <div className="tablewrap">
-            <table className="ctable">
-              <caption className="vh">Contacts in {segment.name}</caption>
+          <TableScroll>
+            <Table>
+              <caption className="sr-only">Contacts in {segment.name}</caption>
               <thead>
                 <tr>
-                  <th className="w-name" scope="col" style={{ paddingLeft: 14 }}>
+                  <Th className="w-[32%] pl-4 @max-[40rem]/content:w-auto" scope="col">
                     Name
-                  </th>
-                  <th className="w-email col-wide" scope="col">
+                  </Th>
+                  <Th className={`w-[36%] ${wideColumnClass}`} scope="col">
                     Primary email
-                  </th>
-                  <th scope="col">Subscription</th>
+                  </Th>
+                  <Th scope="col">Subscription</Th>
                   {segment.kind === "fixed" && props.canWrite ? (
-                    <th scope="col" style={{ width: 44 }}>
-                      <span className="vh">Remove</span>
-                    </th>
+                    <Th scope="col" className="w-12">
+                      <span className="sr-only">Remove</span>
+                    </Th>
                   ) : null}
                 </tr>
               </thead>
               <tbody>
                 {shown.map((contact) => (
-                  <tr key={contact.id}>
-                    <td style={{ paddingLeft: 14 }}>
+                  <Tr key={contact.id}>
+                    <Td className="pl-4">
                       <Link
-                        className="namebtn"
+                        className={nameLinkClass}
                         to="/t/$teamId/contacts"
                         params={{ teamId }}
                         search={{ contact: contact.id }}
                       >
                         <ContactAvatar contact={contact} />
-                        <span className="n">{contact.displayName}</span>
+                        <NameText>{contact.displayName}</NameText>
                       </Link>
-                    </td>
-                    <td className={`col-wide ${contact.emails[0] ? "c-email" : "c-none"}`}>
+                    </Td>
+                    <Td className={`${wideColumnClass} ${contact.emails[0] ? "text-muted" : "text-subtle"}`}>
                       {contact.emails.find((email) => email.isPrimary)?.address ?? contact.emails[0]?.address ?? "—"}
-                    </td>
-                    <td className={contact.subscriptionStatus === "subscribed" ? "c-muted" : "c-warn"}>
+                    </Td>
+                    <Td className={contact.subscriptionStatus === "subscribed" ? "text-subtle" : "text-danger"}>
                       {SUBSCRIPTION_STATUS_LABELS[contact.subscriptionStatus]}
-                    </td>
+                    </Td>
                     {segment.kind === "fixed" && props.canWrite ? (
-                      <td>
-                        <button
-                          className="ibtn xs"
-                          type="button"
-                          aria-label={`Remove ${contact.displayName} from ${segment.name}`}
+                      <Td>
+                        <IconButton
+                          size="xs"
+                          label={`Remove ${contact.displayName} from ${segment.name}`}
                           onClick={() =>
                             void run(() =>
                               call("segments.removeContacts", {
@@ -366,21 +378,21 @@ function SegmentView(props: {
                           }
                         >
                           <CloseIcon className="size-3.5" />
-                        </button>
-                      </td>
+                        </IconButton>
+                      </Td>
                     ) : null}
-                  </tr>
+                  </Tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+            </Table>
+          </TableScroll>
         )}
-      </div>
+      </ViewBody>
       {props.toast ? (
-        <div className="toast" role="status">
+        <Toast>
           <span>{props.toast}</span>
-        </div>
+        </Toast>
       ) : null}
-    </main>
+    </Card>
   )
 }

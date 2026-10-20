@@ -1,6 +1,8 @@
 import type { UserText } from "@parley/errors"
 import type { FormEvent, ReactNode } from "react"
 import { ParleyMark } from "./logo.tsx"
+import { Button, ErrorText, FieldLabel, Input } from "./ui/index.ts"
+import { AuthHeading, AuthPage } from "./ui/public.tsx"
 
 export function AuthForm(props: {
   readonly title: string
@@ -17,25 +19,18 @@ export function AuthForm(props: {
     props.onSubmit(new FormData(event.currentTarget))
   }
   return (
-    <main className="auth">
-      <form className="auth-card" onSubmit={submit} noValidate>
-        <ParleyMark className="h-8" />
-        <div>
-          <h1>{props.title}</h1>
-          <p>{props.intro}</p>
-        </div>
+    <AuthPage>
+      <form className="flex flex-col gap-4" onSubmit={submit} noValidate>
+        <ParleyMark className="h-8 self-start" />
+        <AuthHeading title={props.title}>{props.intro}</AuthHeading>
         {props.children}
-        {props.error ? (
-          <p className="form-error" role="alert">
-            {props.error}
-          </p>
-        ) : null}
-        <button className="btn primary wide" type="submit" disabled={props.busy}>
+        {props.error ? <ErrorText className="text-base">{props.error}</ErrorText> : null}
+        <Button variant="primary" size="lg" wide type="submit" disabled={props.busy}>
           {props.submitLabel}
-        </button>
-        <p className="sm-t">{props.footer}</p>
+        </Button>
+        <p className="m-0 text-sm text-muted [&_a]:text-fg [&_a]:underline [&_a]:underline-offset-2">{props.footer}</p>
       </form>
-    </main>
+    </AuthPage>
   )
 }
 
@@ -48,16 +43,12 @@ export function Field(props: {
 }) {
   return (
     <div>
-      <label className="ilabel" htmlFor={props.name}>
-        {props.label}
-      </label>
-      <input
-        className="inp"
+      <FieldLabel htmlFor={props.name}>{props.label}</FieldLabel>
+      <Input
         id={props.name}
         name={props.name}
         type={props.type ?? "text"}
         autoComplete={props.autoComplete}
-        // biome-ignore lint/a11y/noAutofocus: the first field of a single-purpose sign-in screen
         autoFocus={props.autoFocus}
         required
       />

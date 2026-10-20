@@ -12,6 +12,25 @@ import { createFileRoute, getRouteApi } from "@tanstack/react-router"
 import { useState } from "react"
 import { ChevronDown, ChevronUp, CloseIcon, DisplayIcon, InfoIcon, PlusIcon } from "../components/icons.tsx"
 import { Dialog, Empty, LoadFailed, LoadingRows, SettingsPage, useToast } from "../components/settings.tsx"
+import {
+  Box,
+  Button,
+  ErrorText,
+  Field,
+  Fieldset,
+  Hint,
+  IconButton,
+  Input,
+  Notice,
+  SegmentedControl,
+  Select,
+  Table,
+  Td,
+  TextButton,
+  Th,
+  Tr,
+} from "../components/ui/index.ts"
+import { RowActions } from "../components/ui/settings-extra.tsx"
 import { call, messageOf } from "../lib/client.ts"
 
 export const Route = createFileRoute("/t/$teamId/settings/fields")({ component: Fields })
@@ -84,27 +103,26 @@ function Fields() {
       intro={`Custom fields hold what ${current.name} tracks beyond the built-in ones, like a plan, a renewal date or an account owner. Agents see them too, and set them by field id.`}
       action={
         canManage ? (
-          <button className="btn primary sm" type="button" onClick={() => setDialog("new")}>
+          <Button variant="primary" size="sm" onClick={() => setDialog("new")}>
             New field
-          </button>
+          </Button>
         ) : null
       }
     >
-      <div className="seg" role="radiogroup" aria-label="Record type">
-        {(["contact", "company"] as const).map((type) => (
-          <label key={type} className={recordType === type ? "on" : ""}>
-            <input type="radio" name="record-type" checked={recordType === type} onChange={() => setRecordType(type)} />
-            {type === "contact" ? "Contacts" : "Companies"}
-          </label>
-        ))}
-      </div>
+      <SegmentedControl
+        name="record-type"
+        label="Record type"
+        options={[
+          { value: "contact", label: "Contacts" },
+          { value: "company", label: "Companies" },
+        ]}
+        value={recordType}
+        onChange={setRecordType}
+      />
       {canManage ? null : (
-        <div className="notice">
-          <span className="ic">
-            <InfoIcon />
-          </span>
-          <span>Only admins and owners can add or change fields. You can fill them in on any record.</span>
-        </div>
+        <Notice icon={<InfoIcon />}>
+          Only admins and owners can add or change fields. You can fill them in on any record.
+        </Notice>
       )}
       {fields.isPending ? (
         <LoadingRows />
@@ -124,88 +142,82 @@ function Fields() {
             : "An admin can add fields for anything your team tracks that isn't built in."}
         </Empty>
       ) : (
-        <div className="box">
-          <table className="stable">
+        <Box>
+          <Table kind="settings">
             <thead>
               <tr>
-                <th scope="col" style={{ width: "34%" }}>
+                <Th scope="col" className="w-[34%]">
                   Name
-                </th>
-                <th scope="col" style={{ width: "18%" }}>
+                </Th>
+                <Th scope="col" className="w-[18%]">
                   Type
-                </th>
-                <th scope="col">Options</th>
-                <th scope="col" style={{ width: 190 }}>
-                  <span className="vh">Actions</span>
-                </th>
+                </Th>
+                <Th scope="col">Options</Th>
+                <Th scope="col" className="w-56">
+                  <span className="sr-only">Actions</span>
+                </Th>
               </tr>
             </thead>
             <tbody>
               {shown.map((field, index) => (
-                <tr key={field.id}>
-                  <td>
-                    <span className="who">
-                      <span className="n">{field.name}</span>
-                    </span>
-                  </td>
-                  <td className="c-muted">{typeLabel(field.type)}</td>
-                  <td className="c-muted" title={field.options.map((option) => option.label).join(", ")}>
+                <Tr key={field.id}>
+                  <Td className="font-medium">{field.name}</Td>
+                  <Td className="text-subtle">{typeLabel(field.type)}</Td>
+                  <Td className="text-subtle" title={field.options.map((option) => option.label).join(", ")}>
                     {isSelect(field.type) ? field.options.map((option) => option.label).join(", ") : "—"}
-                  </td>
-                  <td className="c-act">
+                  </Td>
+                  <Td className="text-right">
                     {!canManage ? null : confirming === field.id ? (
-                      <span className="confirm">
-                        <button className="btn sm ghost" type="button" onClick={() => setConfirming(undefined)}>
+                      <RowActions>
+                        <Button size="sm" variant="ghost" onClick={() => setConfirming(undefined)}>
                           Cancel
-                        </button>
-                        <button
-                          className="btn sm danger-solid"
-                          type="button"
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="danger-solid"
                           aria-label={`Confirm: delete ${field.name}`}
                           onClick={() => void remove(field)}
                         >
                           Delete
-                        </button>
-                      </span>
+                        </Button>
+                      </RowActions>
                     ) : (
-                      <span className="confirm">
-                        <button
-                          className="ibtn xs"
-                          type="button"
-                          aria-label={`Move ${field.name} up`}
+                      <RowActions>
+                        <IconButton
+                          size="xs"
+                          label={`Move ${field.name} up`}
                           disabled={index === 0}
                           onClick={() => void move(field, -1)}
                         >
                           <ChevronUp className="size-4" />
-                        </button>
-                        <button
-                          className="ibtn xs"
-                          type="button"
-                          aria-label={`Move ${field.name} down`}
+                        </IconButton>
+                        <IconButton
+                          size="xs"
+                          label={`Move ${field.name} down`}
                           disabled={index === shown.length - 1}
                           onClick={() => void move(field, 1)}
                         >
                           <ChevronDown className="size-4" />
-                        </button>
-                        <button className="btn sm ghost" type="button" onClick={() => setDialog(field)}>
+                        </IconButton>
+                        <Button size="sm" variant="ghost" onClick={() => setDialog(field)}>
                           Edit
-                        </button>
-                        <button
-                          className="btn sm danger"
-                          type="button"
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="danger"
                           aria-label={`Delete ${field.name}`}
                           onClick={() => setConfirming(field.id)}
                         >
                           Delete
-                        </button>
-                      </span>
+                        </Button>
+                      </RowActions>
                     )}
-                  </td>
-                </tr>
+                  </Td>
+                </Tr>
               ))}
             </tbody>
-          </table>
-        </div>
+          </Table>
+        </Box>
       )}
       {dialog ? (
         <FieldDialog
@@ -279,27 +291,22 @@ function FieldDialog(props: {
       onClose={props.onClose}
       footer={
         <>
-          <button className="btn ghost" type="button" onClick={props.onClose}>
+          <Button variant="ghost" onClick={props.onClose}>
             Cancel
-          </button>
-          <button
-            className="btn primary"
-            type="button"
+          </Button>
+          <Button
+            variant="primary"
             disabled={busy || name.trim() === "" || (isSelect(type) && cleanOptions.length === 0)}
             onClick={() => void save()}
           >
             {editing ? "Save field" : "Add field"}
-          </button>
+          </Button>
         </>
       }
     >
-      <div className="fld">
-        <label className="fl" htmlFor="field-name">
-          Name
-        </label>
-        <input
+      <Field label="Name" htmlFor="field-name">
+        <Input
           id="field-name"
-          className="inp"
           type="text"
           maxLength={60}
           placeholder="Plan, Renewal date, Account owner…"
@@ -307,43 +314,25 @@ function FieldDialog(props: {
           value={name}
           onChange={(event) => setName(event.target.value)}
         />
-      </div>
+      </Field>
       {editing ? (
-        <p className="hint sm-t">
-          Type: {typeLabel(editing.type)}. A field's type can't change; add a new field instead.
-        </p>
+        <Hint>Type: {typeLabel(editing.type)}. A field's type can't change; add a new field instead.</Hint>
       ) : (
-        <div className="fld">
-          <label className="fl" htmlFor="field-type">
-            Type
-          </label>
-          <div className="selwrap">
-            <select
-              id="field-type"
-              className="sel plain"
-              value={type}
-              onChange={(event) => setType(event.target.value as CustomFieldType)}
-            >
-              {TYPES.map((entry) => (
-                <option key={entry.type} value={entry.type}>
-                  {entry.label}
-                </option>
-              ))}
-            </select>
-            <span className="sel-chev">
-              <ChevronDown />
-            </span>
-          </div>
-          <p className="hint sm-t">{TYPES.find((entry) => entry.type === type)?.hint}</p>
-        </div>
+        <Field label="Type" htmlFor="field-type" hint={TYPES.find((entry) => entry.type === type)?.hint}>
+          <Select id="field-type" value={type} onChange={(event) => setType(event.target.value as CustomFieldType)}>
+            {TYPES.map((entry) => (
+              <option key={entry.type} value={entry.type}>
+                {entry.label}
+              </option>
+            ))}
+          </Select>
+        </Field>
       )}
       {isSelect(editing?.type ?? type) ? (
-        <fieldset className="fld">
-          <legend>Options</legend>
+        <Fieldset legend="Options">
           {options.map((option, index) => (
-            <div key={option.id} style={{ display: "flex", gap: 6, alignItems: "center" }}>
-              <input
-                className="inp"
+            <div key={option.id} className="flex items-center gap-1.5">
+              <Input
                 type="text"
                 maxLength={60}
                 aria-label={`Option ${index + 1}`}
@@ -354,37 +343,30 @@ function FieldDialog(props: {
                   setOptions(next)
                 }}
               />
-              <button
-                className="ibtn"
-                type="button"
-                aria-label={`Remove option ${option.label || index + 1}`}
+              <IconButton
+                label={`Remove option ${option.label || index + 1}`}
                 onClick={() => setOptions(options.filter((other) => other.id !== option.id))}
               >
                 <CloseIcon className="size-4" />
-              </button>
+              </IconButton>
             </div>
           ))}
-          <button
-            className="linkish sm-t"
-            type="button"
+          <TextButton
+            className="text-sm"
             onClick={() => setOptions([...options, { id: optionId("option"), label: "" }])}
           >
             <PlusIcon className="size-3.5" />
             Add option
-          </button>
+          </TextButton>
           {removedOptions.length > 0 ? (
-            <p className="hint sm-t">
+            <Hint>
               Removing {removedOptions.map((option) => option.label).join(", ")} clears it from every record that has
               it.
-            </p>
+            </Hint>
           ) : null}
-        </fieldset>
+        </Fieldset>
       ) : null}
-      {error ? (
-        <p className="form-error" role="alert">
-          {error}
-        </p>
-      ) : null}
+      {error ? <ErrorText>{error}</ErrorText> : null}
     </Dialog>
   )
 }

@@ -139,6 +139,7 @@ What we decided, who decided it, and what's still open. Nothing becomes "decided
 | I13 | `/mcp` without credentials answers 401 with `WWW-Authenticate: Bearer resource_metadata=…`, and `/.well-known/oauth-protected-resource/mcp` and `/.well-known/oauth-authorization-server/api/auth` are served at the site root | MCP clients discover sign-in this way |
 | I14 | Dynamic client registration is open (no client ID metadata documents yet) | What Claude, ChatGPT and Cursor use today; `@better-auth/cimd` can be added later |
 | I15 | Service accounts are users of kind `service-account` (no password, an undeliverable email) plus a member row; a connection acting as one also needs the connecting person to still be a member | D18, D94 |
+| I16 | Styling is Tailwind only: Ink's palette is theme tokens in `apps/web/src/styles/app.css`, and screens are built from the components in `apps/web/src/components/ui/`, sized on Tailwind's rem scale. No hand-written CSS classes or pixel values outside the CRT canvas plumbing | Owner's direction (2026-10-20): the UI was too small, and sizes must change in one place, not per pixel |
 
 ## What's built, and what's next
 

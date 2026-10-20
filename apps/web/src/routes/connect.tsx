@@ -9,10 +9,29 @@ import {
 import { DisplayName, type UserText, userText } from "@parley/errors"
 import { useQuery } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
-import { useState } from "react"
-import { AlertIcon, CheckIcon, ChevronDown, CloseIcon } from "../components/icons.tsx"
+import { type HTMLAttributes, useState } from "react"
+import { AlertIcon, CheckIcon, CloseIcon } from "../components/icons.tsx"
 import { ParleyMark } from "../components/logo.tsx"
 import { initialsOf, SCOPE_LABELS } from "../components/settings.tsx"
+import {
+  Avatar,
+  Button,
+  buttonClass,
+  Card,
+  Checkbox,
+  cn,
+  EmptyState,
+  Field,
+  Fieldset,
+  Hint,
+  Input,
+  Notice,
+  Option,
+  RadioCard,
+  Select,
+  Skeleton,
+} from "../components/ui/index.ts"
+import { LinkButton } from "../components/ui/public.tsx"
 import { agentRequest, getSession, signOut, withAgentRequest } from "../lib/auth.ts"
 import { call, messageOf } from "../lib/client.ts"
 
@@ -98,19 +117,19 @@ function Connect() {
   const teams = useQuery({ queryKey: ["teams"], queryFn: () => call("teams.list", {}) })
 
   return (
-    <div className="consent">
-      <header className="top">
+    <div className="flex min-h-dvh flex-col bg-canvas">
+      <header className="flex h-16 items-center gap-2.5 px-6 font-medium">
         <ParleyMark className="h-5" />
         <span>Parley</span>
       </header>
-      <main className="stage">
-        <div className="sheet">
+      <main className="flex flex-1 items-start justify-center px-4 pt-12 pb-16 max-sm:px-0 max-sm:pt-2 max-sm:pb-6">
+        <Card className="w-full max-w-lg rounded-2xl max-sm:rounded-none max-sm:shadow-none">
           {!request || agent.isError ? (
             <Problem title="This link doesn't work" message={invalidRequest} />
           ) : agent.isPending || teams.isPending ? (
-            <div className="done" role="status" aria-label="Loading">
-              <span className="sk" style={{ width: 160 }} />
-            </div>
+            <Outcome role="status" aria-label="Loading">
+              <Skeleton className="w-48" />
+            </Outcome>
           ) : teams.isError ? (
             <Problem title="Parley couldn't load your teams" message={messageOf(teams.error)} />
           ) : teams.data.length === 0 ? (
@@ -118,33 +137,41 @@ function Connect() {
           ) : (
             <ConsentForm request={request} agent={agent.data} teams={teams.data} user={user} />
           )}
-        </div>
+        </Card>
       </main>
     </div>
   )
 }
 
+/** The sheet's content when there's nothing to choose: a result, a problem or a next step. */
+function Outcome({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
+  return <div className={cn("grid place-items-center px-8 py-11", className)} {...props} />
+}
+
 function Problem(props: { readonly title: string; readonly message: UserText }) {
   return (
-    <div className="done" role="alert">
-      <div className="e-ic no">
-        <AlertIcon className="size-5.5" />
-      </div>
-      <h2>{props.title}</h2>
-      <p>{props.message}</p>
-    </div>
+    <Outcome role="alert">
+      <EmptyState icon={<AlertIcon className="size-5.5" />} title={props.title}>
+        {props.message}
+      </EmptyState>
+    </Outcome>
   )
 }
 
 function NoTeam(props: { readonly agent: Agent }) {
   return (
-    <div className="done">
-      <h2>Create a team first</h2>
-      <p>{props.agent.name} works in one of your teams, and you aren't in one yet.</p>
-      <a className="btn primary" style={{ marginTop: 10 }} href={withAgentRequest("/new-team")}>
-        Create a team
-      </a>
-    </div>
+    <Outcome>
+      <EmptyState
+        title="Create a team first"
+        actions={
+          <a className={buttonClass({ variant: "primary" })} href={withAgentRequest("/new-team")}>
+            Create a team
+          </a>
+        }
+      >
+        {props.agent.name} works in one of your teams, and you aren't in one yet.
+      </EmptyState>
+    </Outcome>
   )
 }
 
@@ -153,12 +180,13 @@ function AgentHeader(props: {
   readonly user: { readonly name: string; readonly email: string }
 }) {
   return (
-    <div className="a-h">
-      <div className="pair" aria-hidden="true">
-        <span className="big">{initialsOf(props.agent.name)}</span>
+    <div className="flex flex-col items-center gap-2 border-b border-line px-8 pt-8 pb-6 text-center max-sm:px-4">
+      <div className="mb-3 flex items-center gap-3 text-subtle" aria-hidden="true">
+        <span className="grid size-12 place-items-center rounded-xl bg-fill text-base font-semibold text-fg">
+          {initialsOf(props.agent.name)}
+        </span>
         <svg
-          width="28"
-          height="12"
+          className="h-3 w-8"
           viewBox="0 0 28 12"
           fill="none"
           stroke="currentColor"
@@ -169,27 +197,27 @@ function AgentHeader(props: {
         >
           <path d="M2 6h24" />
         </svg>
-        <span className="big p">
-          <ParleyMark />
+        <span className="grid size-12 place-items-center">
+          <ParleyMark className="h-9" />
         </span>
       </div>
-      <h1>{props.agent.name} wants to work in Parley</h1>
-      <span className="origin sm-t">
+      <h1 className="m-0 text-xl font-semibold tracking-tight text-balance">
+        {props.agent.name} wants to work in Parley
+      </h1>
+      <span className="text-sm text-muted">
         Unverified agent: it named itself. Access goes to{" "}
-        <b>{props.agent.destination ?? "an address Parley can't read"}</b>.
+        <b className="font-medium text-fg">{props.agent.destination ?? "an address Parley can't read"}</b>.
       </span>
-      <p className="sm-t">
+      <p className="m-0 text-sm text-muted">
         Signed in as {props.user.name} · {props.user.email} ·{" "}
-        <button
-          className="linkish"
-          type="button"
+        <LinkButton
           onClick={async () => {
             await signOut()
             window.location.assign(withAgentRequest("/sign-in"))
           }}
         >
           Not you?
-        </button>
+        </LinkButton>
       </p>
     </div>
   )
@@ -277,29 +305,25 @@ function ConsentForm(props: {
   if (result?._tag === "Allowed") {
     const words = OFFERED.filter((scope) => scopes.has(scope)).map((scope) => scope.slice(8))
     return (
-      <div className="done" role="status">
-        <div className="e-ic">
-          <CheckIcon className="size-5.5" />
-        </div>
-        <h2>
-          {props.agent.name} is connected to {team.name}
-        </h2>
-        <p>
+      <Outcome role="status">
+        <EmptyState
+          tone="ok"
+          icon={<CheckIcon className="size-5.5" />}
+          title={`${props.agent.name} is connected to ${team.name}`}
+        >
           It acts as {result.actsAs} with {words.join(", ")} access. You can close this tab and go back to{" "}
           {props.agent.name}.
-        </p>
-      </div>
+        </EmptyState>
+      </Outcome>
     )
   }
   if (result?._tag === "Denied") {
     return (
-      <div className="done" role="status">
-        <div className="e-ic no">
-          <CloseIcon className="size-5.5" />
-        </div>
-        <h2>{props.agent.name} wasn't connected</h2>
-        <p>Nothing changed in Parley. You can close this tab.</p>
-      </div>
+      <Outcome role="status">
+        <EmptyState icon={<CloseIcon className="size-5.5" />} title={`${props.agent.name} wasn't connected`}>
+          Nothing changed in Parley. You can close this tab.
+        </EmptyState>
+      </Outcome>
     )
   }
 
@@ -353,131 +377,118 @@ function ConsentForm(props: {
     <>
       <AgentHeader agent={props.agent} user={props.user} />
       <form
-        className="a-b"
+        className="flex flex-col gap-6 px-8 pt-6 pb-2.5 max-sm:px-4"
         onSubmit={(event) => {
           event.preventDefault()
           if (!blocked) void allow()
         }}
       >
-        <div className="fld">
-          <label className="fl" htmlFor="team">
-            Team
-          </label>
-          <div className="selwrap">
-            <span className="logo sel-logo" aria-hidden="true">
-              {team.name[0]?.toUpperCase()}
-            </span>
-            <select
-              className="sel"
-              id="team"
-              value={teamId}
-              onChange={(event) => {
-                setTeamId(event.target.value as TeamId)
-                setActor(undefined)
-              }}
-            >
-              {props.teams.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.name}
-                </option>
-              ))}
-            </select>
-            <span className="sel-chev">
-              <ChevronDown />
-            </span>
-          </div>
-          <p className="hint sm-t">A connection works in one team. Connect again to use another.</p>
-        </div>
-
-        <fieldset className="fld">
-          <legend>Act as</legend>
-          <div className="radios">
-            {actors.map((option) => (
-              <label key={option.id} className={`ropt ${chosen === option.id ? "on" : ""}`}>
-                <input
-                  className="rd"
-                  type="radio"
-                  name="actor"
-                  checked={chosen === option.id}
-                  onChange={() => setActor(option.id)}
-                />
-                <span className="t">
-                  <span className="n">
-                    <span
-                      className={`av ${option.kind === "bot" ? "bot" : option.kind === "new" ? "bot new" : ""}`}
-                      aria-hidden="true"
-                    >
-                      {option.initials}
-                    </span>
-                    {option.label}
-                  </span>
-                  <span className="d sm-t">{option.description}</span>
-                  {option.id === NEW && chosen === NEW ? (
-                    <input
-                      className="inp"
-                      type="text"
-                      aria-label="Service account name"
-                      placeholder="e.g. Sales Agent"
-                      maxLength={60}
-                      value={newName}
-                      onChange={(event) => setNewName(event.target.value)}
-                    />
-                  ) : null}
-                </span>
-              </label>
+        <Field label="Team" htmlFor="team" hint="A connection works in one team. Connect again to use another.">
+          <Select
+            id="team"
+            leading={<TeamLogo name={team.name} />}
+            value={teamId}
+            onChange={(event) => {
+              setTeamId(event.target.value as TeamId)
+              setActor(undefined)
+            }}
+          >
+            {props.teams.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.name}
+              </option>
             ))}
-          </div>
-        </fieldset>
+          </Select>
+        </Field>
 
-        <fieldset className="fld">
-          <legend>Scopes</legend>
-          <div className="checks">
+        <Fieldset legend="Act as">
+          {actors.map((option) => (
+            <RadioCard
+              key={option.id}
+              name="actor"
+              checked={chosen === option.id}
+              onChange={() => setActor(option.id)}
+              label={
+                <>
+                  <Avatar shape={option.kind === "you" ? "round" : "square"} dashed={option.kind === "new"}>
+                    {option.initials}
+                  </Avatar>
+                  {option.label}
+                </>
+              }
+              description={option.description}
+            >
+              {option.id === NEW && chosen === NEW ? (
+                <Input
+                  className="mt-1.5 bg-surface"
+                  type="text"
+                  aria-label="Service account name"
+                  placeholder="e.g. Sales Agent"
+                  maxLength={60}
+                  value={newName}
+                  onChange={(event) => setNewName(event.target.value)}
+                />
+              ) : null}
+            </RadioCard>
+          ))}
+        </Fieldset>
+
+        <Fieldset legend="Scopes">
+          <div className="flex flex-col gap-0.5">
             {OFFERED.map((scope) => {
               const locked = scope === "records:read"
               return (
-                <label key={scope} className="chk">
-                  <input
-                    className={`cb ${locked ? "locked" : ""}`}
-                    type="checkbox"
+                <Option key={scope} className="grid grid-cols-[1rem_8rem_minmax(0,1fr)] py-0.5">
+                  <Checkbox
+                    className={cn(locked && "disabled:opacity-55")}
                     checked={scopes.has(scope)}
                     disabled={locked}
                     onChange={() => toggle(scope)}
                   />
-                  <span className="mono">{scope}</span>
-                  <span className="d">
+                  <span className="font-mono text-sm">{scope}</span>
+                  <span className="text-muted">
                     {SCOPE_LABELS[scope]}
-                    {locked ? <span className="why"> · Always on</span> : null}
+                    {locked ? <span className="text-sm text-subtle"> · Always on</span> : null}
                   </span>
-                </label>
+                </Option>
               )
             })}
           </div>
-          <p className="hint sm-t" style={{ marginTop: 4 }}>
-            A connection never does more than the identity it acts as.
-          </p>
-        </fieldset>
+          <Hint className="mt-1">A connection never does more than the identity it acts as.</Hint>
+        </Fieldset>
 
         {error ? (
-          <div className="alert" role="alert">
-            <span className="ic">
-              <AlertIcon />
-            </span>
-            <p>{error}</p>
-          </div>
+          <Notice tone="danger" icon={<AlertIcon />}>
+            {error}
+          </Notice>
         ) : null}
       </form>
 
-      <div className="a-f">
-        <div className="btns">
-          <button className="btn" type="button" disabled={busy} onClick={() => void deny()}>
+      <div className="flex flex-col gap-3 px-8 pt-4 pb-6 max-sm:px-4">
+        <div className="grid grid-cols-2 gap-2.5">
+          <Button size="lg" disabled={busy} onClick={() => void deny()}>
             Deny
-          </button>
-          <button className="btn primary" type="button" disabled={blocked} onClick={() => void allow()}>
+          </Button>
+          <Button variant="primary" size="lg" disabled={blocked} onClick={() => void allow()}>
             Allow
-          </button>
+          </Button>
         </div>
-        <p className="small sm-t">You can revoke this connection anytime in Settings → Connections.</p>
+        <p className="m-0 text-center text-sm text-subtle">
+          You can revoke this connection anytime in Settings → Connections.
+        </p>
       </div>
     </>
+  )
+}
+
+/** A team's mark: its initial on a dark square. */
+function TeamLogo(props: { readonly name: string }) {
+  return (
+    <span
+      aria-hidden="true"
+      className="grid size-5.5 place-items-center rounded-md bg-primary text-2xs font-semibold text-on-primary"
+    >
+      {props.name[0]?.toUpperCase()}
+    </span>
   )
 }

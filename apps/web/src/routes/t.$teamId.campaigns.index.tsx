@@ -4,7 +4,29 @@ import { createFileRoute, getRouteApi, Link, useNavigate } from "@tanstack/react
 import { useState } from "react"
 import { SendIcon } from "../components/icons.tsx"
 import { LoadFailed } from "../components/record.tsx"
-import { Dialog } from "../components/settings.tsx"
+import { ItemTile, NameText, nameLinkClass, wideColumnClass } from "../components/ui/email.tsx"
+import {
+  Badge,
+  Breadcrumb,
+  Button,
+  Card,
+  Centered,
+  Count,
+  Dialog,
+  EmptyState,
+  ErrorText,
+  Field,
+  Input,
+  PageHeader,
+  Select,
+  Spacer,
+  Table,
+  TableScroll,
+  Td,
+  Th,
+  Tr,
+  ViewBody,
+} from "../components/ui/index.ts"
 import { CAMPAIGN_STATUS_LABELS } from "../lib/campaigns.ts"
 import { call, messageOf } from "../lib/client.ts"
 import { absolute, relative } from "../lib/time.ts"
@@ -26,22 +48,22 @@ function CampaignsScreen() {
   })
   const items = campaigns.data ?? []
   const newButton = canWrite ? (
-    <button className="btn primary" type="button" onClick={() => setCreating(true)}>
+    <Button variant="primary" onClick={() => setCreating(true)}>
       New campaign
-    </button>
+    </Button>
   ) : null
 
   return (
-    <main className="card main">
-      <div className="hd1">
-        <h1 className="crumb">
+    <Card as="main" className="flex-[999_1_35rem]">
+      <PageHeader>
+        <Breadcrumb>
           <span>Campaigns</span>
-        </h1>
-        {items.length > 0 ? <span className="count">{items.length}</span> : null}
-        <div className="spacer" />
+        </Breadcrumb>
+        {items.length > 0 ? <Count>{items.length}</Count> : null}
+        <Spacer />
         {items.length > 0 ? newButton : null}
-      </div>
-      <div className="body">
+      </PageHeader>
+      <ViewBody>
         {campaigns.isPending ? null : campaigns.isError ? (
           <LoadFailed
             title="Campaigns didn't load"
@@ -49,84 +71,72 @@ function CampaignsScreen() {
             onRetry={() => void campaigns.refetch()}
           />
         ) : items.length === 0 ? (
-          <div className="center">
-            <div className="empty">
-              <div className="e-ic">
-                <SendIcon />
-              </div>
-              <h2>No campaigns yet</h2>
-              <p>
-                A campaign is one email to a segment of your contacts. Write it, send yourself a test, then send it.
-              </p>
-              {newButton ? <div className="actions">{newButton}</div> : null}
-            </div>
-          </div>
+          <Centered>
+            <EmptyState icon={<SendIcon />} title="No campaigns yet" actions={newButton}>
+              A campaign is one email to a segment of your contacts. Write it, send yourself a test, then send it.
+            </EmptyState>
+          </Centered>
         ) : (
-          <div className="tablewrap">
-            <table className="ctable">
-              <caption className="vh">Campaigns</caption>
+          <TableScroll>
+            <Table>
+              <caption className="sr-only">Campaigns</caption>
               <thead>
                 <tr>
-                  <th scope="col" style={{ paddingLeft: 14 }}>
+                  <Th scope="col" className="pl-4">
                     Name
-                  </th>
-                  <th className="w-kind" scope="col">
+                  </Th>
+                  <Th className="w-32" scope="col">
                     Status
-                  </th>
-                  <th className="col-wide" scope="col">
+                  </Th>
+                  <Th className={wideColumnClass} scope="col">
                     Segment
-                  </th>
-                  <th className="w-count col-wide" scope="col">
+                  </Th>
+                  <Th className={`w-32 ${wideColumnClass}`} scope="col">
                     Sent
-                  </th>
-                  <th className="w-date" scope="col">
+                  </Th>
+                  <Th className="w-28" scope="col">
                     Updated
-                  </th>
+                  </Th>
                 </tr>
               </thead>
               <tbody>
                 {items.map((campaign) => (
-                  <tr key={campaign.id}>
-                    <td style={{ paddingLeft: 14 }}>
+                  <Tr key={campaign.id}>
+                    <Td className="h-12 pl-4">
                       <Link
-                        className="namebtn"
+                        className={nameLinkClass}
                         to="/t/$teamId/campaigns/$campaignId"
                         params={{ teamId, campaignId: campaign.id }}
                       >
-                        <span className="tile" aria-hidden="true">
-                          <SendIcon className="size-3.5" />
-                        </span>
-                        <span className="stack">
-                          <span className="n">{campaign.name}</span>
-                          {campaign.subject ? <span className="s sm-t">{campaign.subject}</span> : null}
-                        </span>
+                        <ItemTile icon={<SendIcon className="size-4" />} />
+                        <NameText sub={campaign.subject || undefined}>{campaign.name}</NameText>
                       </Link>
-                    </td>
-                    <td>
-                      <span className={`pill ${campaign.status === "sent" ? "ok" : ""}`}>
+                    </Td>
+                    <Td>
+                      <Badge tone={campaign.status === "sent" ? "strong" : "neutral"}>
                         {CAMPAIGN_STATUS_LABELS[campaign.status]}
-                      </span>
-                    </td>
-                    <td className={`col-wide ${campaign.segmentName ? "c-muted" : "c-none"}`}>
+                      </Badge>
+                    </Td>
+                    <Td className={`${wideColumnClass} ${campaign.segmentName ? "text-muted" : "text-subtle"}`}>
                       {campaign.segmentName ?? "—"}
-                    </td>
-                    <td className="tab col-wide">
+                    </Td>
+                    <Td className={`tabular-nums ${wideColumnClass}`}>
                       {campaign.counts
                         ? `${campaign.counts.sent + campaign.counts.delivered} of ${campaign.counts.recipients - campaign.counts.skipped}`
                         : "—"}
-                    </td>
-                    <td className="c-date" title={absolute(campaign.updatedAt)}>
+                    </Td>
+                    <Td className="text-subtle tabular-nums" title={absolute(campaign.updatedAt)}>
                       {relative(campaign.updatedAt)}
-                    </td>
-                  </tr>
+                    </Td>
+                  </Tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+            </Table>
+          </TableScroll>
         )}
-      </div>
+      </ViewBody>
       {creating ? <NewCampaignDialog teamId={teamId} onClose={() => setCreating(false)} /> : null}
-    </main>
+    </Card>
   )
 }
 
@@ -163,22 +173,18 @@ function NewCampaignDialog(props: { readonly teamId: TeamId; readonly onClose: (
       onClose={props.onClose}
       footer={
         <>
-          <button className="btn ghost" type="button" onClick={props.onClose}>
+          <Button variant="ghost" onClick={props.onClose}>
             Cancel
-          </button>
-          <button className="btn primary" type="button" disabled={!name.trim() || busy} onClick={() => void create()}>
+          </Button>
+          <Button variant="primary" disabled={!name.trim() || busy} onClick={() => void create()}>
             Create draft
-          </button>
+          </Button>
         </>
       }
     >
-      <div className="fld">
-        <label className="fl" htmlFor="campaign-name">
-          Name
-        </label>
-        <input
+      <Field label="Name" htmlFor="campaign-name" hint="For your team. Recipients see the subject, not this.">
+        <Input
           id="campaign-name"
-          className="inp"
           maxLength={120}
           placeholder="October update"
           autoFocus
@@ -188,31 +194,18 @@ function NewCampaignDialog(props: { readonly teamId: TeamId; readonly onClose: (
             if (event.key === "Enter" && name.trim()) void create()
           }}
         />
-        <p className="hint sm-t">For your team. Recipients see the subject, not this.</p>
-      </div>
-      <div className="fld">
-        <label className="fl" htmlFor="campaign-template">
-          Start from
-        </label>
-        <select
-          id="campaign-template"
-          className="inp"
-          value={templateId}
-          onChange={(event) => setTemplateId(event.target.value)}
-        >
+      </Field>
+      <Field label="Start from" htmlFor="campaign-template">
+        <Select id="campaign-template" value={templateId} onChange={(event) => setTemplateId(event.target.value)}>
           <option value="">A blank email</option>
           {(templates.data ?? []).map((template) => (
             <option key={template.id} value={template.id}>
               {template.name}
             </option>
           ))}
-        </select>
-      </div>
-      {error ? (
-        <p className="err sm-t" role="alert">
-          {error}
-        </p>
-      ) : null}
+        </Select>
+      </Field>
+      {error ? <ErrorText>{error}</ErrorText> : null}
     </Dialog>
   )
 }

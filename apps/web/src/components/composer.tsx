@@ -1,6 +1,7 @@
 import type { RenderedEmail } from "@parley/domain"
 import { type ReactNode, useEffect, useRef, useState } from "react"
-import { EmailPreview } from "./email-preview.tsx"
+import { EMAIL_FRAME_CLASS, EmailPreview } from "./email-preview.tsx"
+import { cn, ErrorText, FieldLabel, Hint, Input, Notice, Spacer, Textarea } from "./ui/index.ts"
 
 /** Subject, preview text and body: what a template and a campaign both hold (R41). */
 export interface Content {
@@ -50,7 +51,7 @@ export function SaveState(props: { readonly state: "saved" | "saving" | "unsaved
         : props.state === "failed"
           ? "Not saved"
           : "Saved"
-  return <span className={`sm-t savestate ${props.state === "failed" ? "c-warn" : "c-muted"}`}>{text}</span>
+  return <span className={cn("ml-2.5 text-sm", props.state === "failed" ? "text-danger" : "text-subtle")}>{text}</span>
 }
 
 /**
@@ -109,16 +110,13 @@ export function Composer(props: {
   }
 
   return (
-    <div className="composer">
-      <div className="cmp-edit">
+    <div className="grid min-h-0 flex-1 grid-cols-2 overflow-auto border-t border-line @max-4xl/content:grid-cols-1">
+      <div className="flex flex-col gap-3.5 overflow-auto border-r border-line p-4 @max-4xl/content:border-r-0">
         {props.settings}
-        <div className="cmp-f">
-          <label className="flabel sm-t" htmlFor="cmp-subject">
-            Subject
-          </label>
-          <input
+        <div className="flex min-w-0 flex-col">
+          <FieldLabel htmlFor="cmp-subject">Subject</FieldLabel>
+          <Input
             id="cmp-subject"
-            className="inp"
             maxLength={200}
             readOnly={props.readOnly}
             placeholder="What's this email about?"
@@ -126,13 +124,12 @@ export function Composer(props: {
             onChange={(event) => props.onChange({ ...content, subject: event.target.value })}
           />
         </div>
-        <div className="cmp-f">
-          <label className="flabel sm-t" htmlFor="cmp-preview-text">
-            Preview text <span className="c-muted">(optional)</span>
-          </label>
-          <input
+        <div className="flex min-w-0 flex-col">
+          <FieldLabel htmlFor="cmp-preview-text">
+            Preview text <span className="text-subtle">(optional)</span>
+          </FieldLabel>
+          <Input
             id="cmp-preview-text"
-            className="inp"
             maxLength={200}
             readOnly={props.readOnly}
             placeholder="Shown after the subject in most inboxes"
@@ -140,17 +137,17 @@ export function Composer(props: {
             onChange={(event) => props.onChange({ ...content, previewText: event.target.value })}
           />
         </div>
-        <div className="cmp-f grow">
-          <div className="cmp-bodyhead">
-            <label className="flabel sm-t" htmlFor="cmp-body">
-              Body <span className="c-muted">· Markdown</span>
-            </label>
+        <div className="flex min-h-80 min-w-0 flex-1 flex-col gap-1.5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <FieldLabel htmlFor="cmp-body" className="pb-0">
+              Body <span className="text-subtle">· Markdown</span>
+            </FieldLabel>
             {props.readOnly ? null : (
-              <span className="tags" title="Insert a merge tag">
+              <span className="flex flex-wrap gap-1" title="Insert a merge tag">
                 {MERGE_TAGS.map((entry) => (
                   <button
                     key={entry.tag}
-                    className="tagbtn sm-t"
+                    className="h-6 cursor-pointer rounded-full bg-fill px-2.5 text-sm text-muted hover:text-fg"
                     type="button"
                     title={`Insert ${entry.tag}`}
                     onClick={() => insert(entry.tag)}
@@ -161,10 +158,10 @@ export function Composer(props: {
               </span>
             )}
           </div>
-          <textarea
+          <Textarea
             id="cmp-body"
             ref={body}
-            className="inp cmp-body mono"
+            className="min-h-64 flex-1 resize-none py-2.5 font-mono"
             readOnly={props.readOnly}
             placeholder={
               "# A heading\n\nWrite in Markdown: **bold**, _italic_, [links](https://example.com) and lists.\n\nHi {{first_name|there}},"
@@ -172,33 +169,29 @@ export function Composer(props: {
             value={content.body}
             onChange={(event) => props.onChange({ ...content, body: event.target.value })}
           />
-          <p className="hint sm-t">Parley adds your footer, with the unsubscribe link, to the end of every email.</p>
+          <Hint>Parley adds your footer, with the unsubscribe link, to the end of every email.</Hint>
         </div>
       </div>
-      <div className="cmp-prev">
-        <div className="cmp-prevbar">
-          <span className="sm-t c-muted">Preview</span>
-          <div className="spacer" />
+      <div className="flex min-h-0 flex-col bg-canvas">
+        <div className="flex h-11 shrink-0 items-center gap-2 px-3.5">
+          <span className="text-sm text-subtle">Preview</span>
+          <Spacer />
           {props.previewBar}
         </div>
         {rendered ? (
-          <div className="cmp-inbox">
-            <div className="cmp-subject">{rendered.subject || "No subject"}</div>
-            {rendered.previewText ? <div className="sm-t c-muted">{rendered.previewText}</div> : null}
+          <div className="mx-3.5 mb-2.5 rounded-md bg-surface px-3 py-2.5 inset-ring inset-ring-line">
+            <div className="font-semibold">{rendered.subject || "No subject"}</div>
+            {rendered.previewText ? <div className="text-sm text-subtle">{rendered.previewText}</div> : null}
           </div>
         ) : null}
         {rendered && rendered.unknownMergeTags.length > 0 ? (
-          <p className="warn sm-t" style={{ margin: "0 12px 8px" }}>
+          <Notice tone="warn" className="mx-3.5 mb-2.5 text-sm">
             Parley doesn't know {rendered.unknownMergeTags.map((tag) => `{{${tag}}}`).join(", ")}, so{" "}
             {rendered.unknownMergeTags.length === 1 ? "it's" : "they're"} sent as typed.
-          </p>
+          </Notice>
         ) : null}
-        {previewError ? (
-          <p className="err sm-t" style={{ margin: "0 12px 8px" }}>
-            {previewError}
-          </p>
-        ) : null}
-        {rendered ? <EmailPreview html={rendered.html} label="Email preview" /> : <div className="cmp-frame" />}
+        {previewError ? <ErrorText className="mx-3.5 mb-2.5">{previewError}</ErrorText> : null}
+        {rendered ? <EmailPreview html={rendered.html} label="Email preview" /> : <div className={EMAIL_FRAME_CLASS} />}
       </div>
     </div>
   )

@@ -3,6 +3,7 @@ import type { UserText } from "@parley/errors"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { getRouteApi } from "@tanstack/react-router"
 import { call, messageOf } from "../lib/client.ts"
+import { Checkbox, cn, Option, PropertyRow, Section, SectionHeader, Select } from "./ui/index.ts"
 
 const teamRoute = getRouteApi("/t/$teamId")
 
@@ -42,55 +43,49 @@ export function SubscriptionSection(props: {
 
   const topics = subscriptions.data?.topics ?? []
   return (
-    <section className="sec">
-      <h3 className="sec-h">Marketing email</h3>
-      <div className="field">
-        <label className="flabel sm-t" htmlFor={id}>
-          Subscription
-        </label>
-        <div className="fval" style={{ padding: "0 6px" }}>
-          <select
-            id={id}
-            className={`fsel ${status === "subscribed" ? "" : "c-warn"}`}
-            disabled={!props.canWrite}
-            value={status}
-            onChange={(event) => props.onStatus(event.target.value as "subscribed" | "unsubscribed")}
-          >
-            <option value="subscribed" disabled={contact.subscriptionStatus !== "subscribed" && !canResubscribe}>
-              Subscribed
+    <Section>
+      <SectionHeader>Marketing email</SectionHeader>
+      <PropertyRow label="Subscription" htmlFor={id}>
+        <Select
+          variant="inline"
+          id={id}
+          className={cn(status !== "subscribed" && "text-danger")}
+          disabled={!props.canWrite}
+          value={status}
+          onChange={(event) => props.onStatus(event.target.value as "subscribed" | "unsubscribed")}
+        >
+          <option value="subscribed" disabled={contact.subscriptionStatus !== "subscribed" && !canResubscribe}>
+            Subscribed
+          </option>
+          <option value="unsubscribed">Unsubscribed</option>
+          {status === "bounced" || status === "marked-as-spam" ? (
+            <option value={status} disabled>
+              {SUBSCRIPTION_STATUS_LABELS[status]}
             </option>
-            <option value="unsubscribed">Unsubscribed</option>
-            {status === "bounced" || status === "marked-as-spam" ? (
-              <option value={status} disabled>
-                {SUBSCRIPTION_STATUS_LABELS[status]}
-              </option>
-            ) : null}
-          </select>
-        </div>
-      </div>
+          ) : null}
+        </Select>
+      </PropertyRow>
       {status === "bounced" ? (
-        <p className="empty-v sm-t">
+        <p className="m-0 mt-1 text-sm text-subtle">
           Email to this address bounced, so campaigns skip it. Fix the address, then subscribe again.
         </p>
       ) : status === "marked-as-spam" ? (
-        <p className="empty-v sm-t">They marked a campaign as spam, so campaigns skip them.</p>
+        <p className="m-0 mt-1 text-sm text-subtle">They marked a campaign as spam, so campaigns skip them.</p>
       ) : null}
       {status === "subscribed" && topics.length > 0 ? (
-        <div className="topics">
+        <div className="flex flex-col gap-0.5 px-1.5 pt-1">
           {topics.map((topic) => (
-            <label key={topic.topicId} className="opt">
-              <input
-                className="cb shown"
-                type="checkbox"
+            <Option key={topic.topicId}>
+              <Checkbox
                 disabled={!props.canWrite || (!topic.subscribed && !canResubscribe)}
                 checked={topic.subscribed}
                 onChange={(event) => void setTopic(topic.topicId, event.target.checked)}
               />
               {topic.name}
-            </label>
+            </Option>
           ))}
         </div>
       ) : null}
-    </section>
+    </Section>
   )
 }

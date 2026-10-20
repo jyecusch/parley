@@ -3,7 +3,30 @@ import type { UserText } from "@parley/errors"
 import { type ReactNode, useState } from "react"
 import { isApiFailure } from "../lib/client.ts"
 import { absolute, relative } from "../lib/time.ts"
-import { AgentIcon, AlertIcon } from "./icons.tsx"
+import {
+  AgentIcon,
+  AlertIcon,
+  ChevronDown,
+  ChevronUp,
+  CloseIcon,
+  CollapseIcon,
+  ExpandIcon,
+  MoreIcon,
+} from "./icons.tsx"
+import {
+  Avatar,
+  Button,
+  Centered,
+  cn,
+  EmptyState,
+  IconButton,
+  InlineInput,
+  Menu,
+  PropertyRow,
+  propertyValueClass,
+  RecordTitle,
+  Spacer,
+} from "./ui/index.ts"
 
 /** Pieces shared by the contact and company screens: inline editing, activity and load states. */
 
@@ -56,7 +79,7 @@ const describe = (entry: ActivityEntry, recordType: RecordType): ReactNode => {
   const other = entry.related ? <b>{entry.related.name}</b> : "a record"
   const matched =
     entry.reason === "domain-matching" ? (
-      <span className="src"> by domain matching{entry.matchedDomain ? ` on ${entry.matchedDomain}` : ""}</span>
+      <span className="text-subtle"> by domain matching{entry.matchedDomain ? ` on ${entry.matchedDomain}` : ""}</span>
     ) : null
   switch (entry.kind) {
     case "created":
@@ -135,6 +158,43 @@ const describe = (entry: ActivityEntry, recordType: RecordType): ReactNode => {
   }
 }
 
+/**
+ * One entry in a record's timeline: who, what, and when, joined to the entry above by a line.
+ * `aside` sits on the right, after the time.
+ */
+export function TimelineRow(props: {
+  readonly actorName: string
+  readonly via: string | null | undefined
+  readonly first: boolean
+  readonly at: string
+  readonly children: ReactNode
+  readonly body?: ReactNode
+  readonly aside?: ReactNode
+}) {
+  return (
+    <div
+      className={cn(
+        "relative grid grid-cols-[auto_minmax(0,1fr)_auto] gap-2.5 py-1.5",
+        !props.first &&
+          "before:absolute before:-top-1.5 before:left-2.75 before:h-3 before:w-px before:bg-line-strong before:content-['']",
+      )}
+    >
+      <Avatar badge={props.via ? <AgentIcon /> : undefined}>{initialsOfName(props.actorName)}</Avatar>
+      <div className="min-w-0">
+        <div className="text-pretty text-muted [&_b]:font-medium [&_b]:text-fg">
+          <b>{props.actorName}</b>
+          {props.via ? <span className="text-subtle"> via {props.via}</span> : null} {props.children}
+        </div>
+        {props.body}
+      </div>
+      <span className="flex items-start gap-0.5 pt-0.5 text-sm whitespace-nowrap text-subtle tabular-nums">
+        <span title={absolute(props.at)}>{relative(props.at)}</span>
+        {props.aside}
+      </span>
+    </div>
+  )
+}
+
 export function ActivityRow(props: {
   readonly entry: ActivityEntry
   readonly recordType: RecordType
@@ -142,25 +202,9 @@ export function ActivityRow(props: {
 }) {
   const { entry } = props
   return (
-    <div className={`act ${props.first ? "first" : ""}`}>
-      <span className="av" aria-hidden="true">
-        {initialsOfName(entry.actorName)}
-        {entry.via ? (
-          <span className="agent">
-            <AgentIcon />
-          </span>
-        ) : null}
-      </span>
-      <div style={{ minWidth: 0 }}>
-        <div className="act-l">
-          <b>{entry.actorName}</b>
-          {entry.via ? <span className="via"> via {entry.via}</span> : null} {describe(entry, props.recordType)}
-        </div>
-      </div>
-      <span className="when sm-t" title={absolute(entry.at)}>
-        {relative(entry.at)}
-      </span>
-    </div>
+    <TimelineRow actorName={entry.actorName} via={entry.via} first={props.first} at={entry.at}>
+      {describe(entry, props.recordType)}
+    </TimelineRow>
   )
 }
 
@@ -170,22 +214,110 @@ export function LoadFailed(props: {
   readonly onRetry: () => void
 }) {
   return (
-    <div className="center" role="alert">
-      <div className="empty">
-        <div className="e-ic err">
-          <AlertIcon />
-        </div>
-        <h2>{props.title}</h2>
-        <p>{props.message}</p>
-        <div className="actions">
-          <button className="btn primary" type="button" onClick={props.onRetry}>
+    <Centered role="alert">
+      <EmptyState
+        tone="danger"
+        icon={<AlertIcon />}
+        title={props.title}
+        actions={
+          <Button variant="primary" onClick={props.onRetry}>
             Try again
-          </button>
-        </div>
+          </Button>
+        }
+      >
+        {props.message}
+      </EmptyState>
+    </Centered>
+  )
+}
+
+/**
+ * The bar at the top of a record panel: previous and next, the position in the list, the full
+ * page toggle, a menu of more actions, and close.
+ */
+export function PanelBar(props: {
+  readonly noun: "contact" | "company"
+  readonly position: { readonly index: number; readonly total: number }
+  readonly onMove: (delta: number) => void
+  readonly layout: "panel" | "full" | undefined
+  readonly onToggleLayout: (() => void) | undefined
+  readonly onClose: () => void
+  /** The items of the More menu; picking one should close it with `closeMenu`. */
+  readonly menu: (closeMenu: () => void) => ReactNode
+}) {
+  const [menuOpen, setMenuOpen] = useState(false)
+  const full = props.layout === "full"
+  return (
+    <div className="-ml-1.5 flex items-center">
+      <IconButton label={`Previous ${props.noun}`} tip="Previous  K" onClick={() => props.onMove(-1)}>
+        <ChevronUp />
+      </IconButton>
+      <IconButton label={`Next ${props.noun}`} tip="Next  J" onClick={() => props.onMove(1)}>
+        <ChevronDown className="size-5" />
+      </IconButton>
+      <span className="ml-1 text-sm text-subtle tabular-nums">
+        {props.position.index + 1} of {props.position.total}
+      </span>
+      <Spacer />
+      {props.onToggleLayout ? (
+        <IconButton
+          label={full ? "Back to the panel" : "Open full page"}
+          tip={full ? "Back to the list" : "Open full page"}
+          onClick={props.onToggleLayout}
+        >
+          {full ? <CollapseIcon /> : <ExpandIcon />}
+        </IconButton>
+      ) : null}
+      <div className="relative">
+        <IconButton label="More actions" tip="More" onClick={() => setMenuOpen((open) => !open)}>
+          <MoreIcon />
+        </IconButton>
+        {menuOpen ? <Menu className="top-full right-0 mt-1">{props.menu(() => setMenuOpen(false))}</Menu> : null}
+      </div>
+      <IconButton label="Close panel" tip="Close  Esc" onClick={props.onClose}>
+        <CloseIcon />
+      </IconButton>
+    </div>
+  )
+}
+
+/** A record's mark, name and a line under it, at the top of its panel. */
+export function PanelIdentity(props: {
+  readonly mark: ReactNode
+  readonly name: string
+  readonly children: ReactNode
+}) {
+  return (
+    <div className="flex items-center gap-3">
+      {props.mark}
+      <div className="flex min-w-0 flex-col gap-1.5">
+        <RecordTitle>{props.name}</RecordTitle>
+        {props.children}
       </div>
     </div>
   )
 }
+
+/** The line under a record's name in its panel, such as its email. */
+export function PanelSubtitle(props: { readonly children: ReactNode }) {
+  return <p className="m-0 text-sm text-muted">{props.children}</p>
+}
+
+/** How an empty property reads. */
+export const EmptyValue = () => <span className="text-subtle">Empty</span>
+
+/** One line of a list property, such as an email with its "Primary" tag. */
+export function ValueLine(props: { readonly value: ReactNode; readonly tag?: string | undefined }) {
+  return (
+    <span className="flex min-w-0 items-center gap-1.5">
+      <span className="truncate">{props.value}</span>
+      {props.tag ? <span className="text-sm text-subtle">{props.tag}</span> : null}
+    </span>
+  )
+}
+
+/** The classes for a fieldset that edits a property in place. */
+export const propertyFieldsetClass = "m-0 flex min-w-0 flex-col gap-0.5 border-0 p-0"
 
 export function EditableText(props: {
   readonly label: string
@@ -196,41 +328,33 @@ export function EditableText(props: {
   const id = `edit-${props.label.replace(/\s+/g, "-").toLowerCase()}`
   if (editing) {
     return (
-      <div className="field">
-        <label className="flabel sm-t" htmlFor={id}>
-          {props.label}
-        </label>
-        <div className="fval" style={{ padding: "0 6px" }}>
-          <input
-            id={id}
-            className="finp"
-            defaultValue={props.value ?? ""}
-            // biome-ignore lint/a11y/noAutofocus: the person just clicked this field to edit it
-            autoFocus
-            onBlur={(event) => {
+      <PropertyRow label={props.label} htmlFor={id}>
+        <InlineInput
+          id={id}
+          defaultValue={props.value ?? ""}
+          autoFocus
+          onBlur={(event) => {
+            setEditing(false)
+            const next = event.currentTarget.value.trim() || null
+            if (next !== props.value) props.onSave(next)
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") event.currentTarget.blur()
+            if (event.key === "Escape") {
+              event.stopPropagation()
               setEditing(false)
-              const next = event.currentTarget.value.trim() || null
-              if (next !== props.value) props.onSave(next)
-            }}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") event.currentTarget.blur()
-              if (event.key === "Escape") {
-                event.stopPropagation()
-                setEditing(false)
-              }
-            }}
-          />
-        </div>
-      </div>
+            }
+          }}
+        />
+      </PropertyRow>
     )
   }
   return (
-    <div className="field">
-      <span className="flabel sm-t">{props.label}</span>
-      <button className="fval" type="button" onClick={() => setEditing(true)}>
-        {props.value ?? <span className="empty-v">Empty</span>}
+    <PropertyRow label={props.label}>
+      <button className={propertyValueClass} type="button" onClick={() => setEditing(true)}>
+        {props.value ?? <EmptyValue />}
       </button>
-    </div>
+    </PropertyRow>
   )
 }
 
@@ -256,25 +380,21 @@ export function EditableList(props: {
   }
   if (editing) {
     return (
-      <div className="field">
-        <span className="flabel sm-t">{props.label}</span>
+      <PropertyRow label={props.label}>
         <fieldset
-          className="fval"
-          style={{ padding: "0 6px", gap: 2, border: 0, minInlineSize: 0 }}
+          className={propertyFieldsetClass}
           onBlur={(event) => {
             if (!event.currentTarget.contains(event.relatedTarget as Node | null)) commit()
           }}
         >
-          <legend className="vh">{props.label}</legend>
+          <legend className="sr-only">{props.label}</legend>
           {draft.map((value, index) => (
-            <input
+            <InlineInput
               // biome-ignore lint/suspicious/noArrayIndexKey: rows are positional while editing
               key={index}
-              className="finp"
               type={props.type}
               aria-label={`${props.label} ${index + 1}`}
               placeholder={index === draft.length - 1 ? props.empty : undefined}
-              // biome-ignore lint/a11y/noAutofocus: the person just clicked this field to edit it
               autoFocus={index === 0}
               value={value}
               onChange={(event) => {
@@ -293,21 +413,17 @@ export function EditableList(props: {
             />
           ))}
         </fieldset>
-      </div>
+      </PropertyRow>
     )
   }
   return (
-    <div className="field">
-      <span className="flabel sm-t">{props.label}</span>
-      <button className="fval" type="button" onClick={begin}>
-        {props.items.length === 0 ? <span className="empty-v">Empty</span> : null}
+    <PropertyRow label={props.label}>
+      <button className={propertyValueClass} type="button" onClick={begin}>
+        {props.items.length === 0 ? <EmptyValue /> : null}
         {props.items.map((item) => (
-          <span className="fline" key={item.value}>
-            <span className="t">{item.value}</span>
-            {item.tag ? <span className="tag sm-t">{item.tag}</span> : null}
-          </span>
+          <ValueLine key={item.value} value={item.value} tag={item.tag} />
         ))}
       </button>
-    </div>
+    </PropertyRow>
   )
 }

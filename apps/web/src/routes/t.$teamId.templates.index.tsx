@@ -4,6 +4,24 @@ import { createFileRoute, getRouteApi, Link, useNavigate } from "@tanstack/react
 import { useState } from "react"
 import { TemplateIcon } from "../components/icons.tsx"
 import { LoadFailed } from "../components/record.tsx"
+import { ItemTile, NameText, nameLinkClass, wideColumnClass } from "../components/ui/email.tsx"
+import {
+  Breadcrumb,
+  Button,
+  Card,
+  Centered,
+  Count,
+  EmptyState,
+  ErrorText,
+  PageHeader,
+  Spacer,
+  Table,
+  TableScroll,
+  Td,
+  Th,
+  Tr,
+  ViewBody,
+} from "../components/ui/index.ts"
 import { call, messageOf } from "../lib/client.ts"
 import { absolute, relative } from "../lib/time.ts"
 
@@ -31,27 +49,23 @@ function TemplatesScreen() {
   }
 
   const newButton = canWrite ? (
-    <button className="btn primary" type="button" onClick={() => void create()}>
+    <Button variant="primary" onClick={() => void create()}>
       New template
-    </button>
+    </Button>
   ) : null
 
   return (
-    <main className="card main">
-      <div className="hd1">
-        <h1 className="crumb">
+    <Card as="main" className="flex-[999_1_35rem]">
+      <PageHeader>
+        <Breadcrumb>
           <span>Templates</span>
-        </h1>
-        {items.length > 0 ? <span className="count">{items.length}</span> : null}
-        <div className="spacer" />
+        </Breadcrumb>
+        {items.length > 0 ? <Count>{items.length}</Count> : null}
+        <Spacer />
         {items.length > 0 ? newButton : null}
-      </div>
-      <div className="body">
-        {error ? (
-          <p className="err sm-t" role="alert" style={{ padding: "8px 14px" }}>
-            {error}
-          </p>
-        ) : null}
+      </PageHeader>
+      <ViewBody>
+        {error ? <ErrorText className="px-4 py-2.5">{error}</ErrorText> : null}
         {templates.isPending ? null : templates.isError ? (
           <LoadFailed
             title="Templates didn't load"
@@ -59,61 +73,54 @@ function TemplatesScreen() {
             onRetry={() => void templates.refetch()}
           />
         ) : items.length === 0 ? (
-          <div className="center">
-            <div className="empty">
-              <div className="e-ic">
-                <TemplateIcon />
-              </div>
-              <h2>No templates yet</h2>
-              <p>Save the emails you send often as templates. A new campaign can start from one.</p>
-              {newButton ? <div className="actions">{newButton}</div> : null}
-            </div>
-          </div>
+          <Centered>
+            <EmptyState icon={<TemplateIcon />} title="No templates yet" actions={newButton}>
+              Save the emails you send often as templates. A new campaign can start from one.
+            </EmptyState>
+          </Centered>
         ) : (
-          <div className="tablewrap">
-            <table className="ctable">
-              <caption className="vh">Templates</caption>
+          <TableScroll>
+            <Table>
+              <caption className="sr-only">Templates</caption>
               <thead>
                 <tr>
-                  <th scope="col" style={{ paddingLeft: 14 }}>
+                  <Th scope="col" className="pl-4">
                     Name
-                  </th>
-                  <th className="col-wide" scope="col">
+                  </Th>
+                  <Th className={wideColumnClass} scope="col">
                     Subject
-                  </th>
-                  <th className="w-date" scope="col">
+                  </Th>
+                  <Th className="w-28" scope="col">
                     Updated
-                  </th>
+                  </Th>
                 </tr>
               </thead>
               <tbody>
                 {items.map((template) => (
-                  <tr key={template.id}>
-                    <td style={{ paddingLeft: 14 }}>
+                  <Tr key={template.id}>
+                    <Td className="pl-4">
                       <Link
-                        className="namebtn"
+                        className={nameLinkClass}
                         to="/t/$teamId/templates/$templateId"
                         params={{ teamId, templateId: template.id }}
                       >
-                        <span className="tile" aria-hidden="true">
-                          <TemplateIcon className="size-3.5" />
-                        </span>
-                        <span className="n">{template.name}</span>
+                        <ItemTile icon={<TemplateIcon className="size-4" />} />
+                        <NameText>{template.name}</NameText>
                       </Link>
-                    </td>
-                    <td className={`col-wide ${template.subject ? "c-muted" : "c-none"}`}>
+                    </Td>
+                    <Td className={wideColumnClass + (template.subject ? " text-muted" : " text-subtle")}>
                       {template.subject || "No subject"}
-                    </td>
-                    <td className="c-date" title={absolute(template.updatedAt)}>
+                    </Td>
+                    <Td className="text-subtle tabular-nums" title={absolute(template.updatedAt)}>
                       {relative(template.updatedAt)}
-                    </td>
-                  </tr>
+                    </Td>
+                  </Tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+            </Table>
+          </TableScroll>
         )}
-      </div>
-    </main>
+      </ViewBody>
+    </Card>
   )
 }

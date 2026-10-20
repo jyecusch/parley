@@ -31,6 +31,54 @@ import { CompanyLogo } from "../components/images.tsx"
 import { DisplayMenu, ImportDialog, SaveViewDialog, SetFieldDialog, ViewActions } from "../components/index-view.tsx"
 import { initialsOfName, LoadFailed, problemFor, problemsOf, toE164, toggle } from "../components/record.tsx"
 import { isTyping, useShell } from "../components/shell.tsx"
+import {
+  Avatar,
+  Breadcrumb,
+  BreadcrumbSeparator,
+  Button,
+  breadcrumbRootClass,
+  Card,
+  Centered,
+  Checkbox,
+  Count,
+  cn,
+  EmptyState,
+  FloatingBar,
+  FloatingBarDivider,
+  Hint,
+  IconButton,
+  InlineInput,
+  Kbd,
+  PageHeader,
+  PanelFooter,
+  PanelHeader,
+  PropertyRow,
+  RecordPanel,
+  RecordTitle,
+  SearchInput,
+  Section,
+  SectionHeader,
+  Skeleton,
+  Spacer,
+  Table,
+  TableScroll,
+  Td,
+  TextButton,
+  Th,
+  Toolbar,
+  Tooltip,
+  Tr,
+  ViewBody,
+} from "../components/ui/index.ts"
+import {
+  checkCellClass,
+  customColumnClass,
+  dateCellClass,
+  dateColumnClass,
+  nameButtonClass,
+  nameTextClass,
+  wideColumnClass,
+} from "../components/ui/record-list.tsx"
 import { call, isApiFailure, messageOf } from "../lib/client.ts"
 import { companiesCollection, primaryDomainOf } from "../lib/companies.ts"
 import { useFields } from "../lib/custom-fields.ts"
@@ -198,25 +246,27 @@ function CompaniesScreen() {
 
   return (
     <>
-      <main className={`card main ${selected.size > 0 ? "has-sel" : ""}`}>
-        <div className="hd1">
-          <h1 className="crumb">
+      <Card as="main" className="flex-[999_1_39rem]">
+        <PageHeader>
+          <Breadcrumb>
             {search.deleted ? (
               <>
-                <button className="root linkish" type="button" onClick={() => void setSearch({})}>
+                <button
+                  className={cn(breadcrumbRootClass, "cursor-pointer")}
+                  type="button"
+                  onClick={() => void setSearch({})}
+                >
                   Companies
                 </button>
-                <span className="sep" aria-hidden="true">
-                  /
-                </span>
+                <BreadcrumbSeparator />
                 <span>Deleted</span>
               </>
             ) : (
               <span>{indexView.view?.name ?? "Companies"}</span>
             )}
-          </h1>
-          {!search.deleted && !isLoading && !isEmpty ? <span className="count">{companies.length}</span> : null}
-          <div className="spacer" />
+          </Breadcrumb>
+          {!search.deleted && !isLoading && !isEmpty ? <Count>{companies.length}</Count> : null}
+          <Spacer />
           {search.deleted ? null : (
             <ViewActions
               viewName={indexView.view?.name}
@@ -237,27 +287,25 @@ function CompaniesScreen() {
             />
           )}
           {isEmpty && !search.deleted ? null : (
-            <button className="btn primary" type="button" onClick={() => void setSearch({ new: true })}>
-              New company <span className="kbd on-primary">C</span>
-            </button>
+            <Button variant="primary" onClick={() => void setSearch({ new: true })}>
+              New company <Kbd onPrimary>C</Kbd>
+            </Button>
           )}
-        </div>
+        </PageHeader>
 
         {isEmpty && !search.deleted ? null : (
-          <div className="hd2">
+          <Toolbar>
             {search.deleted ? (
-              <span className="sm-t" style={{ color: "var(--fg-subtle)", marginLeft: 7 }}>
-                Deleted companies can be restored for 30 days.
-              </span>
+              <span className="ml-2 text-sm text-subtle">Deleted companies can be restored for 30 days.</span>
             ) : (
               <>
-                <label className="vh" htmlFor="company-filter">
+                <label className="sr-only" htmlFor="company-filter">
                   Filter companies
                 </label>
-                <input
+                <SearchInput
+                  // SearchInput passes its props, ref included, to its input.
                   ref={filterRef}
                   id="company-filter"
-                  className="search-inp"
                   placeholder="Filter by name or domain  /"
                   value={filter}
                   onChange={(event) => setFilter(event.target.value)}
@@ -273,7 +321,7 @@ function CompaniesScreen() {
             {search.deleted ? null : (
               <FilterBar fields={filterInfo} filter={indexView.state.filter} onChange={indexView.setFilter} />
             )}
-            <div className="spacer" />
+            <Spacer />
             <DisplayMenu
               plural="companies"
               fields={filterInfo}
@@ -287,10 +335,10 @@ function CompaniesScreen() {
               onExport={() => void exportCsv(undefined)}
               onImport={() => setDialog("import")}
             />
-          </div>
+          </Toolbar>
         )}
 
-        <div className="body">
+        <ViewBody>
           {search.deleted ? (
             <DeletedCompanies teamId={teamId} onRestore={restore} />
           ) : isLoading ? (
@@ -302,180 +350,172 @@ function CompaniesScreen() {
               onRetry={() => void collection.utils.refetch()}
             />
           ) : isEmpty ? (
-            <div className="center">
-              <div className="empty">
-                <div className="e-ic">
-                  <CompaniesIcon />
-                </div>
-                <h2>No companies yet</h2>
-                <p>
-                  Companies are the organizations your contacts work for. Give a company its domains, and contacts with
-                  an email there are affiliated with it on their own.
-                </p>
-                <div className="actions">
-                  <button className="btn primary" type="button" onClick={() => void setSearch({ new: true })}>
-                    New company <span className="kbd on-primary">C</span>
-                  </button>
-                </div>
-              </div>
-            </div>
+            <Centered>
+              <EmptyState
+                icon={<CompaniesIcon />}
+                title="No companies yet"
+                actions={
+                  <Button variant="primary" onClick={() => void setSearch({ new: true })}>
+                    New company <Kbd onPrimary>C</Kbd>
+                  </Button>
+                }
+              >
+                Companies are the organizations your contacts work for. Give a company its domains, and contacts with an
+                email there are affiliated with it on their own.
+              </EmptyState>
+            </Centered>
           ) : companies.length === 0 ? (
-            <div className="center">
-              <div className="empty">
-                <h2>No companies match “{filter}”</h2>
-                <p>Try part of a name or a domain.</p>
-              </div>
-            </div>
+            <Centered>
+              <EmptyState title={`No companies match “${filter}”`}>Try part of a name or a domain.</EmptyState>
+            </Centered>
           ) : (
-            <div className="tablewrap">
-              <table className="ctable">
-                <caption className="vh">Companies</caption>
+            <TableScroll padForBar={selected.size > 0}>
+              <Table>
+                <caption className="sr-only">Companies</caption>
                 <thead>
                   <tr>
-                    <th className="w-check c-check" scope="col">
-                      <input
-                        className={`cb ${someChecked ? "is-mixed" : ""}`}
-                        type="checkbox"
+                    <Th className={checkCellClass} scope="col">
+                      <Checkbox
+                        reveal={selected.size === 0}
+                        mixed={someChecked}
                         aria-label="Select all companies"
                         checked={allChecked}
                         onChange={() => setSelected(allChecked ? new Set() : new Set(companies.map((c) => c.id)))}
                       />
-                    </th>
-                    <th className="w-co-name" scope="col">
+                    </Th>
+                    <Th className={NAME_COLUMN} scope="col">
                       Name
-                    </th>
-                    <th className="w-count" scope="col">
+                    </Th>
+                    <Th className={COUNT_COLUMN} scope="col">
                       Contacts
-                    </th>
+                    </Th>
                     {shownFields.map((field) => (
-                      <th key={field.id} className="w-custom col-wide" scope="col">
+                      <Th key={field.id} className={cn(customColumnClass, wideColumnClass)} scope="col">
                         {field.name}
-                      </th>
+                      </Th>
                     ))}
-                    <th className="col-wide" scope="col">
-                      <span className="vh">Spacer</span>
-                    </th>
-                    <th className="w-date col-wide" scope="col">
+                    <Th className={wideColumnClass} scope="col">
+                      <span className="sr-only">Spacer</span>
+                    </Th>
+                    <Th className={cn(dateColumnClass, wideColumnClass)} scope="col">
                       Created
-                    </th>
-                    <th className="w-date col-wide" scope="col">
+                    </Th>
+                    <Th className={cn(dateColumnClass, wideColumnClass)} scope="col">
                       Updated
-                    </th>
+                    </Th>
                   </tr>
                 </thead>
                 <tbody>
                   {companies.map((company) => {
                     const domain = primaryDomainOf(company)
-                    const className = [
-                      selected.has(company.id) ? "is-checked" : "",
-                      open?.id === company.id ? "is-open" : "",
-                      !open && cursor === company.id ? "is-cursor" : "",
-                    ]
-                      .join(" ")
-                      .trim()
                     return (
-                      <tr key={company.id} className={className}>
-                        <td className="c-check tall">
-                          <input
-                            className="cb"
-                            type="checkbox"
+                      <Tr
+                        key={company.id}
+                        checked={selected.has(company.id)}
+                        open={open?.id === company.id}
+                        cursor={!open && cursor === company.id}
+                      >
+                        <Td className={cn(checkCellClass, TALL)}>
+                          <Checkbox
+                            reveal={selected.size === 0}
                             aria-label={`Select ${company.name}`}
                             checked={selected.has(company.id)}
                             onChange={() => setSelected((current) => toggle(current, company.id))}
                           />
-                        </td>
-                        <td className="tall">
+                        </Td>
+                        <Td className={TALL}>
                           <button
-                            className="namebtn"
+                            className={nameButtonClass}
                             type="button"
                             onClick={() => void setSearch({ company: company.id })}
                           >
                             <CompanyLogo company={company} size="md" />
-                            <span className="stack">
-                              <span className="n">{company.name}</span>
-                              {domain ? <span className="s sm-t">{domain}</span> : null}
+                            <span className="flex min-w-0 flex-col">
+                              <span className={nameTextClass}>{company.name}</span>
+                              {domain ? (
+                                <span className="truncate text-sm font-normal text-subtle">{domain}</span>
+                              ) : null}
                             </span>
                           </button>
-                        </td>
-                        <td className={`tall tab ${company.contactCount === 0 ? "c-none" : ""}`}>
+                        </Td>
+                        <Td className={cn(TALL, "tabular-nums", company.contactCount === 0 && "text-subtle")}>
                           {contactsLabel(company.contactCount)}
-                        </td>
+                        </Td>
                         {shownFields.map((field) => (
-                          <td key={field.id} className="tall col-wide c-muted">
+                          <Td key={field.id} className={cn(TALL, wideColumnClass, "text-subtle")}>
                             <CustomCell field={field} value={company.custom[field.id]} />
-                          </td>
+                          </Td>
                         ))}
-                        <td className="tall col-wide" />
-                        <td className="tall col-wide c-date" title={`Created ${absolute(company.createdAt)}`}>
+                        <Td className={cn(TALL, wideColumnClass)} />
+                        <Td
+                          className={cn(TALL, wideColumnClass, dateCellClass)}
+                          title={`Created ${absolute(company.createdAt)}`}
+                        >
                           {relative(company.createdAt)}
-                        </td>
-                        <td className="tall col-wide c-date" title={`Updated ${absolute(company.updatedAt)}`}>
+                        </Td>
+                        <Td
+                          className={cn(TALL, wideColumnClass, dateCellClass)}
+                          title={`Updated ${absolute(company.updatedAt)}`}
+                        >
                           {relative(company.updatedAt)}
-                        </td>
-                      </tr>
+                        </Td>
+                      </Tr>
                     )
                   })}
                 </tbody>
-              </table>
-            </div>
+              </Table>
+            </TableScroll>
           )}
-        </div>
+        </ViewBody>
 
         {selected.size > 0 ? (
-          <div className="floatbar" role="toolbar" aria-label="Bulk actions">
-            <span className="n">
-              <b>{selected.size}</b> selected
+          <FloatingBar role="toolbar" aria-label="Bulk actions">
+            <span className="mr-1.5 text-muted tabular-nums">
+              <b className="font-medium text-fg">{selected.size}</b> selected
             </span>
-            <span className="div" />
-            <button className="btn ghost sm" type="button" onClick={() => setDialog("set-field")}>
+            <FloatingBarDivider />
+            <Button variant="ghost" size="sm" onClick={() => setDialog("set-field")}>
               Set field
-            </button>
-            <button className="btn ghost sm" type="button" onClick={() => void exportCsv([...selected])}>
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => void exportCsv([...selected])}>
               Export
-            </button>
-            <button
-              className="btn ghost sm danger tip tip-b"
-              type="button"
-              data-tip="Delete  ⌫"
-              onClick={() => remove([...selected])}
-            >
-              Delete
-            </button>
-            <span className="div" />
-            <button
-              className="ibtn tip tip-b"
-              type="button"
-              aria-label="Clear selection"
-              data-tip="Clear selection  Esc"
-              style={{ width: 24, height: 24 }}
+            </Button>
+            <Tooltip text="Delete  ⌫">
+              <Button variant="danger" size="sm" onClick={() => remove([...selected])}>
+                Delete
+              </Button>
+            </Tooltip>
+            <FloatingBarDivider />
+            <IconButton
+              label="Clear selection"
+              tip="Clear selection  Esc"
+              size="xs"
               onClick={() => setSelected(new Set())}
             >
               <CloseIcon className="size-3.5" />
-            </button>
-          </div>
+            </IconButton>
+          </FloatingBar>
         ) : toast ? (
-          <div className="floatbar" role="status">
-            <span className="n" style={{ color: "var(--fg)" }}>
-              {toast.text}
-            </span>
+          <FloatingBar role="status">
+            <span className="mr-1.5 text-fg">{toast.text}</span>
             {toast.undo ? (
               <>
-                <span className="div" />
-                <button
-                  className="btn ghost sm"
-                  type="button"
+                <FloatingBarDivider />
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => {
                     toast.undo?.()
                     setToast(undefined)
                   }}
                 >
-                  Undo <span className="kbd">⌘Z</span>
-                </button>
+                  Undo <Kbd>⌘Z</Kbd>
+                </Button>
               </>
             ) : null}
-          </div>
+          </FloatingBar>
         ) : null}
-      </main>
+      </Card>
 
       {dialog === "save-view" ? (
         <SaveViewDialog
@@ -561,42 +601,51 @@ function CompaniesScreen() {
   )
 }
 
+/** Company rows are taller: a name and a domain. */
+const TALL = "h-12"
+const NAME_COLUMN = "w-[34%]"
+const COUNT_COLUMN = "w-32"
+
 function LoadingRows() {
   const widths = [56, 72, 48, 64, 80, 52, 68, 60, 44, 76, 58, 66]
   return (
-    <div className="tablewrap" aria-busy="true">
-      <span className="vh" role="status">
+    <TableScroll aria-busy="true">
+      <span className="sr-only" role="status">
         Loading companies
       </span>
-      <table className="ctable" aria-hidden="true">
+      <Table aria-hidden="true">
         <tbody>
           {widths.map((width) => (
-            <tr key={width}>
-              <td className="c-check w-check tall" />
-              <td className="w-co-name tall">
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <div className="sk" style={{ width: 24, height: 24, borderRadius: 6, flex: "none" }} />
-                  <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
-                    <div className="sk" style={{ width: `${width * 0.7}%` }} />
-                    <div className="sk" style={{ width: `${width * 0.4}%` }} />
+            <Tr key={width}>
+              <Td className={cn(checkCellClass, TALL)} />
+              <Td className={cn(NAME_COLUMN, TALL)}>
+                <div className="flex items-center gap-2.5">
+                  <Skeleton className="size-7 shrink-0 rounded-md" />
+                  <div className="flex flex-1 flex-col gap-1.5">
+                    <div style={{ width: `${width * 0.7}%` }}>
+                      <Skeleton />
+                    </div>
+                    <div style={{ width: `${width * 0.4}%` }}>
+                      <Skeleton />
+                    </div>
                   </div>
                 </div>
-              </td>
-              <td className="w-count tall">
-                <div className="sk" style={{ width: 20 }} />
-              </td>
-              <td className="col-wide tall" />
-              <td className="col-wide w-date tall">
-                <div className="sk" style={{ width: 28 }} />
-              </td>
-              <td className="col-wide w-date tall">
-                <div className="sk" style={{ width: 28 }} />
-              </td>
-            </tr>
+              </Td>
+              <Td className={cn(COUNT_COLUMN, TALL)}>
+                <Skeleton className="w-6" />
+              </Td>
+              <Td className={cn(wideColumnClass, TALL)} />
+              <Td className={cn(dateColumnClass, wideColumnClass, TALL)}>
+                <Skeleton className="w-8" />
+              </Td>
+              <Td className={cn(dateColumnClass, wideColumnClass, TALL)}>
+                <Skeleton className="w-8" />
+              </Td>
+            </Tr>
           ))}
         </tbody>
-      </table>
-    </div>
+      </Table>
+    </TableScroll>
   )
 }
 
@@ -621,62 +670,67 @@ function DeletedCompanies(props: {
   const items = deleted.data?.items ?? []
   if (items.length === 0) {
     return (
-      <div className="center">
-        <div className="empty">
-          <div className="e-ic">
-            <TrashIcon />
-          </div>
-          <h2>Nothing deleted</h2>
-          <p>Companies you delete stay here for 30 days, with their contacts' affiliations, so you can restore them.</p>
-        </div>
-      </div>
+      <Centered>
+        <EmptyState icon={<TrashIcon />} title="Nothing deleted">
+          Companies you delete stay here for 30 days, with their contacts' affiliations, so you can restore them.
+        </EmptyState>
+      </Centered>
     )
   }
   return (
-    <div className="tablewrap">
-      <table className="ctable">
-        <caption className="vh">Deleted companies</caption>
+    <TableScroll>
+      <Table>
+        <caption className="sr-only">Deleted companies</caption>
         <thead>
           <tr>
-            <th className="w-co-name" scope="col" style={{ paddingLeft: 14 }}>
+            <Th className={cn(NAME_COLUMN, "pl-4")} scope="col">
               Name
-            </th>
-            <th className="w-date col-wide" scope="col">
+            </Th>
+            <Th className={cn(dateColumnClass, wideColumnClass)} scope="col">
               Deleted
-            </th>
-            <th style={{ width: 120 }} scope="col">
-              <span className="vh">Restore</span>
-            </th>
+            </Th>
+            <Th className="w-36" scope="col">
+              <span className="sr-only">Restore</span>
+            </Th>
           </tr>
         </thead>
         <tbody>
           {items.map((company) => (
-            <tr key={company.id}>
-              <td style={{ paddingLeft: 14 }}>
-                <span className="namebtn" style={{ cursor: "default" }}>
+            <Tr key={company.id}>
+              <Td className={cn(TALL, "pl-4")}>
+                <span className="flex min-w-0 items-center gap-2.5 font-medium">
                   <CompanyLogo company={company} size="md" />
-                  <span className="stack">
-                    <span className="n">{company.name}</span>
-                    {primaryDomainOf(company) ? <span className="s sm-t">{primaryDomainOf(company)}</span> : null}
+                  <span className="flex min-w-0 flex-col">
+                    <span className="truncate">{company.name}</span>
+                    {primaryDomainOf(company) ? (
+                      <span className="truncate text-sm font-normal text-subtle">{primaryDomainOf(company)}</span>
+                    ) : null}
                   </span>
                 </span>
-              </td>
-              <td className="col-wide c-date" title={company.deletedAt ? absolute(company.deletedAt) : undefined}>
+              </Td>
+              <Td
+                className={cn(TALL, wideColumnClass, dateCellClass)}
+                title={company.deletedAt ? absolute(company.deletedAt) : undefined}
+              >
                 {company.deletedAt ? relative(company.deletedAt) : ""}
-              </td>
-              <td style={{ textAlign: "right" }}>
-                <button className="btn sm" type="button" onClick={() => void props.onRestore([company.id])}>
+              </Td>
+              <Td className={cn(TALL, "text-right")}>
+                <Button size="sm" onClick={() => void props.onRestore([company.id])}>
                   <RestoreIcon className="size-3.5" />
                   Restore
-                </button>
-              </td>
-            </tr>
+                </Button>
+              </Td>
+            </Tr>
           ))}
         </tbody>
-      </table>
-    </div>
+      </Table>
+    </TableScroll>
   )
 }
+
+/** A property's value in the create panel, and a problem with it. */
+const VALUE = "flex min-w-0 flex-col px-1.5"
+const ERROR = "my-1 text-sm text-danger"
 
 interface DomainProblem {
   readonly message: UserText
@@ -747,77 +801,58 @@ function CreatePanel(props: {
       : undefined)
 
   return (
-    <aside className="card panel" aria-label="New company">
-      <div className="ph">
-        <div className="ph-bar">
-          <span className="pos sm-t" style={{ marginLeft: 6 }}>
-            New company
-          </span>
-          <div className="spacer" />
-          <button
-            className="ibtn tip tip-b"
-            type="button"
-            aria-label="Close panel"
-            data-tip="Close  Esc"
-            onClick={props.onClose}
-          >
+    <RecordPanel aria-label="New company">
+      <PanelHeader>
+        <div className="flex items-center">
+          <span className="text-sm text-subtle">New company</span>
+          <Spacer />
+          <IconButton label="Close panel" tip="Close  Esc" onClick={props.onClose}>
             <CloseIcon />
-          </button>
+          </IconButton>
         </div>
-        <div className="ph-id">
-          <span className="tile lg" aria-hidden="true">
+        <div className="flex items-center gap-3">
+          <Avatar size="lg" shape="square">
             {name.trim() ? initialsOfName(name) : ""}
-          </span>
-          <div style={{ minWidth: 0 }}>
-            <h2 className="pname" style={name.trim() ? undefined : { color: "var(--fg-subtle)" }}>
-              {name.trim() || "Untitled company"}
-            </h2>
-            <p className="paff sm-t">Only a name is needed.</p>
+          </Avatar>
+          <div className="min-w-0">
+            <RecordTitle className={cn(!name.trim() && "text-subtle")}>{name.trim() || "Untitled company"}</RecordTitle>
+            <p className="m-0 text-sm text-muted">Only a name is needed.</p>
           </div>
         </div>
-      </div>
+      </PanelHeader>
       <form
         ref={formRef}
-        className="pbody"
+        className="flex-1 overflow-auto"
         onSubmit={submit}
         onKeyDown={(event) => {
           if ((event.metaKey || event.ctrlKey) && event.key === "Enter") void submit()
           if (event.key === "Escape") props.onClose()
         }}
       >
-        <section className="sec">
-          <div className="field">
-            <label className="flabel sm-t" htmlFor="nco-name">
-              Name
-            </label>
-            <div className="fval" style={{ padding: "0 6px" }}>
-              <input
+        <Section className="flex flex-col gap-0.5">
+          <PropertyRow label="Name" htmlFor="nco-name">
+            <div className={VALUE}>
+              <InlineInput
                 id="nco-name"
-                className="finp"
                 type="text"
                 autoComplete="off"
                 placeholder="Empty"
                 maxLength={200}
-                // biome-ignore lint/a11y/noAutofocus: the create panel opens for typing, like a dialog
                 autoFocus
                 value={name}
                 onChange={(event) => setName(event.target.value)}
                 aria-invalid={fieldError("name") ? true : undefined}
               />
-              {fieldError("name") ? <p className="ferr sm-t">{fieldError("name")}</p> : null}
+              {fieldError("name") ? <p className={ERROR}>{fieldError("name")}</p> : null}
             </div>
-          </div>
-          <div className="field">
-            <label className="flabel sm-t" htmlFor="nco-domain-0">
-              Domains
-            </label>
-            <div className="fval" style={{ padding: "0 6px" }}>
+          </PropertyRow>
+          <PropertyRow label="Domains" htmlFor="nco-domain-0">
+            <div className={VALUE}>
               {domains.map((domain, index) => (
-                <input
+                <InlineInput
                   // biome-ignore lint/suspicious/noArrayIndexKey: rows are positional while typing
                   key={index}
                   id={`nco-domain-${index}`}
-                  className="finp"
                   type="text"
                   autoComplete="off"
                   placeholder={index === 0 ? "acme.com" : "Another domain"}
@@ -833,86 +868,74 @@ function CreatePanel(props: {
                 />
               ))}
               {shownDomainError ? (
-                <p id="nco-domain-msg" className="ferr sm-t">
+                <p id="nco-domain-msg" className={ERROR}>
                   {shownDomainError}{" "}
                   {domainProblem?.existing ? (
-                    <button
-                      className="linkish sm-t"
-                      type="button"
-                      onClick={() => props.onOpenExisting(domainProblem.existing ?? "")}
-                    >
+                    <TextButton className="text-sm" onClick={() => props.onOpenExisting(domainProblem.existing ?? "")}>
                       Open company
-                    </button>
+                    </TextButton>
                   ) : null}
                 </p>
               ) : (
-                <p id="nco-domain-msg" className="fhint sm-t">
-                  Contacts with an email at these domains are affiliated with this company (domain matching).
-                </p>
+                <Hint className="my-1">
+                  <span id="nco-domain-msg">
+                    Contacts with an email at these domains are affiliated with this company (domain matching).
+                  </span>
+                </Hint>
               )}
-              <button
-                className="linkish sm-t"
-                type="button"
-                style={{ margin: "2px 0 4px" }}
-                onClick={() => setDomains([...domains, ""])}
-              >
+              <TextButton className="mt-0.5 mb-1 text-sm" onClick={() => setDomains([...domains, ""])}>
                 <PlusIcon className="size-3.5" />
                 Add domain
-              </button>
+              </TextButton>
             </div>
-          </div>
+          </PropertyRow>
           {[
             { field: "website", label: "Website", type: "url" },
             { field: "phone", label: "Phone", type: "tel" },
           ].map((entry) => (
-            <div className="field" key={entry.field}>
-              <label className="flabel sm-t" htmlFor={`nco-${entry.field}`}>
-                {entry.label}
-              </label>
-              <div className="fval" style={{ padding: "0 6px" }}>
-                <input
+            <PropertyRow key={entry.field} label={entry.label} htmlFor={`nco-${entry.field}`}>
+              <div className={VALUE}>
+                <InlineInput
                   id={`nco-${entry.field}`}
                   name={entry.field}
-                  className="finp"
                   type={entry.type}
                   autoComplete="off"
                   placeholder="Empty"
                   aria-invalid={fieldError(entry.field) ? true : undefined}
                 />
-                {fieldError(entry.field) ? <p className="ferr sm-t">{fieldError(entry.field)}</p> : null}
+                {fieldError(entry.field) ? <p className={ERROR}>{fieldError(entry.field)}</p> : null}
               </div>
-            </div>
+            </PropertyRow>
           ))}
-        </section>
-        <section className="sec">
-          <h3 className="sec-h sm-t">Address</h3>
+        </Section>
+        <Section>
+          <SectionHeader className="text-sm">Address</SectionHeader>
           <AddressInputs idPrefix="nco" value={null} />
           {problems?.some((problem) => problem.field.startsWith("address")) ? (
-            <p className="ferr sm-t">{problems.find((problem) => problem.field.startsWith("address"))?.userMessage}</p>
+            <p className={ERROR}>{problems.find((problem) => problem.field.startsWith("address"))?.userMessage}</p>
           ) : null}
           {error ? (
-            <p className="ferr sm-t" role="alert">
+            <p className={ERROR} role="alert">
               {error}
             </p>
           ) : null}
-        </section>
-        <button type="submit" className="vh" tabIndex={-1}>
+        </Section>
+        <button type="submit" className="sr-only" tabIndex={-1}>
           Create company
         </button>
       </form>
-      <div className="pfoot">
-        <button
-          className="btn primary"
-          type="button"
+      <PanelFooter>
+        <Button
+          variant="primary"
           disabled={busy || name.trim() === "" || freeDomain !== undefined}
           onClick={() => void submit()}
         >
-          Create company <span className="kbd on-primary">⌘↵</span>
-        </button>
-        <button className="btn ghost" type="button" onClick={props.onClose}>
+          Create company <Kbd onPrimary>⌘↵</Kbd>
+        </Button>
+        <Button variant="ghost" onClick={props.onClose}>
           Cancel
-        </button>
-      </div>
-    </aside>
+        </Button>
+      </PanelFooter>
+    </RecordPanel>
   )
 }

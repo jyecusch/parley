@@ -9,6 +9,28 @@ import { contactsCollection } from "../lib/contacts.ts"
 import { CloseIcon, PlusIcon, SearchIcon } from "./icons.tsx"
 import { initialsOfName } from "./record.tsx"
 import { Dialog } from "./settings.tsx"
+import {
+  Avatar,
+  Box,
+  Button,
+  cn,
+  ErrorText,
+  Field,
+  Hint,
+  IconButton,
+  Input,
+  Popover,
+  PopoverFooter,
+  PopoverHeading,
+  PopoverItem,
+  PopoverList,
+  PopoverSearch,
+  Section,
+  SectionHeader,
+  Skeleton,
+  SmallInput,
+  TextButton,
+} from "./ui/index.ts"
 
 /** A message for the screen's toast, optionally with an undo. */
 export interface ToastRequest {
@@ -30,25 +52,41 @@ const useRefreshAfterChange = (teamId: TeamId) => {
   }
 }
 
+/** A company as a chip: its mark and name, and in the panel the contact's title there. */
+function AffiliationChip(props: {
+  readonly companyName: string
+  readonly title?: string | null | undefined
+  readonly tooltip?: string | undefined
+}) {
+  return (
+    <span
+      className="inline-flex h-7 max-w-full min-w-0 shrink-0 items-center gap-1.5 rounded-md bg-fill pr-2 pl-1 text-sm"
+      title={props.tooltip}
+    >
+      <Avatar shape="square">{initialsOfName(props.companyName)}</Avatar>
+      <span className="truncate">{props.companyName}</span>
+      {props.title ? <span className="truncate text-subtle">{props.title}</span> : null}
+    </span>
+  )
+}
+
 /** In the contacts table: up to two companies, then "+N"; titles are in the tooltip (D113). */
 export function AffiliationChips(props: { readonly affiliations: ReadonlyArray<ContactAffiliation> }) {
-  if (props.affiliations.length === 0) return <span className="c-none">—</span>
+  if (props.affiliations.length === 0) return <span className="text-subtle">—</span>
   const shown = props.affiliations.slice(0, 2)
   const rest = props.affiliations.slice(2)
   const label = (affiliation: ContactAffiliation) =>
     affiliation.title ? `${affiliation.companyName} · ${affiliation.title}` : affiliation.companyName
   return (
-    <span className="affs">
+    <span className="flex min-w-0 items-center gap-1 overflow-hidden">
       {shown.map((affiliation) => (
-        <span key={affiliation.id} className="aff sm-t" title={label(affiliation)}>
-          <span className="tile" aria-hidden="true">
-            {initialsOfName(affiliation.companyName)}
-          </span>
-          <span className="t">{affiliation.companyName}</span>
-        </span>
+        <AffiliationChip key={affiliation.id} companyName={affiliation.companyName} tooltip={label(affiliation)} />
       ))}
       {rest.length > 0 ? (
-        <span className="more" title={rest.map(label).join("\n")}>
+        <span
+          className="inline-grid h-5.5 shrink-0 place-items-center rounded-sm bg-fill px-1.5 text-xs text-subtle"
+          title={rest.map(label).join("\n")}
+        >
           +{rest.length}
         </span>
       ) : null}
@@ -60,17 +98,53 @@ export function AffiliationChips(props: { readonly affiliations: ReadonlyArray<C
 export function AffiliationTags(props: { readonly affiliations: ReadonlyArray<ContactAffiliation> }) {
   if (props.affiliations.length === 0) return null
   return (
-    <div className="ph-affs">
+    <div className="flex flex-wrap gap-1">
       {props.affiliations.map((affiliation) => (
-        <span key={affiliation.id} className="aff sm-t">
-          <span className="tile" aria-hidden="true">
-            {initialsOfName(affiliation.companyName)}
-          </span>
-          <span className="t">{affiliation.companyName}</span>
-          {affiliation.title ? <span className="ti">{affiliation.title}</span> : null}
-        </span>
+        <AffiliationChip key={affiliation.id} companyName={affiliation.companyName} title={affiliation.title} />
       ))}
     </div>
+  )
+}
+
+/** A contact or company in a panel's list, with actions that show on hover. */
+function AffiliationRow(props: {
+  readonly mark: ReactNode
+  readonly children: ReactNode
+  readonly actions: ReactNode
+  readonly editing?: boolean
+}) {
+  return (
+    <div
+      className={cn(
+        "group/arow -mx-1.5 flex min-h-10 items-center gap-2.5 rounded-md pr-1 pl-1.5 hover:bg-hover",
+        props.editing && "bg-hover",
+      )}
+    >
+      {props.mark}
+      {props.children}
+      <span
+        className={cn(
+          "flex opacity-0 group-focus-within/arow:opacity-100 group-hover/arow:opacity-100",
+          props.editing && "opacity-100",
+        )}
+      >
+        {props.actions}
+      </span>
+    </div>
+  )
+}
+
+/** The classes for the other record's link in an affiliation row: its name, with the title underneath. */
+const affiliationLinkClass = "group/who flex min-w-0 flex-1 flex-col items-start text-inherit no-underline"
+
+function AffiliationName(props: { readonly name: string; readonly title: ReactNode }) {
+  return (
+    <>
+      <span className="max-w-full truncate font-medium decoration-line-strong underline-offset-3 group-hover/who:underline">
+        {props.name}
+      </span>
+      {props.title ? <span className="max-w-full truncate text-sm text-subtle">{props.title}</span> : null}
+    </>
   )
 }
 
@@ -115,9 +189,8 @@ export function Picker(props: {
     else if (canCreate) props.onCreate?.(query.trim())
   }
   return (
-    <div className="pop" role="dialog" aria-label={props.label} ref={ref} style={{ right: 8, top: 34 }}>
-      <div className="pop-in">
-        <SearchIcon className="size-4" />
+    <Popover role="dialog" aria-label={props.label} ref={ref} className="top-10 right-2">
+      <PopoverSearch icon={<SearchIcon className="size-4" />}>
         <input
           // biome-ignore lint/a11y/noAutofocus: the picker opens for typing
           autoFocus
@@ -145,40 +218,38 @@ export function Picker(props: {
             }
           }}
         />
-      </div>
-      <div className="pop-list">
-        <p className="pop-gh sm-t">{props.heading}</p>
-        {matches.length === 0 ? <p className="pop-gh sm-t">Nothing matches.</p> : null}
+      </PopoverSearch>
+      <PopoverList>
+        <PopoverHeading>{props.heading}</PopoverHeading>
+        {matches.length === 0 ? <PopoverHeading>Nothing matches.</PopoverHeading> : null}
         {matches.map((item, index) => (
-          <button
+          <PopoverItem
             key={item.id}
-            className={`pop-i ${index === active ? "on" : ""}`}
-            type="button"
+            active={index === active}
+            trailing={item.sub}
             onMouseEnter={() => setActive(index)}
             onClick={() => props.onPick(item.id)}
           >
             {item.avatar}
-            <span>{item.name}</span>
-            {item.sub ? <span className="s sm-t">{item.sub}</span> : null}
-          </button>
+            <span className="truncate">{item.name}</span>
+          </PopoverItem>
         ))}
-      </div>
+      </PopoverList>
       {canCreate ? (
-        <div className="pop-f">
-          <button
-            className={`pop-i ${active === matches.length ? "on" : ""}`}
-            type="button"
+        <PopoverFooter>
+          <PopoverItem
+            active={active === matches.length}
             onMouseEnter={() => setActive(matches.length)}
             onClick={() => props.onCreate?.(query.trim())}
           >
-            <span className="ic">
+            <span className="grid size-5.5 shrink-0 place-items-center">
               <PlusIcon className="size-4" />
             </span>
-            <span>{props.createLabel?.(query.trim())}</span>
-          </button>
-        </div>
+            <span className="truncate">{props.createLabel?.(query.trim())}</span>
+          </PopoverItem>
+        </PopoverFooter>
       ) : null}
-    </div>
+    </Popover>
   )
 }
 
@@ -220,32 +291,24 @@ export function ContactCompanies(props: {
           id: company.id,
           name: company.name,
           sub: primaryDomainOf(company),
-          avatar: (
-            <span className="tile" aria-hidden="true">
-              {initialsOfName(company.name)}
-            </span>
-          ),
+          avatar: <Avatar shape="square">{initialsOfName(company.name)}</Avatar>,
         }),
       )
   }, [all.data, contact.affiliations])
 
   return (
-    <section className="sec" style={{ position: "relative" }}>
-      <h3 className="sec-h split sm-t">
+    <Section className="relative">
+      <SectionHeader>
         <span>
-          Companies<span className="n">{contact.affiliations.length || ""}</span>
+          Companies
+          <SectionCount count={contact.affiliations.length} />
         </span>
-        <button
-          className="linkish sm-t"
-          type="button"
-          aria-expanded={picking}
-          onClick={() => setPicking((open) => !open)}
-        >
+        <TextButton className="text-sm" aria-expanded={picking} onClick={() => setPicking((open) => !open)}>
           <PlusIcon className="size-3.5" />
           Add to company
-        </button>
-      </h3>
-      {contact.affiliations.length === 0 ? <p className="empty-v sm-t">Not affiliated with a company.</p> : null}
+        </TextButton>
+      </SectionHeader>
+      {contact.affiliations.length === 0 ? <SectionEmpty>Not affiliated with a company.</SectionEmpty> : null}
       {contact.affiliations.map((affiliation) =>
         editing === affiliation.id ? (
           <TitleEditor
@@ -262,50 +325,53 @@ export function ContactCompanies(props: {
             }}
           />
         ) : (
-          <div className="arow" key={affiliation.id}>
-            <span className="tile md" aria-hidden="true">
-              {initialsOfName(affiliation.companyName)}
-            </span>
+          <AffiliationRow
+            key={affiliation.id}
+            mark={
+              <Avatar size="md" shape="square">
+                {initialsOfName(affiliation.companyName)}
+              </Avatar>
+            }
+            actions={
+              <>
+                <IconButton
+                  size="xs"
+                  label={`Edit title at ${affiliation.companyName}`}
+                  tip="Edit title"
+                  onClick={() => setEditing(affiliation.id)}
+                >
+                  <PencilIcon />
+                </IconButton>
+                <IconButton
+                  size="xs"
+                  label={`Remove from ${affiliation.companyName}`}
+                  tip={`Remove from ${affiliation.companyName}`}
+                  onClick={() =>
+                    void run(async () => {
+                      await call("affiliations.delete", { teamId, affiliationId: affiliation.id })
+                      await refresh()
+                      // Removal is immediate with an undo (D112); undoing affiliates again with the same title.
+                      props.onToast({
+                        text: `${contact.displayName} removed from ${affiliation.companyName}.`,
+                        undo: () => void run(() => affiliate(affiliation.companyId, affiliation.title)),
+                      })
+                    })
+                  }
+                >
+                  <CloseIcon className="size-3.5" />
+                </IconButton>
+              </>
+            }
+          >
             <Link
-              className="who"
+              className={affiliationLinkClass}
               to="/t/$teamId/companies"
               params={{ teamId }}
               search={{ company: affiliation.companyId }}
             >
-              <span className="n">{affiliation.companyName}</span>
-              <span className="ti sm-t">{affiliation.title ?? "No title"}</span>
+              <AffiliationName name={affiliation.companyName} title={affiliation.title ?? "No title"} />
             </Link>
-            <span className="acts">
-              <button
-                className="ibtn xs tip tip-b"
-                type="button"
-                aria-label={`Edit title at ${affiliation.companyName}`}
-                data-tip="Edit title"
-                onClick={() => setEditing(affiliation.id)}
-              >
-                <PencilIcon />
-              </button>
-              <button
-                className="ibtn xs tip tip-b"
-                type="button"
-                aria-label={`Remove from ${affiliation.companyName}`}
-                data-tip={`Remove from ${affiliation.companyName}`}
-                onClick={() =>
-                  void run(async () => {
-                    await call("affiliations.delete", { teamId, affiliationId: affiliation.id })
-                    await refresh()
-                    // Removal is immediate with an undo (D112); undoing affiliates again with the same title.
-                    props.onToast({
-                      text: `${contact.displayName} removed from ${affiliation.companyName}.`,
-                      undo: () => void run(() => affiliate(affiliation.companyId, affiliation.title)),
-                    })
-                  })
-                }
-              >
-                <CloseIcon className="size-3.5" />
-              </button>
-            </span>
-          </div>
+          </AffiliationRow>
         ),
       )}
       {picking ? (
@@ -329,7 +395,7 @@ export function ContactCompanies(props: {
           createLabel={(name) => `Create company “${name}”`}
         />
       ) : null}
-    </section>
+    </Section>
   )
 }
 
@@ -375,56 +441,37 @@ export function CompanyContacts(props: {
           id: contact.id,
           name: contact.displayName,
           sub: contact.emails[0]?.address,
-          avatar: (
-            <span className="av" aria-hidden="true">
-              {initialsOfName(contact.displayName)}
-            </span>
-          ),
+          avatar: <Avatar>{initialsOfName(contact.displayName)}</Avatar>,
         }),
       )
   }, [all.data, rows])
 
   return (
-    <section className="sec" style={{ position: "relative" }}>
-      <h3 className="sec-h split sm-t">
+    <Section className="relative">
+      <SectionHeader>
         <span>
-          Contacts<span className="n">{rows.length || ""}</span>
+          Contacts
+          <SectionCount count={rows.length} />
         </span>
-        <button
-          className="linkish sm-t"
-          type="button"
-          aria-expanded={picking}
-          onClick={() => setPicking((open) => !open)}
-        >
+        <TextButton className="text-sm" aria-expanded={picking} onClick={() => setPicking((open) => !open)}>
           <PlusIcon className="size-3.5" />
           Add contact
-        </button>
-      </h3>
-      {affiliations.isLoading ? <div className="sk" style={{ width: "60%", margin: "8px 0" }} /> : null}
-      {affiliations.isError ? <p className="ferr sm-t">{messageOf(affiliations.error)}</p> : null}
+        </TextButton>
+      </SectionHeader>
+      {affiliations.isLoading ? <Skeleton className="my-2 w-[60%]" /> : null}
+      {affiliations.isError ? <ErrorText className="my-1">{messageOf(affiliations.error)}</ErrorText> : null}
       {affiliations.isSuccess && rows.length === 0 ? (
-        <p className="empty-v sm-t">No contacts yet. Contacts with an email at its domains join on their own.</p>
+        <SectionEmpty>No contacts yet. Contacts with an email at its domains join on their own.</SectionEmpty>
       ) : null}
       {rows.map((affiliation: Affiliation) => (
-        <div className="arow" key={affiliation.id}>
-          <span className="av" aria-hidden="true">
-            {initialsOfName(affiliation.contactName)}
-          </span>
-          <Link
-            className="who"
-            to="/t/$teamId/contacts"
-            params={{ teamId }}
-            search={{ contact: affiliation.contactId }}
-          >
-            <span className="n">{affiliation.contactName}</span>
-            {affiliation.title ? <span className="ti sm-t">{affiliation.title}</span> : null}
-          </Link>
-          <span className="acts">
-            <button
-              className="ibtn xs tip tip-b"
-              type="button"
-              aria-label={`Remove ${affiliation.contactName} from ${company.name}`}
-              data-tip={`Remove from ${company.name}`}
+        <AffiliationRow
+          key={affiliation.id}
+          mark={<Avatar>{initialsOfName(affiliation.contactName)}</Avatar>}
+          actions={
+            <IconButton
+              size="xs"
+              label={`Remove ${affiliation.contactName} from ${company.name}`}
+              tip={`Remove from ${company.name}`}
               onClick={() =>
                 void run(async () => {
                   await call("affiliations.delete", { teamId, affiliationId: affiliation.id })
@@ -437,9 +484,18 @@ export function CompanyContacts(props: {
               }
             >
               <CloseIcon className="size-3.5" />
-            </button>
-          </span>
-        </div>
+            </IconButton>
+          }
+        >
+          <Link
+            className={affiliationLinkClass}
+            to="/t/$teamId/contacts"
+            params={{ teamId }}
+            search={{ contact: affiliation.contactId }}
+          >
+            <AffiliationName name={affiliation.contactName} title={affiliation.title} />
+          </Link>
+        </AffiliationRow>
       ))}
       {picking ? (
         <Picker
@@ -454,8 +510,17 @@ export function CompanyContacts(props: {
           }}
         />
       ) : null}
-    </section>
+    </Section>
   )
+}
+
+/** How many items a panel section lists, after its heading. */
+function SectionCount(props: { readonly count: number }) {
+  return props.count ? <span className="ml-1 font-normal text-subtle">{props.count}</span> : null
+}
+
+function SectionEmpty(props: { readonly children: ReactNode }) {
+  return <p className="m-0 text-sm text-subtle">{props.children}</p>
 }
 
 function TitleEditor(props: {
@@ -471,18 +536,25 @@ function TitleEditor(props: {
     else props.onSave(next)
   }
   return (
-    <div className="arow editing">
-      <span className="tile md" aria-hidden="true">
-        {initialsOfName(props.name)}
-      </span>
-      <span className="who" style={{ gap: 3, padding: "4px 0" }}>
-        <span className="n">{props.name}</span>
-        <input
-          className="tinp"
+    <AffiliationRow
+      editing
+      mark={
+        <Avatar size="md" shape="square">
+          {initialsOfName(props.name)}
+        </Avatar>
+      }
+      actions={
+        <Button size="sm" variant="primary" onClick={save}>
+          Save
+        </Button>
+      }
+    >
+      <span className="flex min-w-0 flex-1 flex-col gap-1 py-1">
+        <span className="truncate font-medium">{props.name}</span>
+        <SmallInput
           aria-label={`Title at ${props.name}`}
           placeholder="Title, like CTO"
           maxLength={100}
-          // biome-ignore lint/a11y/noAutofocus: the person just asked to edit this title
           autoFocus
           value={value}
           onChange={(event) => setValue(event.target.value)}
@@ -495,19 +567,13 @@ function TitleEditor(props: {
           }}
         />
       </span>
-      <span className="acts">
-        <button className="btn sm primary" type="button" onClick={save}>
-          Save
-        </button>
-      </span>
-    </div>
+    </AffiliationRow>
   )
 }
 
 const PencilIcon = () => (
   <svg
-    width="12"
-    height="12"
+    className="size-3.5"
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
@@ -538,67 +604,54 @@ export function AffiliateDialog(props: {
       onClose={props.onClose}
       footer={
         <>
-          <button className="btn ghost" type="button" onClick={props.onClose}>
+          <Button variant="ghost" onClick={props.onClose}>
             Cancel
-          </button>
-          <button
-            className="btn primary"
-            type="button"
+          </Button>
+          <Button
+            variant="primary"
             disabled={!companyId}
             onClick={() => companyId && void props.onApply(companyId, title.trim() || null)}
           >
             Add to company
-          </button>
+          </Button>
         </>
       }
     >
-      <div className="fld">
-        <label className="fl" htmlFor="affiliate-search">
-          Company
-        </label>
-        <input
+      <Field label="Company" htmlFor="affiliate-search">
+        <Input
           id="affiliate-search"
-          className="inp"
           type="text"
           placeholder="Search companies…"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />
-        <div className="box" style={{ maxHeight: 200, overflow: "auto", padding: 4 }}>
-          {matches.length === 0 ? (
-            <p className="hint sm-t" style={{ padding: 6 }}>
-              No companies match.
-            </p>
-          ) : null}
+        <Box className="max-h-60 overflow-auto p-1">
+          {matches.length === 0 ? <Hint className="p-1.5">No companies match.</Hint> : null}
           {matches.map((company) => (
-            <button
-              key={company.id}
-              className={`pop-i ${companyId === company.id ? "on" : ""}`}
-              type="button"
-              onClick={() => setCompanyId(company.id)}
-            >
-              <span className="tile" aria-hidden="true">
-                {initialsOfName(company.label)}
-              </span>
-              <span>{company.label}</span>
-            </button>
+            <PopoverItem key={company.id} active={companyId === company.id} onClick={() => setCompanyId(company.id)}>
+              <Avatar shape="square">{initialsOfName(company.label)}</Avatar>
+              <span className="truncate">{company.label}</span>
+            </PopoverItem>
           ))}
-        </div>
-      </div>
-      <div className="fld">
-        <label className="fl" htmlFor="affiliate-title">
-          Title <span className="c-muted">(optional)</span>
-        </label>
-        <input
+        </Box>
+      </Field>
+      <Field
+        label={
+          <>
+            Title <span className="font-normal text-subtle">(optional)</span>
+          </>
+        }
+        htmlFor="affiliate-title"
+      >
+        <Input
           id="affiliate-title"
-          className="inp"
           type="text"
           maxLength={100}
           placeholder="Title, like CTO"
           value={title}
           onChange={(event) => setTitle(event.target.value)}
         />
-      </div>
+      </Field>
     </Dialog>
   )
 }

@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react"
 import type { ToastRequest as Toast } from "../components/affiliations.tsx"
 import { CompanyPanel } from "../components/company-panel.tsx"
 import { isTyping } from "../components/shell.tsx"
+import { Card, Centered, EmptyState, FloatingBar } from "../components/ui/index.ts"
 import { messageOf } from "../lib/client.ts"
 import { companiesCollection } from "../lib/companies.ts"
 
@@ -49,17 +50,16 @@ function CompanyRecord() {
     return () => window.removeEventListener("keydown", onKey)
   })
 
-  if (live.isLoading) return <main className="card main" />
+  if (live.isLoading) return <Card as="main" className="flex-1" />
   if (!contact) {
     return (
-      <main className="card main">
-        <div className="center">
-          <div className="empty">
-            <h2>This company isn't here</h2>
-            <p>It may have been deleted. Deleted companies can be restored from Companies for 30 days.</p>
-          </div>
-        </div>
-      </main>
+      <Card as="main" className="flex-1">
+        <Centered>
+          <EmptyState title="This company isn't here">
+            It may have been deleted. Deleted companies can be restored from Companies for 30 days.
+          </EmptyState>
+        </Centered>
+      </Card>
     )
   }
   return (
@@ -84,11 +84,9 @@ function CompanyRecord() {
         onToggleLayout={back}
       />
       {toast ? (
-        <div className="floatbar" role="status">
-          <span className="n" style={{ color: "var(--fg)" }}>
-            {toast.text}
-          </span>
-        </div>
+        <FloatingBar role="status" className="pr-3.5">
+          <span className="text-fg">{toast.text}</span>
+        </FloatingBar>
       ) : null}
     </>
   )

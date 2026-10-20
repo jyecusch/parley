@@ -14,6 +14,8 @@ import {
   useToast,
   When,
 } from "../components/settings.tsx"
+import { Avatar, Box, Hint, Table, Td, Th, Tr } from "../components/ui/index.ts"
+import { Byline, RowIdentity, SettingsPanel } from "../components/ui/settings-extra.tsx"
 import { call, messageOf } from "../lib/client.ts"
 
 export const Route = createFileRoute("/t/$teamId/settings/connections")({ component: Connections })
@@ -49,19 +51,17 @@ function Connections() {
       title="Connections"
       intro={`Agents you've connected to ${current.name}. Each one acts as you or as a service account, with the scopes you chose when you connected it.`}
     >
-      <section className="box urlcard" aria-labelledby="mcp-h">
-        <h3 className="vh" id="mcp-h">
+      <SettingsPanel aria-labelledby="mcp-h">
+        <h3 className="sr-only" id="mcp-h">
           MCP URL
         </h3>
-        <p>
+        <p className="m-0 text-muted [&_b]:font-medium [&_b]:text-fg">
           Add Parley as a custom connector in <b>Claude</b>, <b>ChatGPT</b>, <b>Claude Code</b>, <b>Cursor</b> or{" "}
           <b>opencode</b> using this URL:
         </p>
         <CopyField value={mcpUrl} label="MCP URL" />
-        <p className="hint sm-t">
-          Your agent opens Parley in the browser. You sign in, pick who it acts as, and it shows up below.
-        </p>
-      </section>
+        <Hint>Your agent opens Parley in the browser. You sign in, pick who it acts as, and it shows up below.</Hint>
+      </SettingsPanel>
 
       {connections.isPending ? (
         <LoadingRows />
@@ -77,72 +77,71 @@ function Connections() {
           revoke it anytime.
         </Empty>
       ) : (
-        <div className="box">
-          <table className="stable">
+        <Box>
+          <Table kind="settings">
             <thead>
               <tr>
-                <th scope="col" style={{ width: "27%" }}>
+                <Th scope="col" className="w-[27%]">
                   Agent
-                </th>
-                <th scope="col" style={{ width: "17%" }}>
+                </Th>
+                <Th scope="col" className="w-[17%]">
                   Acts as
-                </th>
-                <th scope="col" style={{ width: "19%" }}>
+                </Th>
+                <Th scope="col" className="w-[19%]">
                   Scopes
-                </th>
-                <th scope="col" style={{ width: 96 }}>
+                </Th>
+                <Th scope="col" className="w-28">
                   Connected
-                </th>
-                <th scope="col" style={{ width: 96 }}>
+                </Th>
+                <Th scope="col" className="w-28">
                   Last used
-                </th>
-                <th scope="col" style={{ width: 150 }}>
-                  <span className="vh">Actions</span>
-                </th>
+                </Th>
+                <Th scope="col" className="w-44">
+                  <span className="sr-only">Actions</span>
+                </Th>
               </tr>
             </thead>
             <tbody>
               {visible?.map((connection) => {
                 const isYou = connection.actsAs.kind === "user"
                 return (
-                  <tr key={connection.id}>
-                    <td>
-                      <div className="who">
-                        <span className="tile" aria-hidden="true">
-                          {initialsOf(connection.name)}
-                        </span>
-                        <span className="stack">
-                          <span className="n">{connection.name}</span>
-                          {connection.origin ? <span className="s sm-t">{connection.origin}</span> : null}
-                        </span>
-                      </div>
-                    </td>
-                    <td>
-                      <span className="as">
-                        <span className={`av ${isYou ? "" : "bot"}`} aria-hidden="true">
-                          {initialsOf(connection.actsAs.name)}
-                        </span>
-                        <span className="lbl">{isYou ? "You" : connection.actsAs.name}</span>
-                      </span>
-                    </td>
-                    <td>
+                  <Tr key={connection.id}>
+                    <Td>
+                      <RowIdentity
+                        mark={
+                          <Avatar size="md" shape="square">
+                            {initialsOf(connection.name)}
+                          </Avatar>
+                        }
+                        name={connection.name}
+                        sub={connection.origin}
+                      />
+                    </Td>
+                    <Td>
+                      <Byline
+                        mark={<Avatar shape={isYou ? "round" : "square"}>{initialsOf(connection.actsAs.name)}</Avatar>}
+                      >
+                        {isYou ? "You" : connection.actsAs.name}
+                      </Byline>
+                    </Td>
+                    <Td>
                       <ScopeChips scopes={connection.scopes} />
-                    </td>
-                    <td>
+                    </Td>
+                    <Td>
                       <When at={connection.authorizedAt} />
-                    </td>
-                    <td>
+                    </Td>
+                    <Td>
                       <When at={connection.lastUsedAt} />
-                    </td>
-                    <td className="c-act">
+                    </Td>
+                    <Td className="text-right">
                       <RevokeButton name={connection.name} onRevoke={() => revoke(connection)} />
-                    </td>
-                  </tr>
+                    </Td>
+                  </Tr>
                 )
               })}
             </tbody>
-          </table>
-        </div>
+          </Table>
+        </Box>
       )}
       {toast}
     </SettingsPage>

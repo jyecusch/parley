@@ -15,9 +15,36 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { createFileRoute, getRouteApi, Link, useNavigate } from "@tanstack/react-router"
 import { useMemo, useState } from "react"
 import { Composer, type Content, SaveState, useAutosave } from "../components/composer.tsx"
-import { EmailPreview } from "../components/email-preview.tsx"
+import { EMAIL_FRAME_CLASS, EmailPreview } from "../components/email-preview.tsx"
 import { LoadFailed } from "../components/record.tsx"
-import { Dialog } from "../components/settings.tsx"
+import { TitleInput } from "../components/ui/email.tsx"
+import {
+  Badge,
+  Box,
+  Breadcrumb,
+  BreadcrumbSeparator,
+  Button,
+  breadcrumbRootClass,
+  Card,
+  Checkbox,
+  Dialog,
+  ErrorText,
+  FieldLabel,
+  Fieldset,
+  Hint,
+  Notice,
+  Option,
+  PageHeader,
+  Select,
+  Spacer,
+  StatTile,
+  Table,
+  Td,
+  Th,
+  Toast,
+  Tr,
+  ViewBody,
+} from "../components/ui/index.ts"
 import { CAMPAIGN_STATUS_LABELS } from "../lib/campaigns.ts"
 import { call, messageOf } from "../lib/client.ts"
 import { contactsCollection } from "../lib/contacts.ts"
@@ -37,18 +64,18 @@ function CampaignScreen() {
     queryFn: () => call("campaigns.get", { teamId, campaignId: campaignId as CampaignId }),
     refetchInterval: (query) => (query.state.data?.status === "sending" ? 2000 : false),
   })
-  if (campaign.isPending) return <main className="card main" />
+  if (campaign.isPending) return <Card as="main" className="flex-[999_1_35rem]" />
   if (campaign.isError) {
     return (
-      <main className="card main">
-        <div className="body">
+      <Card as="main" className="flex-[999_1_35rem]">
+        <ViewBody>
           <LoadFailed
             title="This campaign didn't load"
             message={messageOf(campaign.error)}
             onRetry={() => void campaign.refetch()}
           />
-        </div>
-      </main>
+        </ViewBody>
+      </Card>
     )
   }
   const permissions = ROLE_PERMISSIONS[team.role]
@@ -133,36 +160,32 @@ function DraftEditor(props: {
   const readOnly = !props.canWrite
 
   return (
-    <main className="card main">
-      <div className="hd1">
-        <h1 className="crumb">
-          <Link className="root" to="/t/$teamId/campaigns" params={{ teamId }}>
+    <Card as="main" className="flex-[999_1_35rem]">
+      <PageHeader>
+        <Breadcrumb>
+          <Link className={breadcrumbRootClass} to="/t/$teamId/campaigns" params={{ teamId }}>
             Campaigns
           </Link>
-          <span className="sep" aria-hidden="true">
-            /
-          </span>
-          <input
-            className="crumb-inp plain"
+          <BreadcrumbSeparator />
+          <TitleInput
             aria-label="Campaign name"
             maxLength={120}
             readOnly={readOnly}
             value={draft.name}
             onChange={(event) => setDraft({ ...draft, name: event.target.value })}
           />
-        </h1>
-        <span className="pill">Draft</span>
+        </Breadcrumb>
+        <Badge className="ml-2">Draft</Badge>
         <SaveState state={state} />
-        <div className="spacer" />
+        <Spacer />
         {props.canWrite ? (
           confirmDelete ? (
-            <span className="confirm">
-              <button className="btn ghost" type="button" onClick={() => setConfirmDelete(false)}>
+            <span className="inline-flex items-center gap-1">
+              <Button variant="ghost" onClick={() => setConfirmDelete(false)}>
                 Cancel
-              </button>
-              <button
-                className="btn danger-solid"
-                type="button"
+              </Button>
+              <Button
+                variant="danger-solid"
                 onClick={() =>
                   void call("campaigns.delete", { teamId, campaignId: saved.id })
                     .then(() => queryClient.invalidateQueries({ queryKey: ["campaigns", teamId] }))
@@ -171,36 +194,31 @@ function DraftEditor(props: {
                 }
               >
                 Delete draft
-              </button>
+              </Button>
             </span>
           ) : (
             <>
-              <button className="btn ghost" type="button" onClick={() => setConfirmDelete(true)}>
+              <Button variant="ghost" onClick={() => setConfirmDelete(true)}>
                 Delete
-              </button>
-              <button className="btn" type="button" disabled={state !== "saved"} onClick={() => setDialog("test")}>
+              </Button>
+              <Button disabled={state !== "saved"} onClick={() => setDialog("test")}>
                 Send test
-              </button>
+              </Button>
             </>
           )
         ) : null}
         {props.canSend && !confirmDelete ? (
-          <button
-            className="btn primary"
-            type="button"
+          <Button
+            variant="primary"
             disabled={state !== "saved"}
             title={state !== "saved" ? "Wait for your changes to save" : undefined}
             onClick={() => setDialog("send")}
           >
             Send…
-          </button>
+          </Button>
         ) : null}
-      </div>
-      {error ? (
-        <p className="err sm-t" role="alert" style={{ padding: "8px 14px 0" }}>
-          {error}
-        </p>
-      ) : null}
+      </PageHeader>
+      {error ? <ErrorText className="px-4 pt-2.5">{error}</ErrorText> : null}
       <Composer
         content={draft}
         readOnly={readOnly}
@@ -215,14 +233,11 @@ function DraftEditor(props: {
           })
         }
         settings={
-          <div className="cmp-row">
-            <div className="cmp-f">
-              <label className="flabel sm-t" htmlFor="cmp-segment">
-                To
-              </label>
-              <select
+          <div className="grid grid-cols-2 gap-3.5 @max-xl/content:grid-cols-1">
+            <div className="flex min-w-0 flex-col">
+              <FieldLabel htmlFor="cmp-segment">To</FieldLabel>
+              <Select
                 id="cmp-segment"
-                className="inp"
                 disabled={readOnly}
                 value={draft.segmentId ?? ""}
                 onChange={(event) =>
@@ -235,27 +250,28 @@ function DraftEditor(props: {
                     {entry.name} ({entry.sendableCount})
                   </option>
                 ))}
-              </select>
-              {segment ? (
-                <p className="hint sm-t">
-                  {segment.sendableCount} of {segment.contactCount} can be sent it now: subscribed, with an email.
-                </p>
-              ) : (
-                <p className="hint sm-t">
-                  <Link to="/t/$teamId/segments" params={{ teamId }}>
-                    Segments
-                  </Link>{" "}
-                  are who campaigns go to.
-                </p>
-              )}
+              </Select>
+              <Hint className="mt-1.5">
+                {segment ? (
+                  <>
+                    {segment.sendableCount} of {segment.contactCount} can be sent it now: subscribed, with an email.
+                  </>
+                ) : (
+                  <>
+                    <Link className="text-muted underline" to="/t/$teamId/segments" params={{ teamId }}>
+                      Segments
+                    </Link>{" "}
+                    are who campaigns go to.
+                  </>
+                )}
+              </Hint>
             </div>
-            <div className="cmp-f">
-              <label className="flabel sm-t" htmlFor="cmp-topic">
-                Topic <span className="c-muted">(optional)</span>
-              </label>
-              <select
+            <div className="flex min-w-0 flex-col">
+              <FieldLabel htmlFor="cmp-topic">
+                Topic <span className="text-subtle">(optional)</span>
+              </FieldLabel>
+              <Select
                 id="cmp-topic"
-                className="inp"
                 disabled={readOnly}
                 value={draft.topicId ?? ""}
                 onChange={(event) => setDraft({ ...draft, topicId: (event.target.value || null) as TopicId | null })}
@@ -266,14 +282,15 @@ function DraftEditor(props: {
                     {topic.name}
                   </option>
                 ))}
-              </select>
-              <p className="hint sm-t">Unsubscribing from this email leaves only its topic.</p>
+              </Select>
+              <Hint className="mt-1.5">Unsubscribing from this email leaves only its topic.</Hint>
             </div>
           </div>
         }
         previewBar={
-          <select
-            className="fsel sm-t"
+          <Select
+            variant="inline"
+            className="mx-0 w-auto text-sm"
             aria-label="Preview as"
             value={previewAs}
             onChange={(event) => setPreviewAs(event.target.value as ContactId | "")}
@@ -284,7 +301,7 @@ function DraftEditor(props: {
                 {contact.displayName}
               </option>
             ))}
-          </select>
+          </Select>
         }
       />
       {dialog === "test" ? (
@@ -312,14 +329,14 @@ function DraftEditor(props: {
         />
       ) : null}
       {toast ? (
-        <div className="toast" role="status">
+        <Toast>
           <span>{toast}</span>
-          <button className="btn ghost sm" type="button" onClick={() => setToast(undefined)}>
+          <Button variant="ghost" size="sm" onClick={() => setToast(undefined)}>
             OK
-          </button>
-        </div>
+          </Button>
+        </Toast>
       ) : null}
-    </main>
+    </Card>
   )
 }
 
@@ -359,32 +376,24 @@ function TestSendDialog(props: {
       onClose={props.onClose}
       footer={
         <>
-          <button className="btn ghost" type="button" onClick={props.onClose}>
+          <Button variant="ghost" onClick={props.onClose}>
             Cancel
-          </button>
-          <button
-            className="btn primary"
-            type="button"
-            disabled={chosen.size === 0 || chosen.size > 5 || busy}
-            onClick={() => void send()}
-          >
+          </Button>
+          <Button variant="primary" disabled={chosen.size === 0 || chosen.size > 5 || busy} onClick={() => void send()}>
             Send test
-          </button>
+          </Button>
         </>
       }
     >
-      <p className="hint sm-t" style={{ margin: 0 }}>
+      <Hint>
         Tests go to members of your team, up to 5, with “[Test]” in the subject. Merge tags use the contact you're
         previewing as, or sample values.
-      </p>
-      <div className="fld">
-        <span className="fl">Send to</span>
-        <div className="checks">
+      </Hint>
+      <Fieldset legend="Send to">
+        <div className="flex flex-col gap-0.5">
           {(members.data ?? []).map((member) => (
-            <label key={member.userId} className="opt">
-              <input
-                className="cb shown"
-                type="checkbox"
+            <Option key={member.userId}>
+              <Checkbox
                 checked={chosen.has(member.userId)}
                 onChange={(event) => {
                   const next = new Set(chosen)
@@ -394,17 +403,13 @@ function TestSendDialog(props: {
                 }}
               />
               <span>
-                {member.name} <span className="c-muted">{member.email}</span>
+                {member.name} <span className="text-subtle">{member.email}</span>
               </span>
-            </label>
+            </Option>
           ))}
         </div>
-      </div>
-      {error ? (
-        <p className="err sm-t" role="alert">
-          {error}
-        </p>
-      ) : null}
+      </Fieldset>
+      {error ? <ErrorText>{error}</ErrorText> : null}
     </Dialog>
   )
 }
@@ -446,21 +451,20 @@ function SendDialog(props: {
       onClose={props.onClose}
       footer={
         <>
-          <button className="btn ghost" type="button" onClick={props.onClose}>
+          <Button variant="ghost" onClick={props.onClose}>
             Cancel
-          </button>
-          <button
-            className="btn primary"
-            type="button"
+          </Button>
+          <Button
+            variant="primary"
             disabled={!consent || busy || missing.length > 0 || count === 0}
             onClick={() => void send()}
           >
             Send to {count} {count === 1 ? "person" : "people"}
-          </button>
+          </Button>
         </>
       }
     >
-      <dl className="sendsum">
+      <dl className="m-0 grid grid-cols-[6rem_minmax(0,1fr)] gap-x-3 gap-y-2 [&>dd]:m-0 [&>dt]:text-subtle">
         <dt>To</dt>
         <dd>
           {segment.data ? (
@@ -485,34 +489,22 @@ function SendDialog(props: {
         <dd>{props.campaign.subject || "—"}</dd>
       </dl>
       {missing.length > 0 ? (
-        <p className="warn sm-t">
+        <Notice tone="warn">
           Finish the sender and footer in{" "}
-          <Link to="/t/$teamId/settings/email" params={{ teamId: props.teamId }}>
+          <Link className="underline" to="/t/$teamId/settings/email" params={{ teamId: props.teamId }}>
             Settings → Email
           </Link>{" "}
           first.
-        </p>
+        </Notice>
       ) : null}
-      <label className="opt" style={{ alignItems: "flex-start" }}>
-        <input
-          className="cb shown"
-          type="checkbox"
-          style={{ marginTop: 2 }}
-          checked={consent}
-          onChange={(event) => setConsent(event.target.checked)}
-        />
+      <Option className="items-start">
+        <Checkbox className="mt-1" checked={consent} onChange={(event) => setConsent(event.target.checked)} />
         <span>
-          These people agreed to get email from us. <span className="c-muted">Anti-spam laws require consent.</span>
+          These people agreed to get email from us. <span className="text-subtle">Anti-spam laws require consent.</span>
         </span>
-      </label>
-      <p className="hint sm-t" style={{ margin: 0 }}>
-        Sending starts at once and can't be undone, though you can cancel what hasn't gone yet.
-      </p>
-      {error ? (
-        <p className="err sm-t" role="alert">
-          {error}
-        </p>
-      ) : null}
+      </Option>
+      <Hint>Sending starts at once and can't be undone, though you can cancel what hasn't gone yet.</Hint>
+      {error ? <ErrorText>{error}</ErrorText> : null}
     </Dialog>
   )
 }
@@ -586,33 +578,28 @@ function Report(props: { readonly teamId: TeamId; readonly campaign: Campaign; r
   }
 
   return (
-    <main className="card main">
-      <div className="hd1">
-        <h1 className="crumb">
-          <Link className="root" to="/t/$teamId/campaigns" params={{ teamId }}>
+    <Card as="main" className="flex-[999_1_35rem]">
+      <PageHeader>
+        <Breadcrumb>
+          <Link className={breadcrumbRootClass} to="/t/$teamId/campaigns" params={{ teamId }}>
             Campaigns
           </Link>
-          <span className="sep" aria-hidden="true">
-            /
-          </span>
+          <BreadcrumbSeparator />
           <span>{campaign.name}</span>
-        </h1>
-        <span className={`pill ${campaign.status === "sent" ? "ok" : ""}`}>
+        </Breadcrumb>
+        <Badge className="ml-2" tone={campaign.status === "sent" ? "strong" : "neutral"}>
           {CAMPAIGN_STATUS_LABELS[campaign.status]}
-        </span>
-        <div className="spacer" />
+        </Badge>
+        <Spacer />
         {campaign.status === "sending" && props.canSend ? (
-          <button
-            className="btn ghost"
-            type="button"
+          <Button
+            variant="ghost"
             onClick={() => void act(() => call("campaigns.cancel", { teamId, campaignId: campaign.id }))}
           >
             Cancel sending
-          </button>
+          </Button>
         ) : null}
-        <button
-          className="btn"
-          type="button"
+        <Button
           onClick={() =>
             void act(async () => {
               const copy = await call("campaigns.duplicate", { teamId, campaignId: campaign.id })
@@ -621,16 +608,12 @@ function Report(props: { readonly teamId: TeamId; readonly campaign: Campaign; r
           }
         >
           Duplicate
-        </button>
-      </div>
-      {error ? (
-        <p className="err sm-t" role="alert" style={{ padding: "8px 14px 0" }}>
-          {error}
-        </p>
-      ) : null}
-      <div className="report">
-        <div className="rep-main">
-          <p className="sm-t c-muted rep-meta">
+        </Button>
+      </PageHeader>
+      {error ? <ErrorText className="px-4 pt-2.5">{error}</ErrorText> : null}
+      <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] overflow-auto border-t border-line @max-4xl/content:grid-cols-1">
+        <div className="flex flex-col gap-3.5 overflow-auto border-r border-line p-4 @max-4xl/content:border-r-0">
+          <p className="m-0 text-sm text-subtle">
             {campaign.sentByName ?? "Someone"} sent this to <b>{campaign.segmentName ?? "a segment"}</b>
             {campaign.topicName ? ` (topic: ${campaign.topicName})` : ""}
             {campaign.sendingStartedAt ? (
@@ -638,80 +621,89 @@ function Report(props: { readonly teamId: TeamId; readonly campaign: Campaign; r
             ) : null}
             {campaign.status === "sending" ? " · sending now" : ""}
           </p>
-          <div className="tiles">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-2.5">
             {tiles.map((tile) => (
-              <button
+              <StatTile
                 key={tile.label}
-                type="button"
-                className={`tilestat ${tile.status !== undefined && status === tile.status ? "on" : ""}`}
+                value={tile.value}
+                label={tile.label}
+                active={tile.status !== undefined && status === tile.status}
                 disabled={tile.status === undefined && status === ""}
                 onClick={() => setStatus(tile.status === undefined || status === tile.status ? "" : tile.status)}
-              >
-                <span className="v tab">{tile.value}</span>
-                <span className="l sm-t">{tile.label}</span>
-              </button>
+              />
             ))}
           </div>
-          <div className="box">
-            <table className="stable">
+          <Box>
+            <Table kind="settings">
               <thead>
                 <tr>
-                  <th scope="col">Recipient</th>
-                  <th scope="col">Status</th>
-                  <th scope="col">Detail</th>
+                  <Th scope="col">Recipient</Th>
+                  <Th scope="col">Status</Th>
+                  <Th scope="col">Detail</Th>
                 </tr>
               </thead>
               <tbody>
                 {(recipients.data?.items ?? []).map((recipient, index) => (
                   // biome-ignore lint/suspicious/noArrayIndexKey: a purged contact leaves no id
-                  <tr key={`${recipient.contactId ?? "gone"}-${index}`}>
-                    <td>
+                  <Tr key={`${recipient.contactId ?? "gone"}-${index}`}>
+                    <Td>
                       {recipient.contactId ? (
-                        <Link to="/t/$teamId/contacts" params={{ teamId }} search={{ contact: recipient.contactId }}>
+                        <Link
+                          className="text-fg underline decoration-line-strong underline-offset-3"
+                          to="/t/$teamId/contacts"
+                          params={{ teamId }}
+                          search={{ contact: recipient.contactId }}
+                        >
                           {recipient.name}
                         </Link>
                       ) : (
                         recipient.name
                       )}
-                      {recipient.address ? <span className="c-muted"> {recipient.address}</span> : null}
-                    </td>
-                    <td className={["failed", "bounced", "marked-as-spam"].includes(recipient.status) ? "c-warn" : ""}>
+                      {recipient.address ? <span className="text-subtle"> {recipient.address}</span> : null}
+                    </Td>
+                    <Td
+                      className={
+                        ["failed", "bounced", "marked-as-spam"].includes(recipient.status) ? "text-danger" : undefined
+                      }
+                    >
                       {RECIPIENT_LABELS[recipient.status]}
-                    </td>
-                    <td className="c-muted">
+                    </Td>
+                    <Td className="text-subtle">
                       {recipient.skipReason ? SKIP_LABELS[recipient.skipReason] : (recipient.error ?? "")}
                       {recipient.sentAt ? (
                         <span title={absolute(recipient.sentAt)}>{ago(recipient.sentAt)}</span>
                       ) : null}
-                    </td>
-                  </tr>
+                    </Td>
+                  </Tr>
                 ))}
               </tbody>
-            </table>
+            </Table>
             {recipients.data?.nextCursor ? (
-              <p className="hint sm-t" style={{ padding: 10 }}>
+              <Hint className="p-3">
                 Showing the first 500. Agents can page through every recipient with campaigns.recipients.
-              </p>
+              </Hint>
             ) : null}
-          </div>
+          </Box>
         </div>
-        <div className="cmp-prev">
-          <div className="cmp-prevbar">
-            <span className="sm-t c-muted">The email, with sample values</span>
+        <div className="flex min-h-0 flex-col bg-canvas">
+          <div className="flex h-11 shrink-0 items-center gap-2 px-3.5">
+            <span className="text-sm text-subtle">The email, with sample values</span>
           </div>
           {preview.data ? (
             <>
-              <div className="cmp-inbox">
-                <div className="cmp-subject">{preview.data.subject}</div>
-                {preview.data.previewText ? <div className="sm-t c-muted">{preview.data.previewText}</div> : null}
+              <div className="mx-3.5 mb-2.5 rounded-md bg-surface px-3 py-2.5 inset-ring inset-ring-line">
+                <div className="font-semibold">{preview.data.subject}</div>
+                {preview.data.previewText ? (
+                  <div className="text-sm text-subtle">{preview.data.previewText}</div>
+                ) : null}
               </div>
               <EmailPreview html={preview.data.html} label="Email as sent" />
             </>
           ) : (
-            <div className="cmp-frame" />
+            <div className={EMAIL_FRAME_CLASS} />
           )}
         </div>
       </div>
-    </main>
+    </Card>
   )
 }

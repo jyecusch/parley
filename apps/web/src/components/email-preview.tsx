@@ -1,6 +1,9 @@
 import DOMPurify from "dompurify"
 import { useEffect, useRef } from "react"
 
+/** Where an email shows: a light page, whatever the app's theme, as an inbox shows it. */
+export const EMAIL_FRAME_CLASS = "mx-3.5 mb-3.5 min-h-96 flex-1 rounded-md bg-[#f4f4f4]"
+
 /** CSS that could load something or escape the preview: imports, remote images and old IE scripting. */
 const UNSAFE_CSS = /@import|url\s*\(|expression\s*\(|behavio(u)?r\s*:|-moz-binding/i
 
@@ -51,5 +54,5 @@ ${css.replace(/(^|[\s,}])body\b/g, "$1.email-body")}`
     root.replaceChildren(style, wrapper)
   }, [props.html])
 
-  return <div ref={host} className="cmp-frame" role="document" aria-label={props.label} />
+  return <div ref={host} className={EMAIL_FRAME_CLASS} role="document" aria-label={props.label} />
 }

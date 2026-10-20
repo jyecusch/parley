@@ -1,7 +1,18 @@
 import { type CustomField, type CustomValue, checkCustomValue } from "@parley/domain"
 import { useState } from "react"
 import { formatValue } from "../lib/custom-fields.ts"
-import { toE164 } from "./record.tsx"
+import { EmptyValue, propertyFieldsetClass, toE164, ValueLine } from "./record.tsx"
+import {
+  Checkbox,
+  Chip,
+  ErrorText,
+  InlineInput,
+  Option,
+  PropertyRow,
+  propertyValueClass,
+  Section,
+  Select,
+} from "./ui/index.ts"
 
 /**
  * A record's custom fields, each editable in place (D73). Saving hands back the new value, or null
@@ -14,11 +25,11 @@ export function CustomFieldsSection(props: {
 }) {
   if (props.fields.length === 0) return null
   return (
-    <section className="sec">
+    <Section>
       {props.fields.map((field) => (
         <CustomFieldRow key={field.id} field={field} value={props.values[field.id]} onSave={props.onSave} />
       ))}
-    </section>
+    </Section>
   )
 }
 
@@ -69,68 +80,53 @@ function CustomFieldRow(props: {
 
   if (field.type === "checkbox") {
     return (
-      <div className="field">
-        <label className="flabel sm-t" htmlFor={id}>
-          {field.name}
-        </label>
-        <div className="fval" style={{ cursor: "default" }}>
-          <input
+      <PropertyRow label={field.name} htmlFor={id}>
+        <div className="flex h-8 items-center">
+          <Checkbox
             id={id}
-            className="cb shown"
-            type="checkbox"
             checked={value === true}
             onChange={(event) => props.onSave(field, event.target.checked ? true : null)}
           />
         </div>
-      </div>
+      </PropertyRow>
     )
   }
 
   if (field.type === "single-select") {
     return (
-      <div className="field">
-        <label className="flabel sm-t" htmlFor={id}>
-          {field.name}
-        </label>
-        <div className="fval" style={{ padding: "0 6px" }}>
-          <select
-            id={id}
-            className="fsel"
-            value={typeof value === "string" ? value : ""}
-            onChange={(event) => props.onSave(field, event.target.value || null)}
-          >
-            <option value="">Empty</option>
-            {field.options.map((option) => (
-              <option key={option.id} value={option.id}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
+      <PropertyRow label={field.name} htmlFor={id}>
+        <Select
+          variant="inline"
+          id={id}
+          value={typeof value === "string" ? value : ""}
+          onChange={(event) => props.onSave(field, event.target.value || null)}
+        >
+          <option value="">Empty</option>
+          {field.options.map((option) => (
+            <option key={option.id} value={option.id}>
+              {option.label}
+            </option>
+          ))}
+        </Select>
+      </PropertyRow>
     )
   }
 
   if (field.type === "multi-select") {
     const chosen = new Set(Array.isArray(value) ? value : [])
     return (
-      <div className="field">
-        <span className="flabel sm-t">{field.name}</span>
+      <PropertyRow label={field.name}>
         {editing ? (
           <fieldset
-            className="fval"
-            style={{ border: 0, minInlineSize: 0, cursor: "default" }}
+            className={propertyFieldsetClass}
             onBlur={(event) => {
               if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setEditing(false)
             }}
           >
-            <legend className="vh">{field.name}</legend>
+            <legend className="sr-only">{field.name}</legend>
             {field.options.map((option, index) => (
-              <label key={option.id} className="opt">
-                <input
-                  className="cb shown"
-                  type="checkbox"
-                  // biome-ignore lint/a11y/noAutofocus: the person just opened this field to choose
+              <Option key={option.id}>
+                <Checkbox
                   autoFocus={index === 0}
                   checked={chosen.has(option.id)}
                   onChange={() => {
@@ -141,27 +137,27 @@ function CustomFieldRow(props: {
                   }}
                 />
                 {option.label}
-              </label>
+              </Option>
             ))}
           </fieldset>
         ) : (
-          <button className="fval" type="button" onClick={() => setEditing(true)}>
+          <button className={propertyValueClass} type="button" onClick={() => setEditing(true)}>
             {chosen.size > 0 ? (
-              <span className="chips">
+              <span className="flex flex-wrap gap-1">
                 {field.options
                   .filter((option) => chosen.has(option.id))
                   .map((option) => (
-                    <span key={option.id} className="chip sm-t">
+                    <Chip key={option.id} className="text-sm">
                       {option.label}
-                    </span>
+                    </Chip>
                   ))}
               </span>
             ) : (
-              <span className="empty-v">Empty</span>
+              <EmptyValue />
             )}
           </button>
         )}
-      </div>
+      </PropertyRow>
     )
   }
 
@@ -174,18 +170,13 @@ function CustomFieldRow(props: {
       if (JSON.stringify(parsed.value) !== JSON.stringify(value ?? null)) props.onSave(field, parsed.value)
     }
     return (
-      <div className="field">
-        <label className="flabel sm-t" htmlFor={id}>
-          {field.name}
-        </label>
-        <div className="fval" style={{ padding: "0 6px" }}>
-          <input
+      <PropertyRow label={field.name} htmlFor={id}>
+        <div className="flex min-w-0 flex-col">
+          <InlineInput
             id={id}
-            className="finp"
             type={inputType(field)}
             step={field.type === "number" ? "any" : undefined}
             defaultValue={typeof value === "number" ? String(value) : typeof value === "string" ? value : ""}
-            // biome-ignore lint/a11y/noAutofocus: the person just clicked this field to edit it
             autoFocus
             aria-invalid={error ? true : undefined}
             onBlur={(event) => commit(event.currentTarget.value)}
@@ -198,31 +189,24 @@ function CustomFieldRow(props: {
               }
             }}
           />
-          {error ? <p className="ferr sm-t">{error}</p> : null}
+          {error ? <ErrorText className="my-1">{error}</ErrorText> : null}
         </div>
-      </div>
+      </PropertyRow>
     )
   }
 
   const shown = formatValue(field, value)
   return (
-    <div className="field">
-      <span className="flabel sm-t">{field.name}</span>
-      <button className="fval" type="button" onClick={() => setEditing(true)}>
-        {shown ? (
-          <span className="fline">
-            <span className="t">{shown}</span>
-          </span>
-        ) : (
-          <span className="empty-v">Empty</span>
-        )}
+    <PropertyRow label={field.name}>
+      <button className={propertyValueClass} type="button" onClick={() => setEditing(true)}>
+        {shown ? <ValueLine value={shown} /> : <EmptyValue />}
       </button>
-    </div>
+    </PropertyRow>
   )
 }
 
 /** A custom value in a table cell. */
 export function CustomCell(props: { readonly field: CustomField; readonly value: CustomValue | undefined }) {
   const shown = formatValue(props.field, props.value)
-  return shown ? <span title={shown}>{shown}</span> : <span className="c-none">—</span>
+  return shown ? <span title={shown}>{shown}</span> : <span className="text-subtle">—</span>
 }

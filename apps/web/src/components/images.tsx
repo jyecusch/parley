@@ -4,10 +4,9 @@ import { type ReactNode, useEffect, useRef, useState } from "react"
 import { initialsOf } from "../lib/contacts.ts"
 import { CloseIcon } from "./icons.tsx"
 import { initialsOfName } from "./record.tsx"
+import { Avatar, cn, type MarkSize, Tooltip } from "./ui/index.ts"
 
 const teamRoute = getRouteApi("/t/$teamId")
-
-type Size = "sm" | "md" | "lg"
 
 /** Gravatar addresses by email, hashed once per session. */
 const gravatars = new Map<string, Promise<string>>()
@@ -25,18 +24,27 @@ const gravatarOf = (email: string) => {
   return url
 }
 
-/** An image, or the fallback when there's none or it fails to load. */
-function RecordImage(props: { readonly src: string | null; readonly className: string; readonly fallback: ReactNode }) {
+/** A person's or company's mark showing an image, or the fallback when there's none or it fails to load. */
+function RecordImage(props: {
+  readonly src: string | null
+  readonly size: MarkSize | undefined
+  readonly shape: "round" | "square"
+  readonly fallback: ReactNode
+}) {
   const [failed, setFailed] = useState<string | null>(null)
   const showImage = props.src !== null && failed !== props.src
   return (
-    <span className={`${props.className} ${showImage ? "has-img" : ""}`} aria-hidden="true">
-      {showImage ? (
-        <img src={props.src ?? undefined} alt="" loading="lazy" onError={() => setFailed(props.src)} />
-      ) : (
-        props.fallback
-      )}
-    </span>
+    <Avatar
+      size={props.size}
+      shape={props.shape}
+      image={
+        showImage ? (
+          <img src={props.src ?? undefined} alt="" loading="lazy" onError={() => setFailed(props.src)} />
+        ) : undefined
+      }
+    >
+      {props.fallback}
+    </Avatar>
   )
 }
 
@@ -46,7 +54,7 @@ function RecordImage(props: { readonly src: string | null; readonly className: s
  */
 export function ContactAvatar(props: {
   readonly contact: Pick<Contact, "firstName" | "lastName" | "displayName" | "avatarUrl" | "emails">
-  readonly size?: Size
+  readonly size?: MarkSize
 }) {
   const { team } = teamRoute.useLoaderData()
   const email = props.contact.emails[0]?.address
@@ -63,7 +71,8 @@ export function ContactAvatar(props: {
   return (
     <RecordImage
       src={props.contact.avatarUrl ?? gravatar}
-      className={`av ${props.size === "lg" ? "lg" : props.size === "md" ? "md" : ""}`}
+      size={props.size}
+      shape="round"
       fallback={initialsOf(props.contact)}
     />
   )
@@ -72,12 +81,13 @@ export function ContactAvatar(props: {
 /** A company's logo: uploaded or fetched from its domain, else initials. */
 export function CompanyLogo(props: {
   readonly company: Pick<Company, "name"> & { readonly logoUrl?: string | null }
-  readonly size?: Size
+  readonly size?: MarkSize
 }) {
   return (
     <RecordImage
       src={props.company.logoUrl ?? null}
-      className={`tile ${props.size ?? ""}`}
+      size={props.size}
+      shape="square"
       fallback={initialsOfName(props.company.name)}
     />
   )
@@ -115,20 +125,21 @@ export function ImageEditor(props: {
     }
   }
   return (
-    <span className={`imgedit ${busy ? "busy" : ""}`}>
-      <button
-        className="imgbtn tip tip-b"
-        type="button"
-        aria-label={`Upload ${props.label}`}
-        data-tip={`Upload ${props.label}`}
-        disabled={busy}
-        onClick={() => input.current?.click()}
-      >
-        {props.children}
-      </button>
+    <span className={cn("group/img relative inline-flex shrink-0", busy && "opacity-50")}>
+      <Tooltip text={`Upload ${props.label}`}>
+        <button
+          className="inline-flex cursor-pointer rounded-lg p-0 hover:[&>*]:ring-2 hover:[&>*]:ring-line-strong focus-visible:[&>*]:ring-2 focus-visible:[&>*]:ring-line-strong"
+          type="button"
+          aria-label={`Upload ${props.label}`}
+          disabled={busy}
+          onClick={() => input.current?.click()}
+        >
+          {props.children}
+        </button>
+      </Tooltip>
       {props.hasUpload ? (
         <button
-          className="imgx"
+          className="absolute -top-1.5 -right-1.5 grid size-5 cursor-pointer place-items-center rounded-full bg-surface p-0 text-muted opacity-0 ring ring-line-strong group-hover/img:opacity-100 focus-visible:opacity-100"
           type="button"
           aria-label={`Remove ${props.label}`}
           title={`Remove ${props.label}`}

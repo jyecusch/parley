@@ -3,7 +3,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useState } from "react"
 import { call, messageOf } from "../lib/client.ts"
 import { SegmentIcon } from "./icons.tsx"
-import { Dialog } from "./settings.tsx"
+import { ItemTile } from "./ui/email.tsx"
+import { Box, Button, Dialog, ErrorText, Field, Input, PopoverItem } from "./ui/index.ts"
 
 /** Adds selected contacts to a fixed segment, or to a new one (D23). */
 export function AddToSegmentDialog(props: {
@@ -55,61 +56,49 @@ export function AddToSegmentDialog(props: {
       onClose={props.onClose}
       footer={
         <>
-          <button className="btn ghost" type="button" onClick={props.onClose}>
+          <Button variant="ghost" onClick={props.onClose}>
             Cancel
-          </button>
-          <button className="btn primary" type="button" disabled={!ready || busy} onClick={() => void apply()}>
+          </Button>
+          <Button variant="primary" disabled={!ready || busy} onClick={() => void apply()}>
             Add to segment
-          </button>
+          </Button>
         </>
       }
     >
-      <div className="fld">
-        <span className="fl">Fixed segment</span>
-        <div className="box" style={{ maxHeight: 220, overflow: "auto", padding: 4 }}>
+      <Field
+        label="Fixed segment"
+        hint="Dynamic segments follow their filter, so contacts can't be added to them by hand."
+      >
+        <Box className="max-h-64 overflow-auto p-1">
           {fixed.map((segment) => (
-            <button
+            <PopoverItem
               key={segment.id}
-              className={`pop-i ${choice === segment.id ? "on" : ""}`}
-              type="button"
+              active={choice === segment.id}
+              trailing={<span className="text-sm">{segment.contactCount}</span>}
               onClick={() => setChoice(segment.id)}
             >
-              <span className="tile" aria-hidden="true">
-                <SegmentIcon className="size-3.5" />
-              </span>
+              <ItemTile icon={<SegmentIcon className="size-4" />} />
               <span>{segment.name}</span>
-              <span className="s sm-t">{segment.contactCount}</span>
-            </button>
+            </PopoverItem>
           ))}
-          <button className={`pop-i ${choice === "new" ? "on" : ""}`} type="button" onClick={() => setChoice("new")}>
-            <span className="tile" aria-hidden="true">
-              +
-            </span>
+          <PopoverItem active={choice === "new"} onClick={() => setChoice("new")}>
+            <ItemTile icon="+" />
             <span>New fixed segment</span>
-          </button>
-        </div>
-        <p className="hint sm-t">Dynamic segments follow their filter, so contacts can't be added to them by hand.</p>
-      </div>
+          </PopoverItem>
+        </Box>
+      </Field>
       {choice === "new" ? (
-        <div className="fld">
-          <label className="fl" htmlFor="new-segment-name">
-            Name
-          </label>
-          <input
+        <Field label="Name" htmlFor="new-segment-name">
+          <Input
             id="new-segment-name"
-            className="inp"
             maxLength={80}
             autoFocus
             value={name}
             onChange={(event) => setName(event.target.value)}
           />
-        </div>
+        </Field>
       ) : null}
-      {error ? (
-        <p className="err sm-t" role="alert">
-          {error}
-        </p>
-      ) : null}
+      {error ? <ErrorText>{error}</ErrorText> : null}
     </Dialog>
   )
 }

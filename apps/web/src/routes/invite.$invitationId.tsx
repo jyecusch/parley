@@ -4,6 +4,8 @@ import { useQuery } from "@tanstack/react-query"
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router"
 import { useState } from "react"
 import { ParleyMark } from "../components/logo.tsx"
+import { Button, ErrorText, Skeleton } from "../components/ui/index.ts"
+import { AuthHeading, AuthPage, LinkButton } from "../components/ui/public.tsx"
 import { getSession, signOut } from "../lib/auth.ts"
 import { call, isApiFailure, messageOf } from "../lib/client.ts"
 
@@ -61,64 +63,47 @@ function Invite() {
     await navigate({ to: "/sign-in", search: { redirect: `/invite/${invitationId}` } })
   }
 
+  const signedInAs = (
+    <p className="m-0 text-sm text-muted">
+      Signed in as {user.email}. <LinkButton onClick={() => void switchAccount()}>Use another account</LinkButton>
+    </p>
+  )
+
   return (
-    <main className="auth">
-      <div className="auth-card">
-        <ParleyMark className="h-8" />
-        {invitation.isPending ? (
-          <div className="sk" style={{ width: 200 }} />
-        ) : invitation.isError ? (
-          <>
-            <div>
-              <h1>This invitation doesn't work</h1>
-              <p>{messageOf(invitation.error)}</p>
-            </div>
-            <p className="sm-t">
-              Signed in as {user.email}.{" "}
-              <button className="linkish" type="button" onClick={() => void switchAccount()}>
-                Use another account
-              </button>
-            </p>
-          </>
-        ) : invitation.data.status !== "pending" ? (
-          <div>
-            <h1>This invitation has {invitation.data.status === "accepted" ? "been used" : "expired"}</h1>
-            <p>Ask whoever invited you to {invitation.data.teamName} to send a new one.</p>
-          </div>
-        ) : (
-          <>
-            <div>
-              <h1>Join {invitation.data.teamName}</h1>
-              <p>
-                {invitation.data.invitedBy ?? "Someone"} invited you to {invitation.data.teamName} on Parley.
-              </p>
-            </div>
-            {error ? (
-              <p className="form-error" role="alert">
-                {error}
-              </p>
-            ) : null}
-            {unverified ? (
-              resent ? (
-                <p className="sm-t">We sent a new link to {user.email}. It brings you back here.</p>
-              ) : (
-                <button className="btn wide" type="button" onClick={() => void resend()}>
-                  Email me the link again
-                </button>
-              )
-            ) : null}
-            <button className="btn primary wide" type="button" disabled={busy} onClick={() => void accept()}>
-              Accept invitation
-            </button>
-            <p className="sm-t">
-              Signed in as {user.email}.{" "}
-              <button className="linkish" type="button" onClick={() => void switchAccount()}>
-                Use another account
-              </button>
-            </p>
-          </>
-        )}
-      </div>
-    </main>
+    <AuthPage>
+      <ParleyMark className="h-8 self-start" />
+      {invitation.isPending ? (
+        <Skeleton className="w-60" />
+      ) : invitation.isError ? (
+        <>
+          <AuthHeading title="This invitation doesn't work">{messageOf(invitation.error)}</AuthHeading>
+          {signedInAs}
+        </>
+      ) : invitation.data.status !== "pending" ? (
+        <AuthHeading title={`This invitation has ${invitation.data.status === "accepted" ? "been used" : "expired"}`}>
+          Ask whoever invited you to {invitation.data.teamName} to send a new one.
+        </AuthHeading>
+      ) : (
+        <>
+          <AuthHeading title={`Join ${invitation.data.teamName}`}>
+            {invitation.data.invitedBy ?? "Someone"} invited you to {invitation.data.teamName} on Parley.
+          </AuthHeading>
+          {error ? <ErrorText className="text-base">{error}</ErrorText> : null}
+          {unverified ? (
+            resent ? (
+              <p className="m-0 text-sm text-muted">We sent a new link to {user.email}. It brings you back here.</p>
+            ) : (
+              <Button size="lg" wide onClick={() => void resend()}>
+                Email me the link again
+              </Button>
+            )
+          ) : null}
+          <Button variant="primary" size="lg" wide disabled={busy} onClick={() => void accept()}>
+            Accept invitation
+          </Button>
+          {signedInAs}
+        </>
+      )}
+    </AuthPage>
   )
 }

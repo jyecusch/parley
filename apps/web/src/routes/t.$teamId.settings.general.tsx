@@ -3,6 +3,8 @@ import { createFileRoute, getRouteApi, useRouter } from "@tanstack/react-router"
 import { useState } from "react"
 import { InfoIcon } from "../components/icons.tsx"
 import { SettingsPage, useToast } from "../components/settings.tsx"
+import { Button, Checkbox, Field, Input, Notice, Option } from "../components/ui/index.ts"
+import { SettingsPanel } from "../components/ui/settings-extra.tsx"
 import { call, messageOf } from "../lib/client.ts"
 
 export const Route = createFileRoute("/t/$teamId/settings/general")({ component: General })
@@ -33,23 +35,12 @@ function General() {
 
   return (
     <SettingsPage title="General" intro={`The basics of ${current.name}.`}>
-      {canManage ? null : (
-        <div className="notice">
-          <span className="ic">
-            <InfoIcon />
-          </span>
-          <span>Only owners can change these.</span>
-        </div>
-      )}
-      <section className="box urlcard">
-        <div className="fld">
-          <label className="fl" htmlFor="team-name">
-            Team name
-          </label>
-          <div style={{ display: "flex", gap: 6 }}>
-            <input
+      {canManage ? null : <Notice icon={<InfoIcon />}>Only owners can change these.</Notice>}
+      <SettingsPanel>
+        <Field label="Team name" htmlFor="team-name">
+          <div className="flex gap-1.5">
+            <Input
               id="team-name"
-              className="inp"
               type="text"
               maxLength={80}
               disabled={!canManage}
@@ -61,37 +52,34 @@ function General() {
               }}
             />
             {canManage ? (
-              <button
-                className="btn"
-                type="button"
+              <Button
+                size="lg"
                 disabled={busy || !name.trim() || name.trim() === current.name}
                 onClick={() => void save({ name: name.trim() })}
               >
                 Save
-              </button>
+              </Button>
             ) : null}
           </div>
-        </div>
-      </section>
-      <section className="box urlcard">
-        <label className="opt" style={{ alignItems: "flex-start", gap: 10 }}>
-          <input
-            className="cb shown"
-            type="checkbox"
-            style={{ marginTop: 2 }}
+        </Field>
+      </SettingsPanel>
+      <SettingsPanel>
+        <Option className="items-start">
+          <Checkbox
+            className="mt-1"
             disabled={!canManage || busy}
             checked={current.gravatar}
             onChange={(event) => void save({ gravatar: event.target.checked })}
           />
           <span>
-            <b style={{ fontWeight: 470, color: "var(--fg)" }}>Show Gravatar avatars</b>
-            <span className="hint sm-t" style={{ display: "block", marginTop: 2 }}>
+            <b className="font-medium text-fg">Show Gravatar avatars</b>
+            <span className="mt-0.5 block text-sm text-subtle">
               Contacts without an uploaded avatar show the Gravatar for their primary email. Turning this on sends a
               hash of each email address to Gravatar when someone views it.
             </span>
           </span>
-        </label>
-      </section>
+        </Option>
+      </SettingsPanel>
       {toast}
     </SettingsPage>
   )

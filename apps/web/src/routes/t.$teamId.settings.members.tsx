@@ -14,6 +14,23 @@ import {
   useToast,
   When,
 } from "../components/settings.tsx"
+import {
+  Avatar,
+  Box,
+  Button,
+  ErrorText,
+  Field,
+  Fieldset,
+  Notice,
+  RadioCard,
+  Select,
+  Table,
+  Td,
+  Textarea,
+  Th,
+  Tr,
+} from "../components/ui/index.ts"
+import { RowActions, RowIdentity, SettingsSubIntro } from "../components/ui/settings-extra.tsx"
 import { call, messageOf } from "../lib/client.ts"
 
 export const Route = createFileRoute("/t/$teamId/settings/members")({ component: Members })
@@ -83,19 +100,14 @@ function Members() {
       intro={`The people in ${current.name}. Everyone sees every contact and company; roles decide what they can change.`}
       action={
         canManage ? (
-          <button className="btn primary sm" type="button" onClick={() => setInviting(true)}>
+          <Button variant="primary" size="sm" onClick={() => setInviting(true)}>
             Invite people
-          </button>
+          </Button>
         ) : null
       }
     >
       {canManage ? null : (
-        <div className="notice">
-          <span className="ic">
-            <InfoIcon />
-          </span>
-          <span>Only admins and owners can invite people or change roles.</span>
-        </div>
+        <Notice icon={<InfoIcon />}>Only admins and owners can invite people or change roles.</Notice>
       )}
       {members.isPending ? (
         <LoadingRows />
@@ -106,22 +118,22 @@ function Members() {
           onRetry={() => void members.refetch()}
         />
       ) : (
-        <div className="box">
-          <table className="stable">
+        <Box>
+          <Table kind="settings">
             <thead>
               <tr>
-                <th scope="col" style={{ width: "40%" }}>
+                <Th scope="col" className="w-[40%]">
                   Name
-                </th>
-                <th scope="col" style={{ width: 150 }}>
+                </Th>
+                <Th scope="col" className="w-44">
                   Role
-                </th>
-                <th scope="col" style={{ width: 96 }}>
+                </Th>
+                <Th scope="col" className="w-28">
                   Joined
-                </th>
-                <th scope="col">
-                  <span className="vh">Actions</span>
-                </th>
+                </Th>
+                <Th scope="col">
+                  <span className="sr-only">Actions</span>
+                </Th>
               </tr>
             </thead>
             <tbody>
@@ -130,25 +142,23 @@ function Members() {
                 // Owners are only changed by owners; everyone can leave.
                 const editable = canManage && !isYou && (member.role !== "owner" || isOwner)
                 return (
-                  <tr key={member.userId}>
-                    <td>
-                      <div className="who">
-                        <span className="av md" aria-hidden="true">
-                          {initialsOf(member.name)}
-                        </span>
-                        <span className="stack">
-                          <span className="n">
+                  <Tr key={member.userId}>
+                    <Td>
+                      <RowIdentity
+                        mark={<Avatar size="md">{initialsOf(member.name)}</Avatar>}
+                        name={
+                          <>
                             {member.name}
-                            {isYou ? <span className="c-muted"> (you)</span> : null}
-                          </span>
-                          <span className="s sm-t">{member.email}</span>
-                        </span>
-                      </div>
-                    </td>
-                    <td>
+                            {isYou ? <span className="font-normal text-subtle"> (you)</span> : null}
+                          </>
+                        }
+                        sub={member.email}
+                      />
+                    </Td>
+                    <Td>
                       {editable ? (
-                        <select
-                          className="fsel"
+                        <Select
+                          variant="inline"
                           aria-label={`Role of ${member.name}`}
                           value={member.role}
                           onChange={(event) => void changeRole(member, event.target.value as Role)}
@@ -158,68 +168,61 @@ function Members() {
                               {entry.label}
                             </option>
                           ))}
-                        </select>
+                        </Select>
                       ) : (
-                        <span className="c-muted">{roleLabel(member.role)}</span>
+                        <span className="text-subtle">{roleLabel(member.role)}</span>
                       )}
-                    </td>
-                    <td>
+                    </Td>
+                    <Td>
                       <When at={member.joinedAt} />
-                    </td>
-                    <td className="c-act">
+                    </Td>
+                    <Td className="text-right">
                       {confirming === member.userId ? (
-                        <span className="confirm">
-                          <button className="btn sm ghost" type="button" onClick={() => setConfirming(undefined)}>
+                        <RowActions>
+                          <Button size="sm" variant="ghost" onClick={() => setConfirming(undefined)}>
                             Cancel
-                          </button>
-                          <button className="btn sm danger-solid" type="button" onClick={() => void remove(member)}>
+                          </Button>
+                          <Button size="sm" variant="danger-solid" onClick={() => void remove(member)}>
                             {isYou ? "Leave" : "Remove"}
-                          </button>
-                        </span>
+                          </Button>
+                        </RowActions>
                       ) : isYou || editable ? (
-                        <button className="btn sm danger" type="button" onClick={() => setConfirming(member.userId)}>
+                        <Button size="sm" variant="danger" onClick={() => setConfirming(member.userId)}>
                           {isYou ? "Leave team" : "Remove"}
-                        </button>
+                        </Button>
                       ) : null}
-                    </td>
-                  </tr>
+                    </Td>
+                  </Tr>
                 )
               })}
             </tbody>
-          </table>
-        </div>
+          </Table>
+        </Box>
       )}
 
       {canManage && (invitations.data?.length ?? 0) > 0 ? (
         <>
-          <div className="intro">
-            <h2>Invited</h2>
-            <p>People who haven't accepted yet. Invitations work for 7 days.</p>
-          </div>
-          <div className="box">
-            <table className="stable">
+          <SettingsSubIntro title="Invited">
+            People who haven't accepted yet. Invitations work for 7 days.
+          </SettingsSubIntro>
+          <Box>
+            <Table kind="settings">
               <tbody>
                 {invitations.data?.map((invitation) => (
-                  <tr key={invitation.id}>
-                    <td style={{ width: "40%" }}>
-                      <div className="who">
-                        <span className="av md" aria-hidden="true">
-                          {invitation.email[0]?.toUpperCase()}
-                        </span>
-                        <span className="stack">
-                          <span className="n">{invitation.email}</span>
-                          <span className="s sm-t">Invited by {invitation.invitedBy ?? "someone"}</span>
-                        </span>
-                      </div>
-                    </td>
-                    <td className="c-muted" style={{ width: 150 }}>
-                      {roleLabel(invitation.role)}
-                    </td>
-                    <td className="c-act">
-                      <span className="confirm">
-                        <button
-                          className="btn sm ghost"
-                          type="button"
+                  <Tr key={invitation.id}>
+                    <Td className="w-[40%]">
+                      <RowIdentity
+                        mark={<Avatar size="md">{invitation.email[0]?.toUpperCase()}</Avatar>}
+                        name={invitation.email}
+                        sub={`Invited by ${invitation.invitedBy ?? "someone"}`}
+                      />
+                    </Td>
+                    <Td className="w-44 text-subtle">{roleLabel(invitation.role)}</Td>
+                    <Td className="text-right">
+                      <RowActions>
+                        <Button
+                          size="sm"
+                          variant="ghost"
                           onClick={async () => {
                             try {
                               await call("invitations.create", {
@@ -235,10 +238,10 @@ function Members() {
                           }}
                         >
                           Resend
-                        </button>
-                        <button
-                          className="btn sm danger"
-                          type="button"
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="danger"
                           onClick={async () => {
                             try {
                               await call("invitations.revoke", { teamId, invitationId: invitation.id })
@@ -250,14 +253,14 @@ function Members() {
                           }}
                         >
                           Withdraw
-                        </button>
-                      </span>
-                    </td>
-                  </tr>
+                        </Button>
+                      </RowActions>
+                    </Td>
+                  </Tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+            </Table>
+          </Box>
         </>
       ) : members.isSuccess && members.data.length === 1 && canManage ? (
         <Empty icon={<MembersIcon />} title="Just you so far">
@@ -318,59 +321,41 @@ function InviteDialog(props: {
       onClose={props.onClose}
       footer={
         <>
-          <button className="btn ghost" type="button" onClick={props.onClose}>
+          <Button variant="ghost" onClick={props.onClose}>
             Cancel
-          </button>
-          <button
-            className="btn primary"
-            type="button"
-            disabled={busy || list.length === 0}
-            onClick={() => void invite()}
-          >
+          </Button>
+          <Button variant="primary" disabled={busy || list.length === 0} onClick={() => void invite()}>
             {list.length > 1 ? `Send ${list.length} invitations` : "Send invitation"}
-          </button>
+          </Button>
         </>
       }
     >
-      <div className="fld">
-        <label className="fl" htmlFor="invite-emails">
-          Email addresses
-        </label>
-        <textarea
+      <Field
+        label="Email addresses"
+        htmlFor="invite-emails"
+        hint="Separate addresses with commas or spaces. Each gets a link that works for 7 days."
+      >
+        <Textarea
           id="invite-emails"
-          className="note-inp"
           rows={3}
           placeholder="sam@acme.com, priya@acme.com"
           value={emails}
           onChange={(event) => setEmails(event.target.value)}
         />
-        <p className="hint sm-t">Separate addresses with commas or spaces. Each gets a link that works for 7 days.</p>
-      </div>
-      <fieldset className="fld">
-        <legend>Role</legend>
-        <div className="radios">
-          {ROLES.filter((entry) => entry.role !== "owner" || props.isOwner).map((entry) => (
-            <label key={entry.role} className={`ropt ${role === entry.role ? "on" : ""}`}>
-              <input
-                className="rd"
-                type="radio"
-                name="invite-role"
-                checked={role === entry.role}
-                onChange={() => setRole(entry.role)}
-              />
-              <span className="t">
-                <span className="n">{entry.label}</span>
-                <span className="d sm-t">{entry.description}</span>
-              </span>
-            </label>
-          ))}
-        </div>
-      </fieldset>
-      {error ? (
-        <p className="form-error" role="alert">
-          {error}
-        </p>
-      ) : null}
+      </Field>
+      <Fieldset legend="Role">
+        {ROLES.filter((entry) => entry.role !== "owner" || props.isOwner).map((entry) => (
+          <RadioCard
+            key={entry.role}
+            name="invite-role"
+            label={entry.label}
+            description={entry.description}
+            checked={role === entry.role}
+            onChange={() => setRole(entry.role)}
+          />
+        ))}
+      </Fieldset>
+      {error ? <ErrorText>{error}</ErrorText> : null}
     </Dialog>
   )
 }

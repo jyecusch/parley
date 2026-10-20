@@ -17,6 +17,26 @@ import {
   useToast,
   When,
 } from "../components/settings.tsx"
+import {
+  Box,
+  Button,
+  Checkbox,
+  cn,
+  ErrorText,
+  Field,
+  Fieldset,
+  Hint,
+  Input,
+  Notice,
+  Option,
+  OutlineTag,
+  SegmentedControl,
+  Table,
+  Td,
+  Th,
+  Tr,
+} from "../components/ui/index.ts"
+import { RowIdentity } from "../components/ui/settings-extra.tsx"
 import { call, messageOf } from "../lib/client.ts"
 
 export const Route = createFileRoute("/t/$teamId/settings/api-keys")({ component: ApiKeys })
@@ -59,9 +79,9 @@ function ApiKeys() {
       title="API keys"
       intro="For the HTTP API, and for agents that can't sign in through the browser, like CI jobs. A key acts as you and never does more than your role allows, limited further by its scopes."
       action={
-        <button className="btn primary sm" type="button" onClick={() => setDialog("new")}>
+        <Button variant="primary" size="sm" onClick={() => setDialog("new")}>
           New API key
-        </button>
+        </Button>
       }
     >
       {keys.isPending ? (
@@ -74,65 +94,62 @@ function ApiKeys() {
           it.
         </Empty>
       ) : (
-        <div className="box">
-          <table className="stable">
+        <Box>
+          <Table kind="settings">
             <thead>
               <tr>
-                <th scope="col" style={{ width: "26%" }}>
+                <Th scope="col" className="w-[26%]">
                   Name
-                </th>
-                <th scope="col" style={{ width: "18%" }}>
+                </Th>
+                <Th scope="col" className="w-[18%]">
                   Key
-                </th>
-                <th scope="col" style={{ width: "20%" }}>
+                </Th>
+                <Th scope="col" className="w-[20%]">
                   Scopes
-                </th>
-                <th scope="col" style={{ width: 96 }}>
+                </Th>
+                <Th scope="col" className="w-28">
                   Created
-                </th>
-                <th scope="col" style={{ width: 96 }}>
+                </Th>
+                <Th scope="col" className="w-28">
                   Last used
-                </th>
-                <th scope="col" style={{ width: 150 }}>
-                  <span className="vh">Actions</span>
-                </th>
+                </Th>
+                <Th scope="col" className="w-44">
+                  <span className="sr-only">Actions</span>
+                </Th>
               </tr>
             </thead>
             <tbody>
               {keys.data.map((apiKey) => (
-                <tr key={apiKey.id} className={apiKey.revoked ? "revoked" : ""}>
-                  <td>
-                    <div className="who">
-                      <span className="stack">
-                        <span className="n">{apiKey.name}</span>
-                        <span className="s sm-t">{expiryLine(apiKey)}</span>
-                      </span>
+                <Tr key={apiKey.id} className={cn(apiKey.revoked && "[&>td]:text-subtle")}>
+                  <Td>
+                    <div className={cn(apiKey.revoked && "opacity-60")}>
+                      <RowIdentity name={apiKey.name} sub={expiryLine(apiKey)} />
                     </div>
-                  </td>
-                  <td className="mono">{apiKey.start ? `${apiKey.start}…` : "—"}</td>
-                  <td>
+                  </Td>
+                  <Td className="font-mono text-sm">{apiKey.start ? `${apiKey.start}…` : "—"}</Td>
+                  <Td className={cn(apiKey.revoked && "opacity-60")}>
                     <ScopeChips scopes={apiKey.scopes} />
-                  </td>
-                  <td>
+                  </Td>
+                  <Td>
                     <When at={apiKey.createdAt} />
-                  </td>
-                  <td>
+                  </Td>
+                  <Td>
                     <When at={apiKey.lastUsedAt} />
-                  </td>
-                  <td className="c-act">
+                  </Td>
+                  <Td className="text-right">
                     {apiKey.revoked ? (
-                      <span className="rtag" title="Requests with this key are refused">
-                        Revoked
+                      <span title="Requests with this key are refused">
+                        <OutlineTag>Revoked</OutlineTag>
                       </span>
                     ) : (
                       <RevokeButton name={apiKey.name} onRevoke={() => revoke(apiKey)} />
                     )}
-                  </td>
-                </tr>
+                  </Td>
+                </Tr>
               ))}
             </tbody>
-          </table>
-        </div>
+          </Table>
+        </Box>
       )}
 
       {dialog === "new" ? (
@@ -197,26 +214,17 @@ function NewApiKey(props: {
       onClose={props.onClose}
       footer={
         <>
-          <button className="btn ghost" type="button" onClick={props.onClose}>
+          <Button variant="ghost" onClick={props.onClose}>
             Cancel
-          </button>
-          <button
-            className="btn primary"
-            type="button"
-            disabled={busy || name.trim() === ""}
-            onClick={() => void create()}
-          >
+          </Button>
+          <Button variant="primary" disabled={busy || name.trim() === ""} onClick={() => void create()}>
             Create API key
-          </button>
+          </Button>
         </>
       }
     >
-      <div className="fld">
-        <label className="fl" htmlFor="key-name">
-          Name
-        </label>
-        <input
-          className="inp"
+      <Field label="Name" htmlFor="key-name" hint="Shown in record activity, like “Jane Doe via Nightly CRM sync”.">
+        <Input
           id="key-name"
           type="text"
           placeholder="What it's for"
@@ -228,53 +236,50 @@ function NewApiKey(props: {
             if (event.key === "Enter" && name.trim() !== "") void create()
           }}
         />
-        <p className="hint sm-t">Shown in record activity, like “Jane Doe via Nightly CRM sync”.</p>
-      </div>
-      <fieldset className="fld">
-        <legend>Scopes</legend>
-        <div className="checks">
+      </Field>
+      <Fieldset legend="Scopes">
+        <div className="flex flex-col gap-0.5">
           {OFFERED.map((scope) => {
             const locked = scope === "records:read"
             const allowed = props.rolePermissions.has(scope)
             return (
-              <label key={scope} className={`chk ${allowed ? "" : "off"}`}>
-                <input
-                  className={`cb ${locked ? "locked" : ""}`}
-                  type="checkbox"
+              <Option
+                key={scope}
+                className={cn(
+                  "grid min-h-8 grid-cols-[1rem_8.5rem_minmax(0,1fr)] items-center gap-2.5 py-0.5",
+                  allowed ? "cursor-pointer" : "cursor-default [&>span]:opacity-50",
+                )}
+              >
+                <Checkbox
+                  className={cn(locked && "disabled:opacity-55")}
                   checked={allowed && scopes.has(scope)}
                   disabled={locked || !allowed}
                   onChange={() => toggle(scope)}
                 />
-                <span className="mono">{scope}</span>
-                <span className="d">
+                <span className="font-mono text-sm">{scope}</span>
+                <span className="text-muted">
                   {SCOPE_LABELS[scope]}
-                  {locked ? <span className="why"> · Always on</span> : null}
-                  {allowed ? null : <span className="why"> · Your role can't grant this</span>}
+                  {locked ? <span className="text-sm text-subtle"> · Always on</span> : null}
+                  {allowed ? null : <span className="text-sm text-subtle"> · Your role can't grant this</span>}
                 </span>
-              </label>
+              </Option>
             )
           })}
         </div>
-        <p className="hint sm-t" style={{ marginTop: 6 }}>
+        <Hint className="mt-1.5">
           A key never does more than your role allows. Write and delete are off unless you turn them on.
-        </p>
-      </fieldset>
-      <fieldset className="fld">
-        <legend>Expiry</legend>
-        <div className="seg">
-          {EXPIRIES.map((days) => (
-            <label key={days ?? "never"} className={expiry === days ? "on" : ""}>
-              <input type="radio" name="key-expiry" checked={expiry === days} onChange={() => setExpiry(days)} />
-              {days ? `${days} days` : "Never"}
-            </label>
-          ))}
-        </div>
-      </fieldset>
-      {error ? (
-        <p className="form-error" role="alert">
-          {error}
-        </p>
-      ) : null}
+        </Hint>
+      </Fieldset>
+      <Fieldset legend="Expiry">
+        <SegmentedControl
+          name="key-expiry"
+          label="Expiry"
+          options={EXPIRIES.map((days) => ({ value: String(days ?? "never"), label: days ? `${days} days` : "Never" }))}
+          value={String(expiry ?? "never")}
+          onChange={(value) => setExpiry(EXPIRIES.find((days) => String(days ?? "never") === value))}
+        />
+      </Fieldset>
+      {error ? <ErrorText>{error}</ErrorText> : null}
     </Dialog>
   )
 }
@@ -290,27 +295,24 @@ function ApiKeyCreated(props: {
     <Dialog
       title="API key created"
       footer={
-        <button className="btn primary" type="button" onClick={props.onClose}>
+        <Button variant="primary" onClick={props.onClose}>
           Done
-        </button>
+        </Button>
       }
     >
-      <div className="warn" role="note">
-        <span className="ic">
-          <WarnIcon />
-        </span>
-        <span>This is the only time you'll see this key. Store it somewhere safe.</span>
-      </div>
-      <div className="fld">
-        <span className="fl">{apiKey.name}</span>
+      <Notice tone="warn" icon={<WarnIcon />}>
+        <span role="note">This is the only time you'll see this key. Store it somewhere safe.</span>
+      </Notice>
+      <div className="flex flex-col gap-1.5">
+        <span className="font-medium">{apiKey.name}</span>
         <CopyField value={secret} label="API key" />
-        <p className="hint sm-t">
+        <Hint>
           Scopes: {apiKey.scopes.join(", ")} ·{" "}
           {apiKey.expiresAt ? `Expires ${dateOnly(apiKey.expiresAt)}` : "Never expires"}
-        </p>
+        </Hint>
       </div>
-      <div className="fld">
-        <span className="fl">Try it</span>
+      <div className="flex flex-col gap-1.5">
+        <span className="font-medium">Try it</span>
         <CopyField value={curl} label="example request" code />
       </div>
     </Dialog>

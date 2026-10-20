@@ -11,6 +11,7 @@ import {
 } from "@parley/domain"
 import { useEffect, useRef, useState } from "react"
 import { CloseIcon, PlusIcon } from "./icons.tsx"
+import { Button, Checkbox, cn, Hint, Input, Option, Popover, Select } from "./ui/index.ts"
 
 /** A choice for select and company values. */
 export interface ValueOption {
@@ -34,20 +35,29 @@ export function FilterBar(props: {
   const update = (conditions: ReadonlyArray<FilterCondition>) => props.onChange({ ...filter, conditions })
 
   return (
-    <div className="fbar">
+    <div className="flex min-w-0 flex-wrap items-center gap-1">
       {filter.conditions.map((condition, index) => {
         const info = props.fields.find((field) => field.field === condition.field)
         return (
           // biome-ignore lint/suspicious/noArrayIndexKey: conditions are positional
-          <span key={index} className="fchip-wrap">
-            {index > 0 ? <span className="fjoin sm-t">{filter.match === "all" ? "and" : "or"}</span> : null}
-            <span className={`fchip sm-t ${checkCondition(condition, props.fields) ? "bad" : ""}`}>
-              <button className="fchip-b" type="button" onClick={() => setEditing(index)}>
-                <b>{info?.label ?? "Unknown field"}</b> {OPERATOR_LABELS[condition.operator]}{" "}
-                {describeValue(condition, info, props.companies)}
+          <span key={index} className="relative inline-flex items-center gap-1">
+            {index > 0 ? <span className="text-sm text-subtle">{filter.match === "all" ? "and" : "or"}</span> : null}
+            <span
+              className={cn(
+                "inline-flex h-7 max-w-96 items-center rounded-md bg-fill text-sm",
+                checkCondition(condition, props.fields) && "inset-ring inset-ring-danger",
+              )}
+            >
+              <button
+                className="h-7 cursor-pointer truncate pr-1 pl-2.5 text-muted"
+                type="button"
+                onClick={() => setEditing(index)}
+              >
+                <b className="font-medium text-fg">{info?.label ?? "Unknown field"}</b>{" "}
+                {OPERATOR_LABELS[condition.operator]} {describeValue(condition, info, props.companies)}
               </button>
               <button
-                className="fchip-x"
+                className="grid h-7 w-6 shrink-0 cursor-pointer place-items-center rounded-r-md text-subtle hover:bg-hover hover:text-fg"
                 type="button"
                 aria-label={`Remove filter on ${info?.label ?? "field"}`}
                 onClick={() => update(filter.conditions.filter((_, other) => other !== index))}
@@ -70,11 +80,11 @@ export function FilterBar(props: {
           </span>
         )
       })}
-      <span className="fchip-wrap">
-        <button className="btn ghost sm" type="button" onClick={() => setEditing("new")}>
+      <span className="relative inline-flex items-center gap-1">
+        <Button variant="ghost" size="sm" onClick={() => setEditing("new")}>
           <PlusIcon className="size-3.5" />
           Filter
-        </button>
+        </Button>
         {editing === "new" ? (
           <ConditionEditor
             fields={props.fields}
@@ -89,14 +99,14 @@ export function FilterBar(props: {
         ) : null}
       </span>
       {filter.conditions.length > 1 ? (
-        <button
-          className="btn ghost sm"
-          type="button"
+        <Button
+          variant="ghost"
+          size="sm"
           title="Whether every condition must hold, or any one"
           onClick={() => props.onChange({ ...filter, match: filter.match === "all" ? "any" : "all" })}
         >
           Match {filter.match === "all" ? "all" : "any"}
-        </button>
+        </Button>
       ) : null}
     </div>
   )
@@ -159,8 +169,8 @@ function ConditionEditor(props: {
   const options: ReadonlyArray<ValueOption> = info?.kind === "company" ? props.companies : (info?.options ?? [])
 
   return (
-    <div
-      className="pop fpop"
+    <Popover
+      className="top-full left-0 mt-1.5 w-80 max-w-none"
       role="dialog"
       aria-label="Filter"
       ref={ref}
@@ -173,9 +183,9 @@ function ConditionEditor(props: {
           props.onSave(condition)
       }}
     >
-      <div className="fpop-b">
-        <select
-          className="fsel"
+      <div className="flex flex-col gap-2.5 p-3">
+        <Select
+          className="h-9"
           aria-label="Field"
           value={field}
           onChange={(event) => {
@@ -192,9 +202,9 @@ function ConditionEditor(props: {
               {entry.label}
             </option>
           ))}
-        </select>
-        <select
-          className="fsel"
+        </Select>
+        <Select
+          className="h-9"
           aria-label="Comparison"
           value={operator}
           onChange={(event) => {
@@ -210,20 +220,18 @@ function ConditionEditor(props: {
               {OPERATOR_LABELS[entry]}
             </option>
           ))}
-        </select>
+        </Select>
         {!info || VALUELESS.has(operator) ? null : options.length > 0 ||
           info.kind === "select" ||
           info.kind === "multi" ||
           info.kind === "company" ? (
-          <div className="fopts">
-            {options.length === 0 ? <p className="hint sm-t">Nothing to choose from.</p> : null}
+          <div className="max-h-60 overflow-auto">
+            {options.length === 0 ? <Hint>Nothing to choose from.</Hint> : null}
             {options.map((option) => {
               const chosen = Array.isArray(value) && value.includes(option.id)
               return (
-                <label key={option.id} className="opt">
-                  <input
-                    className="cb shown"
-                    type="checkbox"
+                <Option key={option.id}>
+                  <Checkbox
                     checked={chosen}
                     onChange={() => {
                       const current = Array.isArray(value) ? value : []
@@ -231,54 +239,47 @@ function ConditionEditor(props: {
                     }}
                   />
                   {option.label}
-                </label>
+                </Option>
               )
             })}
           </div>
         ) : operator === "in-last-days" || info.kind === "number" ? (
-          <input
-            className="inp"
+          <Input
+            className="h-9"
             type="number"
             aria-label="Value"
             step="any"
-            // biome-ignore lint/a11y/noAutofocus: the person is about to type the value
             autoFocus
             value={typeof value === "number" ? value : ""}
             onChange={(event) => setValue(event.target.value === "" ? undefined : Number(event.target.value))}
           />
         ) : info.kind === "date" ? (
-          <input
-            className="inp"
+          <Input
+            className="h-9"
             type="date"
             aria-label="Value"
             value={typeof value === "string" ? value : ""}
             onChange={(event) => setValue(event.target.value)}
           />
         ) : (
-          <input
-            className="inp"
+          <Input
+            className="h-9"
             type="text"
             aria-label="Value"
-            // biome-ignore lint/a11y/noAutofocus: the person is about to type the value
             autoFocus
             value={typeof value === "string" ? value : ""}
             onChange={(event) => setValue(event.target.value)}
           />
         )}
       </div>
-      <div className="dlg-f">
-        <button className="btn ghost sm" type="button" onClick={onClose}>
+      <div className="flex justify-end gap-2 border-t border-line px-3 py-2.5">
+        <Button variant="ghost" size="sm" onClick={onClose}>
           Cancel
-        </button>
-        <button
-          className="btn primary sm"
-          type="button"
-          disabled={problem !== undefined}
-          onClick={() => props.onSave(condition)}
-        >
+        </Button>
+        <Button variant="primary" size="sm" disabled={problem !== undefined} onClick={() => props.onSave(condition)}>
           {props.initial ? "Update" : "Add filter"}
-        </button>
+        </Button>
       </div>
-    </div>
+    </Popover>
   )
 }

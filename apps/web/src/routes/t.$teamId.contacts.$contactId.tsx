@@ -5,6 +5,7 @@ import { createFileRoute, getRouteApi, useNavigate } from "@tanstack/react-route
 import { useEffect, useMemo, useState } from "react"
 import { ContactPanel, type Toast } from "../components/contact-panel.tsx"
 import { isTyping } from "../components/shell.tsx"
+import { Card, Centered, EmptyState, FloatingBar } from "../components/ui/index.ts"
 import { messageOf } from "../lib/client.ts"
 import { contactsCollection } from "../lib/contacts.ts"
 
@@ -48,17 +49,16 @@ function ContactRecord() {
     return () => window.removeEventListener("keydown", onKey)
   })
 
-  if (live.isLoading) return <main className="card main" />
+  if (live.isLoading) return <Card as="main" className="flex-1" />
   if (!contact) {
     return (
-      <main className="card main">
-        <div className="center">
-          <div className="empty">
-            <h2>This contact isn't here</h2>
-            <p>It may have been deleted. Deleted contacts can be restored from Contacts for 30 days.</p>
-          </div>
-        </div>
-      </main>
+      <Card as="main" className="flex-1">
+        <Centered>
+          <EmptyState title="This contact isn't here">
+            It may have been deleted. Deleted contacts can be restored from Contacts for 30 days.
+          </EmptyState>
+        </Centered>
+      </Card>
     )
   }
   return (
@@ -84,11 +84,9 @@ function ContactRecord() {
         onToggleLayout={back}
       />
       {toast ? (
-        <div className="floatbar" role="status">
-          <span className="n" style={{ color: "var(--fg)" }}>
-            {toast.text}
-          </span>
-        </div>
+        <FloatingBar role="status" className="pr-3.5">
+          <span className="text-fg">{toast.text}</span>
+        </FloatingBar>
       ) : null}
     </>
   )
