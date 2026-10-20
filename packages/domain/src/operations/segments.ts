@@ -1,7 +1,7 @@
 import { Schema } from "effect"
 import { ContactPage } from "../contact.ts"
 import { Segment, SegmentName } from "../email.ts"
-import { SegmentIsDynamic, SegmentNotFound } from "../errors/campaigns.ts"
+import { SegmentIsDynamic, SegmentLimitReached, SegmentNotFound } from "../errors/campaigns.ts"
 import { ContactNotFound } from "../errors/contacts.ts"
 import { Filter } from "../filter.ts"
 import { ContactId, SegmentId, TeamId } from "../ids.ts"
@@ -50,7 +50,7 @@ export const createSegment = defineTeamOperation({
     filter: Schema.optional(Filter),
   }),
   output: Segment,
-  errors: [],
+  errors: [SegmentLimitReached],
   http: { method: "POST", path: "/teams/:teamId/segments" },
   hints: { readOnly: false, destructive: false, idempotent: false },
   permissions: ["records:read", "email:write"],

@@ -43,6 +43,7 @@ export const ERROR_STATUS: { readonly [Tag in ErrorTag]: Status } = {
   TopicNotFound: 404,
   SegmentNotFound: 404,
   SegmentIsDynamic: 409,
+  SegmentLimitReached: 409,
   TemplateNotFound: 404,
   CampaignNotFound: 404,
   CampaignNotDraft: 409,

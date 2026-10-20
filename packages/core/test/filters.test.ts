@@ -175,4 +175,20 @@ describe("filters", () => {
       }
     }).pipe(Effect.provide(CoreLive)),
   )
+
+  it.effect("refuses filter values that would make a bad or runaway query", () =>
+    Effect.gen(function* () {
+      const f = yield* Fixture
+      for (const value of [1.5, 1e12]) {
+        const refused = yield* run["contacts.list"](f.jane, {
+          teamId: f.acme,
+          filter: { match: "all", conditions: [{ field: "createdAt", operator: "in-last-days", value }] },
+        }).pipe(Effect.flip)
+        expect(refused._tag).toBe("InputRejected")
+      }
+      // A forged cursor starts from the top rather than failing.
+      const page = yield* run["contacts.list"](f.jane, { teamId: f.acme, cursor: btoa("2020-01-01T00:00:00Z|x") })
+      expect(page.items).toBeDefined()
+    }).pipe(Effect.provide(CoreLive)),
+  )
 })

@@ -59,7 +59,16 @@ export class Database extends Context.Service<
   )
 }
 
-/** The Postgres pool, configured from DATABASE_URL. Process tier: built once. */
-export const PgLive = PgClient.layerConfig({ url: Config.Redacted("DATABASE_URL") })
+/**
+ * The Postgres pool, configured from DATABASE_URL. Process tier: built once. Every statement is cut
+ * off after DATABASE_STATEMENT_TIMEOUT_MS (default 30s), so one team's expensive filter can't hold
+ * the database for everyone else.
+ */
+export const PgLive = PgClient.layerConfig({
+  url: Config.Redacted("DATABASE_URL"),
+  startupParameters: Config.withDefault(Config.Int("DATABASE_STATEMENT_TIMEOUT_MS"), 30_000).pipe(
+    Config.map((ms) => ({ statement_timeout: String(ms) })),
+  ),
+})
 
 export const DatabaseLive = Database.layer.pipe(Layer.provideMerge(PgLive))

@@ -63,12 +63,15 @@ const displayNameOf = (firstName: string | null, lastName: string | null, primar
 const encodeCursor = (updatedAt: Date, id: string) => btoa(`${updatedAt.toISOString()}|${id}`)
 /** With a custom sort, pages are by position: "o:<offset>". */
 const encodeOffset = (offset: number) => btoa(`o:${offset}`)
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 const decodeOffset = (cursor: string | undefined): number => {
   if (!cursor) return 0
   try {
     const text = atob(cursor)
     const offset = text.startsWith("o:") ? Number(text.slice(2)) : 0
-    return Number.isInteger(offset) && offset > 0 ? offset : 0
+    // Deep offsets get slow; past 100,000 records a filter is the better tool.
+    return Number.isInteger(offset) && offset > 0 ? Math.min(offset, 100_000) : 0
   } catch {
     return 0
   }
@@ -77,7 +80,8 @@ const decodeCursor = (cursor: string): { readonly updatedAt: Date; readonly id: 
   try {
     const [iso, id] = atob(cursor).split("|")
     const updatedAt = new Date(iso ?? "")
-    return id && !Number.isNaN(updatedAt.getTime()) ? { updatedAt, id } : undefined
+    // Only cursors shaped like ours: anything else would reach the query as a bad uuid.
+    return id && UUID.test(id) && !Number.isNaN(updatedAt.getTime()) ? { updatedAt, id } : undefined
   } catch {
     return undefined
   }

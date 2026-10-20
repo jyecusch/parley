@@ -1,3 +1,4 @@
+export { limitBody } from "./body-limit.ts"
 export { errorBody, FailureResponsesLive, respondToFailures } from "./respond.ts"
 export {
   ApiHandlersLive,

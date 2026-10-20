@@ -272,3 +272,21 @@ export class UnsubscribeLinkInvalid
     return userText`This unsubscribe link doesn't work. It may have been cut short when it was copied; try opening it from the email again, or reply to the email and ask to be removed.`
   }
 }
+
+/** A team can have only so many segments: each one is counted whenever segments are listed. */
+export class SegmentLimitReached
+  extends Schema.TaggedError<SegmentLimitReached>()("SegmentLimitReached", {
+    team: DisplayName.schema,
+    limit: Schema.Number,
+  })
+  implements DomainError
+{
+  readonly isRetryable = false
+  override readonly [ErrorReporter.severity] = "Info" as const
+  override get message() {
+    return `team has reached ${this.limit} segments`
+  }
+  get userMessage() {
+    return userText`${this.team} has ${this.limit} segments, which is the most a team can have. Delete one you no longer use first.`
+  }
+}

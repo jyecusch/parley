@@ -131,7 +131,11 @@ export const VALUELESS: ReadonlySet<FilterOperator> = new Set([
   "is-not-checked",
 ])
 
-export const FilterValue = Schema.Union([Schema.String, Schema.Number, Schema.Array(Schema.String)])
+export const FilterValue = Schema.Union([
+  Schema.String.check(Schema.isMaxLength(500)),
+  Schema.Number,
+  Schema.Array(Schema.String.check(Schema.isMaxLength(100))).check(Schema.isMaxLength(200)),
+])
 export type FilterValue = typeof FilterValue.Type
 
 export const FilterCondition = Schema.Struct({
@@ -222,7 +226,9 @@ export const checkCondition = (
       return typeof value === "number" ? undefined : "wrong-value"
     case "date":
       if (condition.operator === "in-last-days")
-        return typeof value === "number" && value > 0 ? undefined : "wrong-value"
+        return typeof value === "number" && Number.isInteger(value) && value > 0 && value <= 36_500
+          ? undefined
+          : "wrong-value"
       return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) ? undefined : "wrong-value"
     case "select":
     case "multi":

@@ -41,7 +41,7 @@ export class BetterAuth extends Context.Service<BetterAuth, Auth>()("@parley/cor
       const secret = yield* Config.Redacted("BETTER_AUTH_SECRET")
       const baseURL = yield* PublicUrl
       const pool = yield* Effect.acquireRelease(
-        Effect.sync(() => new Pool({ connectionString: Redacted.value(url), max: 5 })),
+        Effect.sync(() => new Pool({ connectionString: Redacted.value(url), max: 5, statement_timeout: 30_000 })),
         (pool) =>
           Effect.callback<void>((resume) => {
             pool.end().then(

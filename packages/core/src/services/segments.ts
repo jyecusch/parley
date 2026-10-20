@@ -5,6 +5,7 @@ import {
   InputRejected,
   type Segment,
   type SegmentId,
+  SegmentLimitReached,
   type TeamId,
 } from "@parley/domain"
 import { userText } from "@parley/errors"
@@ -20,6 +21,9 @@ import { checkFilter, filterSql } from "./filter-sql.ts"
 import { classifySqlError } from "./sql-errors.ts"
 
 const EMPTY: Filter = { match: "all", conditions: [] }
+
+/** Every segment is counted whenever segments are listed, so a team can have only so many. */
+const SEGMENT_LIMIT = 200
 
 export interface SegmentInput {
   readonly name?: string | undefined
@@ -45,7 +49,7 @@ export class Segments extends Context.Service<
     readonly create: <P, T>(
       access: CanWriteEmail<P, T>,
       input: { readonly name: string; readonly kind: "dynamic" | "fixed"; readonly filter?: Filter | undefined },
-    ) => Effect.Effect<Segment, InputRejected | DatabaseUnavailable>
+    ) => Effect.Effect<Segment, InputRejected | SegmentLimitReached | DatabaseUnavailable>
     readonly update: <P, T, K>(
       target: SegmentInTeam<K, T>,
       input: SegmentInput,
@@ -175,6 +179,17 @@ export class Segments extends Context.Service<
               return yield* Effect.fail(fixedHasNoFilter)
             }
             if (input.kind === "dynamic" && input.filter) yield* checked(teamId, input.filter)
+            const [existing] = yield* run(
+              db.query((d) =>
+                d
+                  .select({ count: sql<number>`count(*)::int` })
+                  .from(schema.segments)
+                  .where(eq(schema.segments.teamId, teamId)),
+              ),
+            )
+            if (Number(existing?.count ?? 0) >= SEGMENT_LIMIT) {
+              return yield* new SegmentLimitReached({ team: access.member.teamName, limit: SEGMENT_LIMIT })
+            }
             const id = crypto.randomUUID()
             yield* run(
               db.query((d) =>

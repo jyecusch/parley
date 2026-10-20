@@ -4,6 +4,7 @@ import {
   AuthRoutesLive,
   FailureResponsesLive,
   FileRoutesLive,
+  limitBody,
   UnsubscribeRoutesLive,
   WebhookRoutesLive,
 } from "@parley/http"
@@ -31,5 +32,6 @@ let app: ReturnType<typeof makeApp> | undefined
 
 export const handle = (request: Request): Promise<Response> => {
   app ??= makeApp()
-  return app.handler(request)
+  const limited = limitBody(request)
+  return limited instanceof Response ? Promise.resolve(limited) : app.handler(limited)
 }
