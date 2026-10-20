@@ -141,6 +141,7 @@ What we decided, who decided it, and what's still open. Nothing becomes "decided
 | I14 | Dynamic client registration is open (no client ID metadata documents yet) | What Claude, ChatGPT and Cursor use today; `@better-auth/cimd` can be added later |
 | I15 | Service accounts are users of kind `service-account` (no password, an undeliverable email) plus a member row; a connection acting as one also needs the connecting person to still be a member | D18, D94 |
 | I16 | Styling is Tailwind only: Ink's palette is theme tokens in `apps/web/src/styles/app.css`, and screens are built from the components in `apps/web/src/components/ui/`, sized on Tailwind's rem scale. No hand-written CSS classes or pixel values outside the CRT canvas plumbing | Owner's direction (2026-10-20): the UI was too small, and sizes must change in one place, not per pixel |
+| I17 | The sender address is entered as a name plus a choice of the team's sending domains, not typed in full. Typing `@` moves to the domain; a pasted address on another domain is refused with a message; Save stays disabled until the address is complete | The owner found a typed address on a domain the team doesn't have too easy to save by mistake (2026-10-20) |
 
 ## What's built, and what's next
 

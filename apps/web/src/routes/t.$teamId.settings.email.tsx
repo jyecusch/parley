@@ -13,6 +13,7 @@ import {
   Hint,
   Input,
   Notice,
+  Select,
   Table,
   Td,
   Textarea,
@@ -369,10 +370,12 @@ function SenderForm(props: {
   // biome-ignore lint/correctness/useExhaustiveDependencies: reset when the saved settings change
   useEffect(() => setDraft(initial), [key])
   const dirty = JSON.stringify(draft) !== key
+  const [senderName = "", senderDomain = ""] = draft.senderAddress.split("@")
+  const senderUsable =
+    draft.senderAddress === "" || (senderName !== "" && props.domains.some((entry) => entry.domain === senderDomain))
   const set = (field: keyof typeof initial) => (event: { target: { value: string } }) =>
     setDraft((current) => ({ ...current, [field]: event.target.value }))
   const orNull = (value: string) => (value.trim() ? value.trim() : null)
-  const domainHint = props.domains[0]?.domain ?? "your sending domain"
 
   const save = async () => {
     setBusy(true)
@@ -406,16 +409,12 @@ function SenderForm(props: {
           onChange={set("senderName")}
         />
       </Field>
-      <Field label="Sender address" htmlFor="sender-address" hint="On one of your sending domains.">
-        <Input
-          id="sender-address"
-          type="email"
-          disabled={disabled}
-          placeholder={`news@${domainHint}`}
-          value={draft.senderAddress}
-          onChange={set("senderAddress")}
-        />
-      </Field>
+      <SenderAddressField
+        domains={props.domains}
+        disabled={disabled}
+        value={draft.senderAddress}
+        onChange={(senderAddress) => setDraft((current) => ({ ...current, senderAddress }))}
+      />
       <Field
         label={
           <>
@@ -485,7 +484,7 @@ function SenderForm(props: {
           <Button variant="ghost" disabled={!dirty || busy} onClick={() => setDraft(initial)}>
             Reset
           </Button>
-          <Button variant="primary" disabled={!dirty || busy} onClick={() => void save()}>
+          <Button variant="primary" disabled={!dirty || busy || !senderUsable} onClick={() => void save()}>
             Save
           </Button>
         </div>
@@ -685,5 +684,109 @@ function TopicDialog(props: {
       </Field>
       {error ? <ErrorText>{error}</ErrorText> : null}
     </Dialog>
+  )
+}
+
+/**
+ * The sender address as a name and one of the team's sending domains, so it can't be typed on a
+ * domain the team doesn't have. A domain that isn't verified yet can be chosen (campaigns wait for
+ * it), and an address saved on a domain since removed is flagged.
+ */
+function SenderAddressField(props: {
+  readonly domains: ReadonlyArray<SendingDomain>
+  readonly disabled: boolean
+  readonly value: string
+  readonly onChange: (address: string) => void
+}) {
+  const at = props.value.lastIndexOf("@")
+  const name = at === -1 ? props.value : props.value.slice(0, at)
+  const domain =
+    at === -1 ? (props.domains.length === 1 ? (props.domains[0]?.domain ?? "") : "") : props.value.slice(at + 1)
+  const known = props.domains.some((entry) => entry.domain === domain)
+  const chosen = props.domains.find((entry) => entry.domain === domain)
+  const join = (nextName: string, nextDomain: string) =>
+    props.onChange(nextName || nextDomain ? `${nextName}@${nextDomain}` : "")
+
+  /** A domain from a pasted address that isn't one of the team's, to say why it wasn't used. */
+  const [refused, setRefused] = useState<string>()
+  const onName = (typed: string) => {
+    const pasted = typed.indexOf("@")
+    setRefused(undefined)
+    if (pasted === -1) {
+      join(typed.trim(), domain)
+      return
+    }
+    const before = typed.slice(0, pasted).trim()
+    const after = typed
+      .slice(pasted + 1)
+      .trim()
+      .toLowerCase()
+    if (after === "") {
+      // Typing "@" moves on to choosing the domain.
+      join(before, domain)
+      document.getElementById("sender-domain-part")?.focus()
+      return
+    }
+    // A pasted address picks its domain too, when it's one of the team's.
+    const match = props.domains.some((entry) => entry.domain === after)
+    if (!match) setRefused(after)
+    join(before, match ? after : domain)
+  }
+
+  if (props.domains.length === 0) {
+    return (
+      <Field label="Sender address" htmlFor="sender-name-part" hint="Add a sending domain above first.">
+        <Input id="sender-name-part" disabled placeholder="news@yourdomain.com" />
+      </Field>
+    )
+  }
+
+  const error = refused
+    ? `${refused} isn't one of your sending domains. Choose one of yours, or add it above.`
+    : domain && !known
+      ? `${domain} isn't one of your sending domains any more. Choose another.`
+      : name && !domain
+        ? "Choose one of your sending domains."
+        : undefined
+  const hint =
+    chosen && chosen.status !== "verified"
+      ? `${chosen.domain} isn't verified yet. Campaigns can be sent once it is.`
+      : undefined
+
+  return (
+    <Field label="Sender address" htmlFor="sender-name-part" error={error} hint={hint}>
+      <div className="flex items-center gap-2">
+        <Input
+          id="sender-name-part"
+          className="min-w-0 flex-1"
+          disabled={props.disabled}
+          placeholder="news"
+          aria-label="Sender address, the part before @"
+          value={name}
+          onChange={(event) => onName(event.target.value)}
+        />
+        <span className="text-subtle" aria-hidden="true">
+          @
+        </span>
+        <div className="min-w-0 flex-1">
+          <Select
+            id="sender-domain-part"
+            aria-label="Sender address, sending domain"
+            disabled={props.disabled}
+            value={known ? domain : ""}
+            onChange={(event) => join(name, event.target.value)}
+          >
+            <option value="" disabled>
+              Choose a domain
+            </option>
+            {props.domains.map((entry) => (
+              <option key={entry.id} value={entry.domain}>
+                {entry.status === "verified" ? entry.domain : `${entry.domain} (not verified)`}
+              </option>
+            ))}
+          </Select>
+        </div>
+      </div>
+    </Field>
   )
 }
