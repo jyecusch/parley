@@ -39,6 +39,7 @@
   --ink-skeleton: oklch(0 0 0 / 0.045);
   --ink-skeleton-hi: oklch(0 0 0 / 0.085);
   --ink-scrim: oklch(0.2 0 0 / 0.2);
+  --ink-scrollbar: oklch(0 0 0 / 0.22);
   --ink-shadow-card: 0 0 0 1px oklch(0 0 0 / 0.07), 0 1px 2px oklch(0 0 0 / 0.04);
   --ink-shadow-pop: 0 0 0 1px oklch(0 0 0 / 0.08), 0 16px 48px oklch(0 0 0 / 0.14), 0 4px 12px oklch(0 0 0 / 0.06);
   color-scheme: light;
@@ -72,6 +73,7 @@
   --ink-skeleton: oklch(1 0 0 / 0.05);
   --ink-skeleton-hi: oklch(1 0 0 / 0.1);
   --ink-scrim: oklch(0 0 0 / 0.5);
+  --ink-scrollbar: oklch(1 0 0 / 0.2);
   --ink-shadow-card: 0 0 0 1px oklch(1 0 0 / 0.07);
   --ink-shadow-pop: 0 0 0 1px oklch(1 0 0 / 0.1), 0 16px 48px oklch(0 0 0 / 0.6), 0 4px 12px oklch(0 0 0 / 0.35);
   color-scheme: dark;
@@ -103,6 +105,7 @@
   --ink-warn-soft: var(--ink-fill);
   --ink-ok: var(--ink-fg);
   --ink-ok-soft: var(--ink-fill);
+  --ink-scrollbar: oklch(0.8 calc(0.15 * var(--crt-saturation)) var(--h) / 0.35);
   --ink-shadow-card: 0 0 0 1px oklch(0.8 calc(0.15 * var(--crt-saturation)) var(--h) / 0.14);
   --ink-shadow-pop:
     0 0 0 1px oklch(0.8 calc(0.15 * var(--crt-saturation)) var(--h) / 0.25),
@@ -149,6 +152,7 @@
   --color-skeleton: var(--ink-skeleton);
   --color-skeleton-hi: var(--ink-skeleton-hi);
   --color-scrim: var(--ink-scrim);
+  --color-scrollbar: var(--ink-scrollbar);
 
   --shadow-card: var(--ink-shadow-card);
   --shadow-pop: var(--ink-shadow-pop);
@@ -208,6 +212,11 @@
   }
   ::placeholder {
     color: var(--color-subtle);
+  }
+  /* Thin scrollbars in the theme's colours, CRT's phosphor included, instead of the browser's. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-scrollbar) transparent;
   }
 }
 
