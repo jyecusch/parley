@@ -15,6 +15,7 @@ import {
 } from "../email.ts"
 import {
   SenderAddressNotOnSendingDomain,
+  SendingDomainLimitReached,
   SendingDomainNotFound,
   SendingDomainTaken,
   TopicNotFound,
@@ -88,7 +89,7 @@ export const createSendingDomain = defineTeamOperation({
     "Add a domain to send email from. Returns DNS records to add at the domain's DNS host; then call sendingDomains.verify.",
   input: Schema.Struct({ ...InTeam, domain: Domain.annotate({ title: "Domain" }) }),
   output: SendingDomain,
-  errors: [SendingDomainTaken, ...EmailErrors],
+  errors: [SendingDomainTaken, SendingDomainLimitReached, ...EmailErrors],
   http: { method: "POST", path: "/teams/:teamId/sending-domains" },
   hints: { readOnly: false, destructive: false, idempotent: false },
   permissions: ["email:manage"],

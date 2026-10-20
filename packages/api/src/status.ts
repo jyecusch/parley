@@ -54,6 +54,7 @@ export const ERROR_STATUS: { readonly [Tag in ErrorTag]: Status } = {
   TestRecipientNotMember: 422,
   SenderAddressNotOnSendingDomain: 422,
   SendingDomainTaken: 409,
+  SendingDomainLimitReached: 409,
   SendingDomainNotFound: 404,
   CustomFieldNameTaken: 409,
   CustomFieldNotFound: 404,

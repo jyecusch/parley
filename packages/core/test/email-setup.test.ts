@@ -1,5 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
+import { Database } from "@parley/db"
 import type { ContactId, TopicId } from "@parley/domain"
+import { sql } from "drizzle-orm"
 import { Effect } from "effect"
 import { CoreLive, implementations as run, UnsubscribeLinks, unsubscribeApply, unsubscribePage } from "../src/index.ts"
 import { Fixture } from "./fixture.ts"
@@ -184,6 +186,30 @@ describe("email setup", () => {
         subscriptionStatus: "subscribed",
       })
       expect(admin.subscriptionStatus).toBe("subscribed")
+    }).pipe(Effect.provide(CoreLive)),
+  )
+
+  it.effect("an unverified domain claim lapses, so another team can take the domain", () =>
+    Effect.gen(function* () {
+      const f = yield* Fixture
+      const db = yield* Database
+      const domain = `claim-${unique()}.example.com`
+      const squatted = yield* run["sendingDomains.create"](f.bob, { teamId: f.globex, domain: domain as never })
+      const fresh = yield* run["sendingDomains.create"](f.jane, { teamId: f.acme, domain: domain as never }).pipe(
+        Effect.flip,
+      )
+      expect(fresh._tag).toBe("SendingDomainTaken")
+      // Pretend Globex never verified it, and added it four days ago.
+      yield* db.query((d) =>
+        d.execute(
+          sql`update "sending_domains" set status = 'pending', created_at = now() - interval '4 days' where id = ${squatted.id}`,
+        ),
+      )
+      const taken = yield* run["sendingDomains.create"](f.jane, { teamId: f.acme, domain: domain as never })
+      expect(taken.domain).toBe(domain)
+      expect(yield* run["sendingDomains.list"](f.bob, { teamId: f.globex })).not.toContainEqual(
+        expect.objectContaining({ domain }),
+      )
     }).pipe(Effect.provide(CoreLive)),
   )
 })

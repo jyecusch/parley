@@ -236,7 +236,7 @@ export class SendingDomainTaken
     return "domain is already a sending domain"
   }
   get userMessage() {
-    return userText`${this.domain} is already a sending domain, in this team or another. If it should be yours, remove it there first.`
+    return userText`${this.domain} is already a sending domain, in this team or another. If it's yours and that team hasn't verified it, you can add it 3 days after they did.`
   }
 }
 
@@ -288,5 +288,23 @@ export class SegmentLimitReached
   }
   get userMessage() {
     return userText`${this.team} has ${this.limit} segments, which is the most a team can have. Delete one you no longer use first.`
+  }
+}
+
+/** Each sending domain is registered with the email provider, so a team can have only a few. */
+export class SendingDomainLimitReached
+  extends Schema.TaggedError<SendingDomainLimitReached>()("SendingDomainLimitReached", {
+    team: DisplayName.schema,
+    limit: Schema.Number,
+  })
+  implements DomainError
+{
+  readonly isRetryable = false
+  override readonly [ErrorReporter.severity] = "Info" as const
+  override get message() {
+    return `team has reached ${this.limit} sending domains`
+  }
+  get userMessage() {
+    return userText`${this.team} has ${this.limit} sending domains, which is the most a team can have. Remove one you don't send from first.`
   }
 }

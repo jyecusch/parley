@@ -9,6 +9,7 @@ import {
   SenderNotReady,
   type SendingDomain,
   type SendingDomainId,
+  SendingDomainLimitReached,
   SendingDomainTaken,
   type TeamId,
 } from "@parley/domain"
@@ -39,6 +40,11 @@ export interface Sender {
   readonly footerReason: string
 }
 
+/** How many sending domains a team may have; each is registered with the email provider. */
+const DOMAIN_LIMIT = 5
+/** How long an unverified domain stays claimed before another team may take it. */
+const CLAIM_DAYS = 3
+
 const domainOf = (address: string | null) => (address ? (address.split("@")[1]?.toLowerCase() ?? "") : "")
 
 /** A display name in a From header, quoted when it needs to be. */
@@ -65,7 +71,7 @@ export class Sending extends Context.Service<
     readonly addDomain: <P, T>(
       access: CanManageEmail<P, T>,
       domain: string,
-    ) => Effect.Effect<SendingDomain, SendingDomainTaken | EmailError | DatabaseUnavailable>
+    ) => Effect.Effect<SendingDomain, SendingDomainTaken | SendingDomainLimitReached | EmailError | DatabaseUnavailable>
     readonly verifyDomain: <P, T, D>(
       target: SendingDomainInTeam<D, T>,
       access: CanManageEmail<P, T>,
@@ -189,18 +195,58 @@ export class Sending extends Context.Service<
           return ready
         })
 
+      /**
+       * A domain belongs to one team. A verified claim stands; an unverified one lapses after
+       * CLAIM_DAYS, so nobody can hold a domain they can't prove is theirs (another team may then
+       * take it over). The provider's record is shared, so a takeover reuses it.
+       */
       const addDomain = <P, T>(access: CanManageEmail<P, T>, input: string) =>
         Effect.gen(function* () {
           const domain = normalizeDomain(input)
-          const [taken] = yield* run(
+          const teamId = access.member.team.value
+          const taken = () => new SendingDomainTaken({ domain: EchoedInput.fromRequest(domain) })
+          const [count] = yield* run(
             db.query((d) =>
               d
-                .select({ id: schema.sendingDomains.id })
+                .select({ count: sql<number>`count(*)::int` })
                 .from(schema.sendingDomains)
-                .where(eq(schema.sendingDomains.domain, domain)),
+                .where(eq(schema.sendingDomains.teamId, teamId)),
             ),
           )
-          if (taken) return yield* new SendingDomainTaken({ domain: EchoedInput.fromRequest(domain) })
+          if (Number(count?.count ?? 0) >= DOMAIN_LIMIT) {
+            return yield* new SendingDomainLimitReached({ team: access.member.teamName, limit: DOMAIN_LIMIT })
+          }
+          const [existing] = yield* run(
+            db.query((d) => d.select().from(schema.sendingDomains).where(eq(schema.sendingDomains.domain, domain))),
+          )
+          if (existing) {
+            const lapsed =
+              existing.status !== "verified" && Date.now() - existing.createdAt.getTime() > CLAIM_DAYS * 86_400_000
+            if (existing.teamId === teamId || !lapsed) return yield* taken()
+            const checked = existing.providerId
+              ? yield* mailer.domains.verify(existing.providerId)
+              : yield* mailer.domains.create(domain)
+            const [moved] = yield* run(
+              db.query((d) =>
+                d
+                  .update(schema.sendingDomains)
+                  .set({
+                    teamId,
+                    providerId: checked.providerId,
+                    status: checked.status,
+                    records: [...checked.records],
+                    createdAt: sql`now()`,
+                    updatedAt: sql`now()`,
+                  })
+                  // Only if it's still the lapsed claim we looked at.
+                  .where(
+                    and(eq(schema.sendingDomains.id, existing.id), eq(schema.sendingDomains.teamId, existing.teamId)),
+                  )
+                  .returning(),
+              ),
+            )
+            return moved ? toDomain(moved) : yield* taken()
+          }
           const registered = yield* mailer.domains.create(domain)
           const id = crypto.randomUUID()
           // Two teams adding the same domain at once: the unique index decides.
@@ -208,7 +254,7 @@ export class Sending extends Context.Service<
             .query((d) =>
               d.insert(schema.sendingDomains).values({
                 id,
-                teamId: access.member.team.value,
+                teamId,
                 domain,
                 providerId: registered.providerId,
                 status: registered.status,
@@ -220,7 +266,7 @@ export class Sending extends Context.Service<
                 "SqlError",
                 (error: SqlError.SqlError): Effect.Effect<never, SendingDomainTaken | DatabaseUnavailable> =>
                   isUniqueViolation(error, "sending_domains_domain_key")
-                    ? Effect.fail(new SendingDomainTaken({ domain: EchoedInput.fromRequest(domain) }))
+                    ? Effect.fail(taken())
                     : classifySqlError(error),
               ),
             )
