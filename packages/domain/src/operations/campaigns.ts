@@ -26,6 +26,7 @@ import {
 } from "../errors/campaigns.ts"
 import { ContactNotFound } from "../errors/contacts.ts"
 import { EmailErrors } from "../errors/email.ts"
+import { RequestsTooFrequent } from "../errors/infrastructure.ts"
 import { CampaignId, ContactId, SegmentId, TeamId, TemplateId, TopicId } from "../ids.ts"
 import { defineTeamOperation } from "../operation.ts"
 
@@ -219,7 +220,14 @@ export const testSendCampaign = defineTeamOperation({
     contactId: PreviewContact,
   }),
   output: Schema.Struct({ sentTo: Schema.Array(Schema.String) }),
-  errors: [CampaignNotFound, ContactNotFound, TestRecipientNotMember, SenderNotReady, ...EmailErrors],
+  errors: [
+    CampaignNotFound,
+    ContactNotFound,
+    TestRecipientNotMember,
+    SenderNotReady,
+    RequestsTooFrequent,
+    ...EmailErrors,
+  ],
   http: { method: "POST", path: "/teams/:teamId/campaigns/:campaignId/test-send" },
   hints: { readOnly: false, destructive: false, idempotent: false },
   permissions: ["records:read", "email:write"],

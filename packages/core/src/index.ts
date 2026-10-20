@@ -16,6 +16,7 @@ import { Invitations } from "./services/invitations.ts"
 import { Members } from "./services/members.ts"
 import { Notes } from "./services/notes.ts"
 import { Purge } from "./services/purge.ts"
+import { RateLimiter } from "./services/rate-limiter.ts"
 import { SavedViews } from "./services/saved-views.ts"
 import { Segments } from "./services/segments.ts"
 import { Sending } from "./services/sending.ts"
@@ -40,6 +41,7 @@ export type { Principal } from "./principal.ts"
 export type { DeliveryEvents } from "./services/delivery-events.ts"
 export { FileStore } from "./services/file-store.ts"
 export type { Members } from "./services/members.ts"
+export { RateLimiter } from "./services/rate-limiter.ts"
 export type { Subscriptions } from "./services/subscriptions.ts"
 export { UnsubscribeLinks } from "./services/unsubscribe-links.ts"
 
@@ -65,7 +67,7 @@ const Services = Layer.mergeAll(
   Campaigns.layer,
   CampaignSender.layer,
   DeliveryEvents.layer,
-).pipe(Layer.provideMerge(UnsubscribeLinks.layer))
+).pipe(Layer.provideMerge(Layer.mergeAll(UnsubscribeLinks.layer, RateLimiter.layer)))
 
 /** Everything operations and authentication need, built once per process. */
 export const CoreLive = Authenticator.layer.pipe(

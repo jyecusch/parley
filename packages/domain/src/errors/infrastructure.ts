@@ -2,7 +2,7 @@ import { type DomainError, userText } from "@parley/errors"
 import { Duration, Schema } from "effect"
 import * as ErrorReporter from "effect/ErrorReporter"
 
-/** An API key exceeded its rate limit (D47). */
+/** Too many requests from one API key, connection or team in a short time (D47). */
 export class RequestsTooFrequent
   extends Schema.TaggedError<RequestsTooFrequent>()("RequestsTooFrequent", { retryAfter: Schema.Duration })
   implements DomainError
@@ -14,7 +14,7 @@ export class RequestsTooFrequent
   }
   get userMessage() {
     const seconds = Math.max(1, Math.ceil(Duration.toSeconds(this.retryAfter)))
-    return userText`Too many requests from this API key in a short time. Try again in ${seconds} ${seconds === 1 ? "second" : "seconds"}.`
+    return userText`Too many requests in a short time. Try again in ${seconds} ${seconds === 1 ? "second" : "seconds"}.`
   }
 }
 

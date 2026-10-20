@@ -12,6 +12,7 @@ import type { CustomFields } from "../services/custom-fields.ts"
 import type { Invitations } from "../services/invitations.ts"
 import type { Members } from "../services/members.ts"
 import type { Notes } from "../services/notes.ts"
+import type { RateLimiter } from "../services/rate-limiter.ts"
 import type { SavedViews } from "../services/saved-views.ts"
 import type { Segments } from "../services/segments.ts"
 import type { Sending } from "../services/sending.ts"
@@ -62,6 +63,7 @@ export type OperationServices =
   | Campaigns
   | Mailer
   | UnsubscribeLinks
+  | RateLimiter
 
 export type Implementation<Name extends OperationName> = (
   principal: Principal,

@@ -25,7 +25,7 @@ import {
   type updateTemplate,
 } from "@parley/domain"
 import { DisplayName } from "@parley/errors"
-import { Effect } from "effect"
+import { Duration, Effect } from "effect"
 import { type Footer, type MergeValues, mergeValuesOf, renderEmail, SAMPLE_VALUES } from "../email/render.ts"
 import { Mailer } from "../mail/mailer.ts"
 import type { Principal } from "../principal.ts"
@@ -45,6 +45,7 @@ import { proveTopicsInTeam } from "../proofs/topic-in-team.ts"
 import { Campaigns } from "../services/campaigns.ts"
 import { Contacts } from "../services/contacts.ts"
 import { Members } from "../services/members.ts"
+import { RateLimiter } from "../services/rate-limiter.ts"
 import { Segments } from "../services/segments.ts"
 import { Sending } from "../services/sending.ts"
 import { Templates } from "../services/templates.ts"
@@ -273,6 +274,8 @@ export const testSend = (principal: Principal, input: OperationInput<typeof test
       const canRead = yield* proveCanReadRecords(member)
       yield* proveCanWriteEmail(member)
       const found = (yield* proveCampaignInTeam(member, campaign)).found
+      // Test sends go out on the shared sending reputation, so each team gets a modest allowance.
+      yield* (yield* RateLimiter).take(`test-send:${team.value}`, 30, Duration.hours(1))
       // Test sends go to members only (R45), defaulting to whoever asked.
       const people = yield* members.people(member)
       const wanted = input.userIds ?? [principal.value.userId]

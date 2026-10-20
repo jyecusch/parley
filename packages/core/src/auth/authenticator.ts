@@ -26,6 +26,7 @@ import { Mailer } from "../mail/mailer.ts"
 import { renderVerification } from "../mail/templates.ts"
 import type { Principal } from "../principal.ts"
 import { Connections } from "../services/connections.ts"
+import { RateLimiter } from "../services/rate-limiter.ts"
 import { Users } from "../services/users.ts"
 import { type Auth, CONNECTION_CLAIM, type ConnectionHooks, issuer, makeAuth, mcpResource } from "./better-auth.ts"
 
@@ -211,6 +212,7 @@ export class Authenticator extends Context.Service<
       const auth = yield* BetterAuth
       const users = yield* Users
       const connections = yield* Connections
+      const limiter = yield* RateLimiter
       const baseURL = yield* PublicUrl
 
       // Better-Auth's signing keys, fetched in-process and refetched when a token names a new one.
@@ -262,6 +264,8 @@ export class Authenticator extends Context.Service<
           grant.actsAs.kind === "service-account"
             ? { _tag: "ServiceAccountConnection", ...common, connectedByUserId: grant.connectedByUserId }
             : { _tag: "UserConnection", ...common }
+        // The same allowance as an API key: an agent in a loop can't run without limit.
+        yield* limiter.take(`connection:${grant.id}`, 600, Duration.minutes(1))
         return principal
       })
 

@@ -7,6 +7,7 @@ import {
   implementations,
   type Members,
   type OperationServices,
+  RateLimiter,
   readFile,
   receiveDeliveryEvent,
   type Subscriptions,
@@ -24,7 +25,7 @@ import {
   type UnsubscribePage,
 } from "@parley/domain"
 import { toPublicError } from "@parley/errors"
-import { Effect, Layer, Schema } from "effect"
+import { Duration, Effect, Layer, Schema } from "effect"
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http"
 import { HttpApiBuilder } from "effect/http-api"
 import { errorBody } from "./respond.ts"
@@ -203,7 +204,7 @@ const decodeChange = Schema.decodeUnknownOption(UnsubscribeChange)
  */
 export const UnsubscribeRoutesLive = HttpRouter.use((router) =>
   Effect.gen(function* () {
-    const services = yield* Effect.context<Subscriptions | UnsubscribeLinks>()
+    const services = yield* Effect.context<Subscriptions | UnsubscribeLinks | RateLimiter>()
     const tokenOf = (request: HttpServerRequest.HttpServerRequest) =>
       // Tokens are base64url and a dot, so they're never URL-encoded; a malformed % is just an invalid token.
       new URL(request.url, "http://parley").pathname.replace(/^\/api\/unsubscribe\//, "")
@@ -230,7 +231,22 @@ export const UnsubscribeRoutesLive = HttpRouter.use((router) =>
         ),
         Effect.provide(services),
       )
-    yield* router.add("GET", "/api/unsubscribe/*", (request) => answer(unsubscribePage(tokenOf(request))))
+    // Recipients don't sign in, so the limits are per link and, as a backstop, for everyone.
+    const limited = (token: string, effect: Effect.Effect<HttpServerResponse.HttpServerResponse>) =>
+      Effect.gen(function* () {
+        const limiter = yield* RateLimiter
+        yield* limiter.take(`unsubscribe:${token.slice(-24)}`, 30, Duration.minutes(1))
+        yield* limiter.take("unsubscribe", 3000, Duration.minutes(1))
+        return yield* effect
+      }).pipe(
+        Effect.catchTag("RequestsTooFrequent", (error) =>
+          Effect.succeed(HttpServerResponse.jsonUnsafe(errorBody(error), { status: 429 })),
+        ),
+        Effect.provide(services),
+      )
+    yield* router.add("GET", "/api/unsubscribe/*", (request) =>
+      limited(tokenOf(request), answer(unsubscribePage(tokenOf(request)))),
+    )
     yield* router.add("POST", "/api/unsubscribe/*", (request) =>
       Effect.gen(function* () {
         const type = request.headers["content-type"] ?? ""
@@ -238,8 +254,11 @@ export const UnsubscribeRoutesLive = HttpRouter.use((router) =>
           ? yield* request.json.pipe(Effect.orElseSucceed(() => null))
           : null
         const change = body === null ? undefined : decodeChange(body)
-        return yield* answer(
-          unsubscribeApply(tokenOf(request), change && change._tag === "Some" ? change.value : { kind: "one-click" }),
+        return yield* limited(
+          tokenOf(request),
+          answer(
+            unsubscribeApply(tokenOf(request), change && change._tag === "Some" ? change.value : { kind: "one-click" }),
+          ),
         )
       }),
     )

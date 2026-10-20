@@ -187,6 +187,19 @@ export const makeAuth = (config: AuthConfig): Auth =>
       },
     },
     disabledPaths: DISABLED_PATHS,
+    // Always on (Better-Auth only enables it in production by default), with tighter limits where
+    // a request costs an email or a stored row: sign-up, verification and agents registering.
+    rateLimit: {
+      enabled: true,
+      window: 60,
+      max: 100,
+      customRules: {
+        "/sign-in/email": { window: 60, max: 10 },
+        "/sign-up/email": { window: 3600, max: 20 },
+        "/send-verification-email": { window: 3600, max: 5 },
+        "/oauth2/register": { window: 3600, max: 30 },
+      },
+    },
     hooks: { before: consentGuard(config.connections) },
     plugins: [
       organization({ creatorRole: "owner" }),
