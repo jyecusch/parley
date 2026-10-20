@@ -63,7 +63,7 @@ export const updateContact = defineTeamOperation({
   output: Contact,
   errors: [ContactNotFound, ContactEmailTaken],
   http: { method: "PATCH", path: "/teams/:teamId/contacts/:contactId" },
-  hints: { readOnly: false, destructive: false, idempotent: true },
+  hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: ["records:read", "records:write"],
 })
 

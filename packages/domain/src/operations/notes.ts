@@ -45,7 +45,7 @@ export const updateNote = defineTeamOperation({
   output: Note,
   errors: [NoteNotFound, NotNoteAuthor],
   http: { method: "PATCH", path: "/teams/:teamId/notes/:noteId" },
-  hints: { readOnly: false, destructive: false, idempotent: true },
+  hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: ["records:read", "records:write"],
 })
 

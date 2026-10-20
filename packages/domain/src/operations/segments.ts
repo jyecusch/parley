@@ -67,7 +67,7 @@ export const updateSegment = defineTeamOperation({
   output: Segment,
   errors: [SegmentNotFound],
   http: { method: "PATCH", path: "/teams/:teamId/segments/:segmentId" },
-  hints: { readOnly: false, destructive: false, idempotent: true },
+  hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: ["records:read", "email:write"],
 })
 
@@ -116,6 +116,6 @@ export const removeSegmentContacts = defineTeamOperation({
   output: Segment,
   errors: [SegmentNotFound, SegmentIsDynamic],
   http: { method: "POST", path: "/teams/:teamId/segments/:segmentId/contacts/remove" },
-  hints: { readOnly: false, destructive: false, idempotent: true },
+  hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: ["records:read", "email:write"],
 })

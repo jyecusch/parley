@@ -23,7 +23,7 @@ export const setContactAvatar = defineTeamOperation({
   output: Contact,
   errors: [ContactNotFound, ImageUnreadable, ImageTooLarge],
   http: { method: "POST", path: "/teams/:teamId/contacts/:contactId/avatar" },
-  hints: { readOnly: false, destructive: false, idempotent: true },
+  hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: ["records:read", "records:write"],
 })
 
@@ -45,7 +45,7 @@ export const setCompanyLogo = defineTeamOperation({
   output: Company,
   errors: [CompanyNotFound, ImageUnreadable, ImageTooLarge],
   http: { method: "POST", path: "/teams/:teamId/companies/:companyId/logo" },
-  hints: { readOnly: false, destructive: false, idempotent: true },
+  hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: ["records:read", "records:write"],
 })
 

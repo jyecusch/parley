@@ -65,7 +65,7 @@ export const importContacts = defineTeamOperation({
   output: ImportResult,
   errors: [],
   http: { method: "POST", path: "/teams/:teamId/contacts/import" },
-  hints: { readOnly: false, destructive: false, idempotent: false },
+  hints: { readOnly: false, destructive: true, idempotent: false },
   permissions: ["records:read", "records:write"],
 })
 
@@ -88,6 +88,6 @@ export const importCompanies = defineTeamOperation({
   output: ImportResult,
   errors: [],
   http: { method: "POST", path: "/teams/:teamId/companies/import" },
-  hints: { readOnly: false, destructive: false, idempotent: false },
+  hints: { readOnly: false, destructive: true, idempotent: false },
   permissions: ["records:read", "records:write"],
 })

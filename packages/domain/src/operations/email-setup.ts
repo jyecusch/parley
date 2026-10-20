@@ -67,7 +67,7 @@ export const updateEmailSettings = defineTeamOperation({
   output: EmailSettings,
   errors: [SenderAddressNotOnSendingDomain],
   http: { method: "PATCH", path: "/teams/:teamId/email-settings" },
-  hints: { readOnly: false, destructive: false, idempotent: true },
+  hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: ["email:manage"],
 })
 
@@ -154,7 +154,7 @@ export const updateTopic = defineTeamOperation({
   output: Topic,
   errors: [TopicNotFound],
   http: { method: "PATCH", path: "/teams/:teamId/topics/:topicId" },
-  hints: { readOnly: false, destructive: false, idempotent: true },
+  hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: ["email:manage"],
 })
 
@@ -194,6 +194,6 @@ export const updateContactSubscriptions = defineTeamOperation({
   output: ContactSubscriptions,
   errors: [ContactNotFound, TopicNotFound],
   http: { method: "PATCH", path: "/teams/:teamId/contacts/:contactId/subscriptions" },
-  hints: { readOnly: false, destructive: false, idempotent: true },
+  hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: ["records:read", "records:write"],
 })

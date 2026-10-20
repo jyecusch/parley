@@ -24,7 +24,7 @@ export const updateServiceAccount = defineTeamOperation({
   output: ServiceAccount,
   errors: [ServiceAccountNotFound],
   http: { method: "PATCH", path: "/teams/:teamId/service-accounts/:serviceAccountId" },
-  hints: { readOnly: false, destructive: false, idempotent: true },
+  hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: ["service-accounts:manage"],
 })
 

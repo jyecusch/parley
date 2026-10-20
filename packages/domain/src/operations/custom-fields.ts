@@ -55,7 +55,7 @@ export const updateField = defineTeamOperation({
   output: CustomField,
   errors: [CustomFieldNotFound, CustomFieldNameTaken],
   http: { method: "PATCH", path: "/teams/:teamId/fields/:fieldId" },
-  hints: { readOnly: false, destructive: false, idempotent: true },
+  hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: ["fields:manage"],
 })
 

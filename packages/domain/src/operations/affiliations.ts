@@ -49,7 +49,7 @@ export const updateAffiliation = defineTeamOperation({
   output: Affiliation,
   errors: [AffiliationNotFound],
   http: { method: "PATCH", path: "/teams/:teamId/affiliations/:affiliationId" },
-  hints: { readOnly: false, destructive: false, idempotent: true },
+  hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: ["records:read", "records:write"],
 })
 

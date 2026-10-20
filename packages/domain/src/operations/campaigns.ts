@@ -90,7 +90,7 @@ export const updateTemplate = defineTeamOperation({
   output: Template,
   errors: [TemplateNotFound],
   http: { method: "PATCH", path: "/teams/:teamId/templates/:templateId" },
-  hints: { readOnly: false, destructive: false, idempotent: true },
+  hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: ["records:read", "email:write"],
 })
 
@@ -171,7 +171,7 @@ export const updateCampaign = defineTeamOperation({
   output: Campaign,
   errors: [CampaignNotFound, CampaignNotDraft, SegmentNotFound, TopicNotFound],
   http: { method: "PATCH", path: "/teams/:teamId/campaigns/:campaignId" },
-  hints: { readOnly: false, destructive: false, idempotent: true },
+  hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: ["records:read", "email:write"],
 })
 

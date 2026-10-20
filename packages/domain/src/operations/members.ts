@@ -41,7 +41,7 @@ export const updateMember = defineTeamOperation({
   output: Member,
   errors: [MemberNotFound, LastOwner, OwnerChangeNeedsOwner],
   http: { method: "PATCH", path: "/teams/:teamId/members/:userId" },
-  hints: { readOnly: false, destructive: false, idempotent: true },
+  hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: ["members:manage"],
 })
 

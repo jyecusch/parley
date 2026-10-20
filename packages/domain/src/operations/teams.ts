@@ -59,6 +59,6 @@ export const updateTeam = defineTeamOperation({
   output: Team,
   errors: [],
   http: { method: "PATCH", path: "/teams/:teamId" },
-  hints: { readOnly: false, destructive: false, idempotent: true },
+  hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: ["team:manage"],
 })
