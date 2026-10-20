@@ -33,6 +33,12 @@ export class DeliveryEvents extends Context.Service<
     Effect.gen(function* () {
       const db = yield* Database
       const configured = yield* Config.option(Config.Redacted("RESEND_WEBHOOK_SECRET")).pipe(Effect.orDie)
+      const sendsForReal = yield* Config.option(Config.String("RESEND_API_KEY")).pipe(Effect.orDie)
+      if (Option.isNone(configured) && Option.isSome(sendsForReal) && sendsForReal.value.trim() !== "") {
+        yield* Effect.logWarning(
+          "RESEND_WEBHOOK_SECRET isn't set, so bounces and spam reports from Resend are refused and never recorded.",
+        )
+      }
       const secret = Option.map(configured, (value) =>
         Buffer.from(Redacted.value(value).replace(/^whsec_/, ""), "base64"),
       )

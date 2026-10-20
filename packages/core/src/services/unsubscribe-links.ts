@@ -42,6 +42,14 @@ export class UnsubscribeLinks extends Context.Service<
     Effect.gen(function* () {
       const own = yield* Config.option(Config.Redacted("UNSUBSCRIBE_SECRET")).pipe(Effect.orDie)
       const auth = yield* Config.Redacted("BETTER_AUTH_SECRET").pipe(Effect.orDie)
+      const sendsForReal = yield* Config.option(Config.String("RESEND_API_KEY")).pipe(Effect.orDie)
+      // Links already sent must keep working (R39), so once email really goes out the secret can't
+      // be the sign-in secret, which might one day be rotated.
+      if (Option.isNone(own) && Option.isSome(sendsForReal) && sendsForReal.value.trim() !== "") {
+        return yield* Effect.die(
+          new Error("UNSUBSCRIBE_SECRET is required when RESEND_API_KEY is set. Set it once and never change it."),
+        )
+      }
       const base = yield* PublicUrl.pipe(Effect.orDie)
       const secret = Redacted.value(Option.getOrElse(own, () => auth))
       const mac = (body: string) =>

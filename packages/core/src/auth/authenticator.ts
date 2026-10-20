@@ -40,6 +40,13 @@ export class BetterAuth extends Context.Service<BetterAuth, Auth>()("@parley/cor
     Effect.gen(function* () {
       const url = yield* Config.Redacted("DATABASE_URL")
       const secret = yield* Config.Redacted("BETTER_AUTH_SECRET")
+      // Refuse to start with the example's placeholder, or anything short enough to guess.
+      const secretText = Redacted.value(secret)
+      if (secretText.startsWith("replace-with") || secretText.length < 32) {
+        return yield* Effect.die(
+          new Error("BETTER_AUTH_SECRET must be at least 32 random characters (openssl rand -hex 32)."),
+        )
+      }
       const baseURL = yield* PublicUrl
       const pool = yield* Effect.acquireRelease(
         Effect.sync(() => new Pool({ connectionString: Redacted.value(url), max: 5, statement_timeout: 30_000 })),
