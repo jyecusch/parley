@@ -157,8 +157,13 @@ export class Mailer extends Context.Service<
           Effect.map(post("/domains", { name: domain }), (result) => toDomain(result as ResendDomain)),
         verify: (providerId: string) =>
           Effect.gen(function* () {
-            yield* post(`/domains/${encodeURIComponent(providerId)}/verify`, {})
-            return toDomain((yield* request("GET", `/domains/${encodeURIComponent(providerId)}`)) as ResendDomain)
+            const path = `/domains/${encodeURIComponent(providerId)}`
+            const current = toDomain((yield* request("GET", path)) as ResendDomain)
+            // Asking Resend to verify starts a fresh DNS check, which puts a verified domain back
+            // to pending until it finishes, so a verified domain is left alone.
+            if (current.status === "verified") return current
+            yield* post(`${path}/verify`, {})
+            return toDomain((yield* request("GET", path)) as ResendDomain)
           }),
         remove: (providerId: string) =>
           request("DELETE", `/domains/${encodeURIComponent(providerId)}`).pipe(Effect.asVoid),
