@@ -42,11 +42,7 @@
   },
   "overrides": [
     {
-      "includes": [
-        "**/*.ts",
-        "**/*.tsx",
-        "!packages/errors/src/**"
-      ],
+      "includes": ["**/*.ts", "**/*.tsx", "!packages/errors/src/**"],
       "plugins": [
         "./lint/no-effect-promise.grit",
         "./lint/no-unchecked-user-text.grit",
@@ -57,9 +53,7 @@
       ]
     },
     {
-      "includes": [
-        "**/*.css"
-      ],
+      "includes": ["**/*.css"],
       "linter": {
         "rules": {
           "style": {

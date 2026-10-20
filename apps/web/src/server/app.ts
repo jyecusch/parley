@@ -28,10 +28,22 @@ const AppLive = Layer.mergeAll(
 ).pipe(Layer.provide(CoreLive), Layer.provide(HttpServer.layerServices))
 
 const makeApp = () => HttpRouter.toWebHandler(AppLive)
-let app: ReturnType<typeof makeApp> | undefined
+type App = ReturnType<typeof makeApp>
+
+/*
+ * The app lives on globalThis, not in a module variable. In development, editing server code
+ * re-evaluates this module; the new copy finds the old app here and closes it (its database pool and
+ * background work), or every edit would leave connections open until Postgres refuses new ones.
+ */
+const KEY = Symbol.for("parley.app")
+const holder = globalThis as typeof globalThis & { [KEY]?: App | undefined }
+const stale = holder[KEY]
+holder[KEY] = undefined
+if (stale) void stale.dispose()
 
 export const handle = (request: Request): Promise<Response> => {
-  app ??= makeApp()
+  holder[KEY] ??= makeApp()
+  const app = holder[KEY]
   const limited = limitBody(request)
   return limited instanceof Response ? Promise.resolve(limited) : app.handler(limited)
 }

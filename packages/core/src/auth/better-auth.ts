@@ -78,6 +78,8 @@ export interface AuthConfig {
   readonly connections: ConnectionHooks
   /** Sends the link that proves someone owns their email address. */
   readonly sendVerificationEmail: (to: string, link: string) => Promise<void>
+  /** Headers holding the client's address when behind a proxy, such as `cf-connecting-ip`. */
+  readonly ipAddressHeaders: ReadonlyArray<string>
 }
 
 interface SessionResult {
@@ -187,6 +189,9 @@ export const makeAuth = (config: AuthConfig): Auth =>
       },
     },
     disabledPaths: DISABLED_PATHS,
+    ...(config.ipAddressHeaders.length > 0
+      ? { advanced: { ipAddress: { ipAddressHeaders: [...config.ipAddressHeaders] } } }
+      : {}),
     // Always on (Better-Auth only enables it in production by default), with tighter limits where
     // a request costs an email or a stored row: sign-up, verification and agents registering.
     rateLimit: {

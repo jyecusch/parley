@@ -11,5 +11,7 @@ export default defineConfig({
     strictPort: process.env.PORT !== undefined,
     ...(process.env.HOST ? { host: process.env.HOST } : {}),
   },
+  // Native modules load their binaries at runtime, so the server build leaves them in node_modules.
+  ssr: { external: ["sharp"] },
   plugins: [tailwindcss(), tanstackStart(), react()],
 })

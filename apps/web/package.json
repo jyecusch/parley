@@ -1,13 +1,13 @@
 {
   "name": "@parley/web",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "portless parley bun run dev:app",
     "dev:app": "bun --env-file=../../.env --bun vite dev",
     "build": "bun --bun vite build",
-    "start": "bun --env-file=../../.env .output/server/index.mjs"
+    "start": "bun --env-file=../../.env serve.ts"
   },
   "dependencies": {
     "@parley/api": "workspace:*",
@@ -26,6 +26,7 @@
     "effect": "4.0.5",
     "react": "19.3.1",
     "react-dom": "19.3.1",
+    "sharp": "0.34.5",
     "tailwind-merge": "3.7.0"
   },
   "devDependencies": {

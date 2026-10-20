@@ -40,6 +40,8 @@ export class BetterAuth extends Context.Service<BetterAuth, Auth>()("@parley/cor
     Effect.gen(function* () {
       const url = yield* Config.Redacted("DATABASE_URL")
       const secret = yield* Config.Redacted("BETTER_AUTH_SECRET")
+      // Behind a proxy, the header carrying the visitor's address, so rate limits are per visitor.
+      const ipAddressHeader = yield* Config.String("IP_ADDRESS_HEADER").pipe(Config.withDefault(""))
       // Refuse to start with the example's placeholder, or anything short enough to guess.
       const secretText = Redacted.value(secret)
       if (secretText.startsWith("replace-with") || secretText.length < 32) {
@@ -105,6 +107,7 @@ export class BetterAuth extends Context.Service<BetterAuth, Auth>()("@parley/cor
         baseURL,
         connections: hooks,
         sendVerificationEmail,
+        ipAddressHeaders: ipAddressHeader ? [ipAddressHeader] : [],
       })
     }),
   )

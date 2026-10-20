@@ -29,3 +29,21 @@ bun run typecheck
 bun run lint
 bun run test                    # needs the database running, with .env loaded
 ```
+
+## Deploy it
+
+Parley ships as one container (`Dockerfile`): the web app, the HTTP API and MCP on port 3000. It needs Postgres, and runs its migrations each time it starts.
+
+```sh
+docker build -t parley .
+docker run -p 3000:3000 \
+  -e DATABASE_URL=postgres://user:password@host:5432/parley \
+  -e BETTER_AUTH_SECRET=$(openssl rand -hex 32) \
+  -e BETTER_AUTH_URL=https://parley.example.com \
+  parley
+```
+
+- `BETTER_AUTH_URL` is the public address people and agents use; sign-in and OAuth only work there.
+- Behind a proxy or Cloudflare, set `IP_ADDRESS_HEADER` (for example `cf-connecting-ip`) so sign-in rate limits apply per visitor.
+- Email, file storage and the rest are optional; see `.env.example`.
+- Without Docker: `bun install`, `bun run --cwd apps/web build`, then `bun packages/db/src/migrate.ts && bun apps/web/serve.ts`.
