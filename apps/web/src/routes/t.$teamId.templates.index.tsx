@@ -96,7 +96,7 @@ function TemplatesScreen() {
                         params={{ teamId, templateId: template.id }}
                       >
                         <span className="tile" aria-hidden="true">
-                          <TemplateIcon size={12} />
+                          <TemplateIcon className="size-3.5" />
                         </span>
                         <span className="n">{template.name}</span>
                       </Link>

@@ -2,6 +2,7 @@ import { type QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { createRootRouteWithContext, HeadContent, Outlet, Scripts } from "@tanstack/react-router"
 import type { ReactNode } from "react"
 import appCss from "../styles/app.css?url"
+import legacyCss from "../styles/legacy.css?url"
 import settingsCss from "../styles/settings.css?url"
 
 /** Applies the saved theme and CRT mode before first paint, so there's no flash. */
@@ -25,6 +26,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "icon", href: "/favicon-32.png", type: "image/png", sizes: "32x32" },
       { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
       { rel: "stylesheet", href: appCss },
+      { rel: "stylesheet", href: legacyCss },
       { rel: "stylesheet", href: settingsCss },
     ],
   }),

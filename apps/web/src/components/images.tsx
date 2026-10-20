@@ -135,7 +135,7 @@ export function ImageEditor(props: {
           disabled={busy}
           onClick={() => void run(props.onRemove)}
         >
-          <CloseIcon size={9} />
+          <CloseIcon className="size-3" />
         </button>
       ) : null}
       <input

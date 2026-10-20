@@ -116,7 +116,7 @@ function Fields() {
         />
       ) : shown.length === 0 ? (
         <Empty
-          icon={<DisplayIcon size={16} />}
+          icon={<DisplayIcon className="size-5" />}
           title={`No fields on ${recordType === "contact" ? "contacts" : "companies"} yet`}
         >
           {canManage
@@ -176,7 +176,7 @@ function Fields() {
                           disabled={index === 0}
                           onClick={() => void move(field, -1)}
                         >
-                          <ChevronUp size={14} />
+                          <ChevronUp className="size-4" />
                         </button>
                         <button
                           className="ibtn xs"
@@ -185,7 +185,7 @@ function Fields() {
                           disabled={index === shown.length - 1}
                           onClick={() => void move(field, 1)}
                         >
-                          <ChevronDown size={14} />
+                          <ChevronDown className="size-4" />
                         </button>
                         <button className="btn sm ghost" type="button" onClick={() => setDialog(field)}>
                           Edit
@@ -360,7 +360,7 @@ function FieldDialog(props: {
                 aria-label={`Remove option ${option.label || index + 1}`}
                 onClick={() => setOptions(options.filter((other) => other.id !== option.id))}
               >
-                <CloseIcon size={14} />
+                <CloseIcon className="size-4" />
               </button>
             </div>
           ))}
@@ -369,7 +369,7 @@ function FieldDialog(props: {
             type="button"
             onClick={() => setOptions([...options, { id: optionId("option"), label: "" }])}
           >
-            <PlusIcon size={12} />
+            <PlusIcon className="size-3.5" />
             Add option
           </button>
           {removedOptions.length > 0 ? (

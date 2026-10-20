@@ -52,7 +52,7 @@ export function FilterBar(props: {
                 aria-label={`Remove filter on ${info?.label ?? "field"}`}
                 onClick={() => update(filter.conditions.filter((_, other) => other !== index))}
               >
-                <CloseIcon size={10} />
+                <CloseIcon className="size-3" />
               </button>
             </span>
             {editing === index && info ? (
@@ -72,7 +72,7 @@ export function FilterBar(props: {
       })}
       <span className="fchip-wrap">
         <button className="btn ghost sm" type="button" onClick={() => setEditing("new")}>
-          <PlusIcon size={12} />
+          <PlusIcon className="size-3.5" />
           Filter
         </button>
         {editing === "new" ? (

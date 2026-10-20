@@ -64,7 +64,7 @@ function Invite() {
   return (
     <main className="auth">
       <div className="auth-card">
-        <ParleyMark height={32} />
+        <ParleyMark className="h-8" />
         {invitation.isPending ? (
           <div className="sk" style={{ width: 200 }} />
         ) : invitation.isError ? (

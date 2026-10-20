@@ -450,7 +450,7 @@ function CompaniesScreen() {
               style={{ width: 24, height: 24 }}
               onClick={() => setSelected(new Set())}
             >
-              <CloseIcon size={12} />
+              <CloseIcon className="size-3.5" />
             </button>
           </div>
         ) : toast ? (
@@ -666,7 +666,7 @@ function DeletedCompanies(props: {
               </td>
               <td style={{ textAlign: "right" }}>
                 <button className="btn sm" type="button" onClick={() => void props.onRestore([company.id])}>
-                  <RestoreIcon size={13} />
+                  <RestoreIcon className="size-3.5" />
                   Restore
                 </button>
               </td>
@@ -856,7 +856,7 @@ function CreatePanel(props: {
                 style={{ margin: "2px 0 4px" }}
                 onClick={() => setDomains([...domains, ""])}
               >
-                <PlusIcon size={12} />
+                <PlusIcon className="size-3.5" />
                 Add domain
               </button>
             </div>

@@ -75,7 +75,7 @@ export function AddToSegmentDialog(props: {
               onClick={() => setChoice(segment.id)}
             >
               <span className="tile" aria-hidden="true">
-                <SegmentIcon size={12} />
+                <SegmentIcon className="size-3.5" />
               </span>
               <span>{segment.name}</span>
               <span className="s sm-t">{segment.contactCount}</span>

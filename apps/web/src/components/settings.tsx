@@ -104,7 +104,7 @@ export function SettingsShell(props: { readonly team: Team; readonly children: R
               params={params}
             >
               <span className="ic">
-                <DisplayIcon size={16} />
+                <DisplayIcon className="size-5" />
               </span>
               <span className="lbl">Fields</span>
             </Link>
@@ -332,7 +332,7 @@ export const useToast = () => {
     <div className="toast" role="status">
       <span>{text}</span>
       <button className="ibtn" type="button" aria-label="Dismiss" onClick={() => setText(undefined)}>
-        <CloseIcon size={14} />
+        <CloseIcon className="size-4" />
       </button>
     </div>
   ) : null

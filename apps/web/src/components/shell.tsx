@@ -183,7 +183,7 @@ export function AppShell(props: {
                   <div className="menu-sep" />
                   <Link className="menu-i" to="/new-team" onClick={closeTeamMenu}>
                     <span className="ic">
-                      <PlusIcon size={14} />
+                      <PlusIcon className="size-4" />
                     </span>
                     New team
                   </Link>
@@ -634,7 +634,7 @@ function CommandMenu(props: { readonly onClose: () => void }) {
             onKeyDown={onKey}
           />
           <button className="ibtn" type="button" aria-label="Close command menu" onClick={props.onClose}>
-            <CloseIcon size={14} />
+            <CloseIcon className="size-4" />
           </button>
         </div>
         <div className="cmd-list">

@@ -416,7 +416,7 @@ function ContactsScreen() {
               style={{ width: 24, height: 24 }}
               onClick={() => setSelected(new Set())}
             >
-              <CloseIcon size={12} />
+              <CloseIcon className="size-3.5" />
             </button>
           </div>
         ) : toast ? (
@@ -750,7 +750,7 @@ function DeletedContacts(props: {
               </td>
               <td style={{ textAlign: "right" }}>
                 <button className="btn sm" type="button" onClick={() => void props.onRestore([contact.id])}>
-                  <RestoreIcon size={13} />
+                  <RestoreIcon className="size-3.5" />
                   Restore
                 </button>
               </td>

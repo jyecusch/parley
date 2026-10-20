@@ -117,7 +117,7 @@ export function Picker(props: {
   return (
     <div className="pop" role="dialog" aria-label={props.label} ref={ref} style={{ right: 8, top: 34 }}>
       <div className="pop-in">
-        <SearchIcon size={14} />
+        <SearchIcon className="size-4" />
         <input
           // biome-ignore lint/a11y/noAutofocus: the picker opens for typing
           autoFocus
@@ -172,7 +172,7 @@ export function Picker(props: {
             onClick={() => props.onCreate?.(query.trim())}
           >
             <span className="ic">
-              <PlusIcon size={14} />
+              <PlusIcon className="size-4" />
             </span>
             <span>{props.createLabel?.(query.trim())}</span>
           </button>
@@ -241,7 +241,7 @@ export function ContactCompanies(props: {
           aria-expanded={picking}
           onClick={() => setPicking((open) => !open)}
         >
-          <PlusIcon size={12} />
+          <PlusIcon className="size-3.5" />
           Add to company
         </button>
       </h3>
@@ -302,7 +302,7 @@ export function ContactCompanies(props: {
                   })
                 }
               >
-                <CloseIcon size={12} />
+                <CloseIcon className="size-3.5" />
               </button>
             </span>
           </div>
@@ -396,7 +396,7 @@ export function CompanyContacts(props: {
           aria-expanded={picking}
           onClick={() => setPicking((open) => !open)}
         >
-          <PlusIcon size={12} />
+          <PlusIcon className="size-3.5" />
           Add contact
         </button>
       </h3>
@@ -436,7 +436,7 @@ export function CompanyContacts(props: {
                 })
               }
             >
-              <CloseIcon size={12} />
+              <CloseIcon className="size-3.5" />
             </button>
           </span>
         </div>

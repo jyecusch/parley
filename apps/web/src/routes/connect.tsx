@@ -100,7 +100,7 @@ function Connect() {
   return (
     <div className="consent">
       <header className="top">
-        <ParleyMark height={20} />
+        <ParleyMark className="h-5" />
         <span>Parley</span>
       </header>
       <main className="stage">
@@ -128,7 +128,7 @@ function Problem(props: { readonly title: string; readonly message: UserText }) 
   return (
     <div className="done" role="alert">
       <div className="e-ic no">
-        <AlertIcon size={18} />
+        <AlertIcon className="size-5.5" />
       </div>
       <h2>{props.title}</h2>
       <p>{props.message}</p>
@@ -170,7 +170,7 @@ function AgentHeader(props: {
           <path d="M2 6h24" />
         </svg>
         <span className="big p">
-          <ParleyMark height={28} />
+          <ParleyMark />
         </span>
       </div>
       <h1>{props.agent.name} wants to work in Parley</h1>
@@ -279,7 +279,7 @@ function ConsentForm(props: {
     return (
       <div className="done" role="status">
         <div className="e-ic">
-          <CheckIcon size={18} />
+          <CheckIcon className="size-5.5" />
         </div>
         <h2>
           {props.agent.name} is connected to {team.name}
@@ -295,7 +295,7 @@ function ConsentForm(props: {
     return (
       <div className="done" role="status">
         <div className="e-ic no">
-          <CloseIcon size={18} />
+          <CloseIcon className="size-5.5" />
         </div>
         <h2>{props.agent.name} wasn't connected</h2>
         <p>Nothing changed in Parley. You can close this tab.</p>

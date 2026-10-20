@@ -94,7 +94,7 @@ function CampaignsScreen() {
                         params={{ teamId, campaignId: campaign.id }}
                       >
                         <span className="tile" aria-hidden="true">
-                          <SendIcon size={12} />
+                          <SendIcon className="size-3.5" />
                         </span>
                         <span className="stack">
                           <span className="n">{campaign.name}</span>

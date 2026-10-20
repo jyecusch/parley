@@ -19,7 +19,7 @@ export function AuthForm(props: {
   return (
     <main className="auth">
       <form className="auth-card" onSubmit={submit} noValidate>
-        <ParleyMark height={32} />
+        <ParleyMark className="h-8" />
         <div>
           <h1>{props.title}</h1>
           <p>{props.intro}</p>

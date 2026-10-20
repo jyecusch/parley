@@ -237,7 +237,7 @@ function NoteRow(props: {
               aria-expanded={menu}
               onClick={() => setMenu((open) => !open)}
             >
-              <MoreIcon size={12} />
+              <MoreIcon className="size-3.5" />
             </button>
             {menu ? (
               <div className="menu" style={{ right: 0, top: 24 }}>

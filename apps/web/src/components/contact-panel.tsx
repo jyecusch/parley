@@ -93,7 +93,7 @@ export function ContactPanel(props: {
             data-tip="Next  J"
             onClick={() => props.onMove(1)}
           >
-            <ChevronDown size={16} />
+            <ChevronDown className="size-5" />
           </button>
           <span className="pos sm-t tab">
             {props.position.index + 1} of {props.position.total}
@@ -135,7 +135,7 @@ export function ContactPanel(props: {
                 </button>
                 <div className="menu-sep" />
                 <button className="menu-i" type="button" style={{ color: "var(--danger)" }} onClick={props.onDelete}>
-                  <TrashIcon size={14} />
+                  <TrashIcon className="size-4" />
                   Delete contact
                 </button>
               </div>

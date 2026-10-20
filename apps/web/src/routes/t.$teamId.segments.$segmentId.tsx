@@ -269,7 +269,7 @@ function SegmentView(props: {
         ) : props.canWrite ? (
           <span className="fchip-wrap">
             <button className="btn ghost sm" type="button" onClick={() => setPicking(true)}>
-              <PlusIcon size={12} />
+              <PlusIcon className="size-3.5" />
               Add contacts
             </button>
             {picking ? (
@@ -365,7 +365,7 @@ function SegmentView(props: {
                             )
                           }
                         >
-                          <CloseIcon size={12} />
+                          <CloseIcon className="size-3.5" />
                         </button>
                       </td>
                     ) : null}
