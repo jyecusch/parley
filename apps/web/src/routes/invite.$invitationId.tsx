@@ -3,6 +3,7 @@ import type { UserText } from "@parley/errors"
 import { useQuery } from "@tanstack/react-query"
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router"
 import { useState } from "react"
+import { ParleyMark } from "../components/logo.tsx"
 import { getSession, signOut } from "../lib/auth.ts"
 import { call, isApiFailure, messageOf } from "../lib/client.ts"
 
@@ -63,9 +64,7 @@ function Invite() {
   return (
     <main className="auth">
       <div className="auth-card">
-        <span className="logo" style={{ width: 28, height: 28, fontSize: 14, borderRadius: 7 }} aria-hidden="true">
-          P
-        </span>
+        <ParleyMark height={32} />
         {invitation.isPending ? (
           <div className="sk" style={{ width: 200 }} />
         ) : invitation.isError ? (

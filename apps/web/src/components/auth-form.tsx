@@ -1,5 +1,6 @@
 import type { UserText } from "@parley/errors"
 import type { FormEvent, ReactNode } from "react"
+import { ParleyMark } from "./logo.tsx"
 
 export function AuthForm(props: {
   readonly title: string
@@ -18,9 +19,7 @@ export function AuthForm(props: {
   return (
     <main className="auth">
       <form className="auth-card" onSubmit={submit} noValidate>
-        <span className="logo" style={{ width: 28, height: 28, fontSize: 14, borderRadius: 7 }} aria-hidden="true">
-          P
-        </span>
+        <ParleyMark height={32} />
         <div>
           <h1>{props.title}</h1>
           <p>{props.intro}</p>

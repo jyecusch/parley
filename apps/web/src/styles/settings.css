@@ -624,8 +624,7 @@
   object-fit: cover;
 }
 .consent .big.p {
-  background: var(--primary-bg);
-  color: var(--primary-fg);
+  background: transparent;
 }
 .consent .a-h h1 {
   margin: 0;

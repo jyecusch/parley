@@ -11,6 +11,7 @@ import { useQuery } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
 import { useState } from "react"
 import { AlertIcon, CheckIcon, ChevronDown, CloseIcon } from "../components/icons.tsx"
+import { ParleyMark } from "../components/logo.tsx"
 import { initialsOf, SCOPE_LABELS } from "../components/settings.tsx"
 import { agentRequest, getSession, signOut, withAgentRequest } from "../lib/auth.ts"
 import { call, messageOf } from "../lib/client.ts"
@@ -99,9 +100,7 @@ function Connect() {
   return (
     <div className="consent">
       <header className="top">
-        <span className="logo" aria-hidden="true">
-          P
-        </span>
+        <ParleyMark height={20} />
         <span>Parley</span>
       </header>
       <main className="stage">
@@ -170,7 +169,9 @@ function AgentHeader(props: {
         >
           <path d="M2 6h24" />
         </svg>
-        <span className="big p">P</span>
+        <span className="big p">
+          <ParleyMark height={28} />
+        </span>
       </div>
       <h1>{props.agent.name} wants to work in Parley</h1>
       <span className="origin sm-t">

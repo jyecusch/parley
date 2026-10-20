@@ -2221,3 +2221,30 @@ body {
     box-shadow: var(--card);
   }
 }
+
+/* The loading screen: Parley's mark, breathing gently while a page loads. */
+.loading-screen {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  background: var(--bg-app);
+}
+.loading-screen img {
+  animation: mark-breathe 1.6s ease-in-out infinite;
+}
+@keyframes mark-breathe {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scale(0.96);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .loading-screen img {
+    animation: none;
+  }
+}
