@@ -293,6 +293,7 @@ function SegmentView(props: {
                 label="Add a contact"
                 placeholder="Find a contact"
                 heading="Contacts"
+                placement="top-full left-0 mt-1"
                 items={pickable}
                 onClose={() => setPicking(false)}
                 onPick={(id) =>

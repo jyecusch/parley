@@ -165,6 +165,8 @@ export function Picker(props: {
   readonly onCreate?: (name: string) => void
   readonly createLabel?: (name: string) => string
   readonly onClose: () => void
+  /** Where it opens, relative to the positioned element around it. Defaults to below, from the right. */
+  readonly placement?: string
 }) {
   const [query, setQuery] = useState("")
   const [active, setActive] = useState(0)
@@ -189,7 +191,7 @@ export function Picker(props: {
     else if (canCreate) props.onCreate?.(query.trim())
   }
   return (
-    <Popover role="dialog" aria-label={props.label} ref={ref} className="top-10 right-2">
+    <Popover role="dialog" aria-label={props.label} ref={ref} className={props.placement ?? "top-10 right-2"}>
       <PopoverSearch icon={<SearchIcon className="size-4" />}>
         <input
           // biome-ignore lint/a11y/noAutofocus: the picker opens for typing

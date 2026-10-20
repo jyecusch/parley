@@ -105,13 +105,13 @@ export function MenuHeading({ children }: { children: ReactNode }) {
   return <p className="m-0 px-2.5 pt-2 pb-0.5 text-sm text-subtle">{children}</p>
 }
 
-/** A floating panel, such as a picker or a filter editor, positioned by its caller. */
+/** A floating panel, such as a picker or a filter editor, positioned by its caller. Its width is capped by the window, not by the element it opens from. */
 export function Popover({ className, ref, ...props }: HTMLAttributes<HTMLDivElement> & { ref?: Ref<HTMLDivElement> }) {
   return (
     <div
       ref={ref}
       className={cn(
-        "absolute z-12 w-96 max-w-[calc(100%-1.5rem)] overflow-hidden rounded-xl bg-raised shadow-pop",
+        "absolute z-12 w-96 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl bg-raised shadow-pop",
         className,
       )}
       {...props}
