@@ -19,6 +19,7 @@ import {
   propertyFieldsetClass,
   toE164,
 } from "./record.tsx"
+import { RecordOwnerField } from "./record-owner.tsx"
 import { Timeline } from "./timeline.tsx"
 import {
   Button,
@@ -252,6 +253,19 @@ export function CompanyPanel(props: {
             onSave={(address) =>
               save((draft) => {
                 draft.address = address
+              })
+            }
+          />
+          <RecordOwnerField
+            teamId={props.teamId}
+            label="Company owner"
+            ownerId={company.ownerId}
+            ownerName={company.ownerName}
+            disabled={!props.canWrite}
+            onChange={(owner) =>
+              save((draft) => {
+                draft.ownerId = owner?.id ?? null
+                draft.ownerName = owner?.name ?? null
               })
             }
           />

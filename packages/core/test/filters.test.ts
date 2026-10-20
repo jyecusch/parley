@@ -59,6 +59,7 @@ describe("filters", () => {
         firstName: "Ana",
         lastName: "Lopez",
         emails: [email("ana@acme.io")],
+        ownerId: f.sam.userId,
         custom: {
           [plan.id]: "pro",
           [tags.id]: ["vip", "beta"],
@@ -85,6 +86,9 @@ describe("filters", () => {
         { match: "all", conditions: [{ field: "phone", operator: "is-not-empty" }] },
         { match: "all", conditions: [{ field: "company", operator: "is-any-of", value: [acme.id] }] },
         { match: "all", conditions: [{ field: "company", operator: "is-empty" }] },
+        { match: "all", conditions: [{ field: "owner", operator: "is-any-of", value: [f.sam.userId] }] },
+        { match: "all", conditions: [{ field: "owner", operator: "is-none-of", value: [f.sam.userId] }] },
+        { match: "all", conditions: [{ field: "owner", operator: "is-empty" }] },
         { match: "all", conditions: [{ field: `custom:${plan.id}`, operator: "is-any-of", value: ["pro"] }] },
         { match: "all", conditions: [{ field: `custom:${plan.id}`, operator: "is-none-of", value: ["pro"] }] },
         { match: "all", conditions: [{ field: `custom:${tags.id}`, operator: "has-all-of", value: ["vip", "beta"] }] },

@@ -9,6 +9,7 @@ import { CustomFieldsSection } from "./custom-fields.tsx"
 import { TrashIcon } from "./icons.tsx"
 import { ContactAvatar, ImageEditor } from "./images.tsx"
 import { EditableList, EditableText, PanelBar, PanelIdentity, PanelSubtitle, toE164 } from "./record.tsx"
+import { RecordOwnerField } from "./record-owner.tsx"
 import { SubscriptionSection } from "./subscriptions.tsx"
 import { Timeline } from "./timeline.tsx"
 import {
@@ -177,6 +178,19 @@ export function ContactPanel(props: {
                   number: toE164(value) as Contact["phones"][number]["number"],
                   label: contact.phones[index]?.label ?? null,
                 }))
+              })
+            }
+          />
+          <RecordOwnerField
+            teamId={props.teamId}
+            label="Contact owner"
+            ownerId={contact.ownerId}
+            ownerName={contact.ownerName}
+            disabled={!props.canWrite}
+            onChange={(owner) =>
+              save((draft) => {
+                draft.ownerId = owner?.id ?? null
+                draft.ownerName = owner?.name ?? null
               })
             }
           />

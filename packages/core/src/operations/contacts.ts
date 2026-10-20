@@ -19,6 +19,7 @@ import {
   proveCanWriteRecords,
 } from "../proofs/permissions.ts"
 import { named } from "../proofs/proof.ts"
+import { recordOwnerChange } from "../proofs/record-owner.ts"
 import { Contacts } from "../services/contacts.ts"
 
 export const list = (principal: Principal, input: OperationInput<typeof listContacts>) =>
@@ -48,7 +49,8 @@ export const create = (principal: Principal, input: OperationInput<typeof create
       const contacts = yield* Contacts
       const member = yield* proveMemberOf(principal, team)
       const canWrite = yield* proveCanWriteRecords(member)
-      return yield* contacts.create(team, input, canWrite)
+      const owner = yield* recordOwnerChange(member, input.ownerId)
+      return yield* contacts.create(team, input, canWrite, owner)
     }),
   )
 
@@ -64,7 +66,8 @@ export const update = (principal: Principal, input: OperationInput<typeof update
       const resubscribing =
         input.subscriptionStatus === "subscribed" && (yield* contacts.get(target)).subscriptionStatus !== "subscribed"
       const resubscribe = resubscribing ? yield* proveCanManageEmail(member) : undefined
-      return yield* contacts.update(target, input, canWrite, resubscribe)
+      const owner = yield* recordOwnerChange(member, input.ownerId)
+      return yield* contacts.update(target, input, canWrite, resubscribe, owner)
     }),
   )
 

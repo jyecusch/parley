@@ -13,6 +13,7 @@ import {
   InputRejected,
   type Sort,
   type TeamId,
+  type UserId,
 } from "@parley/domain"
 import { DisplayName, EchoedInput, userText } from "@parley/errors"
 import { and, asc, desc, eq, exists, ilike, inArray, isNotNull, isNull, ne, or, type SQL, sql } from "drizzle-orm"
@@ -22,6 +23,7 @@ import type { Principal } from "../principal.ts"
 import type { ContactInTeam, ContactRestorable } from "../proofs/contact-in-team.ts"
 import type { CanDeleteRecords, CanManageEmail, CanReadRecords, CanWriteRecords } from "../proofs/permissions.ts"
 import type { Named } from "../proofs/proof.ts"
+import type { RecordOwnerChange } from "../proofs/record-owner.ts"
 import { activityRow, toActivityEntry } from "./activity.ts"
 import { Affiliations } from "./affiliations.ts"
 import { CustomFields } from "./custom-fields.ts"
@@ -171,6 +173,8 @@ export class Contacts extends Context.Service<
       team: Named<T, TeamId>,
       fields: ContactFields,
       access: CanWriteRecords<P, T>,
+      /** The record owner (D123), already proven a member; undefined leaves none. `fields.ownerId` is ignored. */
+      owner?: RecordOwnerChange<T>,
     ) => Effect.Effect<Contact, InputRejected | ContactEmailTaken | DatabaseUnavailable>
     /**
      * Subscribing someone again who unsubscribed, bounced or marked mail as spam also takes
@@ -181,6 +185,8 @@ export class Contacts extends Context.Service<
       fields: ContactFields,
       access: CanWriteRecords<P, T>,
       resubscribe?: CanManageEmail<P, T>,
+      /** Undefined leaves the record owner as it is, null clears it (D123). `fields.ownerId` is ignored. */
+      owner?: RecordOwnerChange<T>,
     ) => Effect.Effect<Contact, InputRejected | ContactEmailTaken | DatabaseUnavailable>
     readonly delete: <P, T, C>(
       target: ContactInTeam<C, T>,
@@ -219,8 +225,9 @@ export class Contacts extends Context.Service<
             run(
               db.query((d) =>
                 d
-                  .select()
+                  .select({ contact: schema.contacts, ownerName: schema.user.name })
                   .from(schema.contacts)
+                  .leftJoin(schema.user, eq(schema.user.id, schema.contacts.ownerId))
                   .where(and(eq(schema.contacts.teamId, teamId), inArray(schema.contacts.id, [...ids]))),
               ),
             ),
@@ -248,10 +255,11 @@ export class Contacts extends Context.Service<
             ),
             affiliations.forContacts(teamId, ids),
           ])
-          const byId = new Map(rows.map((row) => [row.id, row]))
+          const byId = new Map(rows.map((row) => [row.contact.id, row]))
           return ids.flatMap((id): Array<Contact> => {
-            const row = byId.get(id)
-            if (!row) return []
+            const found = byId.get(id)
+            if (!found) return []
+            const row = found.contact
             const contactEmails = emails.filter((email) => email.contactId === id)
             const primary = contactEmails.find((email) => email.isPrimary)?.address ?? contactEmails[0]?.address
             return [
@@ -275,6 +283,8 @@ export class Contacts extends Context.Service<
                 custom: row.custom as Contact["custom"],
                 avatarUrl: fileUrl(row.avatarKey),
                 subscriptionStatus: row.subscriptionStatus,
+                ownerId: row.ownerId as UserId | null,
+                ownerName: row.ownerId ? found.ownerName : null,
                 createdAt: row.createdAt.toISOString(),
                 updatedAt: row.updatedAt.toISOString(),
                 deletedAt: row.deletedAt?.toISOString() ?? null,
@@ -524,7 +534,12 @@ export class Contacts extends Context.Service<
 
       const get = <C, T>(target: ContactInTeam<C, T>) => loadOne(target.team.value, target.contact.value)
 
-      const create = <P, T>(team: Named<T, TeamId>, fields: ContactFields, access: CanWriteRecords<P, T>) =>
+      const create = <P, T>(
+        team: Named<T, TeamId>,
+        fields: ContactFields,
+        access: CanWriteRecords<P, T>,
+        owner?: RecordOwnerChange<T>,
+      ) =>
         Effect.gen(function* () {
           const normalized = yield* normalize(fields, true)
           const custom = fields.custom
@@ -547,6 +562,7 @@ export class Contacts extends Context.Service<
                   lastName: normalized.lastName ?? null,
                   custom: custom.values,
                   ...(fields.subscriptionStatus ? { subscriptionStatus: fields.subscriptionStatus } : {}),
+                  ...(owner ? { ownerId: owner.userId } : {}),
                 }),
               )
               yield* replaceEmails(team.value, id, normalized.emails)
@@ -555,6 +571,7 @@ export class Contacts extends Context.Service<
               yield* recordActivity(principal, team.value, id, "created", [
                 ...Object.keys(normalized),
                 ...custom.changed,
+                ...(owner ? ["ownerId"] : []),
               ])
               const name = displayNameOf(
                 normalized.firstName ?? null,
@@ -572,6 +589,7 @@ export class Contacts extends Context.Service<
         fields: ContactFields,
         access: CanWriteRecords<P, T>,
         resubscribe?: CanManageEmail<P, T>,
+        owner?: RecordOwnerChange<T>,
       ) =>
         Effect.gen(function* () {
           const normalized = yield* normalize(fields, false)
@@ -583,7 +601,9 @@ export class Contacts extends Context.Service<
           const custom = fields.custom
             ? yield* customFields.apply(teamId, "contact", current.custom, fields.custom)
             : undefined
-          const changed = [...Object.keys(normalized), ...(custom?.changed ?? [])]
+          const ownerId = owner === undefined ? undefined : (owner?.userId ?? null)
+          const ownerChanged = ownerId !== undefined && ownerId !== current.ownerId
+          const changed = [...Object.keys(normalized), ...(custom?.changed ?? []), ...(ownerChanged ? ["ownerId"] : [])]
           const status =
             fields.subscriptionStatus !== undefined && fields.subscriptionStatus !== current.subscriptionStatus
               ? fields.subscriptionStatus
@@ -614,6 +634,7 @@ export class Contacts extends Context.Service<
                       ...("lastName" in normalized ? { lastName: normalized.lastName ?? null } : {}),
                       ...(custom ? { custom: custom.values } : {}),
                       ...(status ? { subscriptionStatus: status } : {}),
+                      ...(ownerChanged ? { ownerId } : {}),
                       updatedAt: sql`now()`,
                     })
                     .where(and(eq(schema.contacts.teamId, teamId), eq(schema.contacts.id, id))),

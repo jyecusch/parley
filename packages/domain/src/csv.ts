@@ -63,6 +63,7 @@ export const IMPORT_FIELDS = {
       label: "Subscription status",
       aliases: ["subscription status", "subscription", "subscribed", "marketing email", "email consent"],
     },
+    { field: "owner", label: "Contact owner", aliases: ["contact owner", "owner", "record owner", "account owner"] },
   ],
   company: [
     { field: "name", label: "Name", aliases: ["name", "company", "company name"] },
@@ -75,6 +76,7 @@ export const IMPORT_FIELDS = {
     { field: "region", label: "Region", aliases: ["region", "state", "province", "county"] },
     { field: "postcode", label: "Postcode", aliases: ["postcode", "zip", "zip code", "postal code"] },
     { field: "country", label: "Country", aliases: ["country", "country code"] },
+    { field: "owner", label: "Company owner", aliases: ["company owner", "owner", "record owner", "account owner"] },
   ],
 } as const
 

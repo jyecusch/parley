@@ -25,6 +25,7 @@ export const BUILT_IN_FILTER_FIELDS: Readonly<
     { field: "email", label: "Email", kind: "text" },
     { field: "phone", label: "Phone", kind: "text" },
     { field: "company", label: "Company", kind: "company" },
+    { field: "owner", label: "Contact owner", kind: "member" },
     {
       field: "subscriptionStatus",
       label: "Subscription status",
@@ -45,6 +46,7 @@ export const BUILT_IN_FILTER_FIELDS: Readonly<
     { field: "website", label: "Website", kind: "text" },
     { field: "country", label: "Country", kind: "text" },
     { field: "contactCount", label: "Contacts", kind: "number" },
+    { field: "owner", label: "Company owner", kind: "member" },
     { field: "createdAt", label: "Created", kind: "date" },
     { field: "updatedAt", label: "Updated", kind: "date" },
   ],
@@ -57,7 +59,8 @@ export interface FilterOption {
 }
 
 /** What sort of value a field holds, which decides its operators. */
-export type FilterKind = "text" | "number" | "date" | "checkbox" | "select" | "multi" | "company"
+/** "member": one of the team's members, by user id, such as a record owner (D123). */
+export type FilterKind = "text" | "number" | "date" | "checkbox" | "select" | "multi" | "company" | "member"
 
 export const FilterOperator = Schema.Literals([
   // text
@@ -98,6 +101,7 @@ export const OPERATORS_BY_KIND: Readonly<Record<FilterKind, ReadonlyArray<Filter
   select: ["is-any-of", "is-none-of", "is-empty", "is-not-empty"],
   multi: ["has-any-of", "has-all-of", "has-none-of", "is-empty", "is-not-empty"],
   company: ["is-any-of", "is-none-of", "is-empty", "is-not-empty"],
+  member: ["is-any-of", "is-none-of", "is-empty", "is-not-empty"],
 }
 
 export const OPERATOR_LABELS: Readonly<Record<FilterOperator, string>> = {
@@ -233,6 +237,7 @@ export const checkCondition = (
     case "select":
     case "multi":
     case "company":
+    case "member":
       return Array.isArray(value) && value.length > 0 ? undefined : "wrong-value"
     default:
       return typeof value === "string" ? undefined : "wrong-value"

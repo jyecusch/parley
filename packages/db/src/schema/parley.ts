@@ -42,6 +42,8 @@ export const contacts = pgTable(
     })
       .notNull()
       .default("subscribed"),
+    /** The record owner (D123): a member responsible for it. Cleared when they leave the team. */
+    ownerId: text("owner_id").references(() => user.id, { onDelete: "set null" }),
     ...timestamps,
     /** Soft delete: hidden at once, restorable for 30 days, then purged (D30). */
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
@@ -49,6 +51,7 @@ export const contacts = pgTable(
   (t) => [
     unique("contacts_team_id_id_key").on(t.teamId, t.id),
     index("contacts_team_id_updated_at_idx").on(t.teamId, t.updatedAt.desc(), t.id.desc()),
+    index("contacts_team_owner_idx").on(t.teamId, t.ownerId),
   ],
 )
 
@@ -207,6 +210,8 @@ export const companies = pgTable(
     /** The logo's file key, and where it came from: an upload wins over the fetched favicon (D75). */
     logoKey: text("logo_key"),
     logoSource: text("logo_source", { enum: ["upload", "favicon"] }),
+    /** The record owner (D123): a member responsible for it. Cleared when they leave the team. */
+    ownerId: text("owner_id").references(() => user.id, { onDelete: "set null" }),
     ...timestamps,
     /** Soft delete, like contacts (D30, D109). */
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
@@ -214,6 +219,7 @@ export const companies = pgTable(
   (t) => [
     unique("companies_team_id_id_key").on(t.teamId, t.id),
     index("companies_team_id_updated_at_idx").on(t.teamId, t.updatedAt.desc(), t.id.desc()),
+    index("companies_team_owner_idx").on(t.teamId, t.ownerId),
   ],
 )
 

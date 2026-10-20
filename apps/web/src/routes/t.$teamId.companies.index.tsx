@@ -9,6 +9,7 @@ import {
   normalizeDomain,
   ROLE_PERMISSIONS,
   type TeamId,
+  type UserId,
 } from "@parley/domain"
 import type { UserText } from "@parley/errors"
 import { useLiveQuery } from "@tanstack/react-db"
@@ -37,6 +38,7 @@ import {
   ViewActions,
 } from "../components/index-view.tsx"
 import { initialsOfName, LoadFailed, problemFor, problemsOf, toE164, toggle } from "../components/record.tsx"
+import { RecordOwnerCell, RecordOwnerField } from "../components/record-owner.tsx"
 import { isTyping, useShell } from "../components/shell.tsx"
 import {
   Avatar,
@@ -90,6 +92,7 @@ import { call, isApiFailure, messageOf } from "../lib/client.ts"
 import { companiesCollection, primaryDomainOf } from "../lib/companies.ts"
 import { useFields } from "../lib/custom-fields.ts"
 import { compareBy, download, useIndexView } from "../lib/index-view.ts"
+import { sortReaderOf, usePeople, usePeopleOptions } from "../lib/people.ts"
 import { absolute, relative } from "../lib/time.ts"
 
 const teamRoute = getRouteApi("/t/$teamId")
@@ -130,10 +133,12 @@ function CompaniesScreen() {
   const { fields } = useFields(teamId, "company")
   const indexView = useIndexView(teamId, "company", search.view)
   const filterInfo = useMemo(() => filterFields("company", fields), [fields])
+  const showOwner = indexView.state.columns.includes("owner")
   const shownFields = fields.filter(
     (field) => indexView.state.columns.includes(`custom:${field.id}`) || indexView.state.columns.includes(field.id),
   )
   const { userId } = teamRoute.useRouteContext()
+  const peopleOptions = usePeopleOptions(teamId, userId)
   const canWrite = ROLE_PERMISSIONS[team.role].has("records:write")
 
   /**
@@ -164,7 +169,7 @@ function CompaniesScreen() {
       .filter((record) => matchesFilter(indexView.state.filter, companyFieldReader(record)))
       .sort(
         indexView.state.sort
-          ? compareBy(companyFieldReader, indexView.state.sort)
+          ? compareBy(sortReaderOf(companyFieldReader), indexView.state.sort)
           : (a, b) => b.updatedAt.localeCompare(a.updatedAt) || b.id.localeCompare(a.id),
       )
   }, [live.data, filter, indexView.state])
@@ -329,7 +334,12 @@ function CompaniesScreen() {
               </>
             )}
             {search.deleted ? null : (
-              <FilterBar fields={filterInfo} filter={indexView.state.filter} onChange={indexView.setFilter} />
+              <FilterBar
+                fields={filterInfo}
+                filter={indexView.state.filter}
+                onChange={indexView.setFilter}
+                people={peopleOptions}
+              />
             )}
             <Spacer />
             <DisplayMenu
@@ -340,6 +350,7 @@ function CompaniesScreen() {
               onSort={indexView.setSort}
               columns={indexView.state.columns}
               onColumns={(columns) => void indexView.setColumns(columns)}
+              builtInColumns={[{ ref: "owner", label: "Company owner" }]}
               showingDeleted={search.deleted === true}
               onToggleDeleted={() => void setSearch(search.deleted ? {} : { deleted: true })}
             />
@@ -410,6 +421,11 @@ function CompaniesScreen() {
                     <Th className={COUNT_COLUMN} scope="col">
                       Contacts
                     </Th>
+                    {showOwner ? (
+                      <Th className={cn(customColumnClass, wideColumnClass)} scope="col">
+                        Company owner
+                      </Th>
+                    ) : null}
                     {shownFields.map((field) => (
                       <Th key={field.id} className={cn(customColumnClass, wideColumnClass)} scope="col">
                         {field.name}
@@ -462,6 +478,11 @@ function CompaniesScreen() {
                         <Td className={cn(TALL, "tabular-nums", company.contactCount === 0 && "text-subtle")}>
                           {contactsLabel(company.contactCount)}
                         </Td>
+                        {showOwner ? (
+                          <Td className={cn(TALL, wideColumnClass)}>
+                            <RecordOwnerCell name={company.ownerName} />
+                          </Td>
+                        ) : null}
                         {shownFields.map((field) => (
                           <Td key={field.id} className={cn(TALL, wideColumnClass, "text-subtle")}>
                             <CustomCell field={field} value={company.custom[field.id]} />
@@ -772,6 +793,11 @@ function CreatePanel(props: {
   const [domainProblem, setDomainProblem] = useState<DomainProblem>()
   const [error, setError] = useState<UserText>()
   const formRef = useRef<HTMLFormElement>(null)
+  // A company made here is its creator's unless they choose someone else (D123).
+  const { userId } = teamRoute.useRouteContext()
+  const [ownerId, setOwnerId] = useState<UserId | null>(userId as UserId)
+  const people = usePeople(props.teamId).data ?? []
+  const ownerName = people.find((person) => person.userId === ownerId)?.name ?? null
 
   const submit = async (event?: FormEvent) => {
     event?.preventDefault()
@@ -793,6 +819,7 @@ function CreatePanel(props: {
         ...(website ? { website: toWebsite(website) as Company["website"] } : {}),
         ...(phone ? { phone: phone as Company["phone"] } : {}),
         ...(address ? { address } : {}),
+        ownerId,
       })
       await props.onCreated(company)
     } catch (failure) {
@@ -928,6 +955,13 @@ function CreatePanel(props: {
               </div>
             </PropertyRow>
           ))}
+          <RecordOwnerField
+            teamId={props.teamId}
+            label="Company owner"
+            ownerId={ownerId}
+            ownerName={ownerName}
+            onChange={(owner) => setOwnerId(owner?.id ?? null)}
+          />
         </Section>
         <Section>
           <SectionHeader className="text-sm">Address</SectionHeader>

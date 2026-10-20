@@ -1,6 +1,6 @@
 import { Schema } from "effect"
 import { CustomValues, CustomValuesPatch } from "./custom-field.ts"
-import { AffiliationId, CompanyId, ContactId, TeamId } from "./ids.ts"
+import { AffiliationId, CompanyId, ContactId, TeamId, UserId } from "./ids.ts"
 import { RecordType } from "./record-type.ts"
 
 const Timestamp = Schema.String.annotate({ description: "ISO 8601 timestamp" })
@@ -56,6 +56,9 @@ export const Contact = Schema.Struct({
   avatarUrl: Schema.NullOr(Schema.String),
   /** Whether the contact receives marketing email (R37). */
   subscriptionStatus: Schema.Literals(["subscribed", "unsubscribed", "bounced", "marked-as-spam"]),
+  /** The record owner: the member responsible for it (D123), or null. Their name as of now. */
+  ownerId: Schema.NullOr(UserId),
+  ownerName: Schema.NullOr(Schema.String),
   createdAt: Timestamp,
   updatedAt: Timestamp,
   deletedAt: Schema.NullOr(Timestamp),
@@ -83,6 +86,15 @@ export const ContactFields = Schema.Struct({
     ).check(Schema.isMaxLength(20)),
   ),
   custom: Schema.optional(CustomValuesPatch),
+  ownerId: Schema.optional(
+    Schema.NullOr(
+      UserId.annotate({
+        title: "Contact owner",
+        description:
+          "The member responsible for this contact: a userId from members.list or serviceAccounts.list. Null for none.",
+      }),
+    ),
+  ),
   subscriptionStatus: Schema.optional(
     Schema.Literals(["subscribed", "unsubscribed"]).annotate({
       title: "Subscription status",

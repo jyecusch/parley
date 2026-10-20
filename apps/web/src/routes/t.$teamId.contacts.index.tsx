@@ -10,6 +10,7 @@ import {
   ROLE_PERMISSIONS,
   type SegmentId,
   type TeamId,
+  type UserId,
 } from "@parley/domain"
 import type { UserText } from "@parley/errors"
 import { useLiveQuery } from "@tanstack/react-db"
@@ -31,6 +32,7 @@ import {
   ViewActions,
 } from "../components/index-view.tsx"
 import { LoadFailed, problemFor, problemsOf, toE164, toggle } from "../components/record.tsx"
+import { RecordOwnerCell, RecordOwnerField } from "../components/record-owner.tsx"
 import { AddToSegmentDialog } from "../components/segments.tsx"
 import { isTyping, useShell } from "../components/shell.tsx"
 import {
@@ -84,6 +86,7 @@ import { companiesCollection } from "../lib/companies.ts"
 import { contactsCollection } from "../lib/contacts.ts"
 import { useFields } from "../lib/custom-fields.ts"
 import { compareBy, download, useIndexView } from "../lib/index-view.ts"
+import { sortReaderOf, usePeople, usePeopleOptions } from "../lib/people.ts"
 import { absolute, relative } from "../lib/time.ts"
 
 const teamRoute = getRouteApi("/t/$teamId")
@@ -121,12 +124,14 @@ function ContactsScreen() {
   const [toast, setToast] = useState<Toast>()
   const [dialog, setDialog] = useState<"save-view" | "import" | "set-field" | "affiliate" | "segment">()
   const { fields } = useFields(teamId, "contact")
-  const indexView = useIndexView(teamId, "contact", search.view)
+  const { userId } = teamRoute.useRouteContext()
+  const peopleOptions = usePeopleOptions(teamId, userId)
+  const indexView = useIndexView(teamId, "contact", search.view, userId)
   const filterInfo = useMemo(() => filterFields("contact", fields), [fields])
+  const showOwner = indexView.state.columns.includes("owner")
   const shownFields = fields.filter(
     (field) => indexView.state.columns.includes(`custom:${field.id}`) || indexView.state.columns.includes(field.id),
   )
-  const { userId } = teamRoute.useRouteContext()
   const canWrite = ROLE_PERMISSIONS[team.role].has("records:write")
   const canWriteEmail = ROLE_PERMISSIONS[team.role].has("email:write")
   const companyCollection = companiesCollection(teamId, queryClient)
@@ -182,7 +187,7 @@ function ContactsScreen() {
       .filter((record) => matchesFilter(indexView.state.filter, contactFieldReader(record)))
       .sort(
         indexView.state.sort
-          ? compareBy(contactFieldReader, indexView.state.sort)
+          ? compareBy(sortReaderOf(contactFieldReader), indexView.state.sort)
           : (a, b) => b.updatedAt.localeCompare(a.updatedAt) || b.id.localeCompare(a.id),
       )
   }, [live.data, filter, indexView.state])
@@ -292,7 +297,7 @@ function ContactsScreen() {
                 <span>Deleted</span>
               </>
             ) : (
-              <span>{indexView.view?.name ?? "Contacts"}</span>
+              <span>{indexView.viewName ?? "Contacts"}</span>
             )}
           </Breadcrumb>
           {!search.deleted && !isLoading && !isEmpty ? <Count>{contacts.length}</Count> : null}
@@ -354,6 +359,7 @@ function ContactsScreen() {
                 filter={indexView.state.filter}
                 onChange={indexView.setFilter}
                 companies={companyOptions}
+                people={peopleOptions}
               />
             )}
             <Spacer />
@@ -365,6 +371,7 @@ function ContactsScreen() {
               onSort={indexView.setSort}
               columns={indexView.state.columns}
               onColumns={(columns) => void indexView.setColumns(columns)}
+              builtInColumns={[{ ref: "owner", label: "Contact owner" }]}
               showingDeleted={search.deleted === true}
               onToggleDeleted={() => void setSearch(search.deleted ? {} : { deleted: true })}
             />
@@ -427,6 +434,11 @@ function ContactsScreen() {
                     <Th className="w-[30%]" scope="col">
                       Companies
                     </Th>
+                    {showOwner ? (
+                      <Th className={cn(customColumnClass, wideColumnClass)} scope="col">
+                        Contact owner
+                      </Th>
+                    ) : null}
                     {shownFields.map((field) => (
                       <Th key={field.id} className={cn(customColumnClass, wideColumnClass)} scope="col">
                         {field.name}
@@ -452,6 +464,7 @@ function ContactsScreen() {
                       onToggle={() => setSelected((current) => toggle(current, contact.id))}
                       onOpen={() => void setSearch({ contact: contact.id })}
                       fields={shownFields}
+                      showOwner={showOwner}
                     />
                   ))}
                 </tbody>
@@ -651,6 +664,7 @@ function ContactRow(props: {
   readonly onToggle: () => void
   readonly onOpen: () => void
   readonly fields: ReadonlyArray<CustomField>
+  readonly showOwner: boolean
 }) {
   const { contact } = props
   const email = contact.emails.find((e) => e.isPrimary)?.address ?? contact.emails[0]?.address
@@ -674,6 +688,11 @@ function ContactRow(props: {
       <Td>
         <AffiliationChips affiliations={contact.affiliations} />
       </Td>
+      {props.showOwner ? (
+        <Td className={wideColumnClass}>
+          <RecordOwnerCell name={contact.ownerName} />
+        </Td>
+      ) : null}
       {props.fields.map((field) => (
         <Td key={field.id} className={cn(wideColumnClass, "text-subtle")}>
           <CustomCell field={field} value={contact.custom[field.id]} />
@@ -846,6 +865,11 @@ function CreatePanel(props: {
   const [emailTaken, setEmailTaken] = useState<{ readonly message: UserText; readonly existing: string }>()
   const [error, setError] = useState<UserText>()
   const formRef = useRef<HTMLFormElement>(null)
+  // A contact made here is its creator's unless they choose someone else (D123).
+  const { userId } = teamRoute.useRouteContext()
+  const [ownerId, setOwnerId] = useState<UserId | null>(userId as UserId)
+  const people = usePeople(props.teamId).data ?? []
+  const ownerName = people.find((person) => person.userId === ownerId)?.name ?? null
 
   const submit = async (event?: FormEvent) => {
     event?.preventDefault()
@@ -864,6 +888,7 @@ function CreatePanel(props: {
         ...(text("lastName") ? { lastName: text("lastName") } : {}),
         ...(email ? { emails: [{ address: email as Contact["emails"][number]["address"] }] } : {}),
         ...(phone ? { phones: [{ number: phone as Contact["phones"][number]["number"] }] } : {}),
+        ownerId,
       })
       await props.onCreated(contact)
     } catch (failure) {
@@ -942,6 +967,13 @@ function CreatePanel(props: {
               </PropertyRow>
             )
           })}
+          <RecordOwnerField
+            teamId={props.teamId}
+            label="Contact owner"
+            ownerId={ownerId}
+            ownerName={ownerName}
+            onChange={(owner) => setOwnerId(owner?.id ?? null)}
+          />
           {problems && !fields.some((f) => problemFor(problems, f.field)) ? (
             <p className="my-1 text-sm text-danger">{problems[0]?.userMessage}</p>
           ) : null}

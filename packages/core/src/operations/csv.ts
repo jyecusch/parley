@@ -26,6 +26,7 @@ import {
   type SegmentId,
   SUBSCRIPTION_STATUS_LABELS,
   toCsv,
+  type UserId,
   Website,
 } from "@parley/domain"
 import { type UserText, userText } from "@parley/errors"
@@ -36,11 +37,13 @@ import { proveContactInTeam } from "../proofs/contact-in-team.ts"
 import { type MemberOf, proveMemberOf } from "../proofs/member-of.ts"
 import { type CanReadRecords, proveCanReadRecords, proveCanWriteRecords } from "../proofs/permissions.ts"
 import { type Named, named } from "../proofs/proof.ts"
+import { proveRecordOwner, type RecordOwner } from "../proofs/record-owner.ts"
 import { proveSegmentInTeam } from "../proofs/segment-in-team.ts"
 import { Affiliations } from "../services/affiliations.ts"
 import { Companies } from "../services/companies.ts"
 import { Contacts } from "../services/contacts.ts"
 import { CustomFields } from "../services/custom-fields.ts"
+import { Members } from "../services/members.ts"
 import { Segments } from "../services/segments.ts"
 
 /**
@@ -177,6 +180,7 @@ export const exportContactsCsv = (principal: Principal, input: OperationInput<ty
         "Phones",
         "Companies",
         "Subscription status",
+        "Contact owner",
         "Created",
         "Updated",
         ...fields.map((field) => field.name),
@@ -200,6 +204,7 @@ export const exportContactsCsv = (principal: Principal, input: OperationInput<ty
               )
               .join("; "),
             SUBSCRIPTION_STATUS_LABELS[contact.subscriptionStatus],
+            contact.ownerName ?? "",
             isoDay(contact.createdAt),
             isoDay(contact.updatedAt),
             ...fields.map((field) => cellOfCustom(field, contact.custom[field.id])),
@@ -244,6 +249,7 @@ export const exportCompaniesCsv = (principal: Principal, input: OperationInput<t
         "Postcode",
         "Country",
         "Contacts",
+        "Company owner",
         "Created",
         "Updated",
         ...fields.map((field) => field.name),
@@ -262,6 +268,7 @@ export const exportCompaniesCsv = (principal: Principal, input: OperationInput<t
           company.address?.postcode ?? "",
           company.address?.country ?? "",
           String(company.contactCount),
+          company.ownerName ?? "",
           isoDay(company.createdAt),
           isoDay(company.updatedAt),
           ...fields.map((field) => cellOfCustom(field, company.custom[field.id])),
@@ -355,6 +362,46 @@ const subscriptionOf = (cell: string | undefined): "subscribed" | "unsubscribed"
   return "invalid"
 }
 
+/**
+ * Matches a record-owner cell (D123) to a member of the team: by email, or by name when only one
+ * member has it. Proofs are made once per member and reused across rows.
+ */
+const ownerMatcher = <P, T>(member: MemberOf<P, T>) =>
+  Effect.gen(function* () {
+    const members = yield* Members
+    const everyone = yield* members.everyone(member.team.value)
+    const byEmail = new Map(everyone.map((entry) => [entry.email.toLowerCase(), entry.userId]))
+    const byNameAll = new Map<string, Array<UserId>>()
+    for (const entry of everyone) {
+      const key = entry.name.trim().toLowerCase()
+      byNameAll.set(key, [...(byNameAll.get(key) ?? []), entry.userId])
+    }
+    const proofs = new Map<UserId, RecordOwner<T>>()
+    /** The owner for a cell: undefined when empty, "unknown" when no member matches. */
+    const match = (cell: string | undefined): UserId | "unknown" | undefined => {
+      const key = cell?.trim().toLowerCase()
+      if (!key) return undefined
+      const byName = byNameAll.get(key)
+      return byEmail.get(key) ?? (byName?.length === 1 ? byName[0] : undefined) ?? "unknown"
+    }
+    const prove = (userId: UserId | undefined) =>
+      Effect.gen(function* () {
+        if (userId === undefined) return undefined
+        const cached = proofs.get(userId)
+        if (cached) return cached
+        const proof = yield* proveRecordOwner(member, userId)
+        proofs.set(userId, proof)
+        return proof
+      })
+    return { match, prove }
+  })
+
+const unknownOwner = (): FieldProblem => ({
+  field: "owner",
+  problem: "invalid-format",
+  userMessage: userText`No one in the team has this name or email. Use a team member's email address.`,
+})
+
 export const importContactsCsv = (principal: Principal, input: OperationInput<typeof importContacts>) =>
   named(principal, input.teamId, (principal, team) =>
     Effect.gen(function* () {
@@ -367,6 +414,7 @@ export const importContactsCsv = (principal: Principal, input: OperationInput<ty
       const canWrite = yield* proveCanWriteRecords(member)
       const fields = yield* customFields.list(team, "contact", canRead)
       const parsed = yield* parse(input.csv, input.mapping, "contact", fields)
+      const owners = yield* ownerMatcher(member)
 
       // Rows match existing contacts by email, and companies by name.
       const byEmail = new Map<string, ContactId>()
@@ -405,6 +453,8 @@ export const importContactsCsv = (principal: Principal, input: OperationInput<ty
             userMessage: userText`Phone numbers need their country code, like +61 400 812 337.`,
           })
         }
+        const ownerId = owners.match(cells.owner)
+        if (ownerId === "unknown") problems.push(unknownOwner())
         const subscription = subscriptionOf(cells.subscriptionStatus)
         if (subscription === "invalid") {
           problems.push({
@@ -429,6 +479,8 @@ export const importContactsCsv = (principal: Principal, input: OperationInput<ty
         const existing = emails.map((email) => byEmail.get(email)).find(Boolean)
         const outcome = yield* Effect.matchEffect(
           Effect.gen(function* () {
+            // An empty owner cell leaves a contact's owner as it is.
+            const owner = yield* owners.prove(ownerId === "unknown" ? undefined : ownerId)
             let contactId: ContactId
             if (existing) {
               // Updating keeps the contact's other emails, adding any new ones from the row.
@@ -453,6 +505,8 @@ export const importContactsCsv = (principal: Principal, input: OperationInput<ty
                         : {}),
                     },
                     canWrite,
+                    undefined,
+                    owner,
                   )
                   return updated.id
                 }),
@@ -467,6 +521,7 @@ export const importContactsCsv = (principal: Principal, input: OperationInput<ty
                   ...(emails.length > 0 ? { emails: emails.map((address) => ({ address: address as never })) } : {}),
                 },
                 canWrite,
+                owner,
               )
               contactId = created.id
               for (const email of emails) byEmail.set(email, created.id)
@@ -516,6 +571,7 @@ export const importCompaniesCsv = (principal: Principal, input: OperationInput<t
       const canWrite = yield* proveCanWriteRecords(member)
       const fields = yield* customFields.list(team, "company", canRead)
       const parsed = yield* parse(input.csv, input.mapping, "company", fields)
+      const owners = yield* ownerMatcher(member)
 
       // Rows match existing companies by domain, then by exact name.
       const byDomain = new Map<string, CompanyId>()
@@ -583,6 +639,8 @@ export const importCompaniesCsv = (principal: Principal, input: OperationInput<t
             userMessage: userText`This isn't a web address.`,
           })
         }
+        const ownerId = owners.match(cells.owner)
+        if (ownerId === "unknown") problems.push(unknownOwner())
         if (domains.some((domain) => !Schema.is(Domain)(domain))) {
           problems.push({
             field: "domains",
@@ -605,6 +663,8 @@ export const importCompaniesCsv = (principal: Principal, input: OperationInput<t
           (name ? byName.get(name.toLowerCase()) : undefined)
         yield* Effect.matchEffect(
           Effect.gen(function* () {
+            // An empty owner cell leaves a company's owner as it is.
+            const owner = yield* owners.prove(ownerId === "unknown" ? undefined : ownerId)
             if (existing) {
               yield* named(existing, (company) =>
                 Effect.gen(function* () {
@@ -622,6 +682,7 @@ export const importCompaniesCsv = (principal: Principal, input: OperationInput<t
                         : {}),
                     },
                     canWrite,
+                    owner,
                   )
                 }),
               )
@@ -642,6 +703,7 @@ export const importCompaniesCsv = (principal: Principal, input: OperationInput<t
                   ...(domains.length > 0 ? { domains: domains.map((domain) => ({ domain: domain as never })) } : {}),
                 },
                 canWrite,
+                owner,
               )
               for (const domain of domains) byDomain.set(domain, created.id)
               byName.set(name.toLowerCase(), created.id)

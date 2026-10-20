@@ -13,7 +13,7 @@ import { useEffect, useRef, useState } from "react"
 import { CloseIcon, PlusIcon } from "./icons.tsx"
 import { Button, Checkbox, cn, Hint, Input, Option, Popover, Select } from "./ui/index.ts"
 
-/** A choice for select and company values. */
+/** A choice for select, company and member values. */
 export interface ValueOption {
   readonly id: string
   readonly label: string
@@ -29,6 +29,8 @@ export function FilterBar(props: {
   readonly onChange: (filter: Filter) => void
   /** The companies to choose from for a contact's Company condition. */
   readonly companies?: ReadonlyArray<ValueOption>
+  /** The people to choose from for a record owner condition (D123), "Me" first. */
+  readonly people?: ReadonlyArray<ValueOption>
 }) {
   const [editing, setEditing] = useState<number | "new">()
   const { filter } = props
@@ -54,7 +56,8 @@ export function FilterBar(props: {
                 onClick={() => setEditing(index)}
               >
                 <b className="font-medium text-fg">{info?.label ?? "Unknown field"}</b>{" "}
-                {OPERATOR_LABELS[condition.operator]} {describeValue(condition, info, props.companies)}
+                {OPERATOR_LABELS[condition.operator]}{" "}
+                {describeValue(condition, info, info?.kind === "member" ? props.people : props.companies)}
               </button>
               <button
                 className="grid h-7 w-6 shrink-0 cursor-pointer place-items-center rounded-r-md text-subtle hover:bg-hover hover:text-fg"
@@ -70,6 +73,7 @@ export function FilterBar(props: {
                 fields={props.fields}
                 initial={condition}
                 companies={props.companies ?? []}
+                people={props.people ?? []}
                 onClose={() => setEditing(undefined)}
                 onSave={(next) => {
                   update(filter.conditions.map((other, at) => (at === index ? next : other)))
@@ -90,6 +94,7 @@ export function FilterBar(props: {
             fields={props.fields}
             initial={undefined}
             companies={props.companies ?? []}
+            people={props.people ?? []}
             onClose={() => setEditing(undefined)}
             onSave={(next) => {
               update([...filter.conditions, next])
@@ -131,7 +136,7 @@ const defaultValue = (info: FilterFieldInfo, operator: FilterOperator): FilterVa
   if (VALUELESS.has(operator)) return undefined
   if (operator === "in-last-days") return 7
   if (info.kind === "number") return 0
-  if (info.kind === "select" || info.kind === "multi" || info.kind === "company") return []
+  if (info.kind === "select" || info.kind === "multi" || info.kind === "company" || info.kind === "member") return []
   if (info.kind === "date") return new Date().toISOString().slice(0, 10)
   return ""
 }
@@ -141,6 +146,7 @@ function ConditionEditor(props: {
   readonly fields: ReadonlyArray<FilterFieldInfo>
   readonly initial: FilterCondition | undefined
   readonly companies: ReadonlyArray<ValueOption>
+  readonly people: ReadonlyArray<ValueOption>
   readonly onSave: (condition: FilterCondition) => void
   readonly onClose: () => void
 }) {
@@ -166,7 +172,8 @@ function ConditionEditor(props: {
     ...(value !== undefined && !VALUELESS.has(operator) ? { value } : {}),
   }
   const problem = checkCondition(condition, props.fields)
-  const options: ReadonlyArray<ValueOption> = info?.kind === "company" ? props.companies : (info?.options ?? [])
+  const options: ReadonlyArray<ValueOption> =
+    info?.kind === "company" ? props.companies : info?.kind === "member" ? props.people : (info?.options ?? [])
 
   return (
     <Popover
@@ -224,7 +231,8 @@ function ConditionEditor(props: {
         {!info || VALUELESS.has(operator) ? null : options.length > 0 ||
           info.kind === "select" ||
           info.kind === "multi" ||
-          info.kind === "company" ? (
+          info.kind === "company" ||
+          info.kind === "member" ? (
           <div className="max-h-60 overflow-auto">
             {options.length === 0 ? <Hint>Nothing to choose from.</Hint> : null}
             {options.map((option) => {

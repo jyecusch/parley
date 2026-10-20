@@ -2,6 +2,7 @@ import { Schema } from "effect"
 import { Company, CompanyFields, CompanyName, CompanyPage } from "../company.ts"
 import { ActivityEntry } from "../contact.ts"
 import { CompanyDomainTaken, CompanyNotFound, FreeEmailDomain } from "../errors/companies.ts"
+import { MemberNotFound } from "../errors/members.ts"
 import { Filter, Sort } from "../filter.ts"
 import { CompanyId, TeamId } from "../ids.ts"
 import { defineTeamOperation } from "../operation.ts"
@@ -50,7 +51,7 @@ export const createCompany = defineTeamOperation({
     "Create a company. A name is required. Each domain (like acme.com) can belong to one company in the team, and free email domains like gmail.com can't belong to any. Contacts whose email is on one of its domains are affiliated with it automatically.",
   input: Schema.Struct({ ...InTeam, ...CompanyFields.fields, name: CompanyName.annotate({ title: "Name" }) }),
   output: Company,
-  errors: [CompanyDomainTaken, FreeEmailDomain],
+  errors: [CompanyDomainTaken, FreeEmailDomain, MemberNotFound],
   http: { method: "POST", path: "/teams/:teamId/companies" },
   hints: { readOnly: false, destructive: false, idempotent: false },
   permissions: ["records:write"],
@@ -62,7 +63,7 @@ export const updateCompany = defineTeamOperation({
     "Change a company. Only the fields you send change. Sending domains replaces that whole list, so include the ones to keep. Contacts whose email is on a newly added domain are affiliated with it automatically.",
   input: Schema.Struct({ ...OneCompany, ...CompanyFields.fields }),
   output: Company,
-  errors: [CompanyNotFound, CompanyDomainTaken, FreeEmailDomain],
+  errors: [CompanyNotFound, CompanyDomainTaken, FreeEmailDomain, MemberNotFound],
   http: { method: "PATCH", path: "/teams/:teamId/companies/:companyId" },
   hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: ["records:read", "records:write"],

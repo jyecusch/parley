@@ -48,6 +48,7 @@ import { companiesCollection } from "../lib/companies.ts"
 import { contactsCollection } from "../lib/contacts.ts"
 import { useFields } from "../lib/custom-fields.ts"
 import { download, EMPTY_FILTER } from "../lib/index-view.ts"
+import { usePeopleOptions } from "../lib/people.ts"
 
 export const Route = createFileRoute("/t/$teamId/segments/$segmentId")({ component: SegmentScreen })
 
@@ -117,6 +118,8 @@ function SegmentView(props: {
   readonly toast: string | undefined
 }) {
   const { segment, teamId } = props
+  const { userId } = teamRoute.useRouteContext()
+  const peopleOptions = usePeopleOptions(teamId, userId)
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const contacts = contactsCollection(teamId, queryClient)
@@ -299,7 +302,13 @@ function SegmentView(props: {
       <Toolbar>
         {segment.kind === "dynamic" ? (
           props.canWrite ? (
-            <FilterBar fields={filterInfo} filter={filter} onChange={setFilter} companies={companyOptions} />
+            <FilterBar
+              fields={filterInfo}
+              filter={filter}
+              onChange={setFilter}
+              companies={companyOptions}
+              people={peopleOptions}
+            />
           ) : (
             <span className="ml-2 text-sm text-subtle">Everyone matching this segment's filter.</span>
           )

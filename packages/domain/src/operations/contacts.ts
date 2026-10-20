@@ -1,6 +1,7 @@
 import { Schema } from "effect"
 import { ActivityEntry, Contact, ContactFields, ContactPage } from "../contact.ts"
 import { ContactEmailTaken, ContactNotFound } from "../errors/contacts.ts"
+import { MemberNotFound } from "../errors/members.ts"
 import { Filter, Sort } from "../filter.ts"
 import { ContactId, TeamId } from "../ids.ts"
 import { defineTeamOperation } from "../operation.ts"
@@ -49,7 +50,7 @@ export const createContact = defineTeamOperation({
     "Create a contact. Give at least a name or an email. Each email can belong to only one contact in the team; the first email is primary unless one is marked isPrimary.",
   input: Schema.Struct({ ...InTeam, ...ContactFields.fields }),
   output: Contact,
-  errors: [ContactEmailTaken],
+  errors: [ContactEmailTaken, MemberNotFound],
   http: { method: "POST", path: "/teams/:teamId/contacts" },
   hints: { readOnly: false, destructive: false, idempotent: false },
   permissions: ["records:write"],
@@ -61,7 +62,7 @@ export const updateContact = defineTeamOperation({
     "Change a contact. Only the fields you send change. Sending emails or phones replaces that whole list, so include the ones to keep.",
   input: Schema.Struct({ ...OneContact, ...ContactFields.fields }),
   output: Contact,
-  errors: [ContactNotFound, ContactEmailTaken],
+  errors: [ContactNotFound, ContactEmailTaken, MemberNotFound],
   http: { method: "PATCH", path: "/teams/:teamId/contacts/:contactId" },
   hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: ["records:read", "records:write"],

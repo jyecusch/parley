@@ -114,7 +114,10 @@ const describe = (entry: ActivityEntry, recordType: RecordType): ReactNode => {
       if (entry.related) {
         return recordType === "contact" ? <>changed the title at {other}</> : <>changed the title of {other}</>
       }
-      const fields = entry.changedFields.map((field) => FIELD_NAMES[field] ?? field)
+      const fields = entry.changedFields.map((field) =>
+        // The record owner reads by record type (D123): never a bare "owner", which is a role.
+        field === "ownerId" ? `${recordType} owner` : (FIELD_NAMES[field] ?? field),
+      )
       return fields.length > 0 ? `changed ${fields.join(", ")}` : `edited ${self}`
     }
     case "emailed":

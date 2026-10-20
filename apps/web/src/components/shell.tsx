@@ -15,7 +15,7 @@ import {
 import { signOut } from "../lib/auth.ts"
 import { companiesCollection, primaryDomainOf } from "../lib/companies.ts"
 import { contactsCollection } from "../lib/contacts.ts"
-import { useSavedViews } from "../lib/index-view.ts"
+import { MY_CONTACTS_VIEW, useSavedViews } from "../lib/index-view.ts"
 import { useCrt } from "./crt.tsx"
 import { CrtSettingsDialog } from "./crt-settings.tsx"
 import {
@@ -288,6 +288,21 @@ export function AppShell(props: {
                 </Link>
               ),
             })}
+            <Tooltip text="My contacts" side="right" disabled={!collapsed} className="flex">
+              <Link
+                className={subClass}
+                activeProps={{ className: navItemActiveClass }}
+                activeOptions={{ includeSearch: true }}
+                to="/t/$teamId/contacts"
+                params={{ teamId }}
+                search={{ view: MY_CONTACTS_VIEW }}
+              >
+                <NavIcon>
+                  <span className="size-1.5 rounded-full bg-current opacity-60" />
+                </NavIcon>
+                <NavLabel collapsed={collapsed}>My contacts</NavLabel>
+              </Link>
+            </Tooltip>
             {savedViewLinks("contact")}
             {side({
               tip: "Companies",

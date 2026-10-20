@@ -18,7 +18,14 @@ const loadAll = async (teamId: TeamId) => {
   return items
 }
 
-const EDITABLE: ReadonlyArray<keyof ContactFields> = ["firstName", "lastName", "emails", "phones", "subscriptionStatus"]
+const EDITABLE: ReadonlyArray<keyof ContactFields> = [
+  "firstName",
+  "lastName",
+  "emails",
+  "phones",
+  "subscriptionStatus",
+  "ownerId",
+]
 
 const fieldsOf = (changes: Partial<Contact>, original: Contact): ContactFields => {
   const fields: Record<string, unknown> = {}

@@ -14,6 +14,7 @@ import { proveCompanyInTeam, proveCompanyRestorable } from "../proofs/company-in
 import { proveMemberOf } from "../proofs/member-of.ts"
 import { proveCanDeleteRecords, proveCanReadRecords, proveCanWriteRecords } from "../proofs/permissions.ts"
 import { named } from "../proofs/proof.ts"
+import { recordOwnerChange } from "../proofs/record-owner.ts"
 import { Companies } from "../services/companies.ts"
 
 export const list = (principal: Principal, input: OperationInput<typeof listCompanies>) =>
@@ -43,7 +44,8 @@ export const create = (principal: Principal, input: OperationInput<typeof create
       const companies = yield* Companies
       const member = yield* proveMemberOf(principal, team)
       const canWrite = yield* proveCanWriteRecords(member)
-      return yield* companies.create(team, input, canWrite)
+      const owner = yield* recordOwnerChange(member, input.ownerId)
+      return yield* companies.create(team, input, canWrite, owner)
     }),
   )
 
@@ -55,7 +57,8 @@ export const update = (principal: Principal, input: OperationInput<typeof update
       const canRead = yield* proveCanReadRecords(member)
       const canWrite = yield* proveCanWriteRecords(member)
       const target = yield* proveCompanyInTeam(team, company, canRead)
-      return yield* companies.update(target, input, canWrite)
+      const owner = yield* recordOwnerChange(member, input.ownerId)
+      return yield* companies.update(target, input, canWrite, owner)
     }),
   )
 

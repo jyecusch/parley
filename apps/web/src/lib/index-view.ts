@@ -13,6 +13,15 @@ export interface ViewState {
   readonly columns: ReadonlyArray<string>
 }
 
+/** The built-in view of the contacts the signed-in person owns (D123): `?view=mine` on Contacts. */
+export const MY_CONTACTS_VIEW = "mine"
+
+/** The filter of "My contacts": contact owner is this person. */
+export const myContactsFilter = (userId: string): Filter => ({
+  match: "all",
+  conditions: [{ field: "owner", operator: "is-any-of", value: [userId] }],
+})
+
 export const useSavedViews = (teamId: TeamId) =>
   useQuery({ queryKey: ["saved-views", teamId], queryFn: () => call("savedViews.list", { teamId }) })
 
@@ -20,20 +29,32 @@ export const useSavedViews = (teamId: TeamId) =>
  * The state of an index view: from its saved view when one is open, else the defaults, plus any
  * unsaved changes. Changes show "Save view" or "Save" and "Reset" in the header (D65).
  */
-export const useIndexView = (teamId: TeamId, recordType: RecordType, viewId: string | undefined) => {
+export const useIndexView = (
+  teamId: TeamId,
+  recordType: RecordType,
+  viewId: string | undefined,
+  /** The signed-in person, for built-in views about them ("My contacts"). */
+  userId?: string,
+) => {
   const queryClient = useQueryClient()
   const views = useSavedViews(teamId)
   const view = viewId ? views.data?.find((candidate) => candidate.id === viewId) : undefined
+  /** A built-in view: not saved, so it has a name and a filter but nothing to update or delete. */
+  const builtInName = recordType === "contact" && viewId === MY_CONTACTS_VIEW && userId ? "My contacts" : undefined
   const base: ViewState = useMemo(
     () =>
       view
         ? { filter: view.filter, sort: view.sort, columns: view.columns }
-        : { filter: EMPTY_FILTER, sort: null, columns: readColumns(teamId, recordType) },
-    [view, teamId, recordType],
+        : {
+            filter: builtInName && userId ? myContactsFilter(userId) : EMPTY_FILTER,
+            sort: null,
+            columns: readColumns(teamId, recordType),
+          },
+    [view, teamId, recordType, builtInName, userId],
   )
   const [draft, setDraft] = useState<ViewState>(base)
   // Opening another view, or the view changing underneath, starts from what's saved.
-  const baseKey = view ? `${view.id}:${view.updatedAt}` : `none:${recordType}`
+  const baseKey = view ? `${view.id}:${view.updatedAt}` : `${builtInName ?? "none"}:${recordType}`
   // biome-ignore lint/correctness/useExhaustiveDependencies: reset only when the saved state itself changes
   useEffect(() => setDraft(base), [baseKey])
 
@@ -45,6 +66,8 @@ export const useIndexView = (teamId: TeamId, recordType: RecordType, viewId: str
   return {
     views: (views.data ?? []).filter((candidate) => candidate.recordType === recordType),
     view,
+    /** The open view's name: a saved view's, or a built-in one's. */
+    viewName: view?.name ?? builtInName,
     state: draft,
     dirty,
     setFilter: (filter: Filter) => setDraft((current) => ({ ...current, filter })),

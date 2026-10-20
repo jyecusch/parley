@@ -54,6 +54,8 @@ export function DisplayMenu(props: {
   readonly onSort: (sort: Sort | null) => void
   readonly columns: ReadonlyArray<string>
   readonly onColumns: (columns: ReadonlyArray<string>) => void
+  /** Optional built-in columns, such as the record owner, by the name the view stores. */
+  readonly builtInColumns?: ReadonlyArray<{ readonly ref: string; readonly label: string }>
   readonly showingDeleted: boolean
   readonly onToggleDeleted: () => void
 }) {
@@ -108,21 +110,25 @@ export function DisplayMenu(props: {
               </Button>
             ) : null}
           </div>
-          {props.customFields.length > 0 ? (
+          {props.customFields.length > 0 || (props.builtInColumns ?? []).length > 0 ? (
             <>
               <MenuSeparator />
               <MenuHeading>Columns</MenuHeading>
-              {props.customFields.map((field) => {
-                const ref = `custom:${field.id}`
-                const on = props.columns.includes(ref)
+              {[
+                ...(props.builtInColumns ?? []),
+                ...props.customFields.map((field) => ({ ref: `custom:${field.id}`, label: field.name })),
+              ].map((column) => {
+                const on = props.columns.includes(column.ref)
                 return (
                   <MenuItem
-                    key={field.id}
+                    key={column.ref}
                     onClick={() =>
-                      props.onColumns(on ? props.columns.filter((id) => id !== ref) : [...props.columns, ref])
+                      props.onColumns(
+                        on ? props.columns.filter((id) => id !== column.ref) : [...props.columns, column.ref],
+                      )
                     }
                   >
-                    {field.name}
+                    {column.label}
                     {on ? <span className="ml-auto text-subtle">✓</span> : null}
                   </MenuItem>
                 )

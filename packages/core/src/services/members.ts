@@ -33,6 +33,13 @@ export class Members extends Context.Service<
     readonly people: <P, T>(member: MemberOf<P, T>) => Effect.Effect<ReadonlyArray<Member>, DatabaseUnavailable>
     /** Used only by the MemberInTeam prover. */
     readonly person: (teamId: TeamId, userId: UserId) => Effect.Effect<Member | undefined, DatabaseUnavailable>
+    /** Everyone in the team, people and service accounts, for matching a name or email to a member. */
+    readonly everyone: (
+      teamId: TeamId,
+    ) => Effect.Effect<
+      ReadonlyArray<{ readonly userId: UserId; readonly name: string; readonly email: string }>,
+      DatabaseUnavailable
+    >
     readonly changeRole: <P, T, U>(
       target: MemberInTeam<T, U>,
       role: Role,
@@ -195,6 +202,20 @@ export class Members extends Context.Service<
                     .delete(schema.member)
                     .where(and(eq(schema.member.organizationId, teamId), eq(schema.member.userId, userId))),
                 )
+                // Their records in this team no longer have an owner (D123). The foreign key only
+                // clears it when the user is deleted, not when they leave a team.
+                yield* db.query((d) =>
+                  d
+                    .update(schema.contacts)
+                    .set({ ownerId: null, updatedAt: sql`now()` })
+                    .where(and(eq(schema.contacts.teamId, teamId), eq(schema.contacts.ownerId, userId))),
+                )
+                yield* db.query((d) =>
+                  d
+                    .update(schema.companies)
+                    .set({ ownerId: null, updatedAt: sql`now()` })
+                    .where(and(eq(schema.companies.teamId, teamId), eq(schema.companies.ownerId, userId))),
+                )
                 return "done" as const
               }),
             ),
@@ -203,7 +224,18 @@ export class Members extends Context.Service<
           return target.found
         }).pipe(Effect.withSpan("Members.remove"))
 
-      return { lookup, teamsOf, people, person, changeRole, remove }
+      const everyone = (teamId: TeamId) =>
+        run(
+          db.query((d) =>
+            d
+              .select({ userId: schema.user.id, name: schema.user.name, email: schema.user.email })
+              .from(schema.member)
+              .innerJoin(schema.user, eq(schema.user.id, schema.member.userId))
+              .where(eq(schema.member.organizationId, teamId)),
+          ),
+        ).pipe(Effect.map((rows) => rows.map((row) => ({ ...row, userId: row.userId as UserId }))))
+
+      return { lookup, teamsOf, people, person, everyone, changeRole, remove }
     }),
   )
 }

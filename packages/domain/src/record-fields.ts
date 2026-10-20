@@ -18,6 +18,8 @@ export const contactFieldReader =
         return contact.affiliations.map((affiliation) => affiliation.companyId)
       case "subscriptionStatus":
         return contact.subscriptionStatus
+      case "owner":
+        return contact.ownerId
       case "createdAt":
         return contact.createdAt
       case "updatedAt":
@@ -43,6 +45,8 @@ export const companyFieldReader =
         return company.address?.country ?? null
       case "contactCount":
         return company.contactCount
+      case "owner":
+        return company.ownerId
       case "createdAt":
         return company.createdAt
       case "updatedAt":

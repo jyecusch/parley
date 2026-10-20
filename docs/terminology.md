@@ -53,6 +53,7 @@ How to pick a name: choose the most common name for the concept. Reject anything
 | **Principal** | The authenticated identity making a request, and the output of authentication. Exactly one of `UserSession`, `UserApiKey`, `ServiceAccountApiKey`. | actor, caller, requester, subject, identity |
 | **Member** | A user or service account that belongs to a team, with exactly one role. Stored in Better-Auth's `member` table. "Jane is a member of Acme." | membership, seat, team member, teammate |
 | **Role** | `owner`, `admin` or `member`, held by each member. The role named `member` is the default role, so "a member" (anyone in the team) and "the `member` role" rarely conflict. When it matters, say "the `member` role". | level, user type |
+| **Record owner** | The member responsible for a contact or company (D123), shown as **Contact owner** or **Company owner**. Always written with the record type, never bare "owner", which is a role. | assignee, account manager, rep, responsible |
 | **Permission** | A capability the core checks, such as `records:write`. | right, privilege, capability, grant, access |
 | **Scope** | A permission an API key is limited to. An API key's scopes are a ceiling on its owner's permissions. **Effective permissions** = role permissions ∩ scopes. | — (and "scope" means nothing else) |
 
@@ -138,6 +139,7 @@ How to pick a name: choose the most common name for the concept. Reject anything
 | 2026-10-20 | Added **invitation**. |
 | 2026-10-20 | Added **CRT settings** and **phosphor** (D114). |
 | 2026-10-20 | Added **email style** (D116). |
+| 2026-10-21 | Added **record owner** (D123). |
 | 2026-10-20 | Added **domain**, **free email domain** and **domain matching** (D105, D106). |
 | 2026-10-20 | Added the v2 email terms: campaign, draft, template, merge tag, test send, recipient, topic, subscription status, unsubscribe, unsubscribe link, footer, sender and sending domain. Claude's picks, open to veto (see `docs/review.md`). Later: **preview text**. |
 | 2026-10-20 | Added **access token**, and removed it from API key's banned synonyms (P5, D97). |

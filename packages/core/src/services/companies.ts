@@ -17,6 +17,7 @@ import {
   type PostalAddress,
   type Sort,
   type TeamId,
+  type UserId,
 } from "@parley/domain"
 import { DisplayName, EchoedInput, userText } from "@parley/errors"
 import { and, asc, desc, eq, exists, ilike, inArray, isNotNull, isNull, ne, or, sql } from "drizzle-orm"
@@ -27,6 +28,7 @@ import type { Principal } from "../principal.ts"
 import type { CompanyInTeam, CompanyRestorable } from "../proofs/company-in-team.ts"
 import type { CanDeleteRecords, CanReadRecords, CanWriteRecords } from "../proofs/permissions.ts"
 import type { Named } from "../proofs/proof.ts"
+import type { RecordOwnerChange } from "../proofs/record-owner.ts"
 import { activityRow, toActivityEntry } from "./activity.ts"
 import { Affiliations } from "./affiliations.ts"
 import { RESTORE_WINDOW_DAYS } from "./contacts.ts"
@@ -168,11 +170,15 @@ export class Companies extends Context.Service<
       team: Named<T, TeamId>,
       fields: CompanyFields & { readonly name: string },
       access: CanWriteRecords<P, T>,
+      /** The record owner (D123), already proven a member; undefined leaves none. `fields.ownerId` is ignored. */
+      owner?: RecordOwnerChange<T>,
     ) => Effect.Effect<Company, InputRejected | FreeEmailDomain | CompanyDomainTaken | DatabaseUnavailable>
     readonly update: <P, T, K>(
       target: CompanyInTeam<K, T>,
       fields: CompanyFields,
       access: CanWriteRecords<P, T>,
+      /** Undefined leaves the record owner as it is, null clears it (D123). `fields.ownerId` is ignored. */
+      owner?: RecordOwnerChange<T>,
     ) => Effect.Effect<Company, InputRejected | FreeEmailDomain | CompanyDomainTaken | DatabaseUnavailable>
     readonly delete: <P, T, K>(
       target: CompanyInTeam<K, T>,
@@ -253,8 +259,9 @@ export class Companies extends Context.Service<
             run(
               db.query((d) =>
                 d
-                  .select({ company: schema.companies, contactCount: contactCountSql })
+                  .select({ company: schema.companies, contactCount: contactCountSql, ownerName: schema.user.name })
                   .from(schema.companies)
+                  .leftJoin(schema.user, eq(schema.user.id, schema.companies.ownerId))
                   .where(and(eq(schema.companies.teamId, teamId), inArray(schema.companies.id, [...ids]))),
               ),
             ),
@@ -274,7 +281,7 @@ export class Companies extends Context.Service<
           return ids.flatMap((id): Array<Company> => {
             const found = byId.get(id)
             if (!found) return []
-            const { company: row, contactCount } = found
+            const { company: row, contactCount, ownerName } = found
             const address = normalizeAddress({
               line1: row.addressLine1,
               line2: row.addressLine2,
@@ -300,6 +307,8 @@ export class Companies extends Context.Service<
                 contactCount,
                 custom: row.custom as Company["custom"],
                 logoUrl: fileUrl(row.logoKey),
+                ownerId: row.ownerId as UserId | null,
+                ownerName: row.ownerId ? ownerName : null,
                 createdAt: row.createdAt.toISOString(),
                 updatedAt: row.updatedAt.toISOString(),
                 deletedAt: row.deletedAt?.toISOString() ?? null,
@@ -520,6 +529,7 @@ export class Companies extends Context.Service<
         team: Named<T, TeamId>,
         fields: CompanyFields & { readonly name: string },
         access: CanWriteRecords<P, T>,
+        owner?: RecordOwnerChange<T>,
       ) =>
         Effect.gen(function* () {
           const normalized = yield* normalize(fields)
@@ -545,12 +555,14 @@ export class Companies extends Context.Service<
                   phone: normalized.phone ?? null,
                   ...addressColumns(normalized.address ?? null),
                   custom: custom.values,
+                  ...(owner ? { ownerId: owner.userId } : {}),
                 }),
               )
               yield* replaceDomains(team.value, id, normalized.domains)
               yield* recordActivity(principal, team.value, id, "created", [
                 ...Object.keys(normalized),
                 ...custom.changed,
+                ...(owner ? ["ownerId"] : []),
               ])
               yield* affiliations.matchCompany(principal, team.value, { id, name: fields.name }, domains)
             }),
@@ -559,7 +571,12 @@ export class Companies extends Context.Service<
           return yield* loadOne(team.value, id)
         }).pipe(Effect.withSpan("Companies.create"))
 
-      const update = <P, T, K>(target: CompanyInTeam<K, T>, fields: CompanyFields, access: CanWriteRecords<P, T>) =>
+      const update = <P, T, K>(
+        target: CompanyInTeam<K, T>,
+        fields: CompanyFields,
+        access: CanWriteRecords<P, T>,
+        owner?: RecordOwnerChange<T>,
+      ) =>
         Effect.gen(function* () {
           const normalized = yield* normalize(fields)
           const teamId = target.team.value
@@ -570,7 +587,9 @@ export class Companies extends Context.Service<
           const custom = fields.custom
             ? yield* customFields.apply(teamId, "company", current.custom, fields.custom)
             : undefined
-          const changed = [...Object.keys(normalized), ...(custom?.changed ?? [])]
+          const ownerId = owner === undefined ? undefined : (owner?.userId ?? null)
+          const ownerChanged = ownerId !== undefined && ownerId !== current.ownerId
+          const changed = [...Object.keys(normalized), ...(custom?.changed ?? []), ...(ownerChanged ? ["ownerId"] : [])]
           if (changed.length > 0) {
             const before = new Set(current.domains.map((entry) => entry.domain as string))
             const added = domains.filter((domain) => !before.has(domain))
@@ -590,6 +609,7 @@ export class Companies extends Context.Service<
                       ...("phone" in normalized ? { phone: normalized.phone ?? null } : {}),
                       ...("address" in normalized ? addressColumns(normalized.address ?? null) : {}),
                       ...(custom ? { custom: custom.values } : {}),
+                      ...(ownerChanged ? { ownerId } : {}),
                       updatedAt: sql`now()`,
                     })
                     .where(and(eq(schema.companies.teamId, teamId), eq(schema.companies.id, id))),

@@ -191,6 +191,25 @@ const customCondition = (field: CustomField, condition: FilterCondition): SQL =>
   }
 }
 
+/**
+ * A record owner (D123): a nullable user id. Like the evaluator, "none of" includes records with no
+ * owner, and "any of" never matches them.
+ */
+const ownerCondition = (column: SQL, condition: FilterCondition): SQL => {
+  switch (condition.operator) {
+    case "is-any-of":
+      return sql`${column} = any(${textArray(condition.value)})`
+    case "is-none-of":
+      return sql`coalesce(not (${column} = any(${textArray(condition.value)})), true)`
+    case "is-empty":
+      return sql`${column} is null`
+    case "is-not-empty":
+      return sql`${column} is not null`
+    default:
+      return sql`false`
+  }
+}
+
 const contactCondition = (condition: FilterCondition, info: FilterFieldInfo): SQL => {
   if (info.custom) return customCondition(info.custom, condition)
   switch (condition.field) {
@@ -230,6 +249,8 @@ const contactCondition = (condition: FilterCondition, info: FilterFieldInfo): SQ
         default:
           return sql`false`
       }
+    case "owner":
+      return ownerCondition(sql`"contacts"."owner_id"`, condition)
     case "createdAt":
       return dateCondition(timestampDay(sql`"contacts"."created_at"`), condition)
     case "updatedAt":
@@ -256,6 +277,8 @@ const companyCondition = (condition: FilterCondition, info: FilterFieldInfo): SQ
           where a.company_id = "companies"."id" and c.deleted_at is null)`,
         condition,
       )
+    case "owner":
+      return ownerCondition(sql`"companies"."owner_id"`, condition)
     case "createdAt":
       return dateCondition(timestampDay(sql`"companies"."created_at"`), condition)
     case "updatedAt":
@@ -292,6 +315,9 @@ export const sortSql = (recordType: RecordType, sort: Sort, fields: ReadonlyArra
       info.custom.type === "number"
         ? sql`(case when jsonb_typeof(custom->${id}::text) = 'number' then (custom->>${id}::text)::numeric end)`
         : sql`lower(custom->>${id}::text)`
+  } else if (sort.field === "owner") {
+    // By the owner's name; records without one sort last.
+    expr = sql`lower((select u.name from "user" u where u.id = ${table}."owner_id"))`
   } else if (sort.field === "createdAt") {
     expr = sql`${table}."created_at"`
   } else if (sort.field === "name") {
