@@ -4,12 +4,14 @@ import {
   MemberNotFound,
   OwnerChangeNeedsOwner,
   type Role,
+  ServiceAccountCannotBeOwner,
   type TeamId,
   type UserId,
 } from "@parley/domain"
 import type { DisplayName } from "@parley/errors"
 import { Effect } from "effect"
 import { Members } from "../services/members.ts"
+import { Users } from "../services/users.ts"
 import type { MemberOf } from "./member-of.ts"
 import type { CanManageMembers } from "./permissions.ts"
 import { defineProof, type Named, type Proof } from "./proof.ts"
@@ -28,7 +30,8 @@ export interface MemberInTeam<T, U> extends Proof<"MemberInTeam", [T, U]> {
 }
 
 /** Whether the principal is an owner in full, including whoever connected an agent acting as one (D94). */
-const isOwner = <P, T>(member: MemberOf<P, T>) =>
+/** An owner, and not an agent connected by someone who isn't one. */
+export const isOwner = <P, T>(member: MemberOf<P, T>) =>
   member.role === "owner" && (member.connectedBy === undefined || member.connectedBy.role === "owner")
 
 const locate = <P, T, U>(member: MemberOf<P, T>, user: Named<U, UserId>) =>
@@ -44,12 +47,19 @@ export const proveMemberChangeable = <P, T, U>(
   access: CanManageMembers<P, T>,
   user: Named<U, UserId>,
   newRole: Role,
-): Effect.Effect<MemberInTeam<T, U>, MemberNotFound | OwnerChangeNeedsOwner | DatabaseUnavailable, Members> =>
+): Effect.Effect<
+  MemberInTeam<T, U>,
+  MemberNotFound | OwnerChangeNeedsOwner | ServiceAccountCannotBeOwner | DatabaseUnavailable,
+  Members | Users
+> =>
   Effect.gen(function* () {
     const member = access.member
     const found = yield* locate(member, user)
     if ((found.role === "owner" || newRole === "owner") && !isOwner(member)) {
       return yield* new OwnerChangeNeedsOwner({ team: member.teamName })
+    }
+    if (newRole === "owner" && (yield* (yield* Users).find(user.value))?.kind === "service-account") {
+      return yield* new ServiceAccountCannotBeOwner()
     }
     return { ...MemberInTeamProver.prove(member.team, user), team: member.team, user, teamName: member.teamName, found }
   })

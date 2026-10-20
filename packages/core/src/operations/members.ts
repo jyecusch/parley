@@ -14,7 +14,7 @@ import {
 } from "@parley/domain"
 import { Effect } from "effect"
 import type { Principal } from "../principal.ts"
-import { proveMemberChangeable, proveMemberRemovable } from "../proofs/member-in-team.ts"
+import { isOwner, proveMemberChangeable, proveMemberRemovable } from "../proofs/member-in-team.ts"
 import { proveMemberOf } from "../proofs/member-of.ts"
 import { proveCanManageMembers } from "../proofs/permissions.ts"
 import { named } from "../proofs/proof.ts"
@@ -77,7 +77,7 @@ export const invite = (principal: Principal, input: OperationInput<typeof create
       const member = yield* proveMemberOf(principal, team)
       const canManage = yield* proveCanManageMembers(member)
       const role = input.role ?? "member"
-      if (role === "owner" && member.role !== "owner") {
+      if (role === "owner" && !isOwner(member)) {
         return yield* new OwnerChangeNeedsOwner({ team: member.teamName })
       }
       return yield* invitations.create(canManage, input.email, role)

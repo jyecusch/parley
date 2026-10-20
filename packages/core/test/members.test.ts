@@ -135,6 +135,10 @@ describe("members and invitations", () => {
       expect(denied._tag).toBe("ApiKeyScopeExcludes")
 
       const bot = yield* run["serviceAccounts.create"](f.jane, { teamId: f.acme, name: "Sync bot" })
+      const owner = yield* run["members.update"](f.jane, { teamId: f.acme, userId: bot.id, role: "owner" }).pipe(
+        Effect.flip,
+      )
+      expect(owner._tag).toBe("ServiceAccountCannotBeOwner")
       const updated = yield* run["serviceAccounts.update"](f.jane, {
         teamId: f.acme,
         serviceAccountId: bot.id,

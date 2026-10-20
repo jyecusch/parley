@@ -13,6 +13,7 @@ import {
   MemberNotFound,
   OwnerChangeNeedsOwner,
 } from "../errors/members.ts"
+import { ServiceAccountCannotBeOwner } from "../errors/service-accounts.ts"
 import { InvitationId, TeamId, UserId } from "../ids.ts"
 import { InvitableRole, Invitation, Member } from "../member.ts"
 import { defineOperation, defineTeamOperation } from "../operation.ts"
@@ -39,7 +40,7 @@ export const updateMember = defineTeamOperation({
     "Change a member's role. Needs members:manage; only an owner can make someone an owner or change an owner, and a team always keeps at least one owner.",
   input: Schema.Struct({ ...OneMember, role: Role.annotate({ title: "Role" }) }),
   output: Member,
-  errors: [MemberNotFound, LastOwner, OwnerChangeNeedsOwner],
+  errors: [ServiceAccountCannotBeOwner, MemberNotFound, LastOwner, OwnerChangeNeedsOwner],
   http: { method: "PATCH", path: "/teams/:teamId/members/:userId" },
   hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: ["members:manage"],
