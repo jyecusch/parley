@@ -47,3 +47,7 @@ docker run -p 3000:3000 \
 - Behind a proxy or Cloudflare, set `IP_ADDRESS_HEADER` (for example `cf-connecting-ip`) so sign-in rate limits apply per visitor.
 - Email, file storage and the rest are optional; see `.env.example`.
 - Without Docker: `bun install`, `bun run --cwd apps/web build`, then `bun packages/db/src/migrate.ts && bun apps/web/serve.ts`.
+
+## License
+
+[MIT](LICENSE)

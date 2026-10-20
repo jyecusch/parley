@@ -14,3 +14,9 @@ Every concept has exactly one name, defined in [`docs/terminology.md`](docs/term
 ## Read before building
 
 `docs/` is the contract the implementation is held to. Start with `docs/00-architecture.md`. Decisions, proposals and open questions live in `docs/decisions.md`. Don't make product or architecture decisions alone: propose them and record them there.
+
+## Commits, versions and merges
+
+- Commit messages follow [Conventional Commits](https://www.conventionalcommits.org): `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`, with a scope where it helps (`feat(crt): ...`) and `!` or a `BREAKING CHANGE:` footer for breaking changes.
+- Releases follow [Semantic Versioning](https://semver.org) and are tagged `vX.Y.Z`. Every package in the workspace carries the same version.
+- History on `main` is linear. Pull requests merge by squash or rebase only, never a merge commit.
