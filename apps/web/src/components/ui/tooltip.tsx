@@ -1,10 +1,12 @@
 import type { ReactNode } from "react"
 import { cn } from "./cn.ts"
 
-export type TooltipSide = "bottom" | "right"
+/** "bottom-start" lines the tip up with the element's left edge, for elements at a panel's edge. */
+export type TooltipSide = "bottom" | "bottom-start" | "right"
 
 const SIDES: Readonly<Record<TooltipSide, string>> = {
   bottom: "top-full left-1/2 mt-1.5 -translate-x-1/2",
+  "bottom-start": "top-full left-0 mt-1.5",
   right: "top-1/2 left-full ml-2 -translate-y-1/2",
 }
 

@@ -126,7 +126,7 @@ export function ImageEditor(props: {
   }
   return (
     <span className={cn("group/img relative inline-flex shrink-0", busy && "opacity-50")}>
-      <Tooltip text={`Upload ${props.label}`}>
+      <Tooltip text={`Upload ${props.label}`} side="bottom-start">
         <button
           className="inline-flex cursor-pointer rounded-lg p-0 hover:[&>*]:ring-2 hover:[&>*]:ring-line-strong focus-visible:[&>*]:ring-2 focus-visible:[&>*]:ring-line-strong"
           type="button"
