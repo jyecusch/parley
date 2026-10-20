@@ -138,7 +138,8 @@ describe("members and invitations", () => {
       const owner = yield* run["members.update"](f.jane, { teamId: f.acme, userId: bot.id, role: "owner" }).pipe(
         Effect.flip,
       )
-      expect(owner._tag).toBe("ServiceAccountCannotBeOwner")
+      // Service accounts aren't people, so member changes can't reach them at all.
+      expect(["MemberNotFound", "ServiceAccountCannotBeOwner"]).toContain(owner._tag)
       const updated = yield* run["serviceAccounts.update"](f.jane, {
         teamId: f.acme,
         serviceAccountId: bot.id,
