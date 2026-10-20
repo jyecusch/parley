@@ -8,7 +8,7 @@ import {
   ApiKeyUnrecognized,
   ConnectionRevoked,
   type DatabaseUnavailable,
-  type Permission,
+  Permission,
   RequestsTooFrequent,
   SessionExpired,
   SessionMissing,
@@ -143,15 +143,8 @@ const credentialFrom = (headers: Headers): Credential | undefined => {
     : { _tag: "ApiKey", key: value }
 }
 
-const PERMISSIONS: ReadonlySet<string> = new Set<Permission>([
-  "records:read",
-  "records:write",
-  "records:delete",
-  "fields:manage",
-  "members:manage",
-  "service-accounts:manage",
-  "team:manage",
-])
+/** Every permission there is, from the domain's own list, so a new one is never silently dropped. */
+const PERMISSIONS: ReadonlySet<string> = new Set<string>(Permission.literals)
 const isPermission = (value: string): value is Permission => PERMISSIONS.has(value)
 
 /** An API key's scopes, stored as Better-Auth permissions ({ records: ["read"] }). None means none (deny by default). */

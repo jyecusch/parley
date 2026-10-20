@@ -223,3 +223,18 @@ describe("Better-Auth endpoints", () => {
     expect((await call("GET", "/api/auth/get-session")).status).toBe(200)
   })
 })
+
+describe("malformed requests", () => {
+  it("answers a body that isn't JSON, or the wrong shape, with 422 rather than a server error", async () => {
+    for (const body of ["{not json", JSON.stringify({ emails: "nope" })]) {
+      const response = await handler(
+        new Request(`${base}/api/v1/teams/${teamId}/contacts`, {
+          method: "POST",
+          headers: { "content-type": "application/json", cookie },
+          body,
+        }),
+      )
+      expect(response.status, body).toBe(422)
+    }
+  })
+})
