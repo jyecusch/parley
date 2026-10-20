@@ -46,7 +46,7 @@ How to pick a name: choose the most common name for the concept. Reject anything
 | **API key** | A secret credential used by an agent or script. It belongs to either a user (it acts as that user, is limited by its scopes, and is bound to one team) or a service account. | token, PAT, secret, credential (as a noun for this) |
 | **CRT mode** | The optional old-monitor look (D81, D102), drawn by a WebGL shader where the browser can, otherwise by the CSS layer. Amber by default. | retro mode, terminal theme, CRT filter |
 | **CRT settings** | How CRT mode looks, kept per browser (D114): the **phosphor** colour (hue and saturation), text glow, **curvature**, **chromatic aberration**, scanlines, bloom, vignette and flicker. | CRT config, CRT options, CRT preferences |
-| **Phosphor** | The colour CRT mode draws in, named after a monitor's phosphor coating: Amber, Green, Cyan, White, or any hue. | tint, accent colour (for this) |
+| **Phosphor** | The colour CRT mode draws in, named after a monitor's phosphor coating, set by hue and saturation (saturation 0 is white). | tint, accent colour (for this) |
 | **Invitation** | An emailed link to join a team with a role, good for 7 days. | invite (as a noun), join link, team invite |
 | **Access token** | The short-lived OAuth token an agent gets for a connection and sends to `/mcp`. It names the connection and nothing else. In UI copy, say "the agent's sign-in". | token (alone), bearer, JWT (outside code about its format) |
 | **Connection** | An agent someone authorized over OAuth (MCP sign-in), bound to one team, acting as that person or as a service account, limited to its scopes. Listed and revoked in Settings. | grant, authorization, integration, connected app, OAuth app |

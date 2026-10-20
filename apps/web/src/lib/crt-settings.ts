@@ -35,14 +35,6 @@ export const CRT_DEFAULTS: CrtSettings = {
   flicker: true,
 }
 
-/** Phosphors of real monitors, as starting points for the colour. */
-export const PHOSPHORS: ReadonlyArray<{ readonly name: string; readonly hue: number; readonly saturation: number }> = [
-  { name: "Amber", hue: 72, saturation: 1 },
-  { name: "Green", hue: 145, saturation: 1 },
-  { name: "Cyan", hue: 200, saturation: 0.8 },
-  { name: "White", hue: 72, saturation: 0 },
-]
-
 const KEY = "parley.crt.settings"
 
 const LIMITS: Readonly<Record<Exclude<keyof CrtSettings, "flicker">, readonly [number, number]>> = {

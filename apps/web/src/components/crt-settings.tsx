@@ -1,9 +1,6 @@
 import { useState } from "react"
-import { CRT_DEFAULTS, type CrtSettings, crtSettings, PHOSPHORS, saveCrtSettings } from "../lib/crt-settings.ts"
-import { Button, Checkbox, cn, Dialog, Fieldset, Hint, Option, Slider } from "./ui/index.ts"
-
-/** The colour a phosphor draws in, as CRT mode's foreground (app.css) would with these settings. */
-const phosphorColor = (hue: number, saturation: number) => `oklch(0.88 ${0.16 * saturation} ${hue})`
+import { CRT_DEFAULTS, type CrtSettings, crtSettings, saveCrtSettings } from "../lib/crt-settings.ts"
+import { Button, Checkbox, Dialog, Fieldset, Hint, Option, Slider } from "./ui/index.ts"
 
 /**
  * CRT settings (D114): the phosphor colour and how strong each part of the effect is. Every change shows at
@@ -39,26 +36,6 @@ export function CrtSettingsDialog(props: { readonly crtOn: boolean; readonly onC
       {props.crtOn ? null : <Hint>CRT mode is off. Turn it on to see these settings.</Hint>}
 
       <Fieldset legend="Phosphor">
-        <div className="mb-2 flex flex-wrap gap-2">
-          {PHOSPHORS.map((phosphor) => {
-            const chosen = phosphor.hue === settings.hue && phosphor.saturation === settings.saturation
-            return (
-              <Button
-                key={phosphor.name}
-                aria-pressed={chosen}
-                className={cn(chosen && "inset-ring-2 inset-ring-fg")}
-                onClick={() => change({ hue: phosphor.hue, saturation: phosphor.saturation })}
-              >
-                <span
-                  aria-hidden="true"
-                  className="size-3.5 rounded-full"
-                  style={{ backgroundColor: phosphorColor(phosphor.hue, phosphor.saturation) }}
-                />
-                {phosphor.name}
-              </Button>
-            )
-          })}
-        </div>
         <Slider
           label="Hue"
           min={0}

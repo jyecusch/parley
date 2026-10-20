@@ -119,7 +119,7 @@ What we decided, who decided it, and what's still open. Nothing becomes "decided
 | D111 | Domain matching credit | Credited to whoever made the change that triggered it, naming the domain: "Jane Doe via Claude added Sam to Acme by domain matching on acme.com" | Owner | 2026-10-20 |
 | D112 | Removing an affiliation | Immediate, with an undo toast; no confirmation | Owner | 2026-10-20 |
 | D113 | Affiliation chips in the contacts table | Company only, title in the chip's tooltip; up to two chips, then "+N" | Owner | 2026-10-20 |
-| D114 | CRT settings | A button beside the CRT mode toggle in the account menu opens a dialog: phosphor (Amber, Green, Cyan, White presets, plus hue and saturation), text glow, curvature, chromatic aberration, scanlines, bloom, vignette and flicker, with "Reset to defaults". Changes show live behind the dialog and are kept per browser in localStorage (`parley.crt.settings`, which replaces D102's two keys; their values carry over). The phosphor drives the whole CRT palette, the shader and its cursor | Owner (asked); details Claude | 2026-10-20 |
+| D114 | CRT settings | A button beside the CRT mode toggle in the account menu opens a dialog: phosphor (hue and saturation; no presets, which the sliders made redundant), text glow, curvature, chromatic aberration, scanlines, bloom, vignette and flicker, with "Reset to defaults". Changes show live behind the dialog and are kept per browser in localStorage (`parley.crt.settings`, which replaces D102's two keys; their values carry over). The phosphor drives the whole CRT palette, the shader and its cursor | Owner (asked); details Claude | 2026-10-20 |
 
 ## Implementation choices made during milestones 1 and 2 (Claude; low-stakes, open to veto)
 
