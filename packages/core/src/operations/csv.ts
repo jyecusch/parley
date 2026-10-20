@@ -14,6 +14,7 @@ import {
   type exportContacts,
   type FieldProblem,
   guessMapping,
+  IMPORT_FIELDS,
   type ImportResult,
   InputRejected,
   type importCompanies,
@@ -341,6 +342,79 @@ const customOf = (cells: Record<string, string>, fields: ReadonlyArray<CustomFie
   return custom
 }
 
+/**
+ * Checks the values to set on every row (D124) before any row is imported: each must name a field
+ * that exists and be a value it takes, or the whole import is refused.
+ */
+const checkSet = (
+  set: Readonly<Record<string, string>> | undefined,
+  recordType: RecordType,
+  fields: ReadonlyArray<CustomField>,
+) =>
+  Effect.gen(function* () {
+    const problems: Array<FieldProblem> = []
+    for (const [target, text] of Object.entries(set ?? {})) {
+      if (target.startsWith("custom:")) {
+        const field = fields.find((entry) => `custom:${entry.id}` === target)
+        const result = field ? customFromCell(field, text) : undefined
+        if (!field || !result) {
+          problems.push({
+            field: `set.${target}`,
+            problem: "invalid-format",
+            userMessage: userText`There's no field like that to set.`,
+          })
+        } else if ("problem" in result) {
+          problems.push({ field: `set.${target}`, problem: "invalid-format", userMessage: result.problem })
+        }
+      } else if (!IMPORT_FIELDS[recordType].some((entry) => entry.field === target)) {
+        problems.push({
+          field: `set.${target}`,
+          problem: "invalid-format",
+          userMessage: userText`There's no field like that to set.`,
+        })
+      }
+    }
+    if (problems.length > 0) return yield* new InputRejected({ problems })
+  })
+
+/** A row's cells with the values set on every row: the row's own value wins, multi-select values combine. */
+const withSet = (
+  cells: Record<string, string>,
+  set: Readonly<Record<string, string>> | undefined,
+  fields: ReadonlyArray<CustomField>,
+) => {
+  const out = { ...cells }
+  for (const [target, text] of Object.entries(set ?? {})) {
+    if (text.trim() === "") continue
+    const multi = fields.some((field) => `custom:${field.id}` === target && field.type === "multi-select")
+    const own = out[target]
+    out[target] = own === undefined ? text : multi ? `${own}; ${text}` : own
+  }
+  return out
+}
+
+/**
+ * The custom values to write to an existing record. Multi-select values are added to what it has
+ * unless the import replaces them (D124), so importing several sources merges rather than overwrites.
+ */
+const mergeCustom = (
+  incoming: Readonly<Record<string, CustomValue | null>>,
+  current: Readonly<Record<string, CustomValue | null>>,
+  fields: ReadonlyArray<CustomField>,
+  mode: "add" | "replace",
+) => {
+  if (mode === "replace") return incoming
+  const merged: Record<string, CustomValue | null> = { ...incoming }
+  for (const field of fields) {
+    const next = incoming[field.id]
+    const had = current[field.id]
+    if (field.type === "multi-select" && Array.isArray(next) && Array.isArray(had)) {
+      merged[field.id] = [...new Set([...(had as ReadonlyArray<string>), ...(next as ReadonlyArray<string>)])]
+    }
+  }
+  return merged
+}
+
 const split = (cell: string | undefined) =>
   (cell ?? "")
     .split(/[;|]/)
@@ -414,6 +488,7 @@ export const importContactsCsv = (principal: Principal, input: OperationInput<ty
       const canWrite = yield* proveCanWriteRecords(member)
       const fields = yield* customFields.list(team, "contact", canRead)
       const parsed = yield* parse(input.csv, input.mapping, "contact", fields)
+      yield* checkSet(input.set, "contact", fields)
       const owners = yield* ownerMatcher(member)
 
       // Rows match existing contacts by email, and companies by name.
@@ -432,7 +507,7 @@ export const importContactsCsv = (principal: Principal, input: OperationInput<ty
       }
       for (const [index, row] of parsed.rows.entries()) {
         const line = index + 2
-        const cells = cellsOf(parsed, row)
+        const cells = withSet(cellsOf(parsed, row), input.set, fields)
         const problems: Array<FieldProblem> = []
         const custom = customOf(cells, fields, problems)
         const [first, ...rest] = (cells.name ?? "").split(/\s+/).filter(Boolean)
@@ -492,13 +567,17 @@ export const importContactsCsv = (principal: Principal, input: OperationInput<ty
                   const added = emails.filter((email) => !known.has(email))
                   // An import never subscribes someone again who opted out: that takes a person
                   // with email:manage, one contact at a time.
-                  const { subscriptionStatus, ...otherFields } = fieldsForRow
+                  const { subscriptionStatus, custom: rowCustom, ...otherFields } = fieldsForRow
+                  const custom = rowCustom
+                    ? mergeCustom(rowCustom, current.custom, fields, input.multiSelect ?? "add")
+                    : undefined
                   const keepStatus =
                     subscriptionStatus === "unsubscribed" || current.subscriptionStatus === "subscribed"
                   const updated = yield* contacts.update(
                     proof,
                     {
                       ...otherFields,
+                      ...(custom ? { custom } : {}),
                       ...(subscriptionStatus && keepStatus ? { subscriptionStatus } : {}),
                       ...(added.length > 0
                         ? { emails: [...current.emails, ...added.map((address) => ({ address: address as never }))] }
@@ -571,6 +650,7 @@ export const importCompaniesCsv = (principal: Principal, input: OperationInput<t
       const canWrite = yield* proveCanWriteRecords(member)
       const fields = yield* customFields.list(team, "company", canRead)
       const parsed = yield* parse(input.csv, input.mapping, "company", fields)
+      yield* checkSet(input.set, "company", fields)
       const owners = yield* ownerMatcher(member)
 
       // Rows match existing companies by domain, then by exact name.
@@ -588,7 +668,7 @@ export const importCompaniesCsv = (principal: Principal, input: OperationInput<t
       }
       for (const [index, row] of parsed.rows.entries()) {
         const line = index + 2
-        const cells = cellsOf(parsed, row)
+        const cells = withSet(cellsOf(parsed, row), input.set, fields)
         const problems: Array<FieldProblem> = []
         const custom = customOf(cells, fields, problems)
         // A "domain" may come as a website or an email address; keep just the domain.
@@ -672,10 +752,15 @@ export const importCompaniesCsv = (principal: Principal, input: OperationInput<t
                   const current = yield* companies.get(proof)
                   const known = new Set(current.domains.map((entry) => entry.domain as string))
                   const added = domains.filter((domain) => !known.has(domain))
+                  const { custom: rowCustom, ...otherFields } = fieldsForRow
+                  const custom = rowCustom
+                    ? mergeCustom(rowCustom, current.custom, fields, input.multiSelect ?? "add")
+                    : undefined
                   yield* companies.update(
                     proof,
                     {
-                      ...fieldsForRow,
+                      ...otherFields,
+                      ...(custom ? { custom } : {}),
                       ...(name ? { name } : {}),
                       ...(added.length > 0
                         ? { domains: [...current.domains, ...added.map((domain) => ({ domain: domain as never }))] }

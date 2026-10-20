@@ -106,4 +106,59 @@ describe("CSV", () => {
       expect(refused._tag).toBe("SegmentNotFound")
     }).pipe(Effect.provide(CoreLive)),
   )
+
+  it.effect("sets values on every row, and adds to multi-select values when merging imports", () =>
+    Effect.gen(function* () {
+      const f = yield* Fixture
+      const products = yield* run["fields.create"](f.jane, {
+        teamId: f.acme,
+        recordType: "contact",
+        name: "Products",
+        type: "multi-select",
+        options: [
+          { id: "nitric", label: "Nitric Framework" },
+          { id: "suga", label: "Suga Cloud" },
+        ],
+      })
+      const target = `custom:${products.id}`
+      const nitric = yield* run["contacts.import"](f.jane, {
+        teamId: f.acme,
+        csv: "Name,Email\nAna Lopez,ana@merge.co\nBen Ito,ben@merge.co\n",
+        set: { [target]: "Nitric Framework" },
+      })
+      expect(nitric.created).toBe(2)
+
+      // A second source: Ana is in both, so she keeps Nitric and gains Suga.
+      yield* run["contacts.import"](f.jane, {
+        teamId: f.acme,
+        csv: "Name,Email\nAna Lopez,ana@merge.co\n",
+        set: { [target]: "Suga Cloud" },
+      })
+      const listed = yield* run["contacts.list"](f.jane, { teamId: f.acme })
+      const ana = listed.items.find((contact) => contact.displayName === "Ana Lopez")
+      const ben = listed.items.find((contact) => contact.displayName === "Ben Ito")
+      expect([...((ana?.custom[products.id] as ReadonlyArray<string>) ?? [])].sort()).toEqual(["nitric", "suga"])
+      expect(ben?.custom[products.id]).toEqual(["nitric"])
+
+      // Replace uses only the file's values.
+      yield* run["contacts.import"](f.jane, {
+        teamId: f.acme,
+        csv: "Name,Email\nAna Lopez,ana@merge.co\n",
+        set: { [target]: "Suga Cloud" },
+        multiSelect: "replace",
+      })
+      const replaced = yield* run["contacts.list"](f.jane, { teamId: f.acme })
+      expect(replaced.items.find((contact) => contact.displayName === "Ana Lopez")?.custom[products.id]).toEqual([
+        "suga",
+      ])
+
+      // A value the field doesn't have refuses the whole import before any row.
+      const refused = yield* run["contacts.import"](f.jane, {
+        teamId: f.acme,
+        csv: "Name,Email\nCy,cy@merge.co\n",
+        set: { [target]: "Not a product" },
+      }).pipe(Effect.flip)
+      expect(refused._tag).toBe("InputRejected")
+    }).pipe(Effect.provide(CoreLive)),
+  )
 })

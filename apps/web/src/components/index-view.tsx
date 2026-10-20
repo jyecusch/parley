@@ -13,7 +13,7 @@ import type { UserText } from "@parley/errors"
 import { useEffect, useRef, useState } from "react"
 import { messageOf } from "../lib/client.ts"
 import { CustomFieldsSection } from "./custom-fields.tsx"
-import { DisplayIcon, DownloadIcon } from "./icons.tsx"
+import { CloseIcon, DisplayIcon, DownloadIcon } from "./icons.tsx"
 import { Dialog } from "./settings.tsx"
 import {
   Box,
@@ -23,6 +23,7 @@ import {
   Field,
   Fieldset,
   Hint,
+  IconButton,
   Input,
   Menu,
   MenuHeading,
@@ -324,11 +325,22 @@ export function ImportDialog(props: {
   readonly recordType: RecordType
   readonly plural: string
   readonly customFields: ReadonlyArray<CustomField>
-  readonly onImport: (csv: string, mapping: Record<string, string>) => Promise<ImportResult>
+  readonly onImport: (
+    csv: string,
+    mapping: Record<string, string>,
+    options: { readonly set: Record<string, string>; readonly multiSelect: "add" | "replace" },
+  ) => Promise<ImportResult>
   readonly onClose: () => void
 }) {
   const [csv, setCsv] = useState<string>()
   const [mapping, setMapping] = useState<Record<string, string>>({})
+  /** Values for every row, by custom field: what a cell would say (option labels, joined by "; "). */
+  const [set, setSet] = useState<Record<string, string>>({})
+  const [replaceMulti, setReplaceMulti] = useState(false)
+  const multiFields = props.customFields.filter((field) => field.type === "multi-select")
+  const touchesMulti = multiFields.some(
+    (field) => Object.values(mapping).includes(`custom:${field.id}`) || set[`custom:${field.id}`],
+  )
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<UserText>()
   const [result, setResult] = useState<ImportResult>()
@@ -352,7 +364,8 @@ export function ImportDialog(props: {
     setBusy(true)
     setError(undefined)
     try {
-      setResult(await props.onImport(csv, mapping))
+      const filled = Object.fromEntries(Object.entries(set).filter(([, value]) => value.trim() !== ""))
+      setResult(await props.onImport(csv, mapping, { set: filled, multiSelect: replaceMulti ? "replace" : "add" }))
     } catch (failure) {
       setError(messageOf(failure))
     }
@@ -451,6 +464,20 @@ export function ImportDialog(props: {
               ))}
             </Fieldset>
           ) : null}
+          {headers.length > 0 && props.customFields.length > 0 ? (
+            <SetOnEveryRow fields={props.customFields} value={set} onChange={setSet} />
+          ) : null}
+          {headers.length > 0 && touchesMulti ? (
+            <Option>
+              <Checkbox checked={replaceMulti} onChange={(event) => setReplaceMulti(event.target.checked)} />
+              <span>
+                Replace values in multi-select fields{" "}
+                <span className="text-subtle">
+                  (otherwise a {props.recordType} that's already in Parley keeps its values and gains these)
+                </span>
+              </span>
+            </Option>
+          ) : null}
           {error ? <ErrorText>{error}</ErrorText> : null}
         </>
       )}
@@ -521,5 +548,105 @@ export function SetFieldDialog(props: {
         </>
       )}
     </Dialog>
+  )
+}
+
+/**
+ * Custom field values to give every imported row (D124), such as which product a file of contacts
+ * came from. Kept as the text a CSV cell would hold, so the import reads them the same way.
+ */
+function SetOnEveryRow(props: {
+  readonly fields: ReadonlyArray<CustomField>
+  readonly value: Record<string, string>
+  readonly onChange: (value: Record<string, string>) => void
+}) {
+  const chosen = Object.keys(props.value)
+  const available = props.fields.filter((field) => !chosen.includes(`custom:${field.id}`))
+  const setOne = (target: string, text: string) => props.onChange({ ...props.value, [target]: text })
+  const remove = (target: string) => {
+    const next = { ...props.value }
+    delete next[target]
+    props.onChange(next)
+  }
+  return (
+    <Fieldset legend="Set on every row">
+      {chosen.map((target) => {
+        const field = props.fields.find((entry) => `custom:${entry.id}` === target)
+        if (!field) return null
+        const text = props.value[target] ?? ""
+        const labels = text
+          .split(";")
+          .map((label) => label.trim())
+          .filter(Boolean)
+        return (
+          <div key={target} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_auto] items-start gap-2.5">
+            <span className="truncate pt-2 text-sm">{field.name}</span>
+            {field.type === "multi-select" ? (
+              <div className="flex flex-wrap gap-x-3 gap-y-1 pt-1.5">
+                {field.options.map((option) => (
+                  <Option key={option.id} className="min-h-6 text-sm">
+                    <Checkbox
+                      checked={labels.includes(option.label)}
+                      onChange={(event) =>
+                        setOne(
+                          target,
+                          (event.target.checked
+                            ? [...labels, option.label]
+                            : labels.filter((label) => label !== option.label)
+                          ).join("; "),
+                        )
+                      }
+                    />
+                    {option.label}
+                  </Option>
+                ))}
+              </div>
+            ) : field.type === "single-select" ? (
+              <Select
+                className="h-9"
+                aria-label={`Value for ${field.name}`}
+                value={text}
+                onChange={(event) => setOne(target, event.target.value)}
+              >
+                <option value="">Choose…</option>
+                {field.options.map((option) => (
+                  <option key={option.id} value={option.label}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
+            ) : (
+              <Input
+                className="h-9"
+                aria-label={`Value for ${field.name}`}
+                value={text}
+                onChange={(event) => setOne(target, event.target.value)}
+              />
+            )}
+            <IconButton label={`Don't set ${field.name}`} size="xs" onClick={() => remove(target)}>
+              <CloseIcon className="size-4" />
+            </IconButton>
+          </div>
+        )
+      })}
+      {available.length > 0 ? (
+        <Select
+          className="h-9 self-start"
+          aria-label="Add a field to set on every row"
+          value=""
+          onChange={(event) => event.target.value && setOne(event.target.value, "")}
+        >
+          <option value="">Add a field…</option>
+          {available.map((field) => (
+            <option key={field.id} value={`custom:${field.id}`}>
+              {field.name}
+            </option>
+          ))}
+        </Select>
+      ) : null}
+      <Hint>
+        For example, which product this file came from. A row's own value wins; multi-select values are combined.
+      </Hint>
+    </Fieldset>
   )
 }

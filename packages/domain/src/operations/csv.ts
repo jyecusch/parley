@@ -44,6 +44,20 @@ const importInput = Schema.Struct({
         'Which field each column (by header) fills, like {"Work email":"email","Plan":"custom:<field id>"}. Columns left out are skipped. Without a mapping, Parley guesses from the headers.',
     }),
   ),
+  set: Schema.optional(
+    Schema.Record(Schema.String, Schema.String.check(Schema.isMaxLength(2000))).annotate({
+      title: "Set on every row",
+      description:
+        'Values for every imported row, keyed like mapping targets and written as a cell would be, like {"custom:<field id>":"Suga Cloud"}. A row\'s own value wins, except for multi-select fields, where both are kept.',
+    }),
+  ),
+  multiSelect: Schema.optional(
+    Schema.Literals(["add", "replace"]).annotate({
+      title: "Multi-select fields",
+      description:
+        "When a row updates an existing record: add (the default) keeps its values and adds the row's; replace uses only the row's.",
+    }),
+  ),
 })
 
 export const exportContacts = defineTeamOperation({

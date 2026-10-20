@@ -546,8 +546,8 @@ function ContactsScreen() {
           plural="contacts"
           customFields={fields}
           onClose={() => setDialog(undefined)}
-          onImport={async (csv, mapping) => {
-            const result = await call("contacts.import", { teamId, csv, mapping })
+          onImport={async (csv, mapping, options) => {
+            const result = await call("contacts.import", { teamId, csv, mapping, ...options })
             await collection.utils.refetch()
             return result
           }}
