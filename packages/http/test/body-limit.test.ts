@@ -29,4 +29,23 @@ describe("request body limits", () => {
     expect(result).toBeInstanceOf(Request)
     await expect((result as Request).text()).rejects.toThrow()
   })
+
+  it("works with server request objects, which can't be copied once their body is read", async () => {
+    // Like the server's own request (srvx): it exposes the parts, but isn't a Request to copy from.
+    const native = post("/api/auth/sign-in/email", JSON.stringify({ email: "a@b.co" }), {
+      "content-type": "application/json",
+    })
+    const serverRequest = {
+      url: native.url,
+      method: native.method,
+      headers: native.headers,
+      signal: native.signal,
+      get body() {
+        return native.body
+      },
+    } as unknown as Request
+    const result = limitBody(serverRequest)
+    expect(result).toBeInstanceOf(Request)
+    expect(await (result as Request).json()).toEqual({ email: "a@b.co" })
+  })
 })

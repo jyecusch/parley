@@ -36,5 +36,12 @@ export const limitBody = (request: Request): Request | Response => {
       },
     }),
   )
-  return new Request(request, { body: counted, duplex: "half" } as RequestInit)
+  // Built from its parts: the server's own request object refuses to be copied once its body is taken.
+  return new Request(request.url, {
+    method: request.method,
+    headers: request.headers,
+    body: counted,
+    signal: request.signal,
+    duplex: "half",
+  } as RequestInit)
 }

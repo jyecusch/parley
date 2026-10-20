@@ -4,8 +4,12 @@ export interface Session {
   readonly user: { readonly id: string; readonly name: string; readonly email: string }
 }
 
-/** Better-Auth's error codes, in our words. Its own message text is never shown (docs/02). */
-const messageForCode = (code: string | undefined): UserText => {
+/** Better-Auth's error codes and statuses, in our words. Its own message text is never shown (docs/02). */
+const messageForCode = (code: string | undefined, status: number): UserText => {
+  if (status === 429) return userText`Too many attempts in a short time. Wait a minute, then try again.`
+  if (status >= 500) {
+    return userText`Something went wrong on Parley's side, so you weren't signed in. Try again; if it keeps happening, the server's log says why.`
+  }
   switch (code) {
     case "INVALID_EMAIL_OR_PASSWORD":
       return userText`That email and password don't match. Check them and try again.`
@@ -16,6 +20,8 @@ const messageForCode = (code: string | undefined): UserText => {
       return userText`Use at least 8 characters for your password.`
     case "INVALID_EMAIL":
       return userText`Enter a full email address, like jane@example.com.`
+    case "INVALID_ORIGIN":
+      return userText`Parley is set up for a different address than the one you're using. Open it at the address in its settings, or update that address.`
     default:
       return userText`We couldn't sign you in just now. Nothing was changed. Try again in a moment.`
   }
@@ -37,7 +43,7 @@ const post = async (path: string, body: Record<string, unknown>): Promise<AuthOu
       body: JSON.stringify(request ? { ...body, oauth_query: request } : body),
     })
     const json = (await response.json().catch(() => ({}))) as { code?: string; redirect?: boolean; url?: string }
-    if (!response.ok) return { failure: messageForCode(json.code) }
+    if (!response.ok) return { failure: messageForCode(json.code, response.status) }
     return json.redirect && json.url ? { next: json.url } : {}
   } catch {
     return { failure: userText`Parley couldn't be reached. Check your connection and try again.` }
