@@ -1,7 +1,7 @@
 import { type EmailSettings, ROLE_PERMISSIONS, type SendingDomain, type TeamId, type Topic } from "@parley/domain"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { createFileRoute, getRouteApi } from "@tanstack/react-router"
-import { useEffect, useState } from "react"
+import { type ReactNode, useEffect, useState } from "react"
 import { CheckIcon, InfoIcon, MailIcon, WarnIcon } from "../components/icons.tsx"
 import { CopyField, Dialog, Empty, LoadFailed, LoadingRows, SettingsPage, useToast } from "../components/settings.tsx"
 import {
@@ -399,7 +399,7 @@ function SenderForm(props: {
   const disabled = !props.canManage
   return (
     <SettingsPanel className="grid grid-cols-2 gap-x-5 gap-y-4 @max-3xl/content:grid-cols-1">
-      <Field label="Sender name" htmlFor="sender-name">
+      <Field label="Sender name" htmlFor="sender-name" hint={neededIfEmpty(draft.senderName)}>
         <Input
           id="sender-name"
           maxLength={80}
@@ -422,17 +422,18 @@ function SenderForm(props: {
           </>
         }
         htmlFor="reply-to"
+        hint="Replies go to the sender address unless you set one."
       >
         <Input
           id="reply-to"
           type="email"
           disabled={disabled}
-          placeholder="hello@acme.com"
+          placeholder={draft.senderAddress || "Same as the sender address"}
           value={draft.replyTo}
           onChange={set("replyTo")}
         />
       </Field>
-      <Field label="Legal name" htmlFor="legal-name">
+      <Field label="Legal name" htmlFor="legal-name" hint={neededIfEmpty(draft.legalName)}>
         <Input
           id="legal-name"
           maxLength={160}
@@ -442,7 +443,12 @@ function SenderForm(props: {
           onChange={set("legalName")}
         />
       </Field>
-      <Field label="Postal address" htmlFor="postal-address" className="col-span-full">
+      <Field
+        label="Postal address"
+        htmlFor="postal-address"
+        className="col-span-full"
+        hint={neededIfEmpty(draft.postalAddress)}
+      >
         <Textarea
           id="postal-address"
           rows={2}
@@ -453,7 +459,12 @@ function SenderForm(props: {
           onChange={set("postalAddress")}
         />
       </Field>
-      <Field label="Why recipients get your email" htmlFor="footer-reason" className="col-span-full">
+      <Field
+        label="Why recipients get your email"
+        htmlFor="footer-reason"
+        className="col-span-full"
+        hint={neededIfEmpty(draft.footerReason)}
+      >
         <Textarea
           id="footer-reason"
           rows={2}
@@ -467,9 +478,10 @@ function SenderForm(props: {
       <div className="col-span-full flex flex-col gap-1.5">
         <span className="font-medium">Footer preview</span>
         <div className="flex flex-col gap-1 border-t border-dashed border-line-strong pt-3 text-center text-sm text-subtle [&>p]:m-0">
-          <p>{draft.footerReason || "Why recipients get your email."}</p>
+          <p>{draft.footerReason || <MissingPart>Why recipients get your email</MissingPart>}</p>
           <p>
-            {draft.legalName || "Legal name"} · {draft.postalAddress || "Postal address"}
+            {draft.legalName || <MissingPart>Legal name</MissingPart>} ·{" "}
+            {draft.postalAddress || <MissingPart>Postal address</MissingPart>}
           </p>
           <p>
             <u>Unsubscribe</u> or choose which email you get.
@@ -751,7 +763,7 @@ function SenderAddressField(props: {
   const hint =
     chosen && chosen.status !== "verified"
       ? `${chosen.domain} isn't verified yet. Campaigns can be sent once it is.`
-      : undefined
+      : neededIfEmpty(name)
 
   return (
     <Field label="Sender address" htmlFor="sender-name-part" error={error} hint={hint}>
@@ -789,4 +801,13 @@ function SenderAddressField(props: {
       </div>
     </Field>
   )
+}
+
+/** Under a field the team can't send without, while it's empty. */
+const neededIfEmpty = (value: string) =>
+  value.trim() ? undefined : <span className="text-warn">Needed before your team can send.</span>
+
+/** A part of the footer preview that hasn't been filled in, marked as a gap rather than shown as example text. */
+function MissingPart(props: { readonly children: ReactNode }) {
+  return <span className="rounded-sm bg-warn-soft px-1 text-warn">{props.children} needed</span>
 }
