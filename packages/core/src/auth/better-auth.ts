@@ -199,6 +199,9 @@ export const makeAuth = (config: AuthConfig): Auth =>
       window: 60,
       max: 100,
       customRules: {
+        // Reading the session costs one indexed lookup and the web app checks it on every
+        // navigation, so a limit here signs out everyone sharing an IP address (an office).
+        "/get-session": false,
         "/sign-in/email": { window: 60, max: 10 },
         "/sign-up/email": { window: 3600, max: 20 },
         "/send-verification-email": { window: 3600, max: 5 },

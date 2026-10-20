@@ -66,13 +66,38 @@ export const withAgentRequest = (path: string) => {
   return request ? `${path}?${request}` : path
 }
 
-export const signIn = (email: string, password: string) => post("/sign-in/email", { email, password })
-export const signUp = (name: string, email: string, password: string) =>
-  post("/sign-up/email", { name, email, password })
-export const signOut = () => post("/sign-out", {})
+/**
+ * The session, read once and reused briefly: every navigation in the app checks it, and a fresh
+ * read each time adds up fast for a team sharing one IP address.
+ */
+const SESSION_REUSE_MS = 30_000
+let remembered: { readonly at: number; readonly session: Promise<Session | null> } | undefined
 
-export const getSession = async (): Promise<Session | null> => {
-  const response = await fetch("/api/auth/get-session", { credentials: "same-origin" })
-  if (!response.ok) return null
-  return ((await response.json()) as Session | null) ?? null
+/** Forget the remembered session, so the next check asks the server. */
+const forgetSession = <A>(result: A): A => {
+  remembered = undefined
+  return result
+}
+
+export const signIn = (email: string, password: string) =>
+  post("/sign-in/email", { email, password }).then(forgetSession)
+export const signUp = (name: string, email: string, password: string) =>
+  post("/sign-up/email", { name, email, password }).then(forgetSession)
+export const signOut = () => post("/sign-out", {}).then(forgetSession)
+
+/**
+ * The signed-in session, or null when nobody is signed in. A failed check (the server is busy or
+ * unreachable) rejects rather than returning null, so it never looks like being signed out.
+ */
+export const getSession = (): Promise<Session | null> => {
+  if (remembered && Date.now() - remembered.at < SESSION_REUSE_MS) return remembered.session
+  const session = fetch("/api/auth/get-session", { credentials: "same-origin" }).then(async (response) => {
+    if (!response.ok) throw new Error("Couldn't check whether you're signed in. Try again in a moment.")
+    return ((await response.json()) as Session | null) ?? null
+  })
+  remembered = { at: Date.now(), session }
+  session.catch(() => {
+    if (remembered?.session === session) remembered = undefined
+  })
+  return session
 }
