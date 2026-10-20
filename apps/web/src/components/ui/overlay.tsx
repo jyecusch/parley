@@ -1,4 +1,4 @@
-import { type ButtonHTMLAttributes, type HTMLAttributes, type ReactNode, type Ref, useEffect } from "react"
+import { type ButtonHTMLAttributes, type HTMLAttributes, type ReactNode, type Ref, useEffect, useId } from "react"
 import { CloseIcon } from "../icons.tsx"
 import { IconButton } from "./button.tsx"
 import { cn } from "./cn.ts"
@@ -38,19 +38,23 @@ export function Dialog({
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
   }, [onClose])
+  const titleId = useId()
   return (
     <>
       <Scrim onClick={onClose} />
       <div
         role="dialog"
         aria-modal="true"
+        aria-labelledby={titleId}
         className={cn(
           "fixed top-[11%] left-1/2 z-11 flex max-h-[84vh] w-[min(36rem,calc(100%-2rem))] -translate-x-1/2 flex-col overflow-auto rounded-xl bg-raised shadow-pop",
           className,
         )}
       >
         <div className="flex items-center gap-2 pt-4 pr-3 pb-1 pl-5">
-          <h2 className="m-0 flex-1 text-lg font-semibold tracking-tight">{title}</h2>
+          <h2 id={titleId} className="m-0 flex-1 text-lg font-semibold tracking-tight">
+            {title}
+          </h2>
           {onClose ? (
             <IconButton label="Close" onClick={onClose}>
               <CloseIcon />

@@ -33,6 +33,27 @@ import {
   TemplateIcon,
 } from "./icons.tsx"
 import { ContactAvatar } from "./images.tsx"
+import {
+  Avatar,
+  cn,
+  IconButton,
+  Kbd,
+  Menu,
+  MenuHeading,
+  MenuItem,
+  MenuSeparator,
+  menuItemClass,
+  NavGroup,
+  NavIcon,
+  NavLabel,
+  navItemActiveClass,
+  navItemClass,
+  PopoverHeading,
+  PopoverItem,
+  Scrim,
+  Spacer,
+  Tooltip,
+} from "./ui/index.ts"
 
 interface Shell {
   readonly team: Team
@@ -146,234 +167,227 @@ export function AppShell(props: {
     .slice(0, 2)
     .toUpperCase()
 
+  const teamId = props.team.id
+  const side = (item: { tip: string; children: ReactNode }) => (
+    <Tooltip text={item.tip} side="right" disabled={!collapsed} className="flex">
+      {item.children}
+    </Tooltip>
+  )
+  const navClass = navItemClass({ collapsed })
+  const subClass = cn(navClass, "h-7 text-sm")
+  const savedViewLinks = (recordType: "contact" | "company") =>
+    savedViews
+      .filter((view) => view.recordType === recordType)
+      .map((view) => (
+        <Tooltip key={view.id} text={view.name} side="right" disabled={!collapsed} className="flex">
+          <Link
+            className={subClass}
+            activeProps={{ className: navItemActiveClass }}
+            activeOptions={{ includeSearch: true }}
+            to={recordType === "contact" ? "/t/$teamId/contacts" : "/t/$teamId/companies"}
+            params={{ teamId }}
+            search={{ view: view.id }}
+          >
+            <NavIcon>
+              <span className="size-1.5 rounded-full bg-current opacity-60" />
+            </NavIcon>
+            <NavLabel collapsed={collapsed}>{view.name}</NavLabel>
+          </Link>
+        </Tooltip>
+      ))
+
   return (
     <ShellContext.Provider value={shell}>
-      <div ref={crt.screenRef} className={`app ${collapsed ? "sb-collapsed" : ""}`}>
-        <nav className="side" aria-label="Main">
-          <div className="sb-top">
-            <div style={{ position: "relative", flex: 1, minWidth: 0, display: "flex" }} ref={teamMenuRef}>
+      <div ref={crt.screenRef} className="relative flex h-dvh w-full overflow-hidden">
+        <nav className={cn("group/side flex shrink-0 flex-col p-2", collapsed ? "w-14" : "w-64")} aria-label="Main">
+          <div className={cn("mb-3 flex gap-0.5", collapsed ? "flex-col items-center" : "items-center")}>
+            <div className={cn("relative flex min-w-0", collapsed ? "w-full" : "flex-1")} ref={teamMenuRef}>
               <button
-                className="team"
+                className={cn(
+                  "flex h-8 min-w-0 flex-1 cursor-pointer items-center gap-2.5 rounded-md px-1.5 font-medium hover:bg-hover",
+                  collapsed && "justify-center px-0",
+                )}
                 type="button"
                 aria-label={`Switch team (current: ${props.team.name})`}
                 aria-expanded={teamMenu}
                 onClick={() => setTeamMenu((open) => !open)}
               >
-                <span className="logo">{props.team.name[0]?.toUpperCase()}</span>
-                <span className="lbl">{props.team.name}</span>
-                <span className="chev">
-                  <ChevronDown />
-                </span>
+                <TeamLogo name={props.team.name} />
+                <NavLabel collapsed={collapsed}>{props.team.name}</NavLabel>
+                {collapsed ? null : <ChevronDown className="text-subtle" />}
               </button>
               {teamMenu ? (
-                <div className="menu" style={{ top: 32, left: 0 }}>
-                  <p className="menu-h sm-t">Teams</p>
+                <Menu className="top-full left-0 mt-1">
+                  <MenuHeading>Teams</MenuHeading>
                   {props.teams.map((team) => (
                     <Link
                       key={team.id}
-                      className={`menu-i ${team.id === props.team.id ? "on" : ""}`}
+                      role="menuitem"
+                      className={menuItemClass({ active: team.id === props.team.id })}
                       to="/t/$teamId/contacts"
                       params={{ teamId: team.id }}
                       onClick={closeTeamMenu}
                     >
-                      <span className="logo">{team.name[0]?.toUpperCase()}</span>
+                      <TeamLogo name={team.name} />
                       {team.name}
                     </Link>
                   ))}
-                  <div className="menu-sep" />
-                  <Link className="menu-i" to="/new-team" onClick={closeTeamMenu}>
-                    <span className="ic">
+                  <MenuSeparator />
+                  <Link role="menuitem" className={menuItemClass()} to="/new-team" onClick={closeTeamMenu}>
+                    <NavIcon>
                       <PlusIcon className="size-4" />
-                    </span>
+                    </NavIcon>
                     New team
                   </Link>
-                </div>
+                </Menu>
               ) : null}
             </div>
-            <button
-              className="ibtn tip tip-b"
-              type="button"
-              aria-label="Search"
-              data-tip="Search  ⌘K"
-              onClick={() => setCommandOpen(true)}
-            >
+            <IconButton label="Search" tip="Search  ⌘K" onClick={() => setCommandOpen(true)}>
               <SearchIcon />
-            </button>
-            <button
-              className="ibtn tip tip-b sb-new"
-              type="button"
-              aria-label={onCompanies ? "New company" : "New contact"}
-              data-tip={onCompanies ? "New company  C" : "New contact  C"}
-              onClick={() => void newRecord()}
-            >
-              <PlusIcon />
-            </button>
-            <button
-              className="ibtn tip tip-b sb-toggle"
-              type="button"
-              aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-              data-tip={`${collapsed ? "Expand" : "Collapse"} sidebar  ⌘\\`}
+            </IconButton>
+            {collapsed ? null : (
+              <IconButton
+                label={onCompanies ? "New company" : "New contact"}
+                tip={onCompanies ? "New company  C" : "New contact  C"}
+                onClick={() => void newRecord()}
+              >
+                <PlusIcon />
+              </IconButton>
+            )}
+            <IconButton
+              label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+              tip={`${collapsed ? "Expand" : "Collapse"} sidebar  ⌘\\`}
+              className={cn(
+                !collapsed &&
+                  "opacity-0 group-hover/side:opacity-100 focus-visible:opacity-100 transition-opacity motion-reduce:transition-none",
+              )}
               onClick={toggleSidebar}
             >
               <SidebarIcon />
-            </button>
+            </IconButton>
           </div>
 
-          <div className="group">
-            <Link
-              className="nav tip tip-r"
-              activeProps={{ className: "nav tip tip-r on" }}
-              to="/t/$teamId/contacts"
-              params={{ teamId: props.team.id }}
-              search={{}}
-              data-tip="Contacts"
-            >
-              <span className="ic">
-                <ContactsIcon />
-              </span>
-              <span className="lbl">Contacts</span>
-            </Link>
-            {savedViews
-              .filter((view) => view.recordType === "contact")
-              .map((view) => (
+          <NavGroup collapsed={collapsed}>
+            {side({
+              tip: "Contacts",
+              children: (
                 <Link
-                  key={view.id}
-                  className="nav sub tip tip-r"
-                  activeProps={{ className: "nav sub tip tip-r on" }}
-                  activeOptions={{ includeSearch: true }}
+                  className={navClass}
+                  activeProps={{ className: navItemActiveClass }}
                   to="/t/$teamId/contacts"
-                  params={{ teamId: props.team.id }}
-                  search={{ view: view.id }}
-                  data-tip={view.name}
+                  params={{ teamId }}
+                  search={{}}
                 >
-                  <span className="ic" aria-hidden="true">
-                    <span className="dot" />
-                  </span>
-                  <span className="lbl">{view.name}</span>
+                  <NavIcon>
+                    <ContactsIcon />
+                  </NavIcon>
+                  <NavLabel collapsed={collapsed}>Contacts</NavLabel>
                 </Link>
-              ))}
-            <Link
-              className="nav tip tip-r"
-              activeProps={{ className: "nav tip tip-r on" }}
-              to="/t/$teamId/companies"
-              params={{ teamId: props.team.id }}
-              search={{}}
-              data-tip="Companies"
-            >
-              <span className="ic">
-                <CompaniesIcon />
-              </span>
-              <span className="lbl">Companies</span>
-            </Link>
-            {savedViews
-              .filter((view) => view.recordType === "company")
-              .map((view) => (
+              ),
+            })}
+            {savedViewLinks("contact")}
+            {side({
+              tip: "Companies",
+              children: (
                 <Link
-                  key={view.id}
-                  className="nav sub tip tip-r"
-                  activeProps={{ className: "nav sub tip tip-r on" }}
-                  activeOptions={{ includeSearch: true }}
+                  className={navClass}
+                  activeProps={{ className: navItemActiveClass }}
                   to="/t/$teamId/companies"
-                  params={{ teamId: props.team.id }}
-                  search={{ view: view.id }}
-                  data-tip={view.name}
+                  params={{ teamId }}
+                  search={{}}
                 >
-                  <span className="ic" aria-hidden="true">
-                    <span className="dot" />
-                  </span>
-                  <span className="lbl">{view.name}</span>
+                  <NavIcon>
+                    <CompaniesIcon />
+                  </NavIcon>
+                  <NavLabel collapsed={collapsed}>Companies</NavLabel>
                 </Link>
-              ))}
-          </div>
+              ),
+            })}
+            {savedViewLinks("company")}
+          </NavGroup>
 
-          <div className="group">
-            <h2 className="glabel sm-t">Email</h2>
-            <Link
-              className="nav tip tip-r"
-              activeProps={{ className: "nav tip tip-r on" }}
-              to="/t/$teamId/campaigns"
-              params={{ teamId: props.team.id }}
-              data-tip="Campaigns"
-            >
-              <span className="ic">
-                <SendIcon />
-              </span>
-              <span className="lbl">Campaigns</span>
-            </Link>
-            <Link
-              className="nav tip tip-r"
-              activeProps={{ className: "nav tip tip-r on" }}
-              to="/t/$teamId/templates"
-              params={{ teamId: props.team.id }}
-              data-tip="Templates"
-            >
-              <span className="ic">
-                <TemplateIcon />
-              </span>
-              <span className="lbl">Templates</span>
-            </Link>
-            <Link
-              className="nav tip tip-r"
-              activeProps={{ className: "nav tip tip-r on" }}
-              to="/t/$teamId/segments"
-              params={{ teamId: props.team.id }}
-              data-tip="Segments"
-            >
-              <span className="ic">
-                <SegmentIcon />
-              </span>
-              <span className="lbl">Segments</span>
-            </Link>
-          </div>
+          <NavGroup label="Email" collapsed={collapsed}>
+            {(
+              [
+                ["/t/$teamId/campaigns", "Campaigns", <SendIcon key="icon" />],
+                ["/t/$teamId/templates", "Templates", <TemplateIcon key="icon" />],
+                ["/t/$teamId/segments", "Segments", <SegmentIcon key="icon" />],
+              ] as const
+            ).map(([to, label, icon]) => (
+              <Tooltip key={to} text={label} side="right" disabled={!collapsed} className="flex">
+                <Link className={navClass} activeProps={{ className: navItemActiveClass }} to={to} params={{ teamId }}>
+                  <NavIcon>{icon}</NavIcon>
+                  <NavLabel collapsed={collapsed}>{label}</NavLabel>
+                </Link>
+              </Tooltip>
+            ))}
+          </NavGroup>
 
-          <div className="spacer" />
+          <Spacer />
 
-          <div className="group">
-            <Link
-              className="nav tip tip-r"
-              to="/t/$teamId/settings/general"
-              params={{ teamId: props.team.id }}
-              data-tip="Settings"
-            >
-              <span className="ic">
-                <SettingsIcon />
-              </span>
-              <span className="lbl">Settings</span>
-            </Link>
-          </div>
-
-          <div className="group" ref={accountMenuRef} style={{ position: "relative" }}>
-            {accountMenu ? (
-              <AccountMenu
-                onClose={closeAccountMenu}
-                onSignOut={async () => {
-                  await signOut()
-                  await navigate({ to: "/sign-in" })
-                }}
-              />
-            ) : null}
-            <button
-              className="nav tip tip-r"
-              type="button"
-              aria-label={`Account menu (${props.userName})`}
-              aria-expanded={accountMenu}
-              data-tip={props.userName}
-              onClick={() => setAccountMenu((open) => !open)}
-            >
-              <span className="ic">
-                <span className="av">{initials}</span>
-              </span>
-              <span className="lbl">{props.userName}</span>
-            </button>
-          </div>
+          <NavGroup collapsed={collapsed}>
+            {side({
+              tip: "Settings",
+              children: (
+                <Link className={navClass} to="/t/$teamId/settings/general" params={{ teamId }}>
+                  <NavIcon>
+                    <SettingsIcon />
+                  </NavIcon>
+                  <NavLabel collapsed={collapsed}>Settings</NavLabel>
+                </Link>
+              ),
+            })}
+            <div className="relative flex" ref={accountMenuRef}>
+              {accountMenu ? (
+                <AccountMenu
+                  onClose={closeAccountMenu}
+                  onSignOut={async () => {
+                    await signOut()
+                    await navigate({ to: "/sign-in" })
+                  }}
+                />
+              ) : null}
+              {side({
+                tip: props.userName,
+                children: (
+                  <button
+                    className={navClass}
+                    type="button"
+                    aria-label={`Account menu (${props.userName})`}
+                    aria-expanded={accountMenu}
+                    onClick={() => setAccountMenu((open) => !open)}
+                  >
+                    <NavIcon>
+                      <Avatar>{initials}</Avatar>
+                    </NavIcon>
+                    <NavLabel collapsed={collapsed}>{props.userName}</NavLabel>
+                  </button>
+                ),
+              })}
+            </div>
+          </NavGroup>
         </nav>
 
-        <div className="content">{props.children}</div>
+        <div className="@container/content relative flex min-w-0 flex-[999_1_35rem] gap-1.5 py-1.5 pr-1.5">
+          {props.children}
+        </div>
 
         {commandOpen ? <CommandMenu onClose={() => setCommandOpen(false)} /> : null}
       </div>
       {crt.overlay}
     </ShellContext.Provider>
+  )
+}
+
+/** A team's mark: its initial on a dark square. */
+function TeamLogo(props: { readonly name: string }) {
+  return (
+    <span
+      aria-hidden="true"
+      className="grid size-5.5 shrink-0 place-items-center rounded-md bg-primary text-2xs font-semibold text-on-primary"
+    >
+      {props.name[0]?.toUpperCase()}
+    </span>
   )
 }
 
@@ -385,42 +399,33 @@ function AccountMenu(props: { readonly onClose: () => void; readonly onSignOut: 
     setTheme(choice)
   }
   return (
-    <div className="menu" style={{ bottom: 32, left: 0 }}>
-      <p className="menu-h sm-t">Theme</p>
+    <Menu className="bottom-full left-0 mb-1">
+      <MenuHeading>Theme</MenuHeading>
       {(["system", "light", "dark"] as const).map((choice) => (
-        <button
-          key={choice}
-          className={`menu-i ${theme === choice ? "on" : ""}`}
-          type="button"
-          onClick={() => choose(choice)}
-        >
+        <MenuItem key={choice} active={theme === choice} onClick={() => choose(choice)}>
           {choice === "system" ? "Match system" : choice === "light" ? "Light" : "Dark"}
-          {theme === choice ? <span className="hint">✓</span> : null}
-        </button>
+          {theme === choice ? <span className="ml-auto text-subtle">✓</span> : null}
+        </MenuItem>
       ))}
-      <button
-        className="menu-i"
-        type="button"
+      <MenuItem
         onClick={() => {
           setCrt(!crt)
           setCrtState(!crt)
         }}
       >
         CRT mode
-        <span className="hint">{crt ? "On" : "Off"}</span>
-      </button>
-      <div className="menu-sep" />
-      <button
-        className="menu-i"
-        type="button"
+        <span className="ml-auto text-subtle">{crt ? "On" : "Off"}</span>
+      </MenuItem>
+      <MenuSeparator />
+      <MenuItem
         onClick={() => {
           props.onClose()
           props.onSignOut()
         }}
       >
         Sign out
-      </button>
-    </div>
+      </MenuItem>
+    </Menu>
   )
 }
 
@@ -462,7 +467,7 @@ function CommandMenu(props: { readonly onClose: () => void }) {
           group: "Contacts",
           label: contact.displayName,
           ...(contact.emails[0] ? { sub: contact.emails[0].address } : {}),
-          hint: <span className="sm-t">Contact</span>,
+          hint: "Contact",
           icon: <ContactAvatar contact={contact} />,
           run: go(() =>
             navigate({ to: "/t/$teamId/contacts", params: { teamId: team.id }, search: { contact: contact.id } }),
@@ -480,8 +485,8 @@ function CommandMenu(props: { readonly onClose: () => void }) {
           group: "Companies",
           label: company.name,
           ...(domain ? { sub: domain } : {}),
-          hint: <span className="sm-t">Company</span>,
-          icon: <span className="tile">{company.name[0]?.toUpperCase()}</span>,
+          hint: "Company",
+          icon: <Avatar shape="square">{company.name[0]?.toUpperCase()}</Avatar>,
           run: go(() =>
             navigate({ to: "/t/$teamId/companies", params: { teamId: team.id }, search: { company: company.id } }),
           ),
@@ -492,7 +497,7 @@ function CommandMenu(props: { readonly onClose: () => void }) {
         id: "op:new-contact",
         group: "Operations" as const,
         label: "New contact",
-        hint: <span className="kbd">C</span>,
+        hint: <Kbd>C</Kbd>,
         icon: <PlusIcon />,
         run: go(() => navigate({ to: "/t/$teamId/contacts", params: { teamId: team.id }, search: { new: true } })),
       },
@@ -550,7 +555,7 @@ function CommandMenu(props: { readonly onClose: () => void }) {
           id: `go:settings-${page}`,
           group: "Go to" as const,
           label,
-          hint: <span className="sm-t">Settings</span>,
+          hint: "Settings",
           icon: <SettingsIcon />,
           run: go(() => navigate({ to: `/t/$teamId/settings/${page}`, params: { teamId: team.id } })),
         }),
@@ -559,7 +564,7 @@ function CommandMenu(props: { readonly onClose: () => void }) {
         id: "go:connections",
         group: "Go to" as const,
         label: "Connections",
-        hint: <span className="sm-t">Settings</span>,
+        hint: "Settings",
         icon: <SettingsIcon />,
         run: go(() => navigate({ to: "/t/$teamId/settings/connections", params: { teamId: team.id } })),
       },
@@ -567,7 +572,7 @@ function CommandMenu(props: { readonly onClose: () => void }) {
         id: "go:api-keys",
         group: "Go to" as const,
         label: "API keys",
-        hint: <span className="sm-t">Settings</span>,
+        hint: "Settings",
         icon: <SettingsIcon />,
         run: go(() => navigate({ to: "/t/$teamId/settings/api-keys", params: { teamId: team.id } })),
       },
@@ -575,7 +580,7 @@ function CommandMenu(props: { readonly onClose: () => void }) {
         id: "go:service-accounts",
         group: "Go to" as const,
         label: "Service accounts",
-        hint: <span className="sm-t">Settings</span>,
+        hint: "Settings",
         icon: <SettingsIcon />,
         run: go(() => navigate({ to: "/t/$teamId/settings/service-accounts", params: { teamId: team.id } })),
       },
@@ -586,7 +591,7 @@ function CommandMenu(props: { readonly onClose: () => void }) {
             id: `team:${other.id}`,
             group: "Go to" as const,
             label: `Switch to ${other.name}`,
-            hint: <span className="sm-t">Team</span>,
+            hint: "Team",
             icon: <SwitchIcon />,
             run: go(() => navigate({ to: "/t/$teamId/contacts", params: { teamId: other.id } })),
           }),
@@ -616,15 +621,21 @@ function CommandMenu(props: { readonly onClose: () => void }) {
   const groups = ["Contacts", "Companies", "Operations", "Go to"] as const
   return (
     <>
-      <button className="scrim" type="button" tabIndex={-1} aria-hidden="true" onClick={props.onClose} />
-      <div className="cmd" role="dialog" aria-modal="true" aria-label="Command menu">
-        <div className="cmd-in">
+      <Scrim onClick={props.onClose} />
+      <div
+        className="fixed top-[14%] left-1/2 z-11 w-[min(42rem,calc(100%-2rem))] -translate-x-1/2 overflow-hidden rounded-xl bg-raised shadow-pop"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Command menu"
+      >
+        <div className="flex h-14 items-center gap-2.5 border-b border-line pr-3 pl-4 text-subtle">
           <SearchIcon />
-          <label className="vh" htmlFor="cmd-input">
+          <label className="sr-only" htmlFor="cmd-input">
             Search contacts or run an operation
           </label>
           <input
             id="cmd-input"
+            className="min-w-0 flex-1 bg-transparent text-lg text-fg outline-none"
             // biome-ignore lint/a11y/noAutofocus: the command menu is a dialog opened to type into
             autoFocus
             autoComplete="off"
@@ -633,33 +644,32 @@ function CommandMenu(props: { readonly onClose: () => void }) {
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={onKey}
           />
-          <button className="ibtn" type="button" aria-label="Close command menu" onClick={props.onClose}>
+          <IconButton label="Close command menu" size="xs" onClick={props.onClose}>
             <CloseIcon className="size-4" />
-          </button>
+          </IconButton>
         </div>
-        <div className="cmd-list">
-          {items.length === 0 ? <p className="cmd-gh sm-t">Nothing matches “{query}”.</p> : null}
+        <div className="max-h-[30rem] overflow-auto px-1.5 pt-1 pb-1.5">
+          {items.length === 0 ? <PopoverHeading>Nothing matches “{query}”.</PopoverHeading> : null}
           {groups.map((group) => {
             const inGroup = items.filter((item) => item.group === group)
             if (inGroup.length === 0) return null
             return (
               <div key={group}>
-                <p className="cmd-gh sm-t">{group}</p>
+                <PopoverHeading>{group}</PopoverHeading>
                 {inGroup.map((item) => {
                   const index = items.indexOf(item)
                   return (
-                    <button
+                    <PopoverItem
                       key={item.id}
-                      className={`cmd-i ${index === active ? "on" : ""}`}
-                      type="button"
+                      active={index === active}
+                      trailing={item.hint}
                       onMouseEnter={() => setActive(index)}
                       onClick={item.run}
                     >
-                      <span className="ic">{item.icon}</span>
-                      <span>{item.label}</span>
-                      {item.sub ? <span className="sub2">{item.sub}</span> : null}
-                      {item.hint ? <span className="hint">{item.hint}</span> : null}
-                    </button>
+                      <NavIcon>{item.icon}</NavIcon>
+                      <span className="shrink-0">{item.label}</span>
+                      {item.sub ? <span className="truncate text-subtle">{item.sub}</span> : null}
+                    </PopoverItem>
                   )
                 })}
               </div>

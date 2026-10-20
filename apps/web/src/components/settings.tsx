@@ -18,6 +18,29 @@ import {
   ServiceAccountIcon,
   SettingsIcon,
 } from "./icons.tsx"
+import {
+  Box,
+  Breadcrumb,
+  BreadcrumbSeparator,
+  Button,
+  Card,
+  CodeTag,
+  cn,
+  Dialog,
+  EmptyState,
+  IconButton,
+  NavGroup,
+  NavIcon,
+  NavLabel,
+  navItemActiveClass,
+  navItemClass,
+  PageHeader,
+  Skeleton,
+  Table,
+  Td,
+  Toast,
+  Tr,
+} from "./ui/index.ts"
 
 /** What each scope lets a key or connection do, in the words the dialogs use. */
 export const SCOPE_LABELS: Readonly<Record<Permission, string>> = {
@@ -46,14 +69,29 @@ export const initialsOf = (name: string) => {
 
 /** "3d ago", or the fallback for something that hasn't happened. The full time is in the title. */
 export function When(props: { readonly at: string | null; readonly never?: string }) {
-  if (!props.at) return <span className="date">{props.never ?? "Never"}</span>
+  if (!props.at) return <span className="text-subtle tabular-nums">{props.never ?? "Never"}</span>
   const short = relative(props.at)
   return (
-    <span className="date" title={new Date(props.at).toLocaleString()}>
+    <span className="text-subtle tabular-nums" title={new Date(props.at).toLocaleString()}>
       {short === "now" ? "Just now" : `${short} ago`}
     </span>
   )
 }
+
+const SETTINGS_PAGES = [
+  { group: "team", to: "/t/$teamId/settings/general", label: "General", icon: <SettingsIcon /> },
+  { group: "team", to: "/t/$teamId/settings/members", label: "Members", icon: <MembersIcon /> },
+  { group: "team", to: "/t/$teamId/settings/fields", label: "Fields", icon: <DisplayIcon className="size-5" /> },
+  { group: "team", to: "/t/$teamId/settings/email", label: "Email", icon: <MailIcon /> },
+  {
+    group: "team",
+    to: "/t/$teamId/settings/service-accounts",
+    label: "Service accounts",
+    icon: <ServiceAccountIcon />,
+  },
+  { group: "you", to: "/t/$teamId/settings/connections", label: "Connections", icon: <ConnectionIcon /> },
+  { group: "you", to: "/t/$teamId/settings/api-keys", label: "API keys", icon: <KeyIcon /> },
+] as const
 
 /**
  * Settings replace the app sidebar with their own, with a way back (D90).
@@ -61,105 +99,35 @@ export function When(props: { readonly at: string | null; readonly never?: strin
 export function SettingsShell(props: { readonly team: Team; readonly children: ReactNode }) {
   const params = { teamId: props.team.id }
   const crt = useCrt()
+  const links = (group: "team" | "you") =>
+    SETTINGS_PAGES.filter((page) => page.group === group).map((page) => (
+      <Link
+        key={page.to}
+        className={navItemClass()}
+        activeProps={{ className: navItemActiveClass, "aria-current": "page" }}
+        to={page.to}
+        params={params}
+      >
+        <NavIcon>{page.icon}</NavIcon>
+        <NavLabel>{page.label}</NavLabel>
+      </Link>
+    ))
   return (
     <>
-      <div ref={crt.screenRef} className="app">
-        <nav className="side" aria-label="Settings">
-          <Link className="nav back" to="/t/$teamId/contacts" params={params} search={{}}>
-            <span className="ic">
+      <div ref={crt.screenRef} className="relative flex h-dvh w-full overflow-hidden">
+        <nav className="flex w-64 shrink-0 flex-col p-2" aria-label="Settings">
+          <Link className={cn(navItemClass(), "mb-3")} to="/t/$teamId/contacts" params={params} search={{}}>
+            <NavIcon>
               <BackIcon />
-            </span>
-            <span className="lbl">Back to Contacts</span>
+            </NavIcon>
+            <NavLabel>Back to Contacts</NavLabel>
           </Link>
-          <section className="group" aria-labelledby="settings-team">
-            <h2 className="glabel sm-t" id="settings-team">
-              {props.team.name}
-            </h2>
-            <Link
-              className="nav"
-              activeProps={{ className: "nav on", "aria-current": "page" }}
-              to="/t/$teamId/settings/general"
-              params={params}
-            >
-              <span className="ic">
-                <SettingsIcon />
-              </span>
-              <span className="lbl">General</span>
-            </Link>
-            <Link
-              className="nav"
-              activeProps={{ className: "nav on", "aria-current": "page" }}
-              to="/t/$teamId/settings/members"
-              params={params}
-            >
-              <span className="ic">
-                <MembersIcon />
-              </span>
-              <span className="lbl">Members</span>
-            </Link>
-            <Link
-              className="nav"
-              activeProps={{ className: "nav on", "aria-current": "page" }}
-              to="/t/$teamId/settings/fields"
-              params={params}
-            >
-              <span className="ic">
-                <DisplayIcon className="size-5" />
-              </span>
-              <span className="lbl">Fields</span>
-            </Link>
-            <Link
-              className="nav"
-              activeProps={{ className: "nav on", "aria-current": "page" }}
-              to="/t/$teamId/settings/email"
-              params={params}
-            >
-              <span className="ic">
-                <MailIcon />
-              </span>
-              <span className="lbl">Email</span>
-            </Link>
-            <Link
-              className="nav"
-              activeProps={{ className: "nav on", "aria-current": "page" }}
-              to="/t/$teamId/settings/service-accounts"
-              params={params}
-            >
-              <span className="ic">
-                <ServiceAccountIcon />
-              </span>
-              <span className="lbl">Service accounts</span>
-            </Link>
-          </section>
-          <section className="group" aria-labelledby="settings-you">
-            <h2 className="glabel sm-t" id="settings-you">
-              You
-            </h2>
-            <Link
-              className="nav"
-              activeProps={{ className: "nav on", "aria-current": "page" }}
-              to="/t/$teamId/settings/connections"
-              params={params}
-            >
-              <span className="ic">
-                <ConnectionIcon />
-              </span>
-              <span className="lbl">Connections</span>
-            </Link>
-            <Link
-              className="nav"
-              activeProps={{ className: "nav on", "aria-current": "page" }}
-              to="/t/$teamId/settings/api-keys"
-              params={params}
-            >
-              <span className="ic">
-                <KeyIcon />
-              </span>
-              <span className="lbl">API keys</span>
-            </Link>
-          </section>
+          <NavGroup label={props.team.name}>{links("team")}</NavGroup>
+          <NavGroup label="You">{links("you")}</NavGroup>
         </nav>
-        <div className="content">{props.children}</div>
+        <div className="@container/content relative flex min-w-0 flex-[999_1_35rem] gap-1.5 py-1.5 pr-1.5">
+          {props.children}
+        </div>
       </div>
       {crt.overlay}
     </>
@@ -173,30 +141,28 @@ export function SettingsPage(props: {
   readonly children: ReactNode
 }) {
   return (
-    <main className="card settings">
-      <div className="hd1">
-        <h1 className="crumb">
-          <span className="root">Settings</span>
-          <span className="sep" aria-hidden="true">
-            /
-          </span>
+    <Card as="main" className="flex-1">
+      <PageHeader>
+        <Breadcrumb>
+          <span className="text-muted">Settings</span>
+          <BreadcrumbSeparator />
           <span>{props.title}</span>
-        </h1>
-      </div>
-      <div className="scroll">
-        <div className="page">
+        </Breadcrumb>
+      </PageHeader>
+      <div className="min-h-0 flex-1 overflow-auto">
+        <div className="flex max-w-6xl flex-col gap-6 px-10 pt-8 pb-16 @max-3xl/content:px-5">
           {/* The page's main action sits beside its title, next to what it acts on, not at the window's edge. */}
-          <div className="intro">
-            <div className="intro-t">
-              <h2>{props.title}</h2>
-              <p>{props.intro}</p>
+          <div className="flex items-start gap-4">
+            <div className="min-w-0 flex-1">
+              <h2 className="m-0 mb-1 text-lg font-semibold tracking-tight">{props.title}</h2>
+              <p className="m-0 max-w-3xl text-pretty text-muted">{props.intro}</p>
             </div>
-            {props.action ? <div className="intro-a">{props.action}</div> : null}
+            {props.action ? <div className="flex shrink-0 gap-1.5">{props.action}</div> : null}
           </div>
           {props.children}
         </div>
       </div>
-    </main>
+    </Card>
   )
 }
 
@@ -212,29 +178,36 @@ export function CopyField(props: { readonly value: string; readonly label: strin
     timer.current = window.setTimeout(() => setCopied(false), 1600)
   }
   return (
-    <div className={`copyfield ${props.code ? "code" : ""}`}>
-      <output className="val mono" aria-label={props.label}>
+    <div className={cn("relative flex min-w-0 rounded-md bg-fill", props.code ? "items-start" : "h-10 items-center")}>
+      <output
+        className={cn(
+          "min-w-0 flex-1 font-mono text-sm",
+          props.code
+            ? "overflow-auto py-2.5 pr-1 pl-3 leading-6 whitespace-pre select-text"
+            : "truncate pr-1 pl-3 select-all",
+        )}
+        aria-label={props.label}
+      >
         {props.value}
       </output>
-      <button
-        className="ibtn tip tip-b"
-        type="button"
-        aria-label={copied ? `Copied ${props.label}` : `Copy ${props.label}`}
-        data-tip={copied ? "Copied" : "Copy"}
+      <IconButton
+        label={copied ? `Copied ${props.label}` : `Copy ${props.label}`}
+        tip={copied ? "Copied" : "Copy"}
+        className={cn("mr-1", props.code && "mt-1")}
         onClick={() => void copy()}
       >
         {copied ? <CheckIcon /> : <CopyIcon />}
-      </button>
+      </IconButton>
     </div>
   )
 }
 
 export function ScopeChips(props: { readonly scopes: ReadonlyArray<Permission> }) {
   return (
-    <span className="scopes">
+    <span className="flex flex-nowrap gap-1">
       {props.scopes.map((scope) => (
-        <span key={scope} className="scope" title={scope}>
-          {shortScope(scope)}
+        <span key={scope} title={scope}>
+          <CodeTag>{shortScope(scope)}</CodeTag>
         </span>
       ))}
     </span>
@@ -247,24 +220,19 @@ export function RevokeButton(props: { readonly name: string; readonly onRevoke: 
   const [busy, setBusy] = useState(false)
   if (!confirming) {
     return (
-      <button
-        className="btn sm danger"
-        type="button"
-        aria-label={`Revoke ${props.name}`}
-        onClick={() => setConfirming(true)}
-      >
+      <Button size="sm" variant="danger" aria-label={`Revoke ${props.name}`} onClick={() => setConfirming(true)}>
         Revoke
-      </button>
+      </Button>
     )
   }
   return (
-    <span className="confirm">
-      <button className="btn sm ghost" type="button" onClick={() => setConfirming(false)}>
+    <span className="inline-flex items-center gap-1">
+      <Button size="sm" variant="ghost" onClick={() => setConfirming(false)}>
         Cancel
-      </button>
-      <button
-        className="btn sm danger-solid"
-        type="button"
+      </Button>
+      <Button
+        size="sm"
+        variant="danger-solid"
         disabled={busy}
         aria-label={`Confirm: revoke ${props.name}`}
         onClick={async () => {
@@ -275,48 +243,12 @@ export function RevokeButton(props: { readonly name: string; readonly onRevoke: 
         }}
       >
         Revoke
-      </button>
+      </Button>
     </span>
   )
 }
 
-export function Dialog(props: {
-  readonly title: string
-  readonly onClose?: () => void
-  readonly footer: ReactNode
-  readonly children: ReactNode
-}) {
-  const { onClose } = props
-  useEffect(() => {
-    if (!onClose) return
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose()
-    }
-    window.addEventListener("keydown", onKey)
-    return () => window.removeEventListener("keydown", onKey)
-  }, [onClose])
-  return (
-    <>
-      {onClose ? (
-        <button className="scrim" type="button" tabIndex={-1} aria-label="Close" onClick={onClose} />
-      ) : (
-        <div className="scrim" aria-hidden="true" />
-      )}
-      <div className="dlg" role="dialog" aria-modal="true" aria-labelledby="dlg-title">
-        <div className="dlg-h">
-          <h2 id="dlg-title">{props.title}</h2>
-          {onClose ? (
-            <button className="ibtn" type="button" aria-label="Close" onClick={onClose}>
-              <CloseIcon />
-            </button>
-          ) : null}
-        </div>
-        <div className="dlg-b">{props.children}</div>
-        <div className="dlg-f">{props.footer}</div>
-      </div>
-    </>
-  )
-}
+export { Dialog }
 
 /** One toast at a time, dismissed after a while or by hand. */
 export const useToast = () => {
@@ -329,55 +261,55 @@ export const useToast = () => {
     timer.current = window.setTimeout(() => setText(undefined), 6000)
   }, [])
   const node = text ? (
-    <div className="toast" role="status">
+    <Toast>
       <span>{text}</span>
-      <button className="ibtn" type="button" aria-label="Dismiss" onClick={() => setText(undefined)}>
+      <IconButton label="Dismiss" size="xs" onClick={() => setText(undefined)}>
         <CloseIcon className="size-4" />
-      </button>
-    </div>
+      </IconButton>
+    </Toast>
   ) : null
   return [node, show] as const
 }
 
 export function LoadingRows() {
   const rows = [
-    { a: "55%", b: "35%", c: "60%" },
-    { a: "45%", b: "40%", c: "75%" },
-    { a: "65%", b: "30%", c: "55%" },
+    { a: "w-[55%]", b: "w-[35%]", c: "w-[60%]" },
+    { a: "w-[45%]", b: "w-[40%]", c: "w-[75%]" },
+    { a: "w-[65%]", b: "w-[30%]", c: "w-[55%]" },
   ]
   return (
-    <div className="box" role="status" aria-label="Loading">
-      <table className="stable">
+    <Box role="status" aria-label="Loading">
+      <Table kind="settings">
         <tbody>
           {rows.map((row) => (
-            <tr key={row.a}>
-              <td style={{ width: "27%" }}>
-                <div className="who">
-                  <span className="sk t" />
-                  <span className="stack" style={{ flex: 1, gap: 6 }}>
-                    <span className="sk" style={{ width: row.a }} />
-                    <span className="sk" style={{ width: row.b }} />
+            <Tr key={row.a}>
+              <Td className="w-[27%]">
+                <div className="flex items-center gap-2.5">
+                  <Skeleton className="size-7 shrink-0 rounded-md" />
+                  <span className="flex flex-1 flex-col gap-1.5">
+                    <Skeleton className={row.a} />
+                    <Skeleton className={row.b} />
                   </span>
                 </div>
-              </td>
-              <td style={{ width: "17%" }}>
-                <span className="sk" style={{ display: "block", width: row.c }} />
-              </td>
-              <td style={{ width: "19%" }}>
-                <span className="sk" style={{ display: "block", width: "70%" }} />
-              </td>
-              <td>
-                <span className="sk" style={{ display: "block", width: 56 }} />
-              </td>
-              <td>
-                <span className="sk" style={{ display: "block", width: 48 }} />
-              </td>
-              <td style={{ width: 150 }} />
-            </tr>
+              </Td>
+              <Td className="w-[17%]">
+                <Skeleton className={row.c} />
+              </Td>
+              <Td className="w-[19%]">
+                <Skeleton className="w-[70%]" />
+              </Td>
+              <Td>
+                <Skeleton className="w-16" />
+              </Td>
+              <Td>
+                <Skeleton className="w-14" />
+              </Td>
+              <Td className="w-44" />
+            </Tr>
           ))}
         </tbody>
-      </table>
-    </div>
+      </Table>
+    </Box>
   )
 }
 
@@ -387,31 +319,29 @@ export function LoadFailed(props: {
   readonly onRetry: () => void
 }) {
   return (
-    <div className="box center" role="alert">
-      <div className="empty">
-        <div className="e-ic err">
-          <AlertIcon />
-        </div>
-        <h2>{props.title}</h2>
-        <p>{props.message}</p>
-        <div className="actions">
-          <button className="btn primary" type="button" onClick={props.onRetry}>
+    <Box className="grid place-items-center px-6 py-12" role="alert">
+      <EmptyState
+        tone="danger"
+        icon={<AlertIcon />}
+        title={props.title}
+        actions={
+          <Button variant="primary" onClick={props.onRetry}>
             Try again
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        }
+      >
+        {props.message}
+      </EmptyState>
+    </Box>
   )
 }
 
 export function Empty(props: { readonly icon: ReactNode; readonly title: string; readonly children: ReactNode }) {
   return (
-    <div className="box center">
-      <div className="empty">
-        <div className="e-ic">{props.icon}</div>
-        <h2>{props.title}</h2>
-        <p>{props.children}</p>
-      </div>
-    </div>
+    <Box className="grid place-items-center px-6 py-12">
+      <EmptyState icon={props.icon} title={props.title}>
+        {props.children}
+      </EmptyState>
+    </Box>
   )
 }
