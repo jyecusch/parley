@@ -570,7 +570,8 @@ export function ImportDialog(props: {
   const skippedHeaders = headers.filter((header) => !mapping[header])
   const columnRow = (header: string) => (
     <div key={header} className="grid grid-cols-2 items-center gap-2.5">
-      <span className="truncate text-sm" title={header}>
+      {/* The file's own header, as written there, so it reads as quoted rather than as a Parley field. */}
+      <span className="truncate text-sm text-muted" title={header}>
         {header}
       </span>
       <Select
@@ -660,6 +661,10 @@ export function ImportDialog(props: {
           </Field>
           {headers.length > 0 ? (
             <Fieldset legend="Columns">
+              <div className="grid grid-cols-2 gap-2.5 text-sm font-medium text-subtle" aria-hidden="true">
+                <span>In your file</span>
+                <span>Imports into</span>
+              </div>
               {mappedHeaders.length === 0 ? (
                 <Hint>No columns are imported yet. Choose a field for each one you want.</Hint>
               ) : null}
