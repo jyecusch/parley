@@ -20,6 +20,7 @@ import {
   toE164,
 } from "./record.tsx"
 import { RecordOwnerField } from "./record-owner.tsx"
+import { EditableDescription, EditableNumber, SocialProfilesField } from "./record-profile.tsx"
 import { Timeline } from "./timeline.tsx"
 import {
   Button,
@@ -202,6 +203,17 @@ export function CompanyPanel(props: {
       </PanelHeader>
       <PanelBody className={cn(full && readableColumnClass)}>
         <Section>
+          <EditableDescription
+            value={company.description}
+            disabled={!props.canWrite}
+            onSave={(value) =>
+              save((draft) => {
+                draft.description = value
+              })
+            }
+          />
+        </Section>
+        <Section>
           <EditableText
             label="Name"
             value={company.name}
@@ -239,12 +251,64 @@ export function CompanyPanel(props: {
               })
             }
           />
+          <SocialProfilesField
+            profiles={company.socialProfiles}
+            disabled={!props.canWrite}
+            onSave={(profiles) =>
+              save((draft) => {
+                draft.socialProfiles = [...profiles]
+              })
+            }
+          />
           <EditableText
             label="Phone"
             value={company.phone}
             onSave={(value) =>
               save((draft) => {
                 draft.phone = (value ? toE164(value) : null) as Company["phone"]
+              })
+            }
+          />
+          <EditableText
+            label="Industry"
+            value={company.industry}
+            onSave={(value) =>
+              save((draft) => {
+                draft.industry = value
+              })
+            }
+          />
+          <EditableNumber
+            label="Employees"
+            whole
+            min={0}
+            value={company.employees}
+            onSave={(value) =>
+              save((draft) => {
+                draft.employees = value
+              })
+            }
+          />
+          <EditableNumber
+            label="Year founded"
+            whole
+            grouped={false}
+            min={1000}
+            max={2100}
+            value={company.yearFounded}
+            onSave={(value) =>
+              save((draft) => {
+                draft.yearFounded = value
+              })
+            }
+          />
+          <EditableNumber
+            label="Annual revenue"
+            min={0}
+            value={company.annualRevenue}
+            onSave={(value) =>
+              save((draft) => {
+                draft.annualRevenue = value
               })
             }
           />

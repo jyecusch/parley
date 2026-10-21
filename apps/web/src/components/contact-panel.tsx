@@ -11,6 +11,7 @@ import { TrashIcon } from "./icons.tsx"
 import { ContactAvatar, ImageEditor } from "./images.tsx"
 import { EditableList, EditableText, PanelBar, PanelIdentity, PanelSubtitle, toE164 } from "./record.tsx"
 import { RecordOwnerField } from "./record-owner.tsx"
+import { SocialProfilesField } from "./record-profile.tsx"
 import { SubscriptionSection } from "./subscriptions.tsx"
 import { Timeline } from "./timeline.tsx"
 import {
@@ -179,6 +180,15 @@ export function ContactPanel(props: {
                   number: toE164(value) as Contact["phones"][number]["number"],
                   label: contact.phones[index]?.label ?? null,
                 }))
+              })
+            }
+          />
+          <SocialProfilesField
+            profiles={contact.socialProfiles}
+            disabled={!props.canWrite}
+            onSave={(profiles) =>
+              save((draft) => {
+                draft.socialProfiles = [...profiles]
               })
             }
           />

@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm"
 import {
   boolean,
+  doublePrecision,
   foreignKey,
   index,
   integer,
@@ -49,6 +50,8 @@ export const contacts = pgTable(
     region: text("region"),
     postcode: text("postcode"),
     country: text("country"),
+    /** Links to their profiles on social networks (D133). */
+    socialProfiles: text("social_profiles").array().notNull().default(sql`'{}'::text[]`),
     /** The record owner (D123): a member responsible for it. Cleared when they leave the team. */
     ownerId: text("owner_id").references(() => user.id, { onDelete: "set null" }),
     ...timestamps,
@@ -212,6 +215,15 @@ export const companies = pgTable(
     region: text("region"),
     postcode: text("postcode"),
     country: text("country"),
+    /** What the company does (D132). */
+    description: text("description"),
+    employees: integer("employees"),
+    industry: text("industry"),
+    yearFounded: integer("year_founded"),
+    /** In the team's currency (D132). */
+    annualRevenue: doublePrecision("annual_revenue"),
+    /** Links to its pages on social networks (D133). */
+    socialProfiles: text("social_profiles").array().notNull().default(sql`'{}'::text[]`),
     /** Custom field values by field id (D31). */
     custom: jsonb("custom").$type<Record<string, unknown>>().notNull().default({}),
     /** The logo's file key, and where it came from: an upload wins over the fetched favicon (D75). */

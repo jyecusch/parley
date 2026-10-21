@@ -31,6 +31,7 @@ import { Affiliations } from "./affiliations.ts"
 import { CustomFields } from "./custom-fields.ts"
 import { FileStore, fileUrl } from "./file-store.ts"
 import { checkFilter, filterSql, sortSql } from "./filter-sql.ts"
+import { uniqueProfiles } from "./social-profiles.ts"
 import { classifySqlError, isUniqueViolation } from "./sql-errors.ts"
 
 /** Deleted contacts can be restored for this long, then they're purged (D30). */
@@ -97,6 +98,7 @@ interface NormalizedFields {
   readonly emails?: ReadonlyArray<{ readonly address: string; readonly isPrimary: boolean }>
   readonly phones?: ReadonlyArray<{ readonly number: string; readonly label: string | null }>
   readonly address?: PostalAddress | null
+  readonly socialProfiles?: ReadonlyArray<string>
 }
 
 /**
@@ -156,6 +158,7 @@ const normalize = (fields: ContactFields, creating: boolean): Effect.Effect<Norm
       ? { phones: fields.phones.map((phone) => ({ number: phone.number, label: phone.label ?? null })) }
       : {}),
     ...(fields.address !== undefined ? { address: normalizeAddress(fields.address) } : {}),
+    ...(fields.socialProfiles !== undefined ? { socialProfiles: uniqueProfiles(fields.socialProfiles) } : {}),
   })
 }
 
@@ -298,6 +301,7 @@ export class Contacts extends Context.Service<
                 affiliations: companies.get(id) ?? [],
                 custom: row.custom as Contact["custom"],
                 address: addressOfRow(row),
+                socialProfiles: row.socialProfiles,
                 avatarUrl: fileUrl(row.avatarKey),
                 subscriptionStatus: row.subscriptionStatus,
                 ownerId: row.ownerId as UserId | null,
@@ -582,6 +586,7 @@ export class Contacts extends Context.Service<
                   lastName: normalized.lastName ?? null,
                   custom: custom.values,
                   ...addressColumns(normalized.address ?? null),
+                  ...(normalized.socialProfiles ? { socialProfiles: [...normalized.socialProfiles] } : {}),
                   ...(imported?.status
                     ? { subscriptionStatus: imported.status }
                     : fields.subscriptionStatus
@@ -663,6 +668,7 @@ export class Contacts extends Context.Service<
                       ...("lastName" in normalized ? { lastName: normalized.lastName ?? null } : {}),
                       ...(custom ? { custom: custom.values } : {}),
                       ...("address" in normalized ? addressColumns(normalized.address ?? null) : {}),
+                      ...(normalized.socialProfiles ? { socialProfiles: [...normalized.socialProfiles] } : {}),
                       ...(status ? { subscriptionStatus: status } : {}),
                       ...(ownerChanged ? { ownerId } : {}),
                       updatedAt: sql`now()`,

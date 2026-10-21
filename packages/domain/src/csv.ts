@@ -65,6 +65,40 @@ const CREATED_FIELD = {
   aliases: ["created", "created at", "create date", "date created"],
 } as const
 
+/** Social profile columns, one per network (D133), as "social:<network>"; HubSpot's headers included. */
+const socialFields = (recordType: "contact" | "company") =>
+  [
+    {
+      field: "social:linkedin",
+      label: "LinkedIn",
+      aliases:
+        recordType === "company"
+          ? [
+              "linkedin",
+              "linkedin company page",
+              "linkedin company page url",
+              "linkedin page",
+              "linkedin url",
+              "linkedin handle",
+            ]
+          : ["linkedin", "linkedin url", "linkedin profile", "linkedin handle"],
+    },
+    {
+      field: "social:x",
+      label: "X (Twitter)",
+      aliases: ["x", "x handle", "twitter", "twitter handle", "twitter username", "twitter url"],
+    },
+    {
+      field: "social:facebook",
+      label: "Facebook",
+      aliases: ["facebook", "facebook company page", "facebook page", "facebook url"],
+    },
+    { field: "social:instagram", label: "Instagram", aliases: ["instagram", "instagram handle", "instagram url"] },
+    { field: "social:youtube", label: "YouTube", aliases: ["youtube", "youtube channel", "youtube url"] },
+    { field: "social:github", label: "GitHub", aliases: ["github", "github username", "github url"] },
+    { field: "social:bluesky", label: "Bluesky", aliases: ["bluesky", "bluesky handle"] },
+  ] as const
+
 export const IMPORT_FIELDS = {
   contact: [
     { field: "firstName", label: "First name", aliases: ["first name", "first", "given name", "firstname"] },
@@ -106,6 +140,7 @@ export const IMPORT_FIELDS = {
       ],
     },
     { field: "owner", label: "Contact owner", aliases: ["contact owner", "owner", "record owner", "account owner"] },
+    ...socialFields("contact"),
     CREATED_FIELD,
   ],
   company: [
@@ -119,6 +154,17 @@ export const IMPORT_FIELDS = {
     { field: "phone", label: "Phone", aliases: ["phone", "phone number"] },
     ...ADDRESS_FIELDS,
     { field: "owner", label: "Company owner", aliases: ["company owner", "owner", "record owner", "account owner"] },
+    { field: "description", label: "Description", aliases: ["description", "company description"] },
+    {
+      field: "employees",
+      label: "Employees",
+      aliases: ["employees", "number of employees", "employee count", "headcount"],
+    },
+    { field: "industry", label: "Industry", aliases: ["industry"] },
+    { field: "yearFounded", label: "Year founded", aliases: ["year founded", "founded", "founded year"] },
+    { field: "annualRevenue", label: "Annual revenue", aliases: ["annual revenue", "revenue"] },
+    { field: "logoUrl", label: "Logo (an image's address)", aliases: ["logo url", "logo", "logo image"] },
+    ...socialFields("company"),
     CREATED_FIELD,
   ],
 } as const
@@ -127,7 +173,14 @@ export const IMPORT_FIELDS = {
  * Fields several columns may fill at once, their values combined: lists (emails, phones, domains)
  * and flags any of several columns can raise (HubSpot keeps consent in more than one).
  */
-const COMBINED_FIELDS: ReadonlySet<string> = new Set(["emails", "phone", "domains", "unsubscribed", "bounced"])
+const COMBINED_FIELDS: ReadonlySet<string> = new Set([
+  "emails",
+  "phone",
+  "domains",
+  "unsubscribed",
+  "bounced",
+  ...socialFields("company").map((entry) => entry.field),
+])
 
 /**
  * Guesses which field each column holds from its header: built-in aliases first, then custom

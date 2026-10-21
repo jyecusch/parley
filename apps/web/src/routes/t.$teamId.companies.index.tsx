@@ -116,6 +116,34 @@ export const Route = createFileRoute("/t/$teamId/companies/")({
   component: CompaniesScreen,
 })
 
+/** Company details that can be shown as list columns (D132); off until chosen in Display. */
+const PROFILE_COLUMNS: ReadonlyArray<{
+  readonly ref: string
+  readonly label: string
+  readonly numeric: boolean
+  readonly cell: (company: Company) => string
+}> = [
+  { ref: "industry", label: "Industry", numeric: false, cell: (company) => company.industry ?? "" },
+  {
+    ref: "employees",
+    label: "Employees",
+    numeric: true,
+    cell: (company) => (company.employees === null ? "" : company.employees.toLocaleString()),
+  },
+  {
+    ref: "yearFounded",
+    label: "Year founded",
+    numeric: true,
+    cell: (company) => (company.yearFounded === null ? "" : String(company.yearFounded)),
+  },
+  {
+    ref: "annualRevenue",
+    label: "Annual revenue",
+    numeric: true,
+    cell: (company) => (company.annualRevenue === null ? "" : company.annualRevenue.toLocaleString()),
+  },
+]
+
 /** The shape TanStack DB hands to an update: the company, writable. */
 function CompaniesScreen() {
   const { team } = useShell()
@@ -134,6 +162,7 @@ function CompaniesScreen() {
   const indexView = useIndexView(teamId, "company", search.view)
   const filterInfo = useMemo(() => filterFields("company", fields), [fields])
   const showOwner = indexView.state.columns.includes("owner")
+  const profileColumns = PROFILE_COLUMNS.filter((column) => indexView.state.columns.includes(column.ref))
   const shownFields = fields.filter(
     (field) => indexView.state.columns.includes(`custom:${field.id}`) || indexView.state.columns.includes(field.id),
   )
@@ -350,7 +379,7 @@ function CompaniesScreen() {
               onSort={indexView.setSort}
               columns={indexView.state.columns}
               onColumns={(columns) => void indexView.setColumns(columns)}
-              builtInColumns={[{ ref: "owner", label: "Company owner" }]}
+              builtInColumns={[{ ref: "owner", label: "Company owner" }, ...PROFILE_COLUMNS]}
               showingDeleted={search.deleted === true}
               onToggleDeleted={() => void setSearch(search.deleted ? {} : { deleted: true })}
             />
@@ -434,6 +463,11 @@ function CompaniesScreen() {
                         Company owner
                       </Th>
                     ) : null}
+                    {profileColumns.map((column) => (
+                      <Th key={column.ref} className={cn(customColumnClass, wideColumnClass)} scope="col">
+                        {column.label}
+                      </Th>
+                    ))}
                     {shownFields.map((field) => (
                       <Th key={field.id} className={cn(customColumnClass, wideColumnClass)} scope="col">
                         {field.name}
@@ -491,6 +525,14 @@ function CompaniesScreen() {
                             <RecordOwnerCell name={company.ownerName} />
                           </Td>
                         ) : null}
+                        {profileColumns.map((column) => (
+                          <Td
+                            key={column.ref}
+                            className={cn(TALL, wideColumnClass, column.numeric && "tabular-nums", "text-subtle")}
+                          >
+                            {column.cell(company)}
+                          </Td>
+                        ))}
                         {shownFields.map((field) => (
                           <Td key={field.id} className={cn(TALL, wideColumnClass, "text-subtle")}>
                             <CustomCell field={field} value={company.custom[field.id]} />

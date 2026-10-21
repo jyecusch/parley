@@ -3,6 +3,7 @@ import { PostalAddress } from "./address.ts"
 import { CustomValues, CustomValuesPatch } from "./custom-field.ts"
 import { AffiliationId, CompanyId, ContactId, TeamId, UserId } from "./ids.ts"
 import { RecordType } from "./record-type.ts"
+import { SocialProfiles } from "./social.ts"
 
 const Timestamp = Schema.String.annotate({ description: "ISO 8601 timestamp" })
 
@@ -51,6 +52,8 @@ export const Contact = Schema.Struct({
   phones: Schema.Array(ContactPhone),
   /** Where the contact is (D128), or null. */
   address: Schema.NullOr(PostalAddress),
+  /** Links to their profiles on social networks (D133). */
+  socialProfiles: SocialProfiles,
   /** Its companies that aren't deleted, oldest first. */
   affiliations: Schema.Array(ContactAffiliation),
   /** Custom field values by field id (D31). */
@@ -89,6 +92,7 @@ export const ContactFields = Schema.Struct({
     ).check(Schema.isMaxLength(20)),
   ),
   address: Schema.optional(Schema.NullOr(PostalAddress)),
+  socialProfiles: Schema.optional(SocialProfiles.annotate({ title: "Social profiles" })),
   custom: Schema.optional(CustomValuesPatch),
   ownerId: Schema.optional(
     Schema.NullOr(

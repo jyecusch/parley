@@ -55,6 +55,67 @@ describe("companies operations", () => {
     }).pipe(Effect.provide(CoreLive)),
   )
 
+  it.effect("profile fields and social profiles: set, cleared and de-duplicated (D132, D133)", () =>
+    Effect.gen(function* () {
+      const f = yield* Fixture
+      const created = yield* run["companies.create"](f.jane, {
+        teamId: f.acme,
+        name: "Nitric",
+        description: "Cloud apps without the plumbing.",
+        employees: 10,
+        industry: "Computer Software",
+        yearFounded: 2020,
+        annualRevenue: 1_000_000,
+        socialProfiles: [
+          "https://www.linkedin.com/company/nitrictech" as never,
+          "https://linkedin.com/company/nitrictech/" as never,
+          "https://x.com/nitric_io" as never,
+        ],
+      })
+      expect(created).toMatchObject({
+        description: "Cloud apps without the plumbing.",
+        employees: 10,
+        industry: "Computer Software",
+        yearFounded: 2020,
+        annualRevenue: 1_000_000,
+        socialProfiles: ["https://www.linkedin.com/company/nitrictech", "https://x.com/nitric_io"],
+      })
+
+      const updated = yield* run["companies.update"](f.jane, {
+        teamId: f.acme,
+        companyId: created.id,
+        employees: 12,
+        annualRevenue: null,
+        socialProfiles: ["https://github.com/nitrictech" as never],
+      })
+      expect(updated).toMatchObject({
+        description: "Cloud apps without the plumbing.",
+        employees: 12,
+        annualRevenue: null,
+        socialProfiles: ["https://github.com/nitrictech"],
+      })
+      const got = yield* run["companies.get"](f.jane, { teamId: f.acme, companyId: created.id })
+      expect(got).toMatchObject({ employees: 12, annualRevenue: null, yearFounded: 2020 })
+      const activity = yield* run["companies.activity"](f.jane, { teamId: f.acme, companyId: created.id })
+      expect(activity.at(-1)?.changedFields).toEqual(
+        expect.arrayContaining(["employees", "annualRevenue", "socialProfiles"]),
+      )
+
+      const contact = yield* run["contacts.create"](f.jane, {
+        teamId: f.acme,
+        firstName: "Ana",
+        socialProfiles: ["https://x.com/ana" as never, "https://x.com/ana" as never],
+      })
+      expect(contact.socialProfiles).toEqual(["https://x.com/ana"])
+      const cleared = yield* run["contacts.update"](f.jane, {
+        teamId: f.acme,
+        contactId: contact.id,
+        socialProfiles: [],
+      })
+      expect(cleared.socialProfiles).toEqual([])
+    }).pipe(Effect.provide(CoreLive)),
+  )
+
   it.effect("never lets a free email domain belong to a company", () =>
     Effect.gen(function* () {
       const f = yield* Fixture

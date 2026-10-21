@@ -275,6 +275,14 @@ const companyCondition = (condition: FilterCondition, info: FilterFieldInfo): SQ
       return textCondition(sql`"companies"."website"`, condition)
     case "country":
       return textCondition(sql`"companies"."country"`, condition)
+    case "industry":
+      return textCondition(sql`"companies"."industry"`, condition)
+    case "employees":
+      return numberCondition(sql`"companies"."employees"`, condition)
+    case "yearFounded":
+      return numberCondition(sql`"companies"."year_founded"`, condition)
+    case "annualRevenue":
+      return numberCondition(sql`"companies"."annual_revenue"`, condition)
     case "contactCount":
       return numberCondition(
         sql`(select count(*)::int from "affiliations" a join "contacts" c on c.id = a.contact_id
@@ -307,6 +315,13 @@ export const filterSql = (
   return sql`(${sql.join(parts, filter.match === "all" ? sql` and ` : sql` or `)})`
 }
 
+/** Company number fields (D132) and their columns, for sorting. */
+const COMPANY_NUMBER_COLUMNS: Readonly<Record<string, string>> = {
+  employees: "employees",
+  yearFounded: "year_founded",
+  annualRevenue: "annual_revenue",
+}
+
 /** The ORDER BY expression for a sort, with id as a tiebreaker so pages are stable. */
 export const sortSql = (recordType: RecordType, sort: Sort, fields: ReadonlyArray<FilterFieldInfo>): SQL => {
   const table = recordType === "contact" ? sql`"contacts"` : sql`"companies"`
@@ -324,6 +339,10 @@ export const sortSql = (recordType: RecordType, sort: Sort, fields: ReadonlyArra
     expr = sql`lower((select u.name from "user" u where u.id = ${table}."owner_id"))`
   } else if (sort.field === "city" || sort.field === "country") {
     expr = sql`lower(${table}.${sql.identifier(sort.field)})`
+  } else if (recordType === "company" && sort.field === "industry") {
+    expr = sql`lower("companies"."industry")`
+  } else if (recordType === "company" && sort.field in COMPANY_NUMBER_COLUMNS) {
+    expr = sql`"companies".${sql.identifier(COMPANY_NUMBER_COLUMNS[sort.field] ?? "employees")}`
   } else if (sort.field === "createdAt") {
     expr = sql`${table}."created_at"`
   } else if (sort.field === "name") {

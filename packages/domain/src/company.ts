@@ -3,6 +3,7 @@ import { PostalAddress } from "./address.ts"
 import { PhoneNumber } from "./contact.ts"
 import { CustomValues, CustomValuesPatch } from "./custom-field.ts"
 import { AffiliationId, CompanyId, ContactId, TeamId, UserId } from "./ids.ts"
+import { SocialProfiles } from "./social.ts"
 
 const Timestamp = Schema.String.annotate({ description: "ISO 8601 timestamp" })
 
@@ -34,6 +35,16 @@ export const Company = Schema.Struct({
   website: Schema.NullOr(Website),
   phone: Schema.NullOr(PhoneNumber),
   address: Schema.NullOr(PostalAddress),
+  /** What the company does, in a few sentences (D132). */
+  description: Schema.NullOr(Schema.String),
+  /** How many people work there (D132). */
+  employees: Schema.NullOr(Schema.Number),
+  industry: Schema.NullOr(Schema.String),
+  yearFounded: Schema.NullOr(Schema.Number),
+  /** In the team's currency (D132). */
+  annualRevenue: Schema.NullOr(Schema.Number),
+  /** Links to its pages on social networks (D133). */
+  socialProfiles: SocialProfiles,
   /** Contacts affiliated with it that aren't deleted. */
   contactCount: Schema.Number,
   /** Custom field values by field id (D31). */
@@ -65,6 +76,31 @@ export const CompanyFields = Schema.Struct({
   website: Schema.optional(Schema.NullOr(Website.annotate({ title: "Website" }))),
   phone: Schema.optional(Schema.NullOr(PhoneNumber.annotate({ title: "Phone" }))),
   address: Schema.optional(Schema.NullOr(PostalAddress)),
+  description: Schema.optional(
+    Schema.NullOr(Schema.String.check(Schema.isTrimmed(), Schema.isMaxLength(5000)).annotate({ title: "Description" })),
+  ),
+  employees: Schema.optional(
+    Schema.NullOr(
+      Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 10_000_000 })).annotate({ title: "Employees" }),
+    ),
+  ),
+  industry: Schema.optional(
+    Schema.NullOr(Schema.String.check(Schema.isTrimmed(), Schema.isMaxLength(120)).annotate({ title: "Industry" })),
+  ),
+  yearFounded: Schema.optional(
+    Schema.NullOr(
+      Schema.Int.check(Schema.isBetween({ minimum: 1000, maximum: 2100 })).annotate({ title: "Year founded" }),
+    ),
+  ),
+  annualRevenue: Schema.optional(
+    Schema.NullOr(
+      Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)).annotate({
+        title: "Annual revenue",
+        description: "In the team's currency.",
+      }),
+    ),
+  ),
+  socialProfiles: Schema.optional(SocialProfiles.annotate({ title: "Social profiles" })),
   custom: Schema.optional(CustomValuesPatch),
   ownerId: Schema.optional(
     Schema.NullOr(

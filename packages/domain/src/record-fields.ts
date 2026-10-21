@@ -49,6 +49,14 @@ export const companyFieldReader =
         return company.address?.country ?? null
       case "contactCount":
         return company.contactCount
+      case "industry":
+        return company.industry
+      case "employees":
+        return company.employees
+      case "yearFounded":
+        return company.yearFounded
+      case "annualRevenue":
+        return company.annualRevenue
       case "owner":
         return company.ownerId
       case "createdAt":

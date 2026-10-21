@@ -27,7 +27,10 @@ import {
   parseCsv,
   type RecordType,
   type SegmentId,
+  SOCIAL_NETWORKS,
+  type SocialNetworkId,
   SUBSCRIPTION_STATUS_LABELS,
+  socialProfileFrom,
   type TopicId,
   toCsv,
   type UserId,
@@ -35,6 +38,8 @@ import {
 } from "@parley/domain"
 import { type UserText, userText } from "@parley/errors"
 import { Effect, Schema } from "effect"
+import { normalizeImage } from "../files/images.ts"
+import { safeFetch } from "../files/safe-fetch.ts"
 import type { Principal } from "../principal.ts"
 import { proveCompanyInTeam } from "../proofs/company-in-team.ts"
 import { proveContactInTeam } from "../proofs/contact-in-team.ts"
@@ -50,6 +55,7 @@ import { Contacts } from "../services/contacts.ts"
 import { CustomFields } from "../services/custom-fields.ts"
 import { Members } from "../services/members.ts"
 import { Segments } from "../services/segments.ts"
+import { uniqueProfiles } from "../services/social-profiles.ts"
 import { Subscriptions } from "../services/subscriptions.ts"
 
 /**
@@ -191,6 +197,7 @@ export const exportContactsCsv = (principal: Principal, input: OperationInput<ty
         "State or region",
         "Postcode",
         "Country",
+        "Social profiles",
         "Subscription status",
         "Contact owner",
         "Created",
@@ -221,6 +228,7 @@ export const exportContactsCsv = (principal: Principal, input: OperationInput<ty
             contact.address?.region ?? "",
             contact.address?.postcode ?? "",
             contact.address?.country ?? "",
+            contact.socialProfiles.join("; "),
             SUBSCRIPTION_STATUS_LABELS[contact.subscriptionStatus],
             contact.ownerName ?? "",
             isoDay(contact.createdAt),
@@ -266,6 +274,12 @@ export const exportCompaniesCsv = (principal: Principal, input: OperationInput<t
         "Region",
         "Postcode",
         "Country",
+        "Description",
+        "Employees",
+        "Industry",
+        "Year founded",
+        "Annual revenue",
+        "Social profiles",
         "Contacts",
         "Company owner",
         "Created",
@@ -285,6 +299,12 @@ export const exportCompaniesCsv = (principal: Principal, input: OperationInput<t
           company.address?.region ?? "",
           company.address?.postcode ?? "",
           company.address?.country ?? "",
+          company.description ?? "",
+          company.employees === null ? "" : String(company.employees),
+          company.industry ?? "",
+          company.yearFounded === null ? "" : String(company.yearFounded),
+          company.annualRevenue === null ? "" : String(company.annualRevenue),
+          company.socialProfiles.join("; "),
           String(company.contactCount),
           company.ownerName ?? "",
           isoDay(company.createdAt),
@@ -543,6 +563,126 @@ const badCreatedAt = (): FieldProblem => ({
 })
 
 /** A row's address, with the country as a code from a code or a name (D128). Unknown countries are left out. */
+/**
+ * The social profiles in a row's "social:<network>" cells (D133): links as given, or handles made
+ * into the network's address. A part that's neither is left out, with a warning.
+ */
+const profilesOfCells = (
+  cells: Record<string, string>,
+  recordType: "contact" | "company",
+  warnings: Array<FieldProblem>,
+): Array<string> => {
+  const profiles: Array<string> = []
+  for (const network of SOCIAL_NETWORKS) {
+    const cell = cells[`social:${network.id}`]
+    if (!cell) continue
+    for (const part of split(cell)) {
+      const profile = socialProfileFrom(network.id as SocialNetworkId, part, recordType)
+      if (profile) profiles.push(profile)
+      else
+        warnings.push({
+          field: `socialProfiles.${network.id}`,
+          problem: "invalid-format",
+          userMessage: userText`A ${network.label} profile that isn't a link or a handle was left out.`,
+        })
+    }
+  }
+  return uniqueProfiles(profiles)
+}
+
+/** A number in a cell, as CRM exports write them: "10.0", "1,000,000", "$1,000,000". */
+const numberOfCell = (cell: string | undefined): number | "invalid" | undefined => {
+  const text = cell?.trim()
+  if (!text) return undefined
+  const cleaned = text.replace(/[\s,]/g, "").replace(/^[^\d.-]+/, "")
+  const value = Number(cleaned)
+  return cleaned !== "" && Number.isFinite(value) ? value : "invalid"
+}
+
+/** A company's profile fields in a row (D132): description, employees, industry, year founded, revenue. */
+const companyProfileOfCells = (cells: Record<string, string>, warnings: Array<FieldProblem>) => {
+  const fields: {
+    description?: string
+    employees?: number
+    industry?: string
+    yearFounded?: number
+    annualRevenue?: number
+  } = {}
+  const description = cells.description?.trim()
+  if (description) fields.description = description.slice(0, 5000)
+  const industry = cells.industry?.trim()
+  if (industry) fields.industry = industry.slice(0, 120)
+  const employees = numberOfCell(cells.employees)
+  if (typeof employees === "number" && Number.isInteger(employees) && employees >= 0 && employees <= 10_000_000) {
+    fields.employees = employees
+  } else if (employees !== undefined) {
+    warnings.push({
+      field: "employees",
+      problem: "invalid-format",
+      userMessage: userText`A number of employees that isn't a whole number was left out.`,
+    })
+  }
+  const year = numberOfCell(cells.yearFounded)
+  if (typeof year === "number" && Number.isInteger(year) && year >= 1000 && year <= 2100) {
+    fields.yearFounded = year
+  } else if (year !== undefined) {
+    warnings.push({
+      field: "yearFounded",
+      problem: "invalid-format",
+      userMessage: userText`A year founded that isn't a year, like 2020, was left out.`,
+    })
+  }
+  const revenue = numberOfCell(cells.annualRevenue)
+  if (typeof revenue === "number" && revenue >= 0) {
+    fields.annualRevenue = revenue
+  } else if (revenue !== undefined) {
+    warnings.push({
+      field: "annualRevenue",
+      problem: "invalid-format",
+      userMessage: userText`An annual revenue that isn't a number was left out.`,
+    })
+  }
+  return fields
+}
+
+/** Logos fetched at once during an import (D134), and how long each may take. */
+const LOGO_CONCURRENCY = 4
+const LOGO_DEADLINE_MS = 10_000
+const LOGO_MAX_BYTES = 10 * 1024 * 1024
+
+/** A logo cell as the https address to fetch, or "invalid" when it isn't a web address. */
+const logoUrlOf = (cell: string | undefined): string | "invalid" | undefined => {
+  const text = cell?.trim()
+  if (!text) return undefined
+  const url = text.replace(/^http:\/\//i, "https://")
+  return /^https:\/\/[^\s/]+\.[^\s]+$/i.test(url) ? url : "invalid"
+}
+
+const logoProblem = (): FieldProblem => ({
+  field: "logoUrl",
+  problem: "invalid-format",
+  userMessage: userText`The logo couldn't be fetched from its address, so the company keeps the logo it had.`,
+})
+
+/** Fetches a logo safely, as favicons are (D134), and prepares it as an uploaded logo. */
+const fetchLogo = (url: string) =>
+  Effect.gen(function* () {
+    const fetched = yield* Effect.tryPromise({
+      try: () => safeFetch(url, AbortSignal.timeout(LOGO_DEADLINE_MS), LOGO_MAX_BYTES),
+      catch: () => "unreachable" as const,
+    })
+    if (!fetched?.type.startsWith("image/")) return yield* Effect.fail("unreachable" as const)
+    return yield* normalizeImage(fetched.bytes)
+  })
+
+/** Adds problems to a line's warnings, keeping one entry per line. */
+const addWarnings = (outcome: Outcome, line: number, problems: ReadonlyArray<FieldProblem>) => {
+  if (problems.length === 0) return
+  const existing = outcome.warnings.find((entry) => entry.line === line)
+  if (existing) (existing.problems as Array<FieldProblem>).push(...problems)
+  else outcome.warnings.push({ line, problems: [...problems] })
+}
+
 const addressOfCells = (cells: Record<string, string>, warnings: Array<FieldProblem>): PostalAddress | undefined => {
   const text = (value: string | undefined) => {
     const trimmed = value?.trim()
@@ -718,11 +858,13 @@ export const importContactsCsv = (principal: Principal, input: OperationInput<ty
         const createdAt = createdAtOf(cells.createdAt)
         if (createdAt === "invalid") warnings.push(badCreatedAt())
         const address = addressOfCells(cells, warnings)
+        const socialProfiles = profilesOfCells(cells, "contact", warnings)
         if (problems.length > 0) {
           result.failed.push({ line, problems })
           continue
         }
         const fieldsForRow: ContactFields = {
+          ...(socialProfiles.length > 0 ? { socialProfiles: socialProfiles as never } : {}),
           ...((cells.firstName ?? first) ? { firstName: cells.firstName ?? first ?? null } : {}),
           ...((cells.lastName ?? (rest.length > 0 ? rest.join(" ") : undefined))
             ? { lastName: cells.lastName ?? rest.join(" ") }
@@ -773,6 +915,10 @@ export const importContactsCsv = (principal: Principal, input: OperationInput<ty
                     {
                       ...otherFields,
                       ...(custom ? { custom } : {}),
+                      // Social profiles from the file are added; none are removed.
+                      ...(socialProfiles.length > 0
+                        ? { socialProfiles: uniqueProfiles([...current.socialProfiles, ...socialProfiles]) as never }
+                        : {}),
                       ...(subscriptionStatus && keepStatus && !reported ? { subscriptionStatus } : {}),
                       ...(added.length > 0
                         ? { emails: [...current.emails, ...added.map((address) => ({ address: address as never }))] }
@@ -869,6 +1015,8 @@ export const importCompaniesCsv = (principal: Principal, input: OperationInput<t
       }
 
       const result: Outcome = { created: 0, updated: 0, failed: [], warnings: [] }
+      // Logos are fetched once the rows are in, a few at a time (D134).
+      const logos: Array<{ line: number; companyId: CompanyId; url: string }> = []
       for (const [index, row] of parsed.rows.entries()) {
         const line = index + 2
         const cells = withSet(cellsOf(parsed, row), input.set, fields)
@@ -918,7 +1066,12 @@ export const importCompaniesCsv = (principal: Principal, input: OperationInput<t
         if (owner === "unknown") warnings.push(unknownOwner())
         const createdAt = createdAtOf(cells.createdAt)
         if (createdAt === "invalid") warnings.push(badCreatedAt())
+        const profile = companyProfileOfCells(cells, warnings)
+        const socialProfiles = profilesOfCells(cells, "company", warnings)
+        const logoUrl = logoUrlOf(cells.logoUrl)
+        if (logoUrl === "invalid") warnings.push(logoProblem())
         const fieldsForRow: CompanyFields = {
+          ...profile,
           ...(goodWebsite ? { website: goodWebsite as never } : {}),
           ...(phone ? { phone: phone as never } : {}),
           ...(address ? { address } : {}),
@@ -947,6 +1100,10 @@ export const importCompaniesCsv = (principal: Principal, input: OperationInput<t
                     {
                       ...otherFields,
                       ...(custom ? { custom } : {}),
+                      // Social profiles from the file are added; none are removed.
+                      ...(socialProfiles.length > 0
+                        ? { socialProfiles: uniqueProfiles([...current.socialProfiles, ...socialProfiles]) as never }
+                        : {}),
                       ...(name ? { name } : {}),
                       ...(added.length > 0
                         ? { domains: [...current.domains, ...added.map((domain) => ({ domain: domain as never }))] }
@@ -957,6 +1114,8 @@ export const importCompaniesCsv = (principal: Principal, input: OperationInput<t
                   )
                 }),
               )
+              if (typeof logoUrl === "string" && logoUrl !== "invalid")
+                logos.push({ line, companyId: existing, url: logoUrl })
               result.updated++
             } else {
               if (!name) {
@@ -971,6 +1130,7 @@ export const importCompaniesCsv = (principal: Principal, input: OperationInput<t
                 {
                   ...fieldsForRow,
                   name,
+                  ...(socialProfiles.length > 0 ? { socialProfiles: socialProfiles as never } : {}),
                   ...(domains.length > 0 ? { domains: domains.map((domain) => ({ domain: domain as never })) } : {}),
                 },
                 canWrite,
@@ -979,6 +1139,8 @@ export const importCompaniesCsv = (principal: Principal, input: OperationInput<t
               )
               for (const domain of domains) byDomain.set(domain, created.id)
               byName.set(name.toLowerCase(), created.id)
+              if (typeof logoUrl === "string" && logoUrl !== "invalid")
+                logos.push({ line, companyId: created.id, url: logoUrl })
               result.created++
             }
             if (warnings.length > 0) result.warnings.push({ line, problems: warnings })
@@ -994,6 +1156,27 @@ export const importCompaniesCsv = (principal: Principal, input: OperationInput<t
           },
         )
       }
+      yield* Effect.forEach(
+        logos,
+        (logo) =>
+          fetchLogo(logo.url).pipe(
+            Effect.flatMap((image) =>
+              named(logo.companyId, (company) =>
+                Effect.gen(function* () {
+                  const proof = yield* proveCompanyInTeam(team, company, canRead)
+                  yield* companies.setLogo(proof, image, canWrite)
+                }),
+              ),
+            ),
+            Effect.catch((error) =>
+              typeof error === "object" && error._tag === "DatabaseUnavailable"
+                ? Effect.fail(error)
+                : Effect.sync(() => addWarnings(result, logo.line, [logoProblem()])),
+            ),
+          ),
+        { concurrency: LOGO_CONCURRENCY, discard: true },
+      )
+      result.warnings.sort((a, b) => a.line - b.line)
       return result
     }),
   )

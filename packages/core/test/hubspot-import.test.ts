@@ -255,4 +255,121 @@ describe("importing a HubSpot export", () => {
       expect(nitric?.domains.map((entry) => entry.domain).sort()).toEqual(["nitric.dev", "nitric.io", "suga.app"])
     }).pipe(Effect.provide(CoreLive)),
   )
+
+  it.effect("companies: description, size, industry, revenue and social profiles come across (D132, D133)", () =>
+    Effect.gen(function* () {
+      const f = yield* Fixture
+      const existing = yield* run["companies.create"](f.jane, {
+        teamId: f.acme,
+        name: "Nitric",
+        domains: [{ domain: "nitric.io" as never }],
+        socialProfiles: ["https://github.com/nitrictech" as never],
+      })
+      const csv = toCsv([
+        [
+          "Company name",
+          "Company Domain Name",
+          "Description",
+          "Number of Employees",
+          "Industry",
+          "Year Founded",
+          "Annual Revenue",
+          "LinkedIn Company Page URL",
+          "Linkedin handle",
+          "Twitter Handle",
+          "Facebook Company Page",
+          "Logo URL",
+        ],
+        [
+          "Nitric",
+          "nitric.io",
+          "  Cloud apps without the plumbing.  ",
+          "10.0",
+          "Computer Software",
+          "2020",
+          "1000000.0",
+          "https://www.linkedin.com/company/nitrictech",
+          "nitrictech",
+          "nitric_io",
+          "https://www.facebook.com/nitrictech",
+          "",
+        ],
+        [
+          "Suga",
+          "suga.app",
+          "",
+          "a few",
+          "",
+          "20",
+          "$1,500,000",
+          "",
+          "",
+          "@suga_app",
+          "not a page!",
+          // A private address is never fetched (safeFetch refuses it): a warning, not a failure.
+          "https://127.0.0.1/logo.png",
+        ],
+      ]).replaceAll("'@", "@")
+      const [headers = []] = parseCsv(csv)
+      const mapping = guessMapping(headers, "company", [])
+      expect(mapping).toMatchObject({
+        Description: "description",
+        "Number of Employees": "employees",
+        Industry: "industry",
+        "Year Founded": "yearFounded",
+        "Annual Revenue": "annualRevenue",
+        "LinkedIn Company Page URL": "social:linkedin",
+        "Linkedin handle": "social:linkedin",
+        "Twitter Handle": "social:x",
+        "Facebook Company Page": "social:facebook",
+        "Logo URL": "logoUrl",
+      })
+      const result = yield* run["companies.import"](f.jane, { teamId: f.acme, csv, mapping })
+      expect([result.created, result.updated, result.failed]).toEqual([1, 1, []])
+      expect(
+        result.warnings.map((warning) => [warning.line, warning.problems.map((problem) => problem.field)]),
+      ).toEqual([[3, ["employees", "yearFounded", "socialProfiles.facebook", "logoUrl"]]])
+
+      const list = (yield* run["companies.list"](f.jane, { teamId: f.acme })).items
+      const nitric = list.find((company) => company.id === existing.id)
+      expect(nitric).toMatchObject({
+        description: "Cloud apps without the plumbing.",
+        employees: 10,
+        industry: "Computer Software",
+        yearFounded: 2020,
+        annualRevenue: 1_000_000,
+        logoUrl: null,
+      })
+      // Added to the profiles it had, the same LinkedIn page once.
+      expect(nitric?.socialProfiles).toEqual([
+        "https://github.com/nitrictech",
+        "https://www.linkedin.com/company/nitrictech",
+        "https://x.com/nitric_io",
+        "https://www.facebook.com/nitrictech",
+      ])
+      expect(list.find((company) => company.name === "Suga")).toMatchObject({
+        description: null,
+        employees: null,
+        yearFounded: null,
+        annualRevenue: 1_500_000,
+        socialProfiles: ["https://x.com/suga_app"],
+        logoUrl: null,
+      })
+    }).pipe(Effect.provide(CoreLive)),
+  )
+
+  it.effect("contacts: a Twitter username becomes a social profile (D133)", () =>
+    Effect.gen(function* () {
+      const f = yield* Fixture
+      const csv = "Email,Twitter Username,LinkedIn URL\nana@acme.io,@ana_codes,linkedin.com/in/ana\n"
+      const [headers = []] = parseCsv(csv)
+      const mapping = guessMapping(headers, "contact", [])
+      expect(mapping).toMatchObject({ "Twitter Username": "social:x", "LinkedIn URL": "social:linkedin" })
+      const result = yield* run["contacts.import"](f.jane, { teamId: f.acme, csv, mapping })
+      expect([result.created, result.failed, result.warnings]).toEqual([1, [], []])
+      const [ana] = (yield* run["contacts.list"](f.jane, { teamId: f.acme, search: "ana" })).items
+      // A link is kept as given, with https added.
+      expect(ana?.socialProfiles).toEqual(["https://linkedin.com/in/ana", "https://x.com/ana_codes"])
+    }).pipe(Effect.provide(CoreLive)),
+  )
 })

@@ -140,6 +140,42 @@ describe("filters", () => {
           .map((company) => company.name),
       )
       expect(serverCompanies).toEqual(["Acme"])
+
+      // The company profile fields (D132) agree too.
+      yield* run["companies.create"](f.jane, {
+        teamId: f.acme,
+        name: "Profiled",
+        industry: "Computer Software",
+        employees: 10,
+        yearFounded: 2020,
+        annualRevenue: 1_000_000,
+      })
+      yield* run["companies.create"](f.jane, { teamId: f.acme, name: "Small", industry: "Retail", employees: 2 })
+      const profiled = (yield* run["companies.list"](f.jane, { teamId: f.acme, limit: 200 })).items
+      const companyFilters: ReadonlyArray<Filter> = [
+        { match: "all", conditions: [{ field: "industry", operator: "contains", value: "software" }] },
+        { match: "all", conditions: [{ field: "industry", operator: "is-empty" }] },
+        { match: "all", conditions: [{ field: "employees", operator: "greater-than", value: 5 }] },
+        { match: "all", conditions: [{ field: "employees", operator: "is-empty" }] },
+        { match: "all", conditions: [{ field: "yearFounded", operator: "equals", value: 2020 }] },
+        { match: "all", conditions: [{ field: "annualRevenue", operator: "less-than", value: 5_000_000 }] },
+        { match: "all", conditions: [{ field: "annualRevenue", operator: "is-not-empty" }] },
+      ]
+      for (const filter of companyFilters) {
+        const server = (yield* run["companies.list"](f.jane, { teamId: f.acme, filter, limit: 200 })).items
+          .map((company) => company.name)
+          .sort()
+        const local = profiled
+          .filter((company) => matchesFilter(filter, companyFieldReader(company)))
+          .map((company) => company.name)
+          .sort()
+        expect({ filter: filter.conditions, names: server }).toEqual({ filter: filter.conditions, names: local })
+      }
+      const byEmployees = yield* run["companies.list"](f.jane, {
+        teamId: f.acme,
+        sort: { field: "employees", direction: "desc" },
+      })
+      expect(byEmployees.items.slice(0, 2).map((company) => company.name)).toEqual(["Profiled", "Small"])
     }).pipe(Effect.provide(CoreLive)),
   )
 

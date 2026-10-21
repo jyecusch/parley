@@ -36,6 +36,7 @@ import { RESTORE_WINDOW_DAYS } from "./contacts.ts"
 import { CustomFields } from "./custom-fields.ts"
 import { FileStore, fileUrl } from "./file-store.ts"
 import { checkFilter, filterSql, sortSql } from "./filter-sql.ts"
+import { uniqueProfiles } from "./social-profiles.ts"
 import { classifySqlError, isUniqueViolation } from "./sql-errors.ts"
 
 export interface CompanyQuery {
@@ -91,6 +92,18 @@ interface NormalizedFields {
   readonly website?: string | null
   readonly phone?: string | null
   readonly address?: PostalAddress | null
+  readonly description?: string | null
+  readonly employees?: number | null
+  readonly industry?: string | null
+  readonly yearFounded?: number | null
+  readonly annualRevenue?: number | null
+  readonly socialProfiles?: ReadonlyArray<string>
+}
+
+/** Text that's empty once trimmed is no text. */
+const textOrNull = (value: string | null | undefined) => {
+  const trimmed = value?.trim()
+  return trimmed ? trimmed : null
 }
 
 /** Rules that span fields. Each problem names its field and never echoes the value (D26). */
@@ -126,8 +139,24 @@ const normalize = (fields: CompanyFields): Effect.Effect<NormalizedFields, Input
     ...(fields.website !== undefined ? { website: fields.website } : {}),
     ...(fields.phone !== undefined ? { phone: fields.phone } : {}),
     ...(fields.address !== undefined ? { address: normalizeAddress(fields.address) } : {}),
+    ...(fields.description !== undefined ? { description: textOrNull(fields.description) } : {}),
+    ...(fields.employees !== undefined ? { employees: fields.employees } : {}),
+    ...(fields.industry !== undefined ? { industry: textOrNull(fields.industry) } : {}),
+    ...(fields.yearFounded !== undefined ? { yearFounded: fields.yearFounded } : {}),
+    ...(fields.annualRevenue !== undefined ? { annualRevenue: fields.annualRevenue } : {}),
+    ...(fields.socialProfiles !== undefined ? { socialProfiles: uniqueProfiles(fields.socialProfiles) } : {}),
   })
 }
+
+/** The profile fields given (D132, D133), as columns. Fields not given are left as they are. */
+const profileColumns = (fields: NormalizedFields) => ({
+  ...("description" in fields ? { description: fields.description ?? null } : {}),
+  ...("employees" in fields ? { employees: fields.employees ?? null } : {}),
+  ...("industry" in fields ? { industry: fields.industry ?? null } : {}),
+  ...("yearFounded" in fields ? { yearFounded: fields.yearFounded ?? null } : {}),
+  ...("annualRevenue" in fields ? { annualRevenue: fields.annualRevenue ?? null } : {}),
+  ...(fields.socialProfiles !== undefined ? { socialProfiles: [...fields.socialProfiles] } : {}),
+})
 
 /** Contacts affiliated with the company that aren't deleted (D108, D109). */
 const contactCountSql = sql<number>`(
@@ -285,6 +314,12 @@ export class Companies extends Context.Service<
                 website: row.website as Company["website"],
                 phone: row.phone as Company["phone"],
                 address,
+                description: row.description,
+                employees: row.employees,
+                industry: row.industry,
+                yearFounded: row.yearFounded,
+                annualRevenue: row.annualRevenue,
+                socialProfiles: row.socialProfiles,
                 contactCount,
                 custom: row.custom as Company["custom"],
                 logoUrl: fileUrl(row.logoKey),
@@ -538,6 +573,7 @@ export class Companies extends Context.Service<
                   website: normalized.website ?? null,
                   phone: normalized.phone ?? null,
                   ...addressColumns(normalized.address ?? null),
+                  ...profileColumns(normalized),
                   custom: custom.values,
                   ...(owner ? { ownerId: owner.userId } : {}),
                   ...(createdAt ? { createdAt } : {}),
@@ -596,6 +632,7 @@ export class Companies extends Context.Service<
                       ...("website" in normalized ? { website: normalized.website ?? null } : {}),
                       ...("phone" in normalized ? { phone: normalized.phone ?? null } : {}),
                       ...("address" in normalized ? addressColumns(normalized.address ?? null) : {}),
+                      ...profileColumns(normalized),
                       ...(custom ? { custom: custom.values } : {}),
                       ...(ownerChanged ? { ownerId } : {}),
                       updatedAt: sql`now()`,

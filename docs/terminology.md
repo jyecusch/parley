@@ -33,6 +33,7 @@ How to pick a name: choose the most common name for the concept. Reject anything
 | **Note** | Free-form text a principal adds to a record's activity, with an author and a time. | comment, memo, annotation |
 | **Avatar** | A contact's image: uploaded, else Gravatar (if the team enables it), else initials. | photo, profile picture, picture |
 | **Logo** | A company's image: uploaded, else the favicon from its primary domain, else initials. | icon, favicon (except the fetched source), brand image |
+| **Social profile** | A link to a contact's or company's page on a social network, such as LinkedIn or X (D133). | social link, social URL, handle (for the link), socials |
 | **Activity** | The history of changes to a record, as shown in the UI, including who made each change (for example "Jane via Claude"). | audit log, history, timeline, events |
 
 ## Identity and access
@@ -140,6 +141,7 @@ How to pick a name: choose the most common name for the concept. Reject anything
 | 2026-10-20 | Added **CRT settings** and **phosphor** (D114). |
 | 2026-10-20 | Added **email style** (D116). |
 | 2026-10-21 | Added **record owner** (D123). |
+| 2026-10-21 | Added **social profile** (D133). |
 | 2026-10-20 | Added **domain**, **free email domain** and **domain matching** (D105, D106). |
 | 2026-10-20 | Added the v2 email terms: campaign, draft, template, merge tag, test send, recipient, topic, subscription status, unsubscribe, unsubscribe link, footer, sender and sending domain. Claude's picks, open to veto (see `docs/review.md`). Later: **preview text**. |
 | 2026-10-20 | Added **access token**, and removed it from API key's banned synonyms (P5, D97). |

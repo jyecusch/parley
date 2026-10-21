@@ -26,6 +26,7 @@ const EDITABLE: ReadonlyArray<keyof ContactFields> = [
   "address",
   "subscriptionStatus",
   "ownerId",
+  "socialProfiles",
 ]
 
 const fieldsOf = (changes: Partial<Contact>, original: Contact): ContactFields => {
