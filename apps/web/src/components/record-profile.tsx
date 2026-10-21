@@ -9,12 +9,14 @@ import { cn, IconButton, InlineInput, PropertyRow, propertyValueClass, Textarea,
 const LONG_DESCRIPTION = 280
 
 /**
- * A company's description (D132): text with its line breaks, edited in place. ⌘Enter or leaving the
+ * A company's description (D132), or a segment's (D141): text with its line breaks, edited in place. ⌘Enter or leaving the
  * field saves; Escape cancels.
  */
 export function EditableDescription(props: {
   readonly value: string | null
   readonly disabled?: boolean
+  /** The longest description allowed; companies take 5,000 characters. */
+  readonly maxLength?: number
   readonly onSave: (value: string | null) => void
 }) {
   const [editing, setEditing] = useState(false)
@@ -25,7 +27,7 @@ export function EditableDescription(props: {
         aria-label="Description"
         className="min-h-28 text-base"
         defaultValue={props.value ?? ""}
-        maxLength={5000}
+        maxLength={props.maxLength ?? 5000}
         autoFocus
         onBlur={(event) => {
           setEditing(false)

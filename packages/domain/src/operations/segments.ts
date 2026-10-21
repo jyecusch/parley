@@ -1,7 +1,7 @@
 import { Schema } from "effect"
 import { ContactPage } from "../contact.ts"
-import { Segment, SegmentName } from "../email.ts"
-import { SegmentIsDynamic, SegmentLimitReached, SegmentNotFound } from "../errors/campaigns.ts"
+import { Segment, SegmentDescription, SegmentName } from "../email.ts"
+import { SegmentIsDynamic, SegmentLimitReached, SegmentNotFound } from "../errors/broadcasts.ts"
 import { ContactNotFound } from "../errors/contacts.ts"
 import { Filter } from "../filter.ts"
 import { ContactId, SegmentId, TeamId } from "../ids.ts"
@@ -20,7 +20,7 @@ const ContactIds = Schema.Array(ContactId)
 export const listSegments = defineTeamOperation({
   name: "segments.list",
   description:
-    "List the team's segments: groups of contacts a campaign is sent to. Dynamic segments follow a filter; fixed ones are hand-picked. Counts are as of now.",
+    "List the team's segments: groups of contacts a broadcast is sent to. Dynamic segments follow a filter; fixed ones are hand-picked. Counts are as of now.",
   input: Schema.Struct(InTeam),
   output: Schema.Array(Segment),
   errors: [],
@@ -31,7 +31,7 @@ export const listSegments = defineTeamOperation({
 
 export const getSegment = defineTeamOperation({
   name: "segments.get",
-  description: "One segment, with how many contacts it has now and how many a campaign would go to.",
+  description: "One segment, with how many contacts it has now and how many a broadcast would go to.",
   input: Schema.Struct(OneSegment),
   output: Segment,
   errors: [SegmentNotFound],
@@ -47,6 +47,7 @@ export const createSegment = defineTeamOperation({
   input: Schema.Struct({
     ...InTeam,
     name: SegmentName.annotate({ title: "Name" }),
+    description: Schema.optional(Schema.NullOr(SegmentDescription)),
     kind: Schema.Literals(["dynamic", "fixed"]).annotate({ title: "Kind" }),
     filter: Schema.optional(Filter),
   }),
@@ -59,10 +60,12 @@ export const createSegment = defineTeamOperation({
 
 export const updateSegment = defineTeamOperation({
   name: "segments.update",
-  description: "Rename a segment, or change a dynamic segment's filter. A segment's kind can't change.",
+  description:
+    "Rename a segment, change its description, or change a dynamic segment's filter. A segment's kind can't change.",
   input: Schema.Struct({
     ...OneSegment,
     name: Schema.optional(SegmentName.annotate({ title: "Name" })),
+    description: Schema.optional(Schema.NullOr(SegmentDescription)),
     filter: Schema.optional(Filter),
   }),
   output: Segment,
@@ -75,7 +78,7 @@ export const updateSegment = defineTeamOperation({
 export const deleteSegment = defineTeamOperation({
   name: "segments.delete",
   description:
-    "Delete a segment. Draft campaigns that used it need another; sent campaigns keep its name in their history. Its contacts are untouched.",
+    "Delete a segment. Draft broadcasts that used it need another; sent broadcasts keep its name in their history. Its contacts are untouched.",
   input: Schema.Struct(OneSegment),
   output: Segment,
   errors: [SegmentNotFound],

@@ -4,13 +4,13 @@
 
 ---
 
-## The campaign that went out with the wrong footer
+## The broadcast that went out with the wrong footer
 
 It's a few months from now. Parley v2 sends marketing email.
 
-Team A is a coffee roaster in Melbourne. Team B is a law firm in Sydney. On Tuesday morning both of them send a campaign.
+Team A is a coffee roaster in Melbourne. Team B is a law firm in Sydney. On Tuesday morning both of them send a broadcast.
 
-The law firm's 4,000 clients get a campaign email that's mostly fine, except for the footer. The footer is the part the Spam Act requires: who sent this, their postal address, and how to unsubscribe. That footer reads *"Bean There Coffee Roasters, 12 Smith St, Fitzroy VIC"*. The unsubscribe link goes to the coffee roaster's unsubscribe screen.
+The law firm's 4,000 clients get a broadcast email that's mostly fine, except for the footer. The footer is the part the Spam Act requires: who sent this, their postal address, and how to unsubscribe. That footer reads *"Bean There Coffee Roasters, 12 Smith St, Fitzroy VIC"*. The unsubscribe link goes to the coffee roaster's unsubscribe screen.
 
 So the law firm has just sent 4,000 emails that don't identify the law firm. Some of their clients clicked "unsubscribe" and unsubscribed from a coffee roaster they've never heard of. They will keep getting the law firm's email, which is exactly what the law exists to prevent.
 
@@ -18,30 +18,30 @@ No test failed. Nobody's review comment said "this leaks". Every type checked.
 
 ### How it got in
 
-Sending mail at volume needs one thing per process: a sender that batches messages and keeps within Resend's rate limit. You don't want one of those per request. Many senders would each think they own the whole rate limit. So `CampaignSender` is built once, at boot, and shared. That's correct.
+Sending mail at volume needs one thing per process: a sender that batches messages and keeps within Resend's rate limit. You don't want one of those per request. Many senders would each think they own the whole rate limit. So `BroadcastSender` is built once, at boot, and shared. That's correct.
 
 Some weeks later, someone needs to add the compliance footer to each message. The footer comes from the team's sending settings. There's already a service for that, `TeamSendingSettings`, which holds one team's legal name, postal address, verified Resend sending domain and unsubscribe base URL. So they reach for it:
 
 ```diff
-  static readonly layer = Layer.effect(CampaignSender, Effect.gen(function* () {
+  static readonly layer = Layer.effect(BroadcastSender, Effect.gen(function* () {
     const mailer = yield* Mailer
 +   const sending = yield* TeamSendingSettings
     const queue = yield* Queue.bounded<Outgoing>(10_000)
-    const enqueue = Effect.fn("CampaignSender.enqueue")(function* (message: Outgoing) {
+    const enqueue = Effect.fn("BroadcastSender.enqueue")(function* (message: Outgoing) {
 -     yield* Queue.offer(queue, message)
 +     yield* Queue.offer(queue, { ...message, footer: sending.footer })
     })
 ```
 
-The compiler notices something: `CampaignSender.layer` now requires `TeamSendingSettings`. The worker's layer no longer builds. So the developer does the obvious thing and provides it where the worker boots, built from the first job's team:
+The compiler notices something: `BroadcastSender.layer` now requires `TeamSendingSettings`. The worker's layer no longer builds. So the developer does the obvious thing and provides it where the worker boots, built from the first job's team:
 
 ```ts
-const workerLayer = CampaignSender.layer.pipe(Layer.provide(TeamSendingSettings.layerFor(firstJob.teamId)))
+const workerLayer = BroadcastSender.layer.pipe(Layer.provide(TeamSendingSettings.layerFor(firstJob.teamId)))
 ```
 
 The tests use a single fixture team, so they pass. Staging has one team, so it passes. The diff is a handful of lines and every one of them looks reasonable.
 
-The bug is that `CampaignSender` is built **once**, and it now holds something that belongs to **one team**. The first team to send a campaign after boot has its footer captured inside the long-lived sender. Every other team borrows it until the next deploy.
+The bug is that `BroadcastSender` is built **once**, and it now holds something that belongs to **one team**. The first team to send a broadcast after boot has its footer captured inside the long-lived sender. Every other team borrows it until the next deploy.
 
 This kind of bug has a name: a **captive dependency**. A long-lived thing has captured a short-lived one. It is quiet, it is type-correct, and it only appears once a second tenant arrives. A multi-tenant CRM has nothing *but* second tenants.
 
@@ -51,7 +51,7 @@ Everything in Parley is built at one of three **tiers**: how long it lives.
 
 | Tier | Built | Examples |
 | --- | --- | --- |
-| **process** | Once, at boot. Shared by every team and every request. | `SqlClient` (the Postgres pool), the Better-Auth instance, `Mailer` (wrapping the Resend client), `CampaignSender`, config |
+| **process** | Once, at boot. Shared by every team and every request. | `SqlClient` (the Postgres pool), the Better-Auth instance, `Mailer` (wrapping the Resend client), `BroadcastSender`, config |
 | **team** | Once per team. Carries one team's data or settings. | `TeamSendingSettings`, a per-team send quota, anything loaded with a `TeamId` and kept |
 | **request** | Once per request. Gone when the request ends. | The `Principal`, every proof (`MemberOf`, `CanWriteRecords`, …) |
 
@@ -71,13 +71,13 @@ We're not starting from zero. Effect's `Layer` and `Context.Service` already do 
 
 **Layers are built once.** A `Layer` stored in a constant is memoized by reference. Built into the app layer, it's constructed once and shared. That makes "process tier" the natural default, with no singletons hand-rolled behind `let instance`.
 
-**Requirements are visible.** A `Layer.Layer<CampaignSender, never, Mailer | TeamSendingSettings>` says in its type what it needs to be built. That's why our story's diff *did* make the compiler speak up. The `R` channel is the "needs list" that the write-up this post is based on had to invent by hand.
+**Requirements are visible.** A `Layer.Layer<BroadcastSender, never, Mailer | TeamSendingSettings>` says in its type what it needs to be built. That's why our story's diff *did* make the compiler speak up. The `R` channel is the "needs list" that the write-up this post is based on had to invent by hand.
 
 **Service methods take arguments, not ambient context.** Our convention, from Effect's own guidance, is that service methods have `R = never`. Whatever a method needs per call, it takes as a parameter. That's the habit that makes everything later in this post work.
 
 ### Where Effect stops
 
-Effect told the developer "`CampaignSender` now needs `TeamSendingSettings`". It did not say "and that's a mistake". To the type system, every requirement is just a requirement. `R` has no idea that one entry lives for the whole process and another for one team. So the compiler error was "provide this", and the developer did.
+Effect told the developer "`BroadcastSender` now needs `TeamSendingSettings`". It did not say "and that's a mistake". To the type system, every requirement is just a requirement. `R` has no idea that one entry lives for the whole process and another for one team. So the compiler error was "provide this", and the developer did.
 
 There are three ways the leak gets in even with Effect:
 
@@ -102,11 +102,11 @@ class TeamSendingSettings extends Context.Service<TeamSendingSettings, {
 }>()("@parley/TeamSendingSettings") {}
 ```
 
-Then `CampaignSender` doesn't need `TeamSendingSettings` at build time. Each outgoing message arrives already carrying its own footer, looked up for its own team by the operation that queued it. Our story's bug can't be written, because there's nothing at the team tier to capture.
+Then `BroadcastSender` doesn't need `TeamSendingSettings` at build time. Each outgoing message arrives already carrying its own footer, looked up for its own team by the operation that queued it. Our story's bug can't be written, because there's nothing at the team tier to capture.
 
 That gives us the shape for nearly all of v1 and v2:
 
-- **Process tier:** every service: `Contacts`, `Companies`, `CampaignSender`, `TeamSendingSettings`, the mailer. All built once, none holding team data.
+- **Process tier:** every service: `Contacts`, `Companies`, `BroadcastSender`, `TeamSendingSettings`, the mailer. All built once, none holding team data.
 - **Request tier:** the `Principal` and proofs. These are *values* passed down the call, not services in context.
 - **Team tier:** reserved for things that really must hold one team's state across requests. For example, a per-team in-memory send-rate limiter, if we ever need one. Each one is a deliberate decision, made in review.
 
@@ -188,10 +188,10 @@ When nothing is wrong, the check is `unknown`, and `X & unknown` is just `X`, so
 Every process-tier service wraps its layer:
 
 ```ts
-class CampaignSender extends Context.Service<CampaignSender, CampaignSenderShape>()("@parley/CampaignSender") {
+class BroadcastSender extends Context.Service<BroadcastSender, BroadcastSenderShape>()("@parley/BroadcastSender") {
   declare readonly [TierMarker]: "process"
 
-  static readonly layer = processLayer(Layer.effect(CampaignSender, Effect.gen(function* () {
+  static readonly layer = processLayer(Layer.effect(BroadcastSender, Effect.gen(function* () {
     const mailer = yield* Mailer
     const sending = yield* TeamSendRateLimiter   // team tier
     // …
@@ -202,7 +202,7 @@ class CampaignSender extends Context.Service<CampaignSender, CampaignSenderShape
 and the compiler stops the diff on the spot, before anyone gets to "just provide it at boot":
 
 ```
-Argument of type 'Layer<CampaignSender, never, Mailer | TeamSendRateLimiter>' is not assignable to parameter of type
+Argument of type 'Layer<BroadcastSender, never, Mailer | TeamSendRateLimiter>' is not assignable to parameter of type
 'Layer<…> & { readonly "built per team or per request, so a process-wide service cannot depend on it": TeamSendRateLimiter }'.
 ```
 
@@ -266,7 +266,7 @@ There's a second layer we could add underneath: **Postgres row-level security**.
 | `Members`, `ApiKeys`, `ServiceAccounts` | process | Same |
 | `Activity` | process | Each entry carries its own team and principal |
 | `Mailer`: a pluggable interface; the default implementation wraps the Resend client (D50) | process | One client, one Resend credential for our Resend account. Per-team things (verified sending domain, footer legal name and address) are team **data**, looked up per call, never held here |
-| `CampaignSender` (batching, Resend rate limit) | process | Resend's rate limit applies to our account, not per team |
+| `BroadcastSender` (batching, Resend rate limit) | process | Resend's rate limit applies to our account, not per team |
 | `Imports`, `ImportRunner` (D135) | process | Each import row carries its own team and the principal who started it; the runner rebuilds that principal for every part and checks their membership and permissions again, so nothing is held between parts |
 | `TeamSendingSettings` | process | A lookup by named team, not a holder of one team's settings |
 | `Templates`, `Drafts`, and the v2 contact-set services (names not yet defined) | process | Team passed per call |

@@ -83,7 +83,7 @@ export const createEmailStyle = defineTeamOperation({
 export const updateEmailStyle = defineTeamOperation({
   name: "emailStyles.update",
   description:
-    "Change an email style. Draft campaigns and templates using it change too; sent campaigns keep the look they were sent with. Null removes the logo or header line.",
+    "Change an email style. Draft broadcasts and templates using it change too; sent broadcasts keep the look they were sent with. Null removes the logo or header line.",
   input: Schema.Struct({
     ...OneStyle,
     name: Schema.optional(EmailStyleName.annotate({ title: "Name" })),
@@ -98,12 +98,12 @@ export const updateEmailStyle = defineTeamOperation({
 
 export const setDefaultEmailStyle = defineTeamOperation({
   name: "emailStyles.setDefault",
-  description: "Make an email style the team's default, used by templates and campaigns that don't choose one.",
+  description: "Make an email style the team's default, used by templates and broadcasts that don't choose one.",
   input: Schema.Struct(OneStyle),
   output: EmailStyle,
   errors: [EmailStyleNotFound],
   http: { method: "POST", path: "/teams/:teamId/email-styles/:styleId/default" },
-  // It changes how every template and draft campaign without a style of its own looks.
+  // It changes how every template and draft broadcast without a style of its own looks.
   hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: ["email:manage"],
 })
@@ -111,7 +111,7 @@ export const setDefaultEmailStyle = defineTeamOperation({
 export const deleteEmailStyle = defineTeamOperation({
   name: "emailStyles.delete",
   description:
-    "Delete an email style. Refused while it's the default or while templates or draft campaigns use it. Sent campaigns are unaffected.",
+    "Delete an email style. Refused while it's the default or while templates or draft broadcasts use it. Sent broadcasts are unaffected.",
   input: Schema.Struct(OneStyle),
   output: EmailStyle,
   errors: [EmailStyleNotFound, EmailStyleIsDefault, EmailStyleInUse],

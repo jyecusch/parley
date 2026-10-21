@@ -4,8 +4,8 @@ import { Authenticator, BetterAuth } from "./auth/authenticator.ts"
 import { Mailer } from "./mail/mailer.ts"
 import { Affiliations } from "./services/affiliations.ts"
 import { ApiKeys } from "./services/api-keys.ts"
-import { CampaignSender } from "./services/campaign-sender.ts"
-import { Campaigns } from "./services/campaigns.ts"
+import { BroadcastSender } from "./services/broadcast-sender.ts"
+import { Broadcasts } from "./services/broadcasts.ts"
 import { Companies } from "./services/companies.ts"
 import { Connections } from "./services/connections.ts"
 import { Contacts } from "./services/contacts.ts"
@@ -78,8 +78,8 @@ const Services = Layer.mergeAll(
   Topics.layer,
   Sending.layer,
   Subscriptions.layer,
-  Campaigns.layer,
-  CampaignSender.layer,
+  Broadcasts.layer,
+  BroadcastSender.layer,
   DeliveryEvents.layer,
   Imports.layer,
 ).pipe(Layer.provideMerge(Layer.mergeAll(UnsubscribeLinks.layer, RateLimiter.layer)))
@@ -94,13 +94,13 @@ export const CoreLive = Authenticator.layer.pipe(
   Layer.provideMerge(DatabaseLive),
 )
 
-export { CampaignSender } from "./services/campaign-sender.ts"
+export { BroadcastSender } from "./services/broadcast-sender.ts"
 export { ImportRunner } from "./services/import-runner.ts"
 export { Purge } from "./services/purge.ts"
 
 /** Work the server does on its own schedule, such as purging records deleted 30 days ago (D30). */
 export const BackgroundLive = Layer.mergeAll(
   Purge.schedule.pipe(Layer.provide(Purge.layer)),
-  CampaignSender.schedule,
+  BroadcastSender.schedule,
   ImportRunner.schedule,
 )

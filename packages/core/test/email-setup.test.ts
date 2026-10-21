@@ -125,7 +125,7 @@ describe("email setup", () => {
         teamId: f.acme,
         contactId: contact.id as ContactId,
         topicId: topic.id,
-        campaignId: null,
+        broadcastId: null,
         test: false,
       })
       expect(links.urls(token).oneClick).toMatch(/\/api\/unsubscribe\//)
@@ -150,7 +150,7 @@ describe("email setup", () => {
       expect(invalid._tag).toBe("UnsubscribeLinkInvalid")
 
       // A test send's link changes nothing (R45).
-      const test = links.sign({ teamId: f.acme, contactId: null, topicId: null, campaignId: null, test: true })
+      const test = links.sign({ teamId: f.acme, contactId: null, topicId: null, broadcastId: null, test: true })
       expect((yield* unsubscribeApply(test, { kind: "one-click" })).test).toBe(true)
     }).pipe(Effect.provide(CoreLive)),
   )

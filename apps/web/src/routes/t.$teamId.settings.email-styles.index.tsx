@@ -31,8 +31,8 @@ const usedBy = (style: EmailStyle) => {
     style.usedBy.templates > 0
       ? `${style.usedBy.templates} ${style.usedBy.templates === 1 ? "template" : "templates"}`
       : null,
-    style.usedBy.campaigns > 0
-      ? `${style.usedBy.campaigns} ${style.usedBy.campaigns === 1 ? "campaign" : "campaigns"}`
+    style.usedBy.broadcasts > 0
+      ? `${style.usedBy.broadcasts} ${style.usedBy.broadcasts === 1 ? "broadcast" : "broadcasts"}`
       : null,
   ].filter(Boolean)
   return parts.length > 0 ? parts.join(" · ") : "Not used yet"
@@ -66,7 +66,7 @@ function EmailStyles() {
   return (
     <SettingsPage
       title="Email styles"
-      intro="How your emails look: logo, colours, font and layout. Templates and campaigns use the default unless they choose another."
+      intro="How your emails look: logo, colours, font and layout. Templates and broadcasts use the default unless they choose another."
       action={
         canManage ? (
           <Link
@@ -159,7 +159,7 @@ function EmailStyles() {
         </Box>
       )}
       <Hint>
-        A style that templates or draft campaigns use can't be deleted until they choose another. Sent campaigns keep
+        A style that templates or draft broadcasts use can't be deleted until they choose another. Sent broadcasts keep
         the look they were sent with.
       </Hint>
       {toast}

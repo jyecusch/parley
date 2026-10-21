@@ -4,7 +4,7 @@ import { CoreLive, implementations as run } from "../src/index.ts"
 import { Fixture } from "./fixture.ts"
 
 describe("segments", () => {
-  it.effect("a dynamic segment follows its filter, and counts who a campaign would reach", () =>
+  it.effect("a dynamic segment follows its filter, and counts who a broadcast would reach", () =>
     Effect.gen(function* () {
       const f = yield* Fixture
       const domain = `seg-${crypto.randomUUID().slice(0, 8)}.example.com`
@@ -55,6 +55,36 @@ describe("segments", () => {
       expect(readOnly).toMatchObject({ _tag: "ApiKeyScopeExcludes", needed: "email:write" })
       const listed = yield* run["segments.list"](f.janeReadOnlyKey, { teamId: f.acme })
       expect(listed.map((entry) => entry.id)).toContain(segment.id)
+    }).pipe(Effect.provide(CoreLive)),
+  )
+
+  it.effect("a segment has an optional description, cleared by empty or null (D141)", () =>
+    Effect.gen(function* () {
+      const f = yield* Fixture
+      const segment = yield* run["segments.create"](f.sam, {
+        teamId: f.acme,
+        name: `Described ${crypto.randomUUID().slice(0, 8)}`,
+        description: "Customers on the annual plan",
+        kind: "fixed",
+      })
+      expect(segment.description).toBe("Customers on the annual plan")
+      const plain = yield* run["segments.create"](f.sam, { teamId: f.acme, name: `Plain ${segment.id}`, kind: "fixed" })
+      expect(plain.description).toBeNull()
+
+      const changed = yield* run["segments.update"](f.sam, {
+        teamId: f.acme,
+        segmentId: segment.id,
+        description: "Annual and monthly",
+      })
+      expect(changed).toMatchObject({ description: "Annual and monthly", name: segment.name })
+      // Renaming leaves it alone; an empty description clears it.
+      expect(
+        (yield* run["segments.update"](f.sam, { teamId: f.acme, segmentId: segment.id, name: `${segment.name}!` }))
+          .description,
+      ).toBe("Annual and monthly")
+      expect(
+        (yield* run["segments.update"](f.sam, { teamId: f.acme, segmentId: segment.id, description: "" })).description,
+      ).toBeNull()
     }).pipe(Effect.provide(CoreLive)),
   )
 

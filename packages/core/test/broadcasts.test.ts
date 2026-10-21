@@ -3,7 +3,7 @@ import { describe, expect, it } from "@effect/vitest"
 import type { TeamId } from "@parley/domain"
 import { Effect } from "effect"
 import {
-  CampaignSender,
+  BroadcastSender,
   CoreLive,
   Mailer,
   type Principal,
@@ -38,7 +38,7 @@ const signed = (body: string) => {
   return new Headers({ "svix-id": id, "svix-timestamp": timestamp, "svix-signature": `v1,${signature}` })
 }
 
-describe("templates and campaigns", () => {
+describe("templates and broadcasts", () => {
   it.effect("drafts from a template, previews with merge tags, and test-sends to members", () =>
     Effect.gen(function* () {
       const f = yield* Fixture
@@ -55,16 +55,16 @@ describe("templates and campaigns", () => {
         lastName: "<Lovelace>",
         emails: [{ address: `ada-${unique()}@example.com` as never }],
       })
-      const campaign = yield* run["campaigns.create"](f.sam, {
+      const broadcast = yield* run["broadcasts.create"](f.sam, {
         teamId: f.acme,
         name: "October update",
         templateId: template.id,
       })
-      expect(campaign).toMatchObject({ status: "draft", subject: template.subject, counts: null })
+      expect(broadcast).toMatchObject({ status: "draft", subject: template.subject, counts: null })
 
-      const preview = yield* run["campaigns.preview"](f.sam, {
+      const preview = yield* run["broadcasts.preview"](f.sam, {
         teamId: f.acme,
-        campaignId: campaign.id,
+        broadcastId: broadcast.id,
         contactId: contact.id,
       })
       expect(preview.subject).toBe("Hi Ada")
@@ -76,12 +76,12 @@ describe("templates and campaigns", () => {
       // Without a sender set up, the footer has placeholders.
       expect(preview.text).toContain("Your legal name")
 
-      const notReady = yield* run["campaigns.testSend"](f.sam, { teamId: f.acme, campaignId: campaign.id }).pipe(
+      const notReady = yield* run["broadcasts.testSend"](f.sam, { teamId: f.acme, broadcastId: broadcast.id }).pipe(
         Effect.flip,
       )
       expect(notReady._tag).toBe("SenderNotReady")
       yield* setUpSending(f.jane, f.acme)
-      const tested = yield* run["campaigns.testSend"](f.sam, { teamId: f.acme, campaignId: campaign.id })
+      const tested = yield* run["broadcasts.testSend"](f.sam, { teamId: f.acme, broadcastId: broadcast.id })
       expect(tested.sentTo).toHaveLength(1)
       const sent = (yield* mailer.outbox).at(-1)
       expect(sent?.subject).toBe("[Test] Hi Sam")
@@ -89,9 +89,9 @@ describe("templates and campaigns", () => {
       expect(sent?.headers?.["List-Unsubscribe-Post"]).toBe("List-Unsubscribe=One-Click")
       expect(sent?.text).toContain("Acme Pty Ltd · 1 Market St, Sydney NSW 2000")
 
-      const outsider = yield* run["campaigns.testSend"](f.jane, {
+      const outsider = yield* run["broadcasts.testSend"](f.jane, {
         teamId: f.acme,
-        campaignId: campaign.id,
+        broadcastId: broadcast.id,
         userIds: [f.bob.userId],
       }).pipe(Effect.flip)
       expect(outsider._tag).toBe("TestRecipientNotMember")
@@ -102,7 +102,7 @@ describe("templates and campaigns", () => {
     Effect.gen(function* () {
       const f = yield* Fixture
       const mailer = yield* Mailer
-      const sender = yield* CampaignSender
+      const sender = yield* BroadcastSender
       yield* setUpSending(f.jane, f.acme)
       const tag = unique()
       const make = (firstName: string, extra: object = {}) =>
@@ -127,40 +127,40 @@ describe("templates and campaigns", () => {
         kind: "dynamic",
         filter: { match: "all", conditions: [{ field: "email", operator: "contains", value: tag }] },
       })
-      const campaign = yield* run["campaigns.create"](f.jane, {
+      const broadcast = yield* run["broadcasts.create"](f.jane, {
         teamId: f.acme,
         name: "Launch",
         segmentId: segment.id,
         topicId: topic.id,
       })
 
-      const incomplete = yield* run["campaigns.send"](f.jane, { teamId: f.acme, campaignId: campaign.id }).pipe(
+      const incomplete = yield* run["broadcasts.send"](f.jane, { teamId: f.acme, broadcastId: broadcast.id }).pipe(
         Effect.flip,
       )
-      expect(incomplete).toMatchObject({ _tag: "CampaignIncomplete", missing: ["subject", "body"] })
-      yield* run["campaigns.update"](f.jane, {
+      expect(incomplete).toMatchObject({ _tag: "BroadcastIncomplete", missing: ["subject", "body"] })
+      yield* run["broadcasts.update"](f.jane, {
         teamId: f.acme,
-        campaignId: campaign.id,
+        broadcastId: broadcast.id,
         subject: "We launched, {{first_name}}",
         body: "It's out.",
       })
-      const memberCant = yield* run["campaigns.send"](f.sam, { teamId: f.acme, campaignId: campaign.id }).pipe(
+      const memberCant = yield* run["broadcasts.send"](f.sam, { teamId: f.acme, broadcastId: broadcast.id }).pipe(
         Effect.flip,
       )
       expect(memberCant).toMatchObject({ _tag: "RoleLacksPermission", needed: "email:send" })
 
-      const sending = yield* run["campaigns.send"](f.jane, { teamId: f.acme, campaignId: campaign.id })
+      const sending = yield* run["broadcasts.send"](f.jane, { teamId: f.acme, broadcastId: broadcast.id })
       expect(sending.status).toBe("sending")
       expect(sending.counts).toMatchObject({ recipients: 3, queued: 1, skipped: 2 })
-      const again = yield* run["campaigns.update"](f.jane, {
+      const again = yield* run["broadcasts.update"](f.jane, {
         teamId: f.acme,
-        campaignId: campaign.id,
+        broadcastId: broadcast.id,
         name: "Too late",
       }).pipe(Effect.flip)
-      expect(again).toMatchObject({ _tag: "CampaignNotDraft", status: "sending" })
+      expect(again).toMatchObject({ _tag: "BroadcastNotDraft", status: "sending" })
 
       yield* sender.drain
-      const done = yield* run["campaigns.get"](f.jane, { teamId: f.acme, campaignId: campaign.id })
+      const done = yield* run["broadcasts.get"](f.jane, { teamId: f.acme, broadcastId: broadcast.id })
       expect(done).toMatchObject({
         status: "sent",
         sentByName: "Jane",
@@ -172,7 +172,7 @@ describe("templates and campaigns", () => {
       expect(email?.subject).toBe("We launched, Ada")
       expect(email?.headers?.["List-Unsubscribe"]).toMatch(/^<.*\/api\/unsubscribe\/.+>$/)
 
-      const recipients = yield* run["campaigns.recipients"](f.jane, { teamId: f.acme, campaignId: campaign.id })
+      const recipients = yield* run["broadcasts.recipients"](f.jane, { teamId: f.acme, broadcastId: broadcast.id })
       expect(recipients.items.map((item) => [item.name, item.status, item.skipReason])).toEqual([
         ["Ada", "sent", null],
         ["Bo", "skipped", "unsubscribed"],
@@ -182,12 +182,12 @@ describe("templates and campaigns", () => {
       expect(activity.at(-1)).toMatchObject({ kind: "emailed", actorName: "Jane", related: { name: "Launch" } })
       void bo
 
-      // The provider reports a bounce: the contact stops getting campaigns.
+      // The provider reports a bounce: the contact stops getting broadcasts.
       const body = JSON.stringify({ type: "email.bounced", data: { email_id: "unknown" } })
       expect(yield* receiveDeliveryEvent(new Headers(), body)).toBe("refused")
       expect(yield* receiveDeliveryEvent(signed(body), body)).toBe("accepted")
 
-      const copy = yield* run["campaigns.duplicate"](f.jane, { teamId: f.acme, campaignId: campaign.id })
+      const copy = yield* run["broadcasts.duplicate"](f.jane, { teamId: f.acme, broadcastId: broadcast.id })
       expect(copy).toMatchObject({ status: "draft", name: "Launch (copy)", subject: "We launched, {{first_name}}" })
     }).pipe(Effect.provide(CoreLive)),
   )
@@ -197,16 +197,18 @@ describe("templates and campaigns", () => {
       const f = yield* Fixture
       yield* setUpSending(f.jane, f.acme)
       const empty = yield* run["segments.create"](f.jane, { teamId: f.acme, name: "Empty", kind: "fixed" })
-      const campaign = yield* run["campaigns.create"](f.jane, {
+      const broadcast = yield* run["broadcasts.create"](f.jane, {
         teamId: f.acme,
         name: "Nobody",
         segmentId: empty.id,
         subject: "Hello",
         body: "Hi",
       })
-      const nobody = yield* run["campaigns.send"](f.jane, { teamId: f.acme, campaignId: campaign.id }).pipe(Effect.flip)
+      const nobody = yield* run["broadcasts.send"](f.jane, { teamId: f.acme, broadcastId: broadcast.id }).pipe(
+        Effect.flip,
+      )
       expect(nobody._tag).toBe("SegmentHasNoRecipients")
-      expect((yield* run["campaigns.get"](f.jane, { teamId: f.acme, campaignId: campaign.id })).status).toBe("draft")
+      expect((yield* run["broadcasts.get"](f.jane, { teamId: f.acme, broadcastId: broadcast.id })).status).toBe("draft")
 
       const contact = yield* run["contacts.create"](f.jane, {
         teamId: f.acme,
@@ -214,16 +216,18 @@ describe("templates and campaigns", () => {
         emails: [{ address: `dee-${unique()}@example.com` as never }],
       })
       yield* run["segments.addContacts"](f.jane, { teamId: f.acme, segmentId: empty.id, contactIds: [contact.id] })
-      yield* run["campaigns.send"](f.jane, { teamId: f.acme, campaignId: campaign.id })
-      const cancelled = yield* run["campaigns.cancel"](f.jane, { teamId: f.acme, campaignId: campaign.id })
+      yield* run["broadcasts.send"](f.jane, { teamId: f.acme, broadcastId: broadcast.id })
+      const cancelled = yield* run["broadcasts.cancel"](f.jane, { teamId: f.acme, broadcastId: broadcast.id })
       expect(cancelled.status).toBe("cancelled")
       expect(cancelled.counts).toMatchObject({ cancelled: 1, sent: 0 })
-      const twice = yield* run["campaigns.cancel"](f.jane, { teamId: f.acme, campaignId: campaign.id }).pipe(
+      const twice = yield* run["broadcasts.cancel"](f.jane, { teamId: f.acme, broadcastId: broadcast.id }).pipe(
         Effect.flip,
       )
-      expect(twice._tag).toBe("CampaignNotSending")
-      const kept = yield* run["campaigns.delete"](f.jane, { teamId: f.acme, campaignId: campaign.id }).pipe(Effect.flip)
-      expect(kept._tag).toBe("CampaignNotDraft")
+      expect(twice._tag).toBe("BroadcastNotSending")
+      const kept = yield* run["broadcasts.delete"](f.jane, { teamId: f.acme, broadcastId: broadcast.id }).pipe(
+        Effect.flip,
+      )
+      expect(kept._tag).toBe("BroadcastNotDraft")
     }).pipe(Effect.provide(CoreLive)),
   )
 })

@@ -24,6 +24,7 @@ import {
   Table,
   TableScroll,
   Td,
+  Textarea,
   Th,
   Tr,
   ViewBody,
@@ -74,8 +75,8 @@ function SegmentsScreen() {
         ) : items.length === 0 ? (
           <Centered>
             <EmptyState icon={<SegmentIcon />} title="No segments yet" actions={newButton}>
-              A segment is who a campaign goes to: either everyone matching a filter, which keeps up as contacts change,
-              or a list you pick by hand.
+              A segment is who a broadcast goes to: either everyone matching a filter, which keeps up as contacts
+              change, or a list you pick by hand.
             </EmptyState>
           </Centered>
         ) : (
@@ -111,7 +112,7 @@ function SegmentsScreen() {
                         params={{ teamId, segmentId: segment.id }}
                       >
                         <ItemTile icon={<SegmentIcon className="size-4" />} />
-                        <NameText>{segment.name}</NameText>
+                        <NameText sub={segment.description ?? undefined}>{segment.name}</NameText>
                       </Link>
                     </Td>
                     <Td className="text-muted">{segment.kind === "dynamic" ? "Dynamic" : "Fixed"}</Td>
@@ -135,13 +136,19 @@ function SegmentsScreen() {
 function NewSegmentDialog(props: { readonly teamId: TeamId; readonly onClose: () => void }) {
   const navigate = useNavigate()
   const [name, setName] = useState("")
+  const [description, setDescription] = useState("")
   const [kind, setKind] = useState<"dynamic" | "fixed">("dynamic")
   const [error, setError] = useState<string>()
   const [busy, setBusy] = useState(false)
   const create = async () => {
     setBusy(true)
     try {
-      const segment = await call("segments.create", { teamId: props.teamId, name: name.trim(), kind })
+      const segment = await call("segments.create", {
+        teamId: props.teamId,
+        name: name.trim(),
+        ...(description.trim() ? { description: description.trim() } : {}),
+        kind,
+      })
       await navigate({ to: "/t/$teamId/segments/$segmentId", params: { teamId: props.teamId, segmentId: segment.id } })
     } catch (failure) {
       setError(messageOf(failure))
@@ -174,6 +181,23 @@ function NewSegmentDialog(props: { readonly teamId: TeamId; readonly onClose: ()
           onKeyDown={(event) => {
             if (event.key === "Enter" && name.trim()) void create()
           }}
+        />
+      </Field>
+      <Field
+        label={
+          <>
+            Description <span className="font-normal text-subtle">(optional)</span>
+          </>
+        }
+        htmlFor="segment-description"
+      >
+        <Textarea
+          id="segment-description"
+          maxLength={500}
+          rows={2}
+          placeholder="Who's in it, and what you send them"
+          value={description}
+          onChange={(event) => setDescription(event.target.value)}
         />
       </Field>
       <Fieldset legend="Kind">

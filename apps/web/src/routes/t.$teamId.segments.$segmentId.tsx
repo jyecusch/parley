@@ -18,6 +18,7 @@ import { CloseIcon, DownloadIcon, PlusIcon, SegmentIcon } from "../components/ic
 import { ContactAvatar } from "../components/images.tsx"
 import { LoadFailed } from "../components/record.tsx"
 import { PlaceholderRow, SpacerRow, useVirtualRows } from "../components/record-index.tsx"
+import { EditableDescription } from "../components/record-profile.tsx"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -281,6 +282,20 @@ function SegmentView(props: {
         ) : null}
       </PageHeader>
 
+      {/* What the segment is for (D141), under its name. */}
+      {segment.description || props.canWrite ? (
+        <div className="shrink-0 border-b border-line px-4 py-2.5">
+          <EditableDescription
+            value={segment.description}
+            disabled={!props.canWrite}
+            maxLength={500}
+            onSave={(description) =>
+              void run(() => call("segments.update", { teamId, segmentId: segment.id, description }))
+            }
+          />
+        </div>
+      ) : null}
+
       <Toolbar>
         {segment.kind === "dynamic" ? (
           props.canWrite ? (
@@ -322,7 +337,7 @@ function SegmentView(props: {
         <span className="mr-2 text-sm text-subtle">
           {total.toLocaleString()} {total === 1 ? "contact" : "contacts"}
           {/* The sendable count is the saved segment's, so it's left out while the filter is changed. */}
-          {dirty ? null : ` · ${segment.sendableCount.toLocaleString()} can be sent campaigns`}
+          {dirty ? null : ` · ${segment.sendableCount.toLocaleString()} can be sent broadcasts`}
         </span>
       </Toolbar>
 

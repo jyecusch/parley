@@ -61,7 +61,7 @@ function Email() {
   return (
     <SettingsPage
       title="Email"
-      intro={`Who ${current.name}'s campaigns come from, the footer every one of them ends with, and the topics people can unsubscribe from.`}
+      intro={`Who ${current.name}'s broadcasts come from, the footer every one of them ends with, and the topics people can unsubscribe from.`}
     >
       {canManage ? null : <Notice icon={<InfoIcon />}>Only admins and owners can change these.</Notice>}
       {settings.isPending ? (
@@ -110,7 +110,7 @@ function Readiness(props: { readonly settings: EmailSettings }) {
   if (missing.length === 0) {
     return (
       <Notice tone="ok" icon={<CheckIcon />}>
-        Ready to send. Campaigns go out from {props.settings.senderAddress}.
+        Ready to send. Broadcasts go out from {props.settings.senderAddress}.
       </Notice>
     )
   }
@@ -158,7 +158,7 @@ function Domains(props: {
         <LoadingRows />
       ) : props.domains.length === 0 ? (
         <Empty icon={<MailIcon />} title="No sending domains yet">
-          Campaigns are sent from your own domain, like news@acme.com, once its DNS records prove it's yours.
+          Broadcasts are sent from your own domain, like news@acme.com, once its DNS records prove it's yours.
         </Empty>
       ) : (
         <Box>
@@ -488,7 +488,8 @@ function SenderForm(props: {
           </p>
         </div>
         <Hint>
-          Anti-spam laws need every campaign to say who sent it and how to unsubscribe, so Parley adds this to each one.
+          Anti-spam laws need every broadcast to say who sent it and how to unsubscribe, so Parley adds this to each
+          one.
         </Hint>
       </div>
       {props.canManage ? (
@@ -531,7 +532,7 @@ function Topics(props: {
   return (
     <>
       <Hint className="-mt-1">
-        A campaign can have a topic, and people can unsubscribe from one topic while still getting the rest.
+        A broadcast can have a topic, and people can unsubscribe from one topic while still getting the rest.
       </Hint>
       {topics.isPending ? (
         <LoadingRows />
@@ -701,7 +702,7 @@ function TopicDialog(props: {
 
 /**
  * The sender address as a name and one of the team's sending domains, so it can't be typed on a
- * domain the team doesn't have. A domain that isn't verified yet can be chosen (campaigns wait for
+ * domain the team doesn't have. A domain that isn't verified yet can be chosen (broadcasts wait for
  * it), and an address saved on a domain since removed is flagged.
  */
 function SenderAddressField(props: {
@@ -762,7 +763,7 @@ function SenderAddressField(props: {
         : undefined
   const hint =
     chosen && chosen.status !== "verified"
-      ? `${chosen.domain} isn't verified yet. Campaigns can be sent once it is.`
+      ? `${chosen.domain} isn't verified yet. Broadcasts can be sent once it is.`
       : neededIfEmpty(name)
 
   return (

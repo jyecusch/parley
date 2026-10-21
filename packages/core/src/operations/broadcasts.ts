@@ -1,28 +1,28 @@
 import {
-  CampaignIncomplete,
+  BroadcastIncomplete,
   type ContactId,
-  type cancelCampaign,
-  type createCampaign,
+  type cancelBroadcast,
+  type createBroadcast,
   type createTemplate,
   type DatabaseUnavailable,
-  type deleteCampaign,
+  type deleteBroadcast,
   type deleteTemplate,
-  type duplicateCampaign,
+  type duplicateBroadcast,
   type EmailStyleId,
-  type getCampaign,
+  type getBroadcast,
   type getTemplate,
-  type listCampaignRecipients,
-  type listCampaigns,
+  type listBroadcastRecipients,
+  type listBroadcasts,
   type listTemplates,
   type OperationInput,
-  type previewCampaign,
+  type previewBroadcast,
   type previewTemplate,
   type SegmentId,
-  type sendCampaign,
+  type sendBroadcast,
   TestRecipientNotMember,
   type TopicId,
-  type testSendCampaign,
-  type updateCampaign,
+  type testSendBroadcast,
+  type updateBroadcast,
   type updateTemplate,
 } from "@parley/domain"
 import { DisplayName } from "@parley/errors"
@@ -30,7 +30,7 @@ import { Duration, Effect } from "effect"
 import { type Footer, type MergeValues, mergeValuesOf, renderEmail, SAMPLE_VALUES } from "../email/render.ts"
 import { Mailer } from "../mail/mailer.ts"
 import type { Principal } from "../principal.ts"
-import { proveCampaignInTeam, proveCampaignIsDraft } from "../proofs/campaign-in-team.ts"
+import { proveBroadcastInTeam, proveBroadcastIsDraft } from "../proofs/broadcast-in-team.ts"
 import { proveContactInTeam } from "../proofs/contact-in-team.ts"
 import { proveStyleChoice } from "../proofs/email-style-in-team.ts"
 import { type MemberOf, proveMemberOf } from "../proofs/member-of.ts"
@@ -44,7 +44,7 @@ import { named } from "../proofs/proof.ts"
 import { proveSegmentInTeam, proveSegmentOfTeam } from "../proofs/segment-in-team.ts"
 import { proveTemplateInTeam, proveTemplateOfTeam } from "../proofs/template-in-team.ts"
 import { proveTopicsInTeam } from "../proofs/topic-in-team.ts"
-import { Campaigns } from "../services/campaigns.ts"
+import { Broadcasts } from "../services/broadcasts.ts"
 import { Contacts } from "../services/contacts.ts"
 import { EmailStyles } from "../services/email-styles.ts"
 import { Members } from "../services/members.ts"
@@ -133,7 +133,7 @@ const valuesFor = <P, T>(member: MemberOf<P, T>, canRead: CanReadRecords<P, T>, 
 
 /**
  * The look to render with: the style given for an unsaved choice (null is the team's default),
- * else the one saved on the template or campaign, else the team's default (D117).
+ * else the one saved on the template or broadcast, else the team's default (D117).
  */
 const lookFor = <P, T>(member: MemberOf<P, T>, given: EmailStyleId | null | undefined, saved: EmailStyleId | null) =>
   Effect.gen(function* () {
@@ -177,24 +177,24 @@ export const previewOneTemplate = (principal: Principal, input: OperationInput<t
     }),
   )
 
-// Campaigns
+// Broadcasts
 
-export const listAllCampaigns = (principal: Principal, input: OperationInput<typeof listCampaigns>) =>
+export const listAllBroadcasts = (principal: Principal, input: OperationInput<typeof listBroadcasts>) =>
   named(principal, input.teamId, (principal, team) =>
     Effect.gen(function* () {
-      const campaigns = yield* Campaigns
+      const broadcasts = yield* Broadcasts
       const member = yield* proveMemberOf(principal, team)
       yield* proveCanReadRecords(member)
-      return yield* campaigns.list(member, input.status)
+      return yield* broadcasts.list(member, input.status)
     }),
   )
 
-export const getOneCampaign = (principal: Principal, input: OperationInput<typeof getCampaign>) =>
-  named(principal, input.teamId, input.campaignId, (principal, team, campaign) =>
+export const getOneBroadcast = (principal: Principal, input: OperationInput<typeof getBroadcast>) =>
+  named(principal, input.teamId, input.broadcastId, (principal, team, broadcast) =>
     Effect.gen(function* () {
       const member = yield* proveMemberOf(principal, team)
       yield* proveCanReadRecords(member)
-      return (yield* proveCampaignInTeam(member, campaign)).found
+      return (yield* proveBroadcastInTeam(member, broadcast)).found
     }),
   )
 
@@ -209,73 +209,73 @@ const proveLinks = <P, T>(
     topic: topicId == null ? Effect.succeed(topicId) : proveTopicsInTeam(member, [topicId]),
   })
 
-export const addCampaign = (principal: Principal, input: OperationInput<typeof createCampaign>) =>
+export const addBroadcast = (principal: Principal, input: OperationInput<typeof createBroadcast>) =>
   named(principal, input.teamId, (principal, team) =>
     Effect.gen(function* () {
-      const campaigns = yield* Campaigns
+      const broadcasts = yield* Broadcasts
       const member = yield* proveMemberOf(principal, team)
       yield* proveCanReadRecords(member)
       const access = yield* proveCanWriteEmail(member)
       const links = yield* proveLinks(member, input.segmentId, input.topicId)
       const template = input.templateId === undefined ? undefined : yield* proveTemplateOfTeam(member, input.templateId)
       const style = yield* proveStyleChoice(member, input.styleId)
-      return yield* campaigns.create(access, { ...input, ...links, template, style })
+      return yield* broadcasts.create(access, { ...input, ...links, template, style })
     }),
   )
 
-export const changeCampaign = (principal: Principal, input: OperationInput<typeof updateCampaign>) =>
-  named(principal, input.teamId, input.campaignId, (principal, team, campaign) =>
+export const changeBroadcast = (principal: Principal, input: OperationInput<typeof updateBroadcast>) =>
+  named(principal, input.teamId, input.broadcastId, (principal, team, broadcast) =>
     Effect.gen(function* () {
-      const campaigns = yield* Campaigns
+      const broadcasts = yield* Broadcasts
       const member = yield* proveMemberOf(principal, team)
       yield* proveCanReadRecords(member)
       const access = yield* proveCanWriteEmail(member)
-      const target = yield* proveCampaignInTeam(member, campaign)
-      const draft = yield* proveCampaignIsDraft(target)
+      const target = yield* proveBroadcastInTeam(member, broadcast)
+      const draft = yield* proveBroadcastIsDraft(target)
       const links = yield* proveLinks(member, input.segmentId, input.topicId)
       const style = yield* proveStyleChoice(member, input.styleId)
-      return yield* campaigns.update(target, draft, { ...input, ...links, style }, access)
+      return yield* broadcasts.update(target, draft, { ...input, ...links, style }, access)
     }),
   )
 
-export const removeCampaign = (principal: Principal, input: OperationInput<typeof deleteCampaign>) =>
-  named(principal, input.teamId, input.campaignId, (principal, team, campaign) =>
+export const removeBroadcast = (principal: Principal, input: OperationInput<typeof deleteBroadcast>) =>
+  named(principal, input.teamId, input.broadcastId, (principal, team, broadcast) =>
     Effect.gen(function* () {
-      const campaigns = yield* Campaigns
+      const broadcasts = yield* Broadcasts
       const member = yield* proveMemberOf(principal, team)
       yield* proveCanReadRecords(member)
       const access = yield* proveCanWriteEmail(member)
-      const target = yield* proveCampaignInTeam(member, campaign)
-      const draft = yield* proveCampaignIsDraft(target)
-      return yield* campaigns.delete(target, draft, access)
+      const target = yield* proveBroadcastInTeam(member, broadcast)
+      const draft = yield* proveBroadcastIsDraft(target)
+      return yield* broadcasts.delete(target, draft, access)
     }),
   )
 
-export const copyCampaign = (principal: Principal, input: OperationInput<typeof duplicateCampaign>) =>
-  named(principal, input.teamId, input.campaignId, (principal, team, campaign) =>
+export const copyBroadcast = (principal: Principal, input: OperationInput<typeof duplicateBroadcast>) =>
+  named(principal, input.teamId, input.broadcastId, (principal, team, broadcast) =>
     Effect.gen(function* () {
-      const campaigns = yield* Campaigns
+      const broadcasts = yield* Broadcasts
       const member = yield* proveMemberOf(principal, team)
       yield* proveCanReadRecords(member)
       const access = yield* proveCanWriteEmail(member)
-      const target = yield* proveCampaignInTeam(member, campaign)
-      return yield* campaigns.duplicate(target, access)
+      const target = yield* proveBroadcastInTeam(member, broadcast)
+      return yield* broadcasts.duplicate(target, access)
     }),
   )
 
-export const previewOneCampaign = (principal: Principal, input: OperationInput<typeof previewCampaign>) =>
-  named(principal, input.teamId, input.campaignId, (principal, team, campaign) =>
+export const previewOneBroadcast = (principal: Principal, input: OperationInput<typeof previewBroadcast>) =>
+  named(principal, input.teamId, input.broadcastId, (principal, team, broadcast) =>
     Effect.gen(function* () {
       const member = yield* proveMemberOf(principal, team)
       const canRead = yield* proveCanReadRecords(member)
-      const target = yield* proveCampaignInTeam(member, campaign)
+      const target = yield* proveBroadcastInTeam(member, broadcast)
       const found = target.found
       const values = yield* valuesFor(member, canRead, input.contactId)
       const footer = yield* previewFooter(member)
-      // A sent campaign shows the look it was sent with, unless another is asked for.
+      // A sent broadcast shows the look it was sent with, unless another is asked for.
       const look =
         found.status !== "draft" && input.styleId === undefined
-          ? yield* (yield* Campaigns).sentStyle(target)
+          ? yield* (yield* Broadcasts).sentStyle(target)
           : yield* lookFor(member, input.styleId, found.styleId)
       return renderEmail(
         {
@@ -290,8 +290,8 @@ export const previewOneCampaign = (principal: Principal, input: OperationInput<t
     }),
   )
 
-export const testSend = (principal: Principal, input: OperationInput<typeof testSendCampaign>) =>
-  named(principal, input.teamId, input.campaignId, (principal, team, campaign) =>
+export const testSend = (principal: Principal, input: OperationInput<typeof testSendBroadcast>) =>
+  named(principal, input.teamId, input.broadcastId, (principal, team, broadcast) =>
     Effect.gen(function* () {
       const members = yield* Members
       const sending = yield* Sending
@@ -300,7 +300,7 @@ export const testSend = (principal: Principal, input: OperationInput<typeof test
       const member = yield* proveMemberOf(principal, team)
       const canRead = yield* proveCanReadRecords(member)
       yield* proveCanWriteEmail(member)
-      const found = (yield* proveCampaignInTeam(member, campaign)).found
+      const found = (yield* proveBroadcastInTeam(member, broadcast)).found
       // Test sends go out on the shared sending reputation, so each team gets a modest allowance.
       yield* (yield* RateLimiter).take(`test-send:${team.value}`, 30, Duration.hours(1))
       // Test sends go to members only (R45), defaulting to whoever asked.
@@ -318,7 +318,7 @@ export const testSend = (principal: Principal, input: OperationInput<typeof test
         teamId: team.value,
         contactId: null,
         topicId: found.topicId,
-        campaignId: found.id,
+        broadcastId: found.id,
         test: true,
       })
       const urls = links.urls(token)
@@ -349,17 +349,17 @@ export const testSend = (principal: Principal, input: OperationInput<typeof test
     }),
   )
 
-export const send = (principal: Principal, input: OperationInput<typeof sendCampaign>) =>
-  named(principal, input.teamId, input.campaignId, (principal, team, campaign) =>
+export const send = (principal: Principal, input: OperationInput<typeof sendBroadcast>) =>
+  named(principal, input.teamId, input.broadcastId, (principal, team, broadcast) =>
     Effect.gen(function* () {
-      const campaigns = yield* Campaigns
+      const broadcasts = yield* Broadcasts
       const segments = yield* Segments
       const sending = yield* Sending
       const member = yield* proveMemberOf(principal, team)
       yield* proveCanReadRecords(member)
       const access = yield* proveCanSendEmail(member)
-      const target = yield* proveCampaignInTeam(member, campaign)
-      const draft = yield* proveCampaignIsDraft(target)
+      const target = yield* proveBroadcastInTeam(member, broadcast)
+      const draft = yield* proveBroadcastIsDraft(target)
       const found = target.found
       const missing = [
         ...(found.subject.trim() ? [] : (["subject"] as const)),
@@ -367,7 +367,7 @@ export const send = (principal: Principal, input: OperationInput<typeof sendCamp
         ...(found.segmentId ? [] : (["segment"] as const)),
       ]
       if (missing.length > 0 || !found.segmentId) {
-        return yield* new CampaignIncomplete({ campaign: DisplayName.fromRecord(found.name), missing })
+        return yield* new BroadcastIncomplete({ broadcast: DisplayName.fromRecord(found.name), missing })
       }
       const sender = yield* sending.sender(member)
       // The look is copied with the sender, so editing the style later doesn't change what went out.
@@ -376,31 +376,31 @@ export const send = (principal: Principal, input: OperationInput<typeof sendCamp
         Effect.gen(function* () {
           const segment = yield* proveSegmentInTeam(member, segmentId)
           const scope = yield* segments.scope(segment)
-          return yield* campaigns.queue(target, draft, segment, scope, { ...sender, style }, access)
+          return yield* broadcasts.queue(target, draft, segment, scope, { ...sender, style }, access)
         }),
       )
     }),
   )
 
-export const cancel = (principal: Principal, input: OperationInput<typeof cancelCampaign>) =>
-  named(principal, input.teamId, input.campaignId, (principal, team, campaign) =>
+export const cancel = (principal: Principal, input: OperationInput<typeof cancelBroadcast>) =>
+  named(principal, input.teamId, input.broadcastId, (principal, team, broadcast) =>
     Effect.gen(function* () {
-      const campaigns = yield* Campaigns
+      const broadcasts = yield* Broadcasts
       const member = yield* proveMemberOf(principal, team)
       yield* proveCanReadRecords(member)
       const access = yield* proveCanSendEmail(member)
-      const target = yield* proveCampaignInTeam(member, campaign)
-      return yield* campaigns.cancel(target, access)
+      const target = yield* proveBroadcastInTeam(member, broadcast)
+      return yield* broadcasts.cancel(target, access)
     }),
   )
 
-export const recipients = (principal: Principal, input: OperationInput<typeof listCampaignRecipients>) =>
-  named(principal, input.teamId, input.campaignId, (principal, team, campaign) =>
+export const recipients = (principal: Principal, input: OperationInput<typeof listBroadcastRecipients>) =>
+  named(principal, input.teamId, input.broadcastId, (principal, team, broadcast) =>
     Effect.gen(function* () {
-      const campaigns = yield* Campaigns
+      const broadcasts = yield* Broadcasts
       const member = yield* proveMemberOf(principal, team)
       yield* proveCanReadRecords(member)
-      const target = yield* proveCampaignInTeam(member, campaign)
-      return yield* campaigns.recipients(target, input)
+      const target = yield* proveBroadcastInTeam(member, broadcast)
+      return yield* broadcasts.recipients(target, input)
     }),
   )

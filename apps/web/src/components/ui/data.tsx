@@ -120,7 +120,7 @@ export function Avatar({
   )
 }
 
-/** A number with its label, as in a campaign's report. Pressable to filter by it. */
+/** A number with its label, as in a broadcast's report. Pressable to filter by it. */
 export function StatTile({
   value,
   label,

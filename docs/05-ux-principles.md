@@ -30,13 +30,13 @@ Parley has very few view types, which is a gift. Let's name them and design them
 
 | View type | v1 examples | v2 examples |
 | --- | --- | --- |
-| **Index view** (many records of one type) | Contacts, Companies | Campaigns, templates, and dynamic and fixed segments |
-| **Record view** (one record, its fields and activity) | A contact, a company | A campaign, a template |
-| **Panel** (a record peeked from an index view, without leaving it) | Contact peek from the Contacts index view | Recipient peek from a campaign report |
+| **Index view** (many records of one type) | Contacts, Companies | Broadcasts, templates, and dynamic and fixed segments |
+| **Record view** (one record, its fields and activity) | A contact, a company | A broadcast, a template |
+| **Panel** (a record peeked from an index view, without leaving it) | Contact peek from the Contacts index view | Recipient peek from a broadcast report |
 | **Composer** (making something new that's bigger than a form) | (n/a) | Email editor, filter builder for a dynamic segment |
 | **Settings** | Team, members, service accounts, API keys | Sending domains, footer, unsubscribe screen |
 
-Every index view gets the same header (title, filters, display options, primary action) in the same places. Every record has the same anatomy: identity at the top, properties in a consistent order, activity below. Every panel is a record view at a narrower width, not a separate design. If you learn Contacts, you already know Campaigns.
+Every index view gets the same header (title, filters, display options, primary action) in the same places. Every record has the same anatomy: identity at the top, properties in a consistent order, activity below. Every panel is a record view at a narrower width, not a separate design. If you learn Contacts, you already know Broadcasts.
 
 Two of these are decided. **Index views are tables** (D54): dense, sortable columns, custom fields as columns, inline editing, and filters above. **Opening a record from an index view opens a panel** (D55): you keep your place in the table, `J`/`K` move between records, and expanding the panel opens the full record view at its own URL.
 
@@ -52,9 +52,9 @@ The rule we'll hold ourselves to: **a new screen is an instance of an existing v
 
 So we design v1's frame with v2 sketched in:
 
-- **The sidebar has sections, not a flat list.** v1 ships with *Records* (Contacts, Companies). v2 adds an email section (campaigns, templates, segments). We draw the v2 section in the design asset, even though it won't ship, to prove the sidebar holds it gracefully.
+- **The sidebar has sections, not a flat list.** v1 ships with *Records* (Contacts, Companies). v2 adds an email section (broadcasts, templates, segments). We draw the v2 section in the design asset, even though it won't ship, to prove the sidebar holds it gracefully.
 - **Filters are a first-class, reusable component from day one.** In v1 they filter a contacts table. In v2, *the exact same filter* defines a dynamic segment ("save these filters"). If we design v1 filters as a throwaway search bar, we pay for it later.
-- **Activity is designed to grow from day one.** In v1 it shows edits ("Jane changed email"). In v2 it shows "Received *October update* campaign", "Opened", "Unsubscribed from Marketing". The record view is designed so activity can grow without anyone rearranging the page.
+- **Activity is designed to grow from day one.** In v1 it shows edits ("Jane changed email"). In v2 it shows "Received *October update* broadcast", "Opened", "Unsubscribed from Marketing". The record view is designed so activity can grow without anyone rearranging the page.
 - **Subscription status is a property in v1,** even if nothing sends mail yet. It's a fact about a contact. Putting it in its proper place now means v2 doesn't have to invent a new place for it.
 
 We're not building v2 early. We're making sure v1 doesn't *assume v2 won't happen*.
@@ -178,7 +178,7 @@ Which typeface we use is still open: the first design asset will show two or thr
 
 - **Every feature has to earn its place in the chrome.** A capability that agents can reach through the API doesn't automatically deserve a sidebar item.
 - **"Not yet" is a complete answer.** Deals, pipelines, tasks, custom objects and reporting dashboards are all things we're consciously *not* building, until the core is excellent.
-- **Speed is the feature users will notice first.** The web app keeps the records on screen in TanStack Query's cache, loaded a page at a time (D136). Edits apply instantly and reconcile in the background, so **no spinners for local actions.** Renaming a contact doesn't show a loading state. It just happens. Spinners are for things that are really remote and really slow, such as an import or sending a campaign, and those get real progress, not a spinner.
+- **Speed is the feature users will notice first.** The web app keeps the records on screen in TanStack Query's cache, loaded a page at a time (D136). Edits apply instantly and reconcile in the background, so **no spinners for local actions.** Renaming a contact doesn't show a loading state. It just happens. Spinners are for things that are really remote and really slow, such as an import or sending a broadcast, and those get real progress, not a spinner.
 - **Navigation is instant.** Moving between Contacts and Companies renders from local data first and refreshes quietly.
 
 ---

@@ -86,17 +86,17 @@ export class DeliveryEvents extends Context.Service<
             db.query((d) =>
               d
                 .select({
-                  id: schema.campaignRecipients.id,
-                  teamId: schema.campaignRecipients.teamId,
-                  contactId: schema.campaignRecipients.contactId,
-                  name: schema.campaignRecipients.name,
-                  status: schema.campaignRecipients.status,
-                  campaignId: schema.campaigns.id,
-                  campaignName: schema.campaigns.name,
+                  id: schema.broadcastRecipients.id,
+                  teamId: schema.broadcastRecipients.teamId,
+                  contactId: schema.broadcastRecipients.contactId,
+                  name: schema.broadcastRecipients.name,
+                  status: schema.broadcastRecipients.status,
+                  broadcastId: schema.broadcasts.id,
+                  broadcastName: schema.broadcasts.name,
                 })
-                .from(schema.campaignRecipients)
-                .innerJoin(schema.campaigns, eq(schema.campaigns.id, schema.campaignRecipients.campaignId))
-                .where(eq(schema.campaignRecipients.providerId, event.providerId)),
+                .from(schema.broadcastRecipients)
+                .innerJoin(schema.broadcasts, eq(schema.broadcasts.id, schema.broadcastRecipients.broadcastId))
+                .where(eq(schema.broadcastRecipients.providerId, event.providerId)),
             ),
           )
           if (!recipient) return
@@ -105,10 +105,10 @@ export class DeliveryEvents extends Context.Service<
             yield* run(
               db.query((d) =>
                 d
-                  .update(schema.campaignRecipients)
+                  .update(schema.broadcastRecipients)
                   .set({ status: "delivered", updatedAt: sql`now()` })
                   .where(
-                    and(eq(schema.campaignRecipients.id, recipient.id), eq(schema.campaignRecipients.status, "sent")),
+                    and(eq(schema.broadcastRecipients.id, recipient.id), eq(schema.broadcastRecipients.status, "sent")),
                   ),
               ),
             )
@@ -120,9 +120,9 @@ export class DeliveryEvents extends Context.Service<
               Effect.gen(function* () {
                 yield* db.query((d) =>
                   d
-                    .update(schema.campaignRecipients)
+                    .update(schema.broadcastRecipients)
                     .set({ status: kind, updatedAt: sql`now()` })
-                    .where(eq(schema.campaignRecipients.id, recipient.id)),
+                    .where(eq(schema.broadcastRecipients.id, recipient.id)),
                 )
                 if (!recipient.contactId) return
                 const contactId = recipient.contactId
@@ -145,9 +145,9 @@ export class DeliveryEvents extends Context.Service<
                     recordId: contactId,
                     kind: kind,
                     changedFields: [],
-                    relatedRecordType: "campaign",
-                    relatedRecordId: recipient.campaignId,
-                    relatedName: recipient.campaignName,
+                    relatedRecordType: "broadcast",
+                    relatedRecordId: recipient.broadcastId,
+                    relatedName: recipient.broadcastName,
                     // A bounce is the mail system's doing; a spam report is the recipient's.
                     actorUserId: null,
                     actorName: kind === "bounced" ? "Parley" : recipient.name,

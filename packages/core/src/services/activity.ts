@@ -4,7 +4,7 @@ import { attribution, type Principal } from "../principal.ts"
 
 /** The other record an affiliation change was about, named as it was at the time. */
 export interface RelatedRecord {
-  readonly recordType: RecordType | "campaign"
+  readonly recordType: RecordType | "broadcast"
   readonly id: string
   readonly name: string
 }

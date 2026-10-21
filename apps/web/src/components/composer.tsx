@@ -9,7 +9,7 @@ import { Button as PlainButton } from "./ui/button.tsx"
 import { cn, ErrorText, FieldLabel, Hint, IconButton, Input, Notice, Spacer, Textarea } from "./ui/index.ts"
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "./ui/resizable.tsx"
 
-/** Subject, preview text and body: what a template and a campaign both hold (R41). */
+/** Subject, preview text and body: what a template and a broadcast both hold (R41). */
 export interface Content {
   readonly subject: string
   readonly previewText: string
@@ -76,7 +76,7 @@ export function Composer(props: {
   readonly onChange: (change: Partial<Content>) => void
   readonly readOnly: boolean
   readonly preview: (content: Content) => Promise<RenderedEmail>
-  /** Fields above the content, such as a campaign's segment and topic. */
+  /** Fields above the content, such as a broadcast's segment and topic. */
   readonly settings?: ReactNode
   /** Above the preview, such as "Preview as". */
   readonly previewBar?: ReactNode

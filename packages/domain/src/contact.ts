@@ -129,7 +129,7 @@ export const ActivityEntry = Schema.Struct({
   actorName: Schema.String,
   /** The API key's or connection's name when the change came through one ("Claude on my laptop"). */
   via: Schema.NullOr(Schema.String),
-  /** "emailed" names the campaign in `related`. "affiliated" and "unaffiliated" name the other record in `related`; a title change is "updated" with `related`. */
+  /** "emailed" names the broadcast in `related`. "affiliated" and "unaffiliated" name the other record in `related`; a title change is "updated" with `related`. */
   kind: Schema.Literals([
     "created",
     "updated",
@@ -147,7 +147,7 @@ export const ActivityEntry = Schema.Struct({
   /** The other record an affiliation change was about, by its name at the time. */
   related: Schema.NullOr(
     Schema.Struct({
-      recordType: Schema.Union([RecordType, Schema.Literal("campaign")]),
+      recordType: Schema.Union([RecordType, Schema.Literal("broadcast")]),
       id: Schema.String,
       name: Schema.String,
     }),

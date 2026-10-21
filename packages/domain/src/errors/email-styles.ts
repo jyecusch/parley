@@ -21,22 +21,22 @@ export class EmailStyleNotFound
   }
 }
 
-/** Templates or draft campaigns still use the style, so deleting it would change how they look. */
+/** Templates or draft broadcasts still use the style, so deleting it would change how they look. */
 export class EmailStyleInUse
   extends Schema.TaggedError<EmailStyleInUse>()("EmailStyleInUse", {
     style: DisplayName.schema,
     templates: Schema.Number,
-    campaigns: Schema.Number,
+    broadcasts: Schema.Number,
   })
   implements DomainError
 {
   readonly isRetryable = false
   override readonly [ErrorReporter.severity] = "Info" as const
   override get message() {
-    return `email style in use by ${this.templates} templates and ${this.campaigns} campaigns`
+    return `email style in use by ${this.templates} templates and ${this.broadcasts} broadcasts`
   }
   get userMessage() {
-    return userText`${this.style} is still used by ${this.templates} templates and ${this.campaigns} draft campaigns. Choose another style for them first.`
+    return userText`${this.style} is still used by ${this.templates} templates and ${this.broadcasts} draft broadcasts. Choose another style for them first.`
   }
 }
 

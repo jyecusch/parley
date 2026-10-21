@@ -92,7 +92,7 @@ One consequence: write messages so they still make sense **without the screen ar
 | `DatabaseUnavailable` | Something went wrong. | We couldn't save this contact because of a problem on our end. Your changes are still here. Try again in a minute. |
 | `ApiKeyRevoked` | Invalid API key. | This API key was revoked, so Parley can't accept requests from it. Whoever created it can create a new one in Settings → API keys. |
 | `RequestsTooFrequent` | 429 Too Many Requests. | Too many requests from this API key in a short time. Try again in 30 seconds. |
-| `SendingDomainNotVerified` *(v2)* | Send failed: domain not verified. | This campaign wasn't sent because Acme hasn't verified a sending domain yet. Your draft is saved. A team admin can verify one in Settings → Email. |
+| `SendingDomainNotVerified` *(v2)* | Send failed: domain not verified. | This broadcast wasn't sent because Acme hasn't verified a sending domain yet. Your draft is saved. A team admin can verify one in Settings → Email. |
 
 Notice that `RoleLacksPermission` and `ApiKeyScopeExcludes` are **two classes**, not one `PermissionMissing` with a `reason` field. They need different fixes from different users: one needs an admin to change a role, the other needs the API key's creator to create a new API key. Different fix, different class. That rule comes from [01](./01-errors-are-data.md), and this table is why it matters.
 

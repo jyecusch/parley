@@ -53,7 +53,7 @@ const PLAIN_NAME = "Plain"
 
 /**
  * Email styles (D116): how a team's emails look. Every team has at least one, and exactly one is
- * its default, which templates and campaigns without a style of their own use (D117). Process tier.
+ * its default, which templates and broadcasts without a style of their own use (D117). Process tier.
  */
 export class EmailStyles extends Context.Service<
   EmailStyles,
@@ -107,7 +107,7 @@ export class EmailStyles extends Context.Service<
         customHtml: row.customHtml,
       })
 
-      const toStyle = (row: Row, usedBy: { templates: number; campaigns: number }): EmailStyle => ({
+      const toStyle = (row: Row, usedBy: { templates: number; broadcasts: number }): EmailStyle => ({
         id: row.id as EmailStyleId,
         name: row.name,
         isDefault: row.isDefault,
@@ -132,12 +132,12 @@ export class EmailStyles extends Context.Service<
           ),
         ).pipe(Effect.asVoid)
 
-      /** How many templates and draft campaigns name each style. Sent campaigns keep their own copy. */
+      /** How many templates and draft broadcasts name each style. Sent broadcasts keep their own copy. */
       const usageOf = (ids: ReadonlyArray<string>) =>
         ids.length === 0
-          ? Effect.succeed(new Map<string, { templates: number; campaigns: number }>())
+          ? Effect.succeed(new Map<string, { templates: number; broadcasts: number }>())
           : Effect.gen(function* () {
-              const [templates, campaigns] = yield* Effect.all([
+              const [templates, broadcasts] = yield* Effect.all([
                 run(
                   db.query((d) =>
                     d
@@ -150,21 +150,21 @@ export class EmailStyles extends Context.Service<
                 run(
                   db.query((d) =>
                     d
-                      .select({ styleId: schema.campaigns.styleId, count: count() })
-                      .from(schema.campaigns)
-                      .where(and(inArray(schema.campaigns.styleId, [...ids]), eq(schema.campaigns.status, "draft")))
-                      .groupBy(schema.campaigns.styleId),
+                      .select({ styleId: schema.broadcasts.styleId, count: count() })
+                      .from(schema.broadcasts)
+                      .where(and(inArray(schema.broadcasts.styleId, [...ids]), eq(schema.broadcasts.status, "draft")))
+                      .groupBy(schema.broadcasts.styleId),
                   ),
                 ),
               ])
-              const usage = new Map(ids.map((id) => [id, { templates: 0, campaigns: 0 }]))
+              const usage = new Map(ids.map((id) => [id, { templates: 0, broadcasts: 0 }]))
               for (const row of templates) {
                 const entry = row.styleId ? usage.get(row.styleId) : undefined
                 if (entry) entry.templates = Number(row.count)
               }
-              for (const row of campaigns) {
+              for (const row of broadcasts) {
                 const entry = row.styleId ? usage.get(row.styleId) : undefined
-                if (entry) entry.campaigns = Number(row.count)
+                if (entry) entry.broadcasts = Number(row.count)
               }
               return usage
             })
@@ -184,7 +184,7 @@ export class EmailStyles extends Context.Service<
           const row = yield* rowOf(teamId, id)
           if (!row) return undefined
           const usage = yield* usageOf([row.id])
-          return toStyle(row, usage.get(row.id) ?? { templates: 0, campaigns: 0 })
+          return toStyle(row, usage.get(row.id) ?? { templates: 0, broadcasts: 0 })
         })
 
       const one = (teamId: string, id: string) =>
@@ -214,7 +214,7 @@ export class EmailStyles extends Context.Service<
             ),
           )
           const usage = yield* usageOf(rows.map((row) => row.id))
-          return rows.map((row) => toStyle(row, usage.get(row.id) ?? { templates: 0, campaigns: 0 }))
+          return rows.map((row) => toStyle(row, usage.get(row.id) ?? { templates: 0, broadcasts: 0 }))
         })
 
       const create = <P, T>(access: CanManageEmail<P, T>, input: StyleInput & { readonly name: string }) =>
@@ -309,7 +309,7 @@ export class EmailStyles extends Context.Service<
           const found = target.found
           const style = DisplayName.fromRecord(found.name)
           if (found.isDefault) return yield* new EmailStyleIsDefault({ style })
-          if (found.usedBy.templates > 0 || found.usedBy.campaigns > 0) {
+          if (found.usedBy.templates > 0 || found.usedBy.broadcasts > 0) {
             return yield* new EmailStyleInUse({ style, ...found.usedBy })
           }
           yield* run(

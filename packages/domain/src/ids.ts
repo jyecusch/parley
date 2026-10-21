@@ -45,8 +45,8 @@ export type SegmentId = typeof SegmentId.Type
 export const TemplateId = Schema.String.pipe(Schema.brand("TemplateId"))
 export type TemplateId = typeof TemplateId.Type
 
-export const CampaignId = Schema.String.pipe(Schema.brand("CampaignId"))
-export type CampaignId = typeof CampaignId.Type
+export const BroadcastId = Schema.String.pipe(Schema.brand("BroadcastId"))
+export type BroadcastId = typeof BroadcastId.Type
 
 export const SendingDomainId = Schema.String.pipe(Schema.brand("SendingDomainId"))
 export type SendingDomainId = typeof SendingDomainId.Type

@@ -1,10 +1,10 @@
 import { Database, schema } from "@parley/db"
 import {
-  type Campaign,
-  type CampaignCounts,
-  type CampaignId,
-  CampaignNotSending,
-  type CampaignStatus,
+  type Broadcast,
+  type BroadcastCounts,
+  type BroadcastId,
+  BroadcastNotSending,
+  type BroadcastStatus,
   type DatabaseUnavailable,
   type EmailStyleId,
   type Recipient,
@@ -21,7 +21,7 @@ import { and, desc, eq, inArray, sql } from "drizzle-orm"
 import { Context, Effect, Layer } from "effect"
 import type { SqlError } from "effect/sql"
 import { PLAIN_STYLE, type RenderStyle } from "../email/render.ts"
-import type { CampaignInTeam, CampaignIsDraft } from "../proofs/campaign-in-team.ts"
+import type { BroadcastInTeam, BroadcastIsDraft } from "../proofs/broadcast-in-team.ts"
 import type { CanSendEmail, CanWriteEmail, MemberOf } from "../proofs/permissions.ts"
 import type { SegmentInTeam, SegmentOfTeam } from "../proofs/segment-in-team.ts"
 import type { TemplateOfTeam } from "../proofs/template-in-team.ts"
@@ -31,13 +31,13 @@ import type { Sender } from "./sending.ts"
 import { classifySqlError } from "./sql-errors.ts"
 import { type ContentInput, type StyleChoice, styleColumnOf } from "./templates.ts"
 
-type Row = typeof schema.campaigns.$inferSelect
+type Row = typeof schema.broadcasts.$inferSelect
 
 /** Rows from a raw query, however the driver shapes the result. */
 const rowsOf = <A>(result: unknown): ReadonlyArray<A> =>
   Array.isArray(result) ? (result as ReadonlyArray<A>) : ((result as { readonly rows?: ReadonlyArray<A> }).rows ?? [])
 
-const ZERO: CampaignCounts = {
+const ZERO: BroadcastCounts = {
   recipients: 0,
   queued: 0,
   sent: 0,
@@ -51,21 +51,21 @@ const ZERO: CampaignCounts = {
 }
 
 /**
- * What a campaign was sent as, copied when sending starts (R42): the sender, footer and email
- * style. Campaigns sent before email styles have no style and render plain.
+ * What a broadcast was sent as, copied when sending starts (R42): the sender, footer and email
+ * style. Broadcasts sent before email styles have no style and render plain.
  */
 export interface SentAs extends Sender {
   readonly style?: RenderStyle | undefined
 }
 
-/** The look a sent campaign was sent with. */
+/** The look a sent broadcast was sent with. */
 export const styleSentWith = (sentAs: unknown): RenderStyle => ({
   ...PLAIN_STYLE,
   // Older snapshots predate settings added since (such as footerAlign); the plain look fills them in.
   ...(sentAs as SentAs | null | undefined)?.style,
 })
 
-const COUNT_KEY: Readonly<Record<RecipientStatus, keyof CampaignCounts>> = {
+const COUNT_KEY: Readonly<Record<RecipientStatus, keyof BroadcastCounts>> = {
   queued: "queued",
   sent: "sent",
   delivered: "delivered",
@@ -80,62 +80,62 @@ const COUNT_KEY: Readonly<Record<RecipientStatus, keyof CampaignCounts>> = {
 export interface DraftChanges<T> extends ContentInput, StyleChoice<T> {
   readonly name?: string | undefined
   readonly segment?: SegmentOfTeam<T> | null | undefined
-  /** At most one topic: a campaign has one or none. */
+  /** At most one topic: a broadcast has one or none. */
   readonly topic?: TopicsInTeam<T> | null | undefined
 }
 
 /**
- * Campaigns (R42): drafts, and the record of what was sent. Process tier; the team comes with each
- * call. Sending itself is CampaignSender's: this service only queues the recipients.
+ * Broadcasts (R42): drafts, and the record of what was sent. Process tier; the team comes with each
+ * call. Sending itself is BroadcastSender's: this service only queues the recipients.
  */
-export class Campaigns extends Context.Service<
-  Campaigns,
+export class Broadcasts extends Context.Service<
+  Broadcasts,
   {
     readonly list: <P, T>(
       member: MemberOf<P, T>,
-      status: CampaignStatus | undefined,
-    ) => Effect.Effect<ReadonlyArray<Campaign>, DatabaseUnavailable>
-    /** Used only by the CampaignInTeam prover. */
-    readonly locate: (teamId: TeamId, id: CampaignId) => Effect.Effect<Campaign | undefined, DatabaseUnavailable>
+      status: BroadcastStatus | undefined,
+    ) => Effect.Effect<ReadonlyArray<Broadcast>, DatabaseUnavailable>
+    /** Used only by the BroadcastInTeam prover. */
+    readonly locate: (teamId: TeamId, id: BroadcastId) => Effect.Effect<Broadcast | undefined, DatabaseUnavailable>
     readonly create: <P, T>(
       access: CanWriteEmail<P, T>,
       input: DraftChanges<T> & { readonly name: string; readonly template?: TemplateOfTeam<T> | undefined },
-    ) => Effect.Effect<Campaign, DatabaseUnavailable>
+    ) => Effect.Effect<Broadcast, DatabaseUnavailable>
     readonly update: <P, T, C>(
-      target: CampaignInTeam<C, T>,
-      draft: CampaignIsDraft<C>,
+      target: BroadcastInTeam<C, T>,
+      draft: BroadcastIsDraft<C>,
       input: DraftChanges<T>,
       access: CanWriteEmail<P, T>,
-    ) => Effect.Effect<Campaign, DatabaseUnavailable>
+    ) => Effect.Effect<Broadcast, DatabaseUnavailable>
     readonly delete: <P, T, C>(
-      target: CampaignInTeam<C, T>,
-      draft: CampaignIsDraft<C>,
+      target: BroadcastInTeam<C, T>,
+      draft: BroadcastIsDraft<C>,
       access: CanWriteEmail<P, T>,
-    ) => Effect.Effect<Campaign, DatabaseUnavailable>
+    ) => Effect.Effect<Broadcast, DatabaseUnavailable>
     readonly duplicate: <P, T, C>(
-      target: CampaignInTeam<C, T>,
+      target: BroadcastInTeam<C, T>,
       access: CanWriteEmail<P, T>,
-    ) => Effect.Effect<Campaign, DatabaseUnavailable>
+    ) => Effect.Effect<Broadcast, DatabaseUnavailable>
     /**
      * Fixes the recipients and starts sending (R42): the segment's contacts now, each queued or
-     * skipped with the reason. The sender and footer are copied onto the campaign.
+     * skipped with the reason. The sender and footer are copied onto the broadcast.
      */
     readonly queue: <P, T, C, S>(
-      target: CampaignInTeam<C, T>,
-      draft: CampaignIsDraft<C>,
+      target: BroadcastInTeam<C, T>,
+      draft: BroadcastIsDraft<C>,
       segment: SegmentInTeam<S, T>,
       scope: ContactScope,
       sentAs: SentAs,
       access: CanSendEmail<P, T>,
-    ) => Effect.Effect<Campaign, SegmentHasNoRecipients | DatabaseUnavailable>
-    /** The look a campaign that's no longer a draft was sent with. */
-    readonly sentStyle: <C, T>(target: CampaignInTeam<C, T>) => Effect.Effect<RenderStyle, DatabaseUnavailable>
+    ) => Effect.Effect<Broadcast, SegmentHasNoRecipients | DatabaseUnavailable>
+    /** The look a broadcast that's no longer a draft was sent with. */
+    readonly sentStyle: <C, T>(target: BroadcastInTeam<C, T>) => Effect.Effect<RenderStyle, DatabaseUnavailable>
     readonly cancel: <P, T, C>(
-      target: CampaignInTeam<C, T>,
+      target: BroadcastInTeam<C, T>,
       access: CanSendEmail<P, T>,
-    ) => Effect.Effect<Campaign, CampaignNotSending | DatabaseUnavailable>
+    ) => Effect.Effect<Broadcast, BroadcastNotSending | DatabaseUnavailable>
     readonly recipients: <C, T>(
-      target: CampaignInTeam<C, T>,
+      target: BroadcastInTeam<C, T>,
       query: {
         readonly status?: RecipientStatus | undefined
         readonly unsubscribed?: boolean | undefined
@@ -147,17 +147,17 @@ export class Campaigns extends Context.Service<
       DatabaseUnavailable
     >
   }
->()("@parley/core/Campaigns") {
+>()("@parley/core/Broadcasts") {
   static readonly layer = Layer.effect(
-    Campaigns,
+    Broadcasts,
     Effect.gen(function* () {
       const db = yield* Database
       const run = <A>(effect: Effect.Effect<A, SqlError.SqlError>) =>
         effect.pipe(Effect.catchTag("SqlError", classifySqlError))
 
       /**
-       * Who unsubscribed through each campaign's link (D119), by contact: "everything" when they
-       * left all marketing email, "topic" when they left only the campaign's topic.
+       * Who unsubscribed through each broadcast's link (D119), by contact: "everything" when they
+       * left all marketing email, "topic" when they left only the broadcast's topic.
        */
       const unsubscribesOf = (ids: ReadonlyArray<string>) =>
         ids.length === 0
@@ -166,7 +166,7 @@ export class Campaigns extends Context.Service<
               db.query((d) =>
                 d
                   .select({
-                    campaignId: schema.activity.relatedRecordId,
+                    broadcastId: schema.activity.relatedRecordId,
                     contactId: schema.activity.recordId,
                     everything: sql<boolean>`bool_or(${schema.activity.topicName} is null)`,
                   })
@@ -174,7 +174,7 @@ export class Campaigns extends Context.Service<
                   .where(
                     and(
                       eq(schema.activity.kind, "unsubscribed"),
-                      eq(schema.activity.relatedRecordType, "campaign"),
+                      eq(schema.activity.relatedRecordType, "broadcast"),
                       inArray(schema.activity.relatedRecordId, [...ids]),
                     ),
                   )
@@ -182,58 +182,61 @@ export class Campaigns extends Context.Service<
               ),
             ).pipe(
               Effect.map((rows) => {
-                const byCampaign = new Map<string, Map<string, "everything" | "topic">>()
+                const byBroadcast = new Map<string, Map<string, "everything" | "topic">>()
                 for (const row of rows) {
-                  if (!row.campaignId) continue
-                  const contacts = byCampaign.get(row.campaignId) ?? new Map<string, "everything" | "topic">()
+                  if (!row.broadcastId) continue
+                  const contacts = byBroadcast.get(row.broadcastId) ?? new Map<string, "everything" | "topic">()
                   contacts.set(row.contactId, row.everything ? "everything" : "topic")
-                  byCampaign.set(row.campaignId, contacts)
+                  byBroadcast.set(row.broadcastId, contacts)
                 }
-                return byCampaign
+                return byBroadcast
               }),
             )
 
       const countsOf = (ids: ReadonlyArray<string>) =>
         ids.length === 0
-          ? Effect.succeed(new Map<string, CampaignCounts>())
+          ? Effect.succeed(new Map<string, BroadcastCounts>())
           : run(
               db.query((d) =>
                 d
                   .select({
-                    campaignId: schema.campaignRecipients.campaignId,
-                    status: schema.campaignRecipients.status,
+                    broadcastId: schema.broadcastRecipients.broadcastId,
+                    status: schema.broadcastRecipients.status,
                     count: sql<number>`count(*)::int`,
                   })
-                  .from(schema.campaignRecipients)
-                  .where(inArray(schema.campaignRecipients.campaignId, [...ids]))
-                  .groupBy(schema.campaignRecipients.campaignId, schema.campaignRecipients.status),
+                  .from(schema.broadcastRecipients)
+                  .where(inArray(schema.broadcastRecipients.broadcastId, [...ids]))
+                  .groupBy(schema.broadcastRecipients.broadcastId, schema.broadcastRecipients.status),
               ),
             ).pipe(
               Effect.map((rows) => {
-                const byCampaign = new Map<string, CampaignCounts>()
+                const byBroadcast = new Map<string, BroadcastCounts>()
                 for (const row of rows) {
-                  const current = byCampaign.get(row.campaignId) ?? ZERO
+                  const current = byBroadcast.get(row.broadcastId) ?? ZERO
                   const count = Number(row.count)
-                  byCampaign.set(row.campaignId, {
+                  byBroadcast.set(row.broadcastId, {
                     ...current,
                     recipients: current.recipients + count,
                     [COUNT_KEY[row.status]]: current[COUNT_KEY[row.status]] + count,
                   })
                 }
-                return byCampaign
+                return byBroadcast
               }),
-              Effect.flatMap((byCampaign) =>
+              Effect.flatMap((byBroadcast) =>
                 Effect.map(unsubscribesOf(ids), (unsubscribes) => {
-                  for (const [campaignId, contacts] of unsubscribes) {
-                    byCampaign.set(campaignId, { ...(byCampaign.get(campaignId) ?? ZERO), unsubscribed: contacts.size })
+                  for (const [broadcastId, contacts] of unsubscribes) {
+                    byBroadcast.set(broadcastId, {
+                      ...(byBroadcast.get(broadcastId) ?? ZERO),
+                      unsubscribed: contacts.size,
+                    })
                   }
-                  return byCampaign
+                  return byBroadcast
                 }),
               ),
             )
 
-      const toCampaign = (row: Row, counts: Map<string, CampaignCounts>, names: Map<string, string>): Campaign => ({
-        id: row.id as CampaignId,
+      const toBroadcast = (row: Row, counts: Map<string, BroadcastCounts>, names: Map<string, string>): Broadcast => ({
+        id: row.id as BroadcastId,
         name: row.name,
         subject: row.subject,
         previewText: row.previewText,
@@ -281,7 +284,7 @@ export class Campaigns extends Context.Service<
       const summarize = (teamId: string, rows: ReadonlyArray<Row>) =>
         Effect.gen(function* () {
           const [counts, names] = yield* Effect.all([countsOf(rows.map((row) => row.id)), namesOf(teamId)])
-          return rows.map((row) => toCampaign(row, counts, names))
+          return rows.map((row) => toBroadcast(row, counts, names))
         })
 
       const rowOf = (teamId: string, id: string) =>
@@ -289,17 +292,17 @@ export class Campaigns extends Context.Service<
           db.query((d) =>
             d
               .select()
-              .from(schema.campaigns)
-              .where(and(eq(schema.campaigns.teamId, teamId), eq(schema.campaigns.id, id))),
+              .from(schema.broadcasts)
+              .where(and(eq(schema.broadcasts.teamId, teamId), eq(schema.broadcasts.id, id))),
           ),
         ).pipe(Effect.map(([row]) => row))
 
       const one = (teamId: string, id: string) =>
         Effect.gen(function* () {
           const row = yield* rowOf(teamId, id)
-          if (!row) return yield* Effect.die(new Error("campaign vanished"))
-          const [campaign] = yield* summarize(teamId, [row])
-          return campaign as Campaign
+          if (!row) return yield* Effect.die(new Error("broadcast vanished"))
+          const [broadcast] = yield* summarize(teamId, [row])
+          return broadcast as Broadcast
         })
 
       const changesOf = <T>(input: DraftChanges<T>) => ({
@@ -312,16 +315,16 @@ export class Campaigns extends Context.Service<
         ...styleColumnOf(input),
       })
 
-      const insertDraft = (teamId: string, values: Partial<typeof schema.campaigns.$inferInsert> & { name: string }) =>
+      const insertDraft = (teamId: string, values: Partial<typeof schema.broadcasts.$inferInsert> & { name: string }) =>
         Effect.gen(function* () {
           const id = crypto.randomUUID()
-          yield* run(db.query((d) => d.insert(schema.campaigns).values({ ...values, id, teamId, status: "draft" })))
+          yield* run(db.query((d) => d.insert(schema.broadcasts).values({ ...values, id, teamId, status: "draft" })))
           return yield* one(teamId, id)
         })
 
       const queue = <P, T, C, S>(
-        target: CampaignInTeam<C, T>,
-        _draft: CampaignIsDraft<C>,
+        target: BroadcastInTeam<C, T>,
+        _draft: BroadcastIsDraft<C>,
         segment: SegmentInTeam<S, T>,
         scope: ContactScope,
         sentAs: SentAs,
@@ -329,7 +332,7 @@ export class Campaigns extends Context.Service<
       ) =>
         Effect.gen(function* () {
           const teamId = target.team.value
-          const campaignId = target.campaign.value
+          const broadcastId = target.broadcast.value
           const topicId = target.found.topicId
           const principal = access.member.principal.value
           const queued = yield* db
@@ -339,7 +342,7 @@ export class Campaigns extends Context.Service<
                 const [locked] = yield* db
                   .query((d) =>
                     d.execute(
-                      sql`select status from "campaigns" where id = ${campaignId} and team_id = ${teamId} for update`,
+                      sql`select status from "broadcasts" where id = ${broadcastId} and team_id = ${teamId} for update`,
                     ),
                   )
                   .pipe(Effect.map((result) => rowsOf<{ status: string }>(result)))
@@ -349,9 +352,9 @@ export class Campaigns extends Context.Service<
                   : sql`left join (select null::uuid as contact_id) tu on false`
                 yield* db.query((d) =>
                   d.execute(sql`
-                    insert into "campaign_recipients"
-                      (id, team_id, campaign_id, contact_id, address, name, merge, status, skip_reason)
-                    select gen_random_uuid(), "contacts"."team_id", ${campaignId}, "contacts"."id", e.address,
+                    insert into "broadcast_recipients"
+                      (id, team_id, broadcast_id, contact_id, address, name, merge, status, skip_reason)
+                    select gen_random_uuid(), "contacts"."team_id", ${broadcastId}, "contacts"."id", e.address,
                       coalesce(nullif(trim(concat_ws(' ', "contacts"."first_name", "contacts"."last_name")), ''), e.address, 'Contact'),
                       jsonb_build_object(
                         'first_name', coalesce("contacts"."first_name", ''),
@@ -383,11 +386,11 @@ export class Campaigns extends Context.Service<
                 const [count] = yield* db.query((d) =>
                   d
                     .select({ queued: sql<number>`count(*)::int` })
-                    .from(schema.campaignRecipients)
+                    .from(schema.broadcastRecipients)
                     .where(
                       and(
-                        eq(schema.campaignRecipients.campaignId, campaignId),
-                        eq(schema.campaignRecipients.status, "queued"),
+                        eq(schema.broadcastRecipients.broadcastId, broadcastId),
+                        eq(schema.broadcastRecipients.status, "queued"),
                       ),
                     ),
                 )
@@ -399,7 +402,7 @@ export class Campaigns extends Context.Service<
                   )
                 yield* db.query((d) =>
                   d
-                    .update(schema.campaigns)
+                    .update(schema.broadcasts)
                     .set({
                       status: "sending",
                       sentAs,
@@ -410,45 +413,45 @@ export class Campaigns extends Context.Service<
                       sendingStartedAt: sql`now()`,
                       updatedAt: sql`now()`,
                     })
-                    .where(eq(schema.campaigns.id, campaignId)),
+                    .where(eq(schema.broadcasts.id, broadcastId)),
                 )
                 return queuedCount
               }),
             )
             .pipe(Effect.catchTag("SqlError", classifySqlError))
           void queued
-          return yield* one(teamId, campaignId)
-        }).pipe(Effect.withSpan("Campaigns.queue"))
+          return yield* one(teamId, broadcastId)
+        }).pipe(Effect.withSpan("Broadcasts.queue"))
 
-      const cancel = <T, C>(target: CampaignInTeam<C, T>) =>
+      const cancel = <T, C>(target: BroadcastInTeam<C, T>) =>
         Effect.gen(function* () {
           const teamId = target.team.value
-          const campaignId = target.campaign.value
+          const broadcastId = target.broadcast.value
           const changed = yield* run(
             db.transaction(
               Effect.gen(function* () {
                 const updated = yield* db.query((d) =>
                   d
-                    .update(schema.campaigns)
+                    .update(schema.broadcasts)
                     .set({ status: "cancelled", finishedAt: sql`now()`, updatedAt: sql`now()` })
                     .where(
                       and(
-                        eq(schema.campaigns.teamId, teamId),
-                        eq(schema.campaigns.id, campaignId),
-                        eq(schema.campaigns.status, "sending"),
+                        eq(schema.broadcasts.teamId, teamId),
+                        eq(schema.broadcasts.id, broadcastId),
+                        eq(schema.broadcasts.status, "sending"),
                       ),
                     )
-                    .returning({ id: schema.campaigns.id }),
+                    .returning({ id: schema.broadcasts.id }),
                 )
                 if (updated.length === 0) return false
                 yield* db.query((d) =>
                   d
-                    .update(schema.campaignRecipients)
+                    .update(schema.broadcastRecipients)
                     .set({ status: "cancelled", updatedAt: sql`now()` })
                     .where(
                       and(
-                        eq(schema.campaignRecipients.campaignId, campaignId),
-                        eq(schema.campaignRecipients.status, "queued"),
+                        eq(schema.broadcastRecipients.broadcastId, broadcastId),
+                        eq(schema.broadcastRecipients.status, "queued"),
                       ),
                     ),
                 )
@@ -456,12 +459,12 @@ export class Campaigns extends Context.Service<
               }),
             ),
           )
-          if (!changed) return yield* new CampaignNotSending({ campaign: DisplayName.fromRecord(target.found.name) })
-          return yield* one(teamId, campaignId)
-        }).pipe(Effect.withSpan("Campaigns.cancel"))
+          if (!changed) return yield* new BroadcastNotSending({ broadcast: DisplayName.fromRecord(target.found.name) })
+          return yield* one(teamId, broadcastId)
+        }).pipe(Effect.withSpan("Broadcasts.cancel"))
 
       const recipients = <C, T>(
-        target: CampaignInTeam<C, T>,
+        target: BroadcastInTeam<C, T>,
         query: {
           readonly status?: RecipientStatus | undefined
           readonly unsubscribed?: boolean | undefined
@@ -472,23 +475,23 @@ export class Campaigns extends Context.Service<
         Effect.gen(function* () {
           const limit = query.limit ?? 100
           const offset = query.cursor ? Number(Buffer.from(query.cursor, "base64url").toString()) || 0 : 0
-          const unsubscribed = (yield* unsubscribesOf([target.campaign.value])).get(target.campaign.value)
+          const unsubscribed = (yield* unsubscribesOf([target.broadcast.value])).get(target.broadcast.value)
           const unsubscribedIds = [...(unsubscribed?.keys() ?? [])]
           if (query.unsubscribed && unsubscribedIds.length === 0) return { items: [], nextCursor: null }
           const rows = yield* run(
             db.query((d) =>
               d
                 .select()
-                .from(schema.campaignRecipients)
+                .from(schema.broadcastRecipients)
                 .where(
                   and(
-                    eq(schema.campaignRecipients.campaignId, target.campaign.value),
-                    eq(schema.campaignRecipients.teamId, target.team.value),
-                    query.status ? eq(schema.campaignRecipients.status, query.status) : undefined,
-                    query.unsubscribed ? inArray(schema.campaignRecipients.contactId, unsubscribedIds) : undefined,
+                    eq(schema.broadcastRecipients.broadcastId, target.broadcast.value),
+                    eq(schema.broadcastRecipients.teamId, target.team.value),
+                    query.status ? eq(schema.broadcastRecipients.status, query.status) : undefined,
+                    query.unsubscribed ? inArray(schema.broadcastRecipients.contactId, unsubscribedIds) : undefined,
                   ),
                 )
-                .orderBy(schema.campaignRecipients.name, schema.campaignRecipients.id)
+                .orderBy(schema.broadcastRecipients.name, schema.broadcastRecipients.id)
                 .limit(limit + 1)
                 .offset(offset),
             ),
@@ -518,14 +521,14 @@ export class Campaigns extends Context.Service<
               db.query((d) =>
                 d
                   .select()
-                  .from(schema.campaigns)
+                  .from(schema.broadcasts)
                   .where(
                     and(
-                      eq(schema.campaigns.teamId, member.team.value),
-                      status ? eq(schema.campaigns.status, status) : undefined,
+                      eq(schema.broadcasts.teamId, member.team.value),
+                      status ? eq(schema.broadcasts.status, status) : undefined,
                     ),
                   )
-                  .orderBy(desc(schema.campaigns.updatedAt)),
+                  .orderBy(desc(schema.broadcasts.updatedAt)),
               ),
             )
             return yield* summarize(member.team.value, rows)
@@ -534,8 +537,8 @@ export class Campaigns extends Context.Service<
           Effect.gen(function* () {
             const row = yield* rowOf(teamId, id)
             if (!row) return undefined
-            const [campaign] = yield* summarize(teamId, [row])
-            return campaign
+            const [broadcast] = yield* summarize(teamId, [row])
+            return broadcast
           }),
         create: (access, input) => {
           const from = input.template?.found
@@ -545,7 +548,7 @@ export class Campaigns extends Context.Service<
               : {}),
             ...changesOf(input),
             name: input.name,
-          }).pipe(Effect.withSpan("Campaigns.create"))
+          }).pipe(Effect.withSpan("Broadcasts.create"))
         },
         update: (target, _draft, input) =>
           Effect.gen(function* () {
@@ -553,36 +556,36 @@ export class Campaigns extends Context.Service<
             yield* run(
               db.query((d) =>
                 d
-                  .update(schema.campaigns)
+                  .update(schema.broadcasts)
                   .set({ ...changesOf(input), updatedAt: sql`now()` })
                   .where(
                     and(
-                      eq(schema.campaigns.teamId, teamId),
-                      eq(schema.campaigns.id, target.campaign.value),
-                      eq(schema.campaigns.status, "draft"),
+                      eq(schema.broadcasts.teamId, teamId),
+                      eq(schema.broadcasts.id, target.broadcast.value),
+                      eq(schema.broadcasts.status, "draft"),
                     ),
                   ),
               ),
             )
-            return yield* one(teamId, target.campaign.value)
-          }).pipe(Effect.withSpan("Campaigns.update")),
+            return yield* one(teamId, target.broadcast.value)
+          }).pipe(Effect.withSpan("Broadcasts.update")),
         delete: (target) =>
           Effect.gen(function* () {
             yield* run(
               db.query((d) =>
                 d
-                  .delete(schema.campaigns)
+                  .delete(schema.broadcasts)
                   .where(
                     and(
-                      eq(schema.campaigns.teamId, target.team.value),
-                      eq(schema.campaigns.id, target.campaign.value),
-                      eq(schema.campaigns.status, "draft"),
+                      eq(schema.broadcasts.teamId, target.team.value),
+                      eq(schema.broadcasts.id, target.broadcast.value),
+                      eq(schema.broadcasts.status, "draft"),
                     ),
                   ),
               ),
             )
             return target.found
-          }).pipe(Effect.withSpan("Campaigns.delete")),
+          }).pipe(Effect.withSpan("Broadcasts.delete")),
         duplicate: (target, access) =>
           Effect.gen(function* () {
             const source = target.found
@@ -595,10 +598,10 @@ export class Campaigns extends Context.Service<
               topicId: source.topicId,
               styleId: source.styleId,
             })
-          }).pipe(Effect.withSpan("Campaigns.duplicate")),
+          }).pipe(Effect.withSpan("Broadcasts.duplicate")),
         queue,
         sentStyle: (target) =>
-          Effect.map(rowOf(target.team.value, target.campaign.value), (row) => styleSentWith(row?.sentAs)),
+          Effect.map(rowOf(target.team.value, target.broadcast.value), (row) => styleSentWith(row?.sentAs)),
         cancel,
         recipients,
       }

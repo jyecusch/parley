@@ -23,7 +23,7 @@ const ability = (permission: Permission): UserText => {
     case "email:write":
       return userText`write marketing email`
     case "email:send":
-      return userText`send campaigns`
+      return userText`send broadcasts`
     case "email:manage":
       return userText`manage the team's email settings`
   }

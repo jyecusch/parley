@@ -1,8 +1,8 @@
 import { Schema } from "effect"
 import {
   Body,
-  Campaign,
-  CampaignStatus,
+  Broadcast,
+  BroadcastStatus,
   ContentName,
   PreviewText,
   RecipientPage,
@@ -13,22 +13,22 @@ import {
   TestRecipients,
 } from "../email.ts"
 import {
-  CampaignIncomplete,
-  CampaignNotDraft,
-  CampaignNotFound,
-  CampaignNotSending,
+  BroadcastIncomplete,
+  BroadcastNotDraft,
+  BroadcastNotFound,
+  BroadcastNotSending,
   SegmentHasNoRecipients,
   SegmentNotFound,
   SenderNotReady,
   TemplateNotFound,
   TestRecipientNotMember,
   TopicNotFound,
-} from "../errors/campaigns.ts"
+} from "../errors/broadcasts.ts"
 import { ContactNotFound } from "../errors/contacts.ts"
 import { EmailErrors } from "../errors/email.ts"
 import { EmailStyleNotFound } from "../errors/email-styles.ts"
 import { RequestsTooFrequent } from "../errors/infrastructure.ts"
-import { CampaignId, ContactId, EmailStyleId, SegmentId, TeamId, TemplateId, TopicId } from "../ids.ts"
+import { BroadcastId, ContactId, EmailStyleId, SegmentId, TeamId, TemplateId, TopicId } from "../ids.ts"
 import { defineTeamOperation } from "../operation.ts"
 
 const InTeam = { teamId: TeamId.annotate({ description: "The team, from teams.list." }) }
@@ -36,9 +36,9 @@ const OneTemplate = {
   ...InTeam,
   templateId: TemplateId.annotate({ description: "The template's id, from templates.list." }),
 }
-const OneCampaign = {
+const OneBroadcast = {
   ...InTeam,
-  campaignId: CampaignId.annotate({ description: "The campaign's id, from campaigns.list." }),
+  broadcastId: BroadcastId.annotate({ description: "The broadcast's id, from broadcasts.list." }),
 }
 const Content = {
   subject: Schema.optional(Subject),
@@ -65,7 +65,7 @@ const PreviewContact = Schema.optional(
 
 export const listTemplates = defineTeamOperation({
   name: "templates.list",
-  description: "List the team's templates: reusable content a new campaign can start from.",
+  description: "List the team's templates: reusable content a new broadcast can start from.",
   input: Schema.Struct(InTeam),
   output: Schema.Array(Template),
   errors: [],
@@ -98,7 +98,7 @@ export const createTemplate = defineTeamOperation({
 
 export const updateTemplate = defineTeamOperation({
   name: "templates.update",
-  description: "Change a template. Campaigns made from it earlier keep their own copy.",
+  description: "Change a template. Broadcasts made from it earlier keep their own copy.",
   input: Schema.Struct({
     ...OneTemplate,
     name: Schema.optional(ContentName.annotate({ title: "Name" })),
@@ -114,7 +114,7 @@ export const updateTemplate = defineTeamOperation({
 
 export const deleteTemplate = defineTeamOperation({
   name: "templates.delete",
-  description: "Delete a template. Campaigns made from it are untouched.",
+  description: "Delete a template. Broadcasts made from it are untouched.",
   input: Schema.Struct(OneTemplate),
   output: Template,
   errors: [TemplateNotFound],
@@ -135,32 +135,32 @@ export const previewTemplate = defineTeamOperation({
   permissions: ["records:read"],
 })
 
-export const listCampaigns = defineTeamOperation({
-  name: "campaigns.list",
-  description: "List the team's campaigns, most recently changed first: drafts, and ones being sent or sent.",
-  input: Schema.Struct({ ...InTeam, status: Schema.optional(CampaignStatus) }),
-  output: Schema.Array(Campaign),
+export const listBroadcasts = defineTeamOperation({
+  name: "broadcasts.list",
+  description: "List the team's broadcasts, most recently changed first: drafts, and ones being sent or sent.",
+  input: Schema.Struct({ ...InTeam, status: Schema.optional(BroadcastStatus) }),
+  output: Schema.Array(Broadcast),
   errors: [],
-  http: { method: "GET", path: "/teams/:teamId/campaigns" },
+  http: { method: "GET", path: "/teams/:teamId/broadcasts" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: ["records:read"],
 })
 
-export const getCampaign = defineTeamOperation({
-  name: "campaigns.get",
-  description: "One campaign, with its content and, once it's sending, counts of what happened.",
-  input: Schema.Struct(OneCampaign),
-  output: Campaign,
-  errors: [CampaignNotFound],
-  http: { method: "GET", path: "/teams/:teamId/campaigns/:campaignId" },
+export const getBroadcast = defineTeamOperation({
+  name: "broadcasts.get",
+  description: "One broadcast, with its content and, once it's sending, counts of what happened.",
+  input: Schema.Struct(OneBroadcast),
+  output: Broadcast,
+  errors: [BroadcastNotFound],
+  http: { method: "GET", path: "/teams/:teamId/broadcasts/:broadcastId" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: ["records:read"],
 })
 
-export const createCampaign = defineTeamOperation({
-  name: "campaigns.create",
+export const createBroadcast = defineTeamOperation({
+  name: "broadcasts.create",
   description:
-    "Start a draft campaign, empty or from a template (its content and email style are copied). Set its segment and, optionally, its topic and email style.",
+    "Start a draft broadcast, empty or from a template (its content and email style are copied). Set its segment and, optionally, its topic and email style.",
   input: Schema.Struct({
     ...InTeam,
     name: ContentName.annotate({ title: "Name", description: "For your team; recipients don't see it." }),
@@ -170,137 +170,137 @@ export const createCampaign = defineTeamOperation({
     ...Content,
     ...Style,
   }),
-  output: Campaign,
+  output: Broadcast,
   errors: [TemplateNotFound, SegmentNotFound, TopicNotFound, EmailStyleNotFound],
-  http: { method: "POST", path: "/teams/:teamId/campaigns" },
+  http: { method: "POST", path: "/teams/:teamId/broadcasts" },
   hints: { readOnly: false, destructive: false, idempotent: false },
   permissions: ["records:read", "email:write"],
 })
 
-export const updateCampaign = defineTeamOperation({
-  name: "campaigns.update",
-  description: "Change a draft campaign. Null clears its segment or topic.",
+export const updateBroadcast = defineTeamOperation({
+  name: "broadcasts.update",
+  description: "Change a draft broadcast. Null clears its segment or topic.",
   input: Schema.Struct({
-    ...OneCampaign,
+    ...OneBroadcast,
     name: Schema.optional(ContentName.annotate({ title: "Name" })),
     segmentId: Schema.optional(Schema.NullOr(SegmentId)),
     topicId: Schema.optional(Schema.NullOr(TopicId)),
     ...Content,
     ...Style,
   }),
-  output: Campaign,
-  errors: [CampaignNotFound, CampaignNotDraft, SegmentNotFound, TopicNotFound, EmailStyleNotFound],
-  http: { method: "PATCH", path: "/teams/:teamId/campaigns/:campaignId" },
+  output: Broadcast,
+  errors: [BroadcastNotFound, BroadcastNotDraft, SegmentNotFound, TopicNotFound, EmailStyleNotFound],
+  http: { method: "PATCH", path: "/teams/:teamId/broadcasts/:broadcastId" },
   hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: ["records:read", "email:write"],
 })
 
-export const deleteCampaign = defineTeamOperation({
-  name: "campaigns.delete",
-  description: "Delete a draft campaign. Campaigns that were sent stay, as a record of what went out.",
-  input: Schema.Struct(OneCampaign),
-  output: Campaign,
-  errors: [CampaignNotFound, CampaignNotDraft],
-  http: { method: "DELETE", path: "/teams/:teamId/campaigns/:campaignId" },
+export const deleteBroadcast = defineTeamOperation({
+  name: "broadcasts.delete",
+  description: "Delete a draft broadcast. Broadcasts that were sent stay, as a record of what went out.",
+  input: Schema.Struct(OneBroadcast),
+  output: Broadcast,
+  errors: [BroadcastNotFound, BroadcastNotDraft],
+  http: { method: "DELETE", path: "/teams/:teamId/broadcasts/:broadcastId" },
   hints: { readOnly: false, destructive: true, idempotent: false },
   permissions: ["records:read", "email:write"],
 })
 
-export const duplicateCampaign = defineTeamOperation({
-  name: "campaigns.duplicate",
-  description: "Copy any campaign, sent or not, into a new draft.",
-  input: Schema.Struct(OneCampaign),
-  output: Campaign,
-  errors: [CampaignNotFound],
-  http: { method: "POST", path: "/teams/:teamId/campaigns/:campaignId/duplicate" },
+export const duplicateBroadcast = defineTeamOperation({
+  name: "broadcasts.duplicate",
+  description: "Copy any broadcast, sent or not, into a new draft.",
+  input: Schema.Struct(OneBroadcast),
+  output: Broadcast,
+  errors: [BroadcastNotFound],
+  http: { method: "POST", path: "/teams/:teamId/broadcasts/:broadcastId/duplicate" },
   hints: { readOnly: false, destructive: false, idempotent: false },
   permissions: ["records:read", "email:write"],
 })
 
-export const previewCampaign = defineTeamOperation({
-  name: "campaigns.preview",
+export const previewBroadcast = defineTeamOperation({
+  name: "broadcasts.preview",
   description:
-    "Render a campaign as a recipient would get it, with the footer. Pass subject, previewText or body to preview unsaved changes.",
-  input: Schema.Struct({ ...OneCampaign, ...Content, ...Style, contactId: PreviewContact }),
+    "Render a broadcast as a recipient would get it, with the footer. Pass subject, previewText or body to preview unsaved changes.",
+  input: Schema.Struct({ ...OneBroadcast, ...Content, ...Style, contactId: PreviewContact }),
   output: RenderedEmail,
-  errors: [CampaignNotFound, ContactNotFound, EmailStyleNotFound],
-  http: { method: "POST", path: "/teams/:teamId/campaigns/:campaignId/preview" },
+  errors: [BroadcastNotFound, ContactNotFound, EmailStyleNotFound],
+  http: { method: "POST", path: "/teams/:teamId/broadcasts/:broadcastId/preview" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: ["records:read"],
 })
 
-export const testSendCampaign = defineTeamOperation({
-  name: "campaigns.testSend",
+export const testSendBroadcast = defineTeamOperation({
+  name: "broadcasts.testSend",
   description:
     'Send a draft to members of the team to check it, labelled "[Test]". Defaults to you. Its unsubscribe link changes nothing.',
   input: Schema.Struct({
-    ...OneCampaign,
+    ...OneBroadcast,
     userIds: Schema.optional(TestRecipients.annotate({ title: "Members", description: "Up to 5 members' user ids." })),
     contactId: PreviewContact,
   }),
   output: Schema.Struct({ sentTo: Schema.Array(Schema.String) }),
   errors: [
-    CampaignNotFound,
+    BroadcastNotFound,
     ContactNotFound,
     TestRecipientNotMember,
     SenderNotReady,
     RequestsTooFrequent,
     ...EmailErrors,
   ],
-  http: { method: "POST", path: "/teams/:teamId/campaigns/:campaignId/test-send" },
+  http: { method: "POST", path: "/teams/:teamId/broadcasts/:broadcastId/test-send" },
   hints: { readOnly: false, destructive: false, idempotent: false },
   permissions: ["records:read", "email:write"],
 })
 
-export const sendCampaign = defineTeamOperation({
-  name: "campaigns.send",
+export const sendBroadcast = defineTeamOperation({
+  name: "broadcasts.send",
   description:
     "Send a draft to its segment now. Recipients are fixed at this moment: subscribed contacts with an email address (and still subscribed to its topic). This can't be undone, though the rest of the sending can be cancelled. Only send to people who agreed to get it.",
-  input: Schema.Struct(OneCampaign),
-  output: Campaign,
+  input: Schema.Struct(OneBroadcast),
+  output: Broadcast,
   errors: [
-    CampaignNotFound,
-    CampaignNotDraft,
-    CampaignIncomplete,
+    BroadcastNotFound,
+    BroadcastNotDraft,
+    BroadcastIncomplete,
     SegmentNotFound,
     SegmentHasNoRecipients,
     SenderNotReady,
   ],
-  http: { method: "POST", path: "/teams/:teamId/campaigns/:campaignId/send" },
+  http: { method: "POST", path: "/teams/:teamId/broadcasts/:broadcastId/send" },
   hints: { readOnly: false, destructive: true, idempotent: false },
   permissions: ["records:read", "email:send"],
 })
 
-export const cancelCampaign = defineTeamOperation({
-  name: "campaigns.cancel",
-  description: "Stop sending a campaign. Emails already sent stay sent; the rest are recorded as cancelled.",
-  input: Schema.Struct(OneCampaign),
-  output: Campaign,
-  errors: [CampaignNotFound, CampaignNotSending],
-  http: { method: "POST", path: "/teams/:teamId/campaigns/:campaignId/cancel" },
+export const cancelBroadcast = defineTeamOperation({
+  name: "broadcasts.cancel",
+  description: "Stop sending a broadcast. Emails already sent stay sent; the rest are recorded as cancelled.",
+  input: Schema.Struct(OneBroadcast),
+  output: Broadcast,
+  errors: [BroadcastNotFound, BroadcastNotSending],
+  http: { method: "POST", path: "/teams/:teamId/broadcasts/:broadcastId/cancel" },
   hints: { readOnly: false, destructive: true, idempotent: false },
   permissions: ["records:read", "email:send"],
 })
 
-export const listCampaignRecipients = defineTeamOperation({
-  name: "campaigns.recipients",
+export const listBroadcastRecipients = defineTeamOperation({
+  name: "broadcasts.recipients",
   description:
-    "Who a campaign went to, and what happened for each: sent, delivered, skipped (and why), failed, bounced, and whether they unsubscribed through it.",
+    "Who a broadcast went to, and what happened for each: sent, delivered, skipped (and why), failed, bounced, and whether they unsubscribed through it.",
   input: Schema.Struct({
-    ...OneCampaign,
+    ...OneBroadcast,
     status: Schema.optional(RecipientStatus),
     unsubscribed: Schema.optional(
       Schema.Boolean.annotate({
         title: "Unsubscribed",
-        description: "true: only recipients who unsubscribed through this campaign's link (D119).",
+        description: "true: only recipients who unsubscribed through this broadcast's link (D119).",
       }),
     ),
     limit: Schema.optional(Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 500 }))),
     cursor: Schema.optional(Schema.String),
   }),
   output: RecipientPage,
-  errors: [CampaignNotFound],
-  http: { method: "GET", path: "/teams/:teamId/campaigns/:campaignId/recipients" },
+  errors: [BroadcastNotFound],
+  http: { method: "GET", path: "/teams/:teamId/broadcasts/:broadcastId/recipients" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: ["records:read"],
 })

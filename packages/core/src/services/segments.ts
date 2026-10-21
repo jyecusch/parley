@@ -27,15 +27,20 @@ const SEGMENT_LIMIT = 200
 
 export interface SegmentInput {
   readonly name?: string | undefined
+  /** Empty or null clears it (D141). */
+  readonly description?: string | null | undefined
   readonly filter?: Filter | undefined
 }
 
-/** Who a campaign can go to: subscribed, with an email address that's in use. */
+/** A description as stored: empty means none. */
+const descriptionOf = (value: string | null | undefined) => (value?.trim() ? value.trim() : null)
+
+/** Who a broadcast can go to: subscribed, with an email address that's in use. */
 export const SENDABLE = sql`"contacts"."subscription_status" = 'subscribed' and exists (
   select 1 from "contact_emails" e where e.contact_id = "contacts"."id" and e.active)`
 
 /**
- * Segments (D23): groups of contacts a campaign is sent to. Process tier. A dynamic segment's
+ * Segments (D23): groups of contacts a broadcast is sent to. Process tier. A dynamic segment's
  * contacts are its filter's matches at the moment of asking; a fixed one's are listed.
  */
 export class Segments extends Context.Service<
@@ -48,7 +53,12 @@ export class Segments extends Context.Service<
     readonly scope: <K, T>(target: SegmentInTeam<K, T>) => Effect.Effect<ContactScope, DatabaseUnavailable>
     readonly create: <P, T>(
       access: CanWriteEmail<P, T>,
-      input: { readonly name: string; readonly kind: "dynamic" | "fixed"; readonly filter?: Filter | undefined },
+      input: {
+        readonly name: string
+        readonly description?: string | null | undefined
+        readonly kind: "dynamic" | "fixed"
+        readonly filter?: Filter | undefined
+      },
     ) => Effect.Effect<Segment, InputRejected | SegmentLimitReached | DatabaseUnavailable>
     readonly update: <P, T, K>(
       target: SegmentInTeam<K, T>,
@@ -115,6 +125,7 @@ export class Segments extends Context.Service<
           const segment: Segment = {
             id: row.id as SegmentId,
             name: row.name,
+            description: row.description,
             kind: row.kind,
             filter: row.kind === "dynamic" ? ((row.filter as Filter | null) ?? EMPTY) : null,
             contactCount: Number(counts?.contacts ?? 0),
@@ -197,6 +208,7 @@ export class Segments extends Context.Service<
                   id,
                   teamId,
                   name: input.name,
+                  description: descriptionOf(input.description),
                   kind: input.kind,
                   filter: input.kind === "dynamic" ? (input.filter ?? EMPTY) : null,
                 }),
@@ -215,6 +227,7 @@ export class Segments extends Context.Service<
                   .update(schema.segments)
                   .set({
                     ...(input.name !== undefined ? { name: input.name } : {}),
+                    ...(input.description !== undefined ? { description: descriptionOf(input.description) } : {}),
                     ...(input.filter !== undefined ? { filter: input.filter } : {}),
                     updatedAt: sql`now()`,
                   })

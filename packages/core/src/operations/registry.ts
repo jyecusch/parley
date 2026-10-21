@@ -4,7 +4,7 @@ import type { Mailer } from "../mail/mailer.ts"
 import type { Principal } from "../principal.ts"
 import type { Affiliations } from "../services/affiliations.ts"
 import type { ApiKeys } from "../services/api-keys.ts"
-import type { Campaigns } from "../services/campaigns.ts"
+import type { Broadcasts } from "../services/broadcasts.ts"
 import type { Companies } from "../services/companies.ts"
 import type { Connections } from "../services/connections.ts"
 import type { Contacts } from "../services/contacts.ts"
@@ -28,7 +28,7 @@ import type { UnsubscribeLinks } from "../services/unsubscribe-links.ts"
 import type { Users } from "../services/users.ts"
 import * as affiliations from "./affiliations.ts"
 import * as apiKeys from "./api-keys.ts"
-import * as campaigns from "./campaigns.ts"
+import * as broadcasts from "./broadcasts.ts"
 import * as companies from "./companies.ts"
 import * as connections from "./connections.ts"
 import * as contacts from "./contacts.ts"
@@ -66,7 +66,7 @@ export type OperationServices =
   | Subscriptions
   | Segments
   | Templates
-  | Campaigns
+  | Broadcasts
   | Mailer
   | UnsubscribeLinks
   | RateLimiter
@@ -185,21 +185,21 @@ export const implementations: { readonly [Name in OperationName]: Implementation
   "segments.contacts": segments.contacts,
   "segments.addContacts": segments.addContacts,
   "segments.removeContacts": segments.removeContacts,
-  "templates.list": campaigns.listAllTemplates,
-  "templates.get": campaigns.getOneTemplate,
-  "templates.create": campaigns.addTemplate,
-  "templates.update": campaigns.changeTemplate,
-  "templates.delete": campaigns.removeTemplate,
-  "templates.preview": campaigns.previewOneTemplate,
-  "campaigns.list": campaigns.listAllCampaigns,
-  "campaigns.get": campaigns.getOneCampaign,
-  "campaigns.create": campaigns.addCampaign,
-  "campaigns.update": campaigns.changeCampaign,
-  "campaigns.delete": campaigns.removeCampaign,
-  "campaigns.duplicate": campaigns.copyCampaign,
-  "campaigns.preview": campaigns.previewOneCampaign,
-  "campaigns.testSend": campaigns.testSend,
-  "campaigns.send": campaigns.send,
-  "campaigns.cancel": campaigns.cancel,
-  "campaigns.recipients": campaigns.recipients,
+  "templates.list": broadcasts.listAllTemplates,
+  "templates.get": broadcasts.getOneTemplate,
+  "templates.create": broadcasts.addTemplate,
+  "templates.update": broadcasts.changeTemplate,
+  "templates.delete": broadcasts.removeTemplate,
+  "templates.preview": broadcasts.previewOneTemplate,
+  "broadcasts.list": broadcasts.listAllBroadcasts,
+  "broadcasts.get": broadcasts.getOneBroadcast,
+  "broadcasts.create": broadcasts.addBroadcast,
+  "broadcasts.update": broadcasts.changeBroadcast,
+  "broadcasts.delete": broadcasts.removeBroadcast,
+  "broadcasts.duplicate": broadcasts.copyBroadcast,
+  "broadcasts.preview": broadcasts.previewOneBroadcast,
+  "broadcasts.testSend": broadcasts.testSend,
+  "broadcasts.send": broadcasts.send,
+  "broadcasts.cancel": broadcasts.cancel,
+  "broadcasts.recipients": broadcasts.recipients,
 }

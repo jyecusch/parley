@@ -1,7 +1,7 @@
 import { Schema } from "effect"
 import { Filter } from "./filter.ts"
 import {
-  CampaignId,
+  BroadcastId,
   ContactId,
   EmailImageId,
   EmailStyleId,
@@ -14,12 +14,12 @@ import {
 
 const Timestamp = Schema.String.annotate({ description: "ISO 8601 timestamp" })
 
-/** Whether a contact receives marketing email (R37). Only subscribed contacts are sent campaigns. */
+/** Whether a contact receives marketing email (R37). Only subscribed contacts are sent broadcasts. */
 export const SubscriptionStatus = Schema.Literals(["subscribed", "unsubscribed", "bounced", "marked-as-spam"]).annotate(
   {
     title: "Subscription status",
     description:
-      "subscribed, unsubscribed, bounced or marked-as-spam. Only subscribed contacts are sent campaigns. Bounced and marked-as-spam are set by Parley from the email provider.",
+      "subscribed, unsubscribed, bounced or marked-as-spam. Only subscribed contacts are sent broadcasts. Bounced and marked-as-spam are set by Parley from the email provider.",
   },
 )
 export type SubscriptionStatus = typeof SubscriptionStatus.Type
@@ -116,24 +116,32 @@ export const FooterReason = Schema.String.check(Schema.isTrimmed(), Schema.isMin
 
 export const SegmentName = Schema.String.check(Schema.isTrimmed(), Schema.isMinLength(1), Schema.isMaxLength(80))
 
-/** A group of contacts a campaign is sent to (D23). */
+/** A segment's optional description (D141). */
+export const SegmentDescription = Schema.String.check(Schema.isTrimmed(), Schema.isMaxLength(500)).annotate({
+  title: "Description",
+  description: "What the segment is for, in a sentence or two. Empty or null clears it.",
+})
+
+/** A group of contacts a broadcast is sent to (D23). */
 export const Segment = Schema.Struct({
   id: SegmentId,
   name: Schema.String,
+  /** What the segment is for, in a sentence or two (D141), or null. */
+  description: Schema.NullOr(Schema.String),
   /** dynamic: defined by a filter over contacts; fixed: hand-picked contacts. */
   kind: Schema.Literals(["dynamic", "fixed"]),
   /** A dynamic segment's filter, the same as contacts.list takes. Null for a fixed segment. */
   filter: Schema.NullOr(Filter),
   /** Live contacts in the segment now, whatever their subscription status. */
   contactCount: Schema.Number,
-  /** Of those, the ones a campaign would be sent to: subscribed, with an email address. */
+  /** Of those, the ones a broadcast would be sent to: subscribed, with an email address. */
   sendableCount: Schema.Number,
   createdAt: Timestamp,
   updatedAt: Timestamp,
 })
 export type Segment = typeof Segment.Type
 
-// Templates and campaigns
+// Templates and broadcasts
 
 export const ContentName = Schema.String.check(Schema.isTrimmed(), Schema.isMinLength(1), Schema.isMaxLength(120))
 export const Subject = Schema.String.check(Schema.isMaxLength(200)).annotate({
@@ -150,7 +158,7 @@ export const Body = Schema.String.check(Schema.isMaxLength(100_000)).annotate({
     "Markdown. Merge tags: {{first_name}}, {{last_name}}, {{name}}, {{email}}, {{company}}, each with an optional fallback, like {{first_name|there}}. HTML is shown as typed, not rendered. Parley adds the footer.",
 })
 
-/** Reusable content a campaign starts from (R41). */
+/** Reusable content a broadcast starts from (R41). */
 export const Template = Schema.Struct({
   id: TemplateId,
   name: Schema.String,
@@ -164,11 +172,11 @@ export const Template = Schema.Struct({
 })
 export type Template = typeof Template.Type
 
-export const CampaignStatus = Schema.Literals(["draft", "sending", "sent", "cancelled"])
-export type CampaignStatus = typeof CampaignStatus.Type
+export const BroadcastStatus = Schema.Literals(["draft", "sending", "sent", "cancelled"])
+export type BroadcastStatus = typeof BroadcastStatus.Type
 
-/** How a campaign's sending went, by recipient. */
-export const CampaignCounts = Schema.Struct({
+/** How a broadcast's sending went, by recipient. */
+export const BroadcastCounts = Schema.Struct({
   recipients: Schema.Number,
   queued: Schema.Number,
   sent: Schema.Number,
@@ -178,23 +186,23 @@ export const CampaignCounts = Schema.Struct({
   bounced: Schema.Number,
   markedAsSpam: Schema.Number,
   cancelled: Schema.Number,
-  /** Recipients who unsubscribed through this campaign's link, from everything or from its topic (D119). */
+  /** Recipients who unsubscribed through this broadcast's link, from everything or from its topic (D119). */
   unsubscribed: Schema.Number,
 })
-export type CampaignCounts = typeof CampaignCounts.Type
+export type BroadcastCounts = typeof BroadcastCounts.Type
 
 /** One marketing email (R42). */
-export const Campaign = Schema.Struct({
-  id: CampaignId,
+export const Broadcast = Schema.Struct({
+  id: BroadcastId,
   name: Schema.String,
   subject: Schema.String,
   previewText: Schema.String,
   body: Schema.String,
-  status: CampaignStatus,
-  /** The email style it uses; null means the team's default (D117). A sent campaign keeps the look it was sent with. */
+  status: BroadcastStatus,
+  /** The email style it uses; null means the team's default (D117). A sent broadcast keeps the look it was sent with. */
   styleId: Schema.NullOr(EmailStyleId),
   segmentId: Schema.NullOr(SegmentId),
-  /** The segment's name, as it was when sent for a sent campaign. */
+  /** The segment's name, as it was when sent for a sent broadcast. */
   segmentName: Schema.NullOr(Schema.String),
   topicId: Schema.NullOr(TopicId),
   topicName: Schema.NullOr(Schema.String),
@@ -203,11 +211,11 @@ export const Campaign = Schema.Struct({
   sendingStartedAt: Schema.NullOr(Timestamp),
   finishedAt: Schema.NullOr(Timestamp),
   /** Null for a draft. */
-  counts: Schema.NullOr(CampaignCounts),
+  counts: Schema.NullOr(BroadcastCounts),
   createdAt: Timestamp,
   updatedAt: Timestamp,
 })
-export type Campaign = typeof Campaign.Type
+export type Broadcast = typeof Broadcast.Type
 
 export const RecipientStatus = Schema.Literals([
   "queued",
@@ -230,7 +238,7 @@ export const SkipReason = Schema.Literals([
 ])
 export type SkipReason = typeof SkipReason.Type
 
-/** A contact a campaign was sent to, and what happened. */
+/** A contact a broadcast was sent to, and what happened. */
 export const Recipient = Schema.Struct({
   contactId: Schema.NullOr(ContactId),
   name: Schema.String,
@@ -240,7 +248,7 @@ export const Recipient = Schema.Struct({
   /** Why sending failed, in our words. */
   error: Schema.NullOr(Schema.String),
   sentAt: Schema.NullOr(Timestamp),
-  /** Whether they unsubscribed through this campaign's link: from everything, or from its topic (D119). */
+  /** Whether they unsubscribed through this broadcast's link: from everything, or from its topic (D119). */
   unsubscribed: Schema.NullOr(Schema.Literals(["everything", "topic"])),
 })
 export type Recipient = typeof Recipient.Type
@@ -270,7 +278,7 @@ export const UnsubscribePage = Schema.Struct({
   /** The address the email went to, partly hidden ("s***@acme.com"). */
   address: Schema.NullOr(Schema.String),
   status: SubscriptionStatus,
-  /** The topic of the campaign the link came from, if it had one. */
+  /** The topic of the broadcast the link came from, if it had one. */
   topicId: Schema.NullOr(TopicId),
   topics: Schema.Array(
     Schema.Struct({
@@ -330,7 +338,7 @@ export const CustomHtml = Schema.String.check(Schema.isMaxLength(100_000)).annot
 export const EmailStyle = Schema.Struct({
   id: EmailStyleId,
   name: Schema.String,
-  /** The team's default: templates and campaigns without a style of their own use it. Exactly one per team. */
+  /** The team's default: templates and broadcasts without a style of their own use it. Exactly one per team. */
   isDefault: Schema.Boolean,
   layout: EmailStyleLayout,
   /** The logo's public address, or null for none. */
@@ -342,8 +350,8 @@ export const EmailStyle = Schema.Struct({
   colors: EmailStyleColors,
   font: EmailFont,
   customHtml: Schema.NullOr(Schema.String),
-  /** How many templates and draft campaigns name this style. A style in use can't be deleted. */
-  usedBy: Schema.Struct({ templates: Schema.Number, campaigns: Schema.Number }),
+  /** How many templates and draft broadcasts name this style. A style in use can't be deleted. */
+  usedBy: Schema.Struct({ templates: Schema.Number, broadcasts: Schema.Number }),
   createdAt: Timestamp,
   updatedAt: Timestamp,
 })

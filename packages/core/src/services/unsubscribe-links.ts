@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto"
-import type { CampaignId, ContactId, TeamId, TopicId } from "@parley/domain"
+import type { BroadcastId, ContactId, TeamId, TopicId } from "@parley/domain"
 import { Config, Context, Effect, Layer, Option, Redacted } from "effect"
 import { PublicUrl } from "../config/public-url.ts"
 
@@ -8,7 +8,7 @@ export interface UnsubscribeLinkFacts {
   readonly teamId: TeamId
   readonly contactId: ContactId | null
   readonly topicId: TopicId | null
-  readonly campaignId: CampaignId | null
+  readonly broadcastId: BroadcastId | null
   readonly test: boolean
 }
 
@@ -61,7 +61,7 @@ export class UnsubscribeLinks extends Context.Service<
             t: facts.teamId,
             ...(facts.contactId ? { c: facts.contactId } : {}),
             ...(facts.topicId ? { p: facts.topicId } : {}),
-            ...(facts.campaignId ? { m: facts.campaignId } : {}),
+            ...(facts.broadcastId ? { m: facts.broadcastId } : {}),
             ...(facts.test ? { x: 1 as const } : {}),
           }
           const body = encode(JSON.stringify(payload))
@@ -84,7 +84,7 @@ export class UnsubscribeLinks extends Context.Service<
               teamId: payload.t as TeamId,
               contactId: (payload.c ?? null) as ContactId | null,
               topicId: (payload.p ?? null) as TopicId | null,
-              campaignId: (payload.m ?? null) as CampaignId | null,
+              broadcastId: (payload.m ?? null) as BroadcastId | null,
               test: payload.x === 1,
             }
           } catch {

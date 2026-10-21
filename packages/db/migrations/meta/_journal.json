@@ -120,6 +120,20 @@
       "when": 1792544888395,
       "tag": "0016_imports",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1792544948395,
+      "tag": "0017_broadcasts",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1792559178058,
+      "tag": "0018_segment_description",
+      "breakpoints": true
     }
   ]
 }

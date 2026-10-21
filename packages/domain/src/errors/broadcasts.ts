@@ -1,7 +1,7 @@
 import { DisplayName, type DomainError, EchoedInput, userText } from "@parley/errors"
 import { Schema } from "effect"
 import * as ErrorReporter from "effect/ErrorReporter"
-import { CampaignId, SegmentId, SendingDomainId, TemplateId, TopicId, UserId } from "../ids.ts"
+import { BroadcastId, SegmentId, SendingDomainId, TemplateId, TopicId, UserId } from "../ids.ts"
 
 /** No topic with that id in this team. */
 export class TopicNotFound
@@ -66,28 +66,28 @@ export class TemplateNotFound
   }
 }
 
-/** No campaign with that id in this team. */
-export class CampaignNotFound
-  extends Schema.TaggedError<CampaignNotFound>()("CampaignNotFound", {
+/** No broadcast with that id in this team. */
+export class BroadcastNotFound
+  extends Schema.TaggedError<BroadcastNotFound>()("BroadcastNotFound", {
     team: DisplayName.schema,
-    campaignId: CampaignId,
+    broadcastId: BroadcastId,
   })
   implements DomainError
 {
   readonly isRetryable = false
   override readonly [ErrorReporter.severity] = "Info" as const
   override get message() {
-    return `campaign ${this.campaignId} not found in team`
+    return `broadcast ${this.broadcastId} not found in team`
   }
   get userMessage() {
-    return userText`We can't find that campaign in ${this.team}. It may have been deleted.`
+    return userText`We can't find that broadcast in ${this.team}. It may have been deleted.`
   }
 }
 
-/** Only a draft can be edited, sent or deleted; a campaign that has gone out stays as sent (R42). */
-export class CampaignNotDraft
-  extends Schema.TaggedError<CampaignNotDraft>()("CampaignNotDraft", {
-    campaign: DisplayName.schema,
+/** Only a draft can be edited, sent or deleted; a broadcast that has gone out stays as sent (R42). */
+export class BroadcastNotDraft
+  extends Schema.TaggedError<BroadcastNotDraft>()("BroadcastNotDraft", {
+    broadcast: DisplayName.schema,
     status: Schema.Literals(["sending", "sent", "cancelled"]),
   })
   implements DomainError
@@ -95,36 +95,36 @@ export class CampaignNotDraft
   readonly isRetryable = false
   override readonly [ErrorReporter.severity] = "Info" as const
   override get message() {
-    return `campaign is ${this.status}, not a draft`
+    return `broadcast is ${this.status}, not a draft`
   }
   get userMessage() {
     return this.status === "sending"
-      ? userText`${this.campaign} is being sent, so it can't be changed. You can cancel the rest of the sending.`
+      ? userText`${this.broadcast} is being sent, so it can't be changed. You can cancel the rest of the sending.`
       : this.status === "sent"
-        ? userText`${this.campaign} has been sent, so it can't be changed. Duplicate it to send something similar.`
-        : userText`${this.campaign} was cancelled, so it can't be changed. Duplicate it to try again.`
+        ? userText`${this.broadcast} has been sent, so it can't be changed. Duplicate it to send something similar.`
+        : userText`${this.broadcast} was cancelled, so it can't be changed. Duplicate it to try again.`
   }
 }
 
-/** Only a campaign that's sending can be cancelled. */
-export class CampaignNotSending
-  extends Schema.TaggedError<CampaignNotSending>()("CampaignNotSending", { campaign: DisplayName.schema })
+/** Only a broadcast that's sending can be cancelled. */
+export class BroadcastNotSending
+  extends Schema.TaggedError<BroadcastNotSending>()("BroadcastNotSending", { broadcast: DisplayName.schema })
   implements DomainError
 {
   readonly isRetryable = false
   override readonly [ErrorReporter.severity] = "Info" as const
   override get message() {
-    return "campaign is not sending"
+    return "broadcast is not sending"
   }
   get userMessage() {
-    return userText`${this.campaign} isn't being sent, so there's nothing to cancel.`
+    return userText`${this.broadcast} isn't being sent, so there's nothing to cancel.`
   }
 }
 
-/** A campaign needs these before it can be sent. */
-export class CampaignIncomplete
-  extends Schema.TaggedError<CampaignIncomplete>()("CampaignIncomplete", {
-    campaign: DisplayName.schema,
+/** A broadcast needs these before it can be sent. */
+export class BroadcastIncomplete
+  extends Schema.TaggedError<BroadcastIncomplete>()("BroadcastIncomplete", {
+    broadcast: DisplayName.schema,
     missing: Schema.Array(Schema.Literals(["subject", "body", "segment"])),
   })
   implements DomainError
@@ -132,21 +132,21 @@ export class CampaignIncomplete
   readonly isRetryable = false
   override readonly [ErrorReporter.severity] = "Info" as const
   override get message() {
-    return `campaign is missing ${this.missing.join(", ")}`
+    return `broadcast is missing ${this.missing.join(", ")}`
   }
   get userMessage() {
     const subject = this.missing.includes("subject")
     const body = this.missing.includes("body")
     const segment = this.missing.includes("segment")
-    if (subject && body) return userText`${this.campaign} needs a subject and a body before it can be sent.`
-    if (subject) return userText`${this.campaign} needs a subject before it can be sent.`
-    if (body) return userText`${this.campaign} needs a body before it can be sent.`
-    if (segment) return userText`${this.campaign} needs a segment to send to before it can be sent.`
-    return userText`${this.campaign} isn't ready to send.`
+    if (subject && body) return userText`${this.broadcast} needs a subject and a body before it can be sent.`
+    if (subject) return userText`${this.broadcast} needs a subject before it can be sent.`
+    if (body) return userText`${this.broadcast} needs a body before it can be sent.`
+    if (segment) return userText`${this.broadcast} needs a segment to send to before it can be sent.`
+    return userText`${this.broadcast} isn't ready to send.`
   }
 }
 
-/** The segment has nobody a campaign would go to. */
+/** The segment has nobody a broadcast would go to. */
 export class SegmentHasNoRecipients
   extends Schema.TaggedError<SegmentHasNoRecipients>()("SegmentHasNoRecipients", { segment: DisplayName.schema })
   implements DomainError
@@ -157,7 +157,7 @@ export class SegmentHasNoRecipients
     return "segment has no subscribed contacts with an email"
   }
   get userMessage() {
-    return userText`Nobody in ${this.segment} can be sent this campaign: a contact needs an email address and to be subscribed.`
+    return userText`Nobody in ${this.segment} can be sent this broadcast: a contact needs an email address and to be subscribed.`
   }
 }
 

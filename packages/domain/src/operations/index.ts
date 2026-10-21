@@ -7,24 +7,24 @@ import {
 } from "./affiliations.ts"
 import { createApiKey, listApiKeys, revokeApiKey } from "./api-keys.ts"
 import {
-  cancelCampaign,
-  createCampaign,
+  cancelBroadcast,
+  createBroadcast,
   createTemplate,
-  deleteCampaign,
+  deleteBroadcast,
   deleteTemplate,
-  duplicateCampaign,
-  getCampaign,
+  duplicateBroadcast,
+  getBroadcast,
   getTemplate,
-  listCampaignRecipients,
-  listCampaigns,
+  listBroadcastRecipients,
+  listBroadcasts,
   listTemplates,
-  previewCampaign,
+  previewBroadcast,
   previewTemplate,
-  sendCampaign,
-  testSendCampaign,
-  updateCampaign,
+  sendBroadcast,
+  testSendBroadcast,
+  updateBroadcast,
   updateTemplate,
-} from "./campaigns.ts"
+} from "./broadcasts.ts"
 import {
   companyActivity,
   createCompany,
@@ -113,7 +113,7 @@ import { createTeam, listTeams, updateTeam } from "./teams.ts"
 
 export * from "./affiliations.ts"
 export * from "./api-keys.ts"
-export * from "./campaigns.ts"
+export * from "./broadcasts.ts"
 export * from "./companies.ts"
 export * from "./connections.ts"
 export * from "./contacts.ts"
@@ -239,17 +239,17 @@ export const operations = {
   "templates.update": updateTemplate,
   "templates.delete": deleteTemplate,
   "templates.preview": previewTemplate,
-  "campaigns.list": listCampaigns,
-  "campaigns.get": getCampaign,
-  "campaigns.create": createCampaign,
-  "campaigns.update": updateCampaign,
-  "campaigns.delete": deleteCampaign,
-  "campaigns.duplicate": duplicateCampaign,
-  "campaigns.preview": previewCampaign,
-  "campaigns.testSend": testSendCampaign,
-  "campaigns.send": sendCampaign,
-  "campaigns.cancel": cancelCampaign,
-  "campaigns.recipients": listCampaignRecipients,
+  "broadcasts.list": listBroadcasts,
+  "broadcasts.get": getBroadcast,
+  "broadcasts.create": createBroadcast,
+  "broadcasts.update": updateBroadcast,
+  "broadcasts.delete": deleteBroadcast,
+  "broadcasts.duplicate": duplicateBroadcast,
+  "broadcasts.preview": previewBroadcast,
+  "broadcasts.testSend": testSendBroadcast,
+  "broadcasts.send": sendBroadcast,
+  "broadcasts.cancel": cancelBroadcast,
+  "broadcasts.recipients": listBroadcastRecipients,
 } as const
 export type Operations = typeof operations
 export type OperationName = keyof Operations

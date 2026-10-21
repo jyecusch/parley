@@ -9,7 +9,7 @@ export const useEmailStyles = (teamId: TeamId) =>
   useQuery({ queryKey: ["email-styles", teamId], queryFn: () => call("emailStyles.list", { teamId }) })
 
 /**
- * Which email style a template or campaign uses (D117). Null means the team's default, so a later
+ * Which email style a template or broadcast uses (D117). Null means the team's default, so a later
  * change of default carries through.
  */
 export function EmailStyleSelect(props: {

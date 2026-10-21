@@ -81,7 +81,12 @@ export function AddToSegmentDialog(props: {
               trailing={<span className="text-sm">{segment.contactCount}</span>}
             >
               <ItemTile icon={<SegmentIcon className="size-4" />} />
-              <span>{segment.name}</span>
+              <span className="flex min-w-0 flex-col">
+                <span className="truncate">{segment.name}</span>
+                {segment.description ? (
+                  <span className="truncate text-sm text-subtle">{segment.description}</span>
+                ) : null}
+              </span>
             </ChoiceItem>
           ))}
           <ChoiceItem value="new">

@@ -29,7 +29,7 @@ export const Route = createFileRoute("/t/$teamId/templates/")({ component: Templ
 
 const teamRoute = getRouteApi("/t/$teamId")
 
-/** The templates index view (R41): content a new campaign can start from. */
+/** The templates index view (R41): content a new broadcast can start from. */
 function TemplatesScreen() {
   const { team } = teamRoute.useLoaderData()
   const teamId = team.id as TeamId
@@ -79,7 +79,7 @@ function TemplatesScreen() {
         ) : items.length === 0 ? (
           <Centered>
             <EmptyState icon={<TemplateIcon />} title="No templates yet" actions={newButton}>
-              Save the emails you send often as templates. A new campaign can start from one.
+              Save the emails you send often as templates. A new broadcast can start from one.
             </EmptyState>
           </Centered>
         ) : (

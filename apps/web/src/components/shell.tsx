@@ -339,7 +339,7 @@ export function AppShell(props: {
                   <SidebarMenu>
                     {(
                       [
-                        ["/t/$teamId/campaigns", "Campaigns", <SendIcon key="icon" />],
+                        ["/t/$teamId/broadcasts", "Broadcasts", <SendIcon key="icon" />],
                         ["/t/$teamId/templates", "Templates", <TemplateIcon key="icon" />],
                         ["/t/$teamId/segments", "Segments", <SegmentIcon key="icon" />],
                       ] as const
@@ -568,11 +568,11 @@ function CommandMenu(props: { readonly onClose: () => void }) {
         run: go(() => navigate({ to: "/t/$teamId/contacts", params: { teamId: team.id }, search: { deleted: true } })),
       },
       {
-        id: "go:campaigns",
+        id: "go:broadcasts",
         group: "Go to" as const,
-        label: "Campaigns",
+        label: "Broadcasts",
         icon: <SendIcon />,
-        run: go(() => navigate({ to: "/t/$teamId/campaigns", params: { teamId: team.id } })),
+        run: go(() => navigate({ to: "/t/$teamId/broadcasts", params: { teamId: team.id } })),
       },
       {
         id: "go:templates",

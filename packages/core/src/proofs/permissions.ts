@@ -156,12 +156,12 @@ const CanWriteEmailProver = defineProof("CanWriteEmail")
 const CanSendEmailProver = defineProof("CanSendEmail")
 const CanManageEmailProver = defineProof("CanManageEmail")
 
-/** P may write segments, templates and draft campaigns, and test-send them, in team T (R36). */
+/** P may write segments, templates and draft broadcasts, and test-send them, in team T (R36). */
 export interface CanWriteEmail<P, T> extends Proof<"CanWriteEmail", [P, T]> {
   readonly member: MemberOf<P, T>
 }
 
-/** P may send campaigns to their segments in team T (R36). */
+/** P may send broadcasts to their segments in team T (R36). */
 export interface CanSendEmail<P, T> extends Proof<"CanSendEmail", [P, T]> {
   readonly member: MemberOf<P, T>
 }

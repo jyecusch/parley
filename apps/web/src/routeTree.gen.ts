@@ -22,6 +22,8 @@ import { Route as InviteInvitationIdRouteImport } from './routes/invite.$invitat
 import { Route as TTeamIdRouteImport } from './routes/t.$teamId'
 import { Route as UnsubscribeTokenRouteImport } from './routes/unsubscribe.$token'
 import { Route as TTeamIdSettingsRouteImport } from './routes/t.$teamId.settings'
+import { Route as TTeamIdBroadcastsIndexRouteImport } from './routes/t.$teamId.broadcasts.index'
+import { Route as TTeamIdBroadcastsBroadcastIdRouteImport } from './routes/t.$teamId.broadcasts.$broadcastId'
 import { Route as TTeamIdCampaignsIndexRouteImport } from './routes/t.$teamId.campaigns.index'
 import { Route as TTeamIdCampaignsCampaignIdRouteImport } from './routes/t.$teamId.campaigns.$campaignId'
 import { Route as TTeamIdCompaniesIndexRouteImport } from './routes/t.$teamId.companies.index'
@@ -108,6 +110,17 @@ const TTeamIdSettingsRoute = TTeamIdSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => TTeamIdRoute,
 } as any)
+const TTeamIdBroadcastsIndexRoute = TTeamIdBroadcastsIndexRouteImport.update({
+  id: '/broadcasts/',
+  path: '/broadcasts/',
+  getParentRoute: () => TTeamIdRoute,
+} as any)
+const TTeamIdBroadcastsBroadcastIdRoute =
+  TTeamIdBroadcastsBroadcastIdRouteImport.update({
+    id: '/broadcasts/$broadcastId',
+    path: '/broadcasts/$broadcastId',
+    getParentRoute: () => TTeamIdRoute,
+  } as any)
 const TTeamIdCampaignsIndexRoute = TTeamIdCampaignsIndexRouteImport.update({
   id: '/campaigns/',
   path: '/campaigns/',
@@ -232,6 +245,7 @@ export interface FileRoutesByFullPath {
   '/t/$teamId': typeof TTeamIdRouteWithChildren
   '/unsubscribe/$token': typeof UnsubscribeTokenRoute
   '/t/$teamId/settings': typeof TTeamIdSettingsRouteWithChildren
+  '/t/$teamId/broadcasts/$broadcastId': typeof TTeamIdBroadcastsBroadcastIdRoute
   '/t/$teamId/campaigns/$campaignId': typeof TTeamIdCampaignsCampaignIdRoute
   '/t/$teamId/companies/$companyId': typeof TTeamIdCompaniesCompanyIdRoute
   '/t/$teamId/contacts/$contactId': typeof TTeamIdContactsContactIdRoute
@@ -244,6 +258,7 @@ export interface FileRoutesByFullPath {
   '/t/$teamId/settings/members': typeof TTeamIdSettingsMembersRoute
   '/t/$teamId/settings/service-accounts': typeof TTeamIdSettingsServiceAccountsRoute
   '/t/$teamId/templates/$templateId': typeof TTeamIdTemplatesTemplateIdRoute
+  '/t/$teamId/broadcasts/': typeof TTeamIdBroadcastsIndexRoute
   '/t/$teamId/campaigns/': typeof TTeamIdCampaignsIndexRoute
   '/t/$teamId/companies/': typeof TTeamIdCompaniesIndexRoute
   '/t/$teamId/contacts/': typeof TTeamIdContactsIndexRoute
@@ -266,6 +281,7 @@ export interface FileRoutesByTo {
   '/invite/$invitationId': typeof InviteInvitationIdRoute
   '/t/$teamId': typeof TTeamIdRouteWithChildren
   '/unsubscribe/$token': typeof UnsubscribeTokenRoute
+  '/t/$teamId/broadcasts/$broadcastId': typeof TTeamIdBroadcastsBroadcastIdRoute
   '/t/$teamId/campaigns/$campaignId': typeof TTeamIdCampaignsCampaignIdRoute
   '/t/$teamId/companies/$companyId': typeof TTeamIdCompaniesCompanyIdRoute
   '/t/$teamId/contacts/$contactId': typeof TTeamIdContactsContactIdRoute
@@ -278,6 +294,7 @@ export interface FileRoutesByTo {
   '/t/$teamId/settings/members': typeof TTeamIdSettingsMembersRoute
   '/t/$teamId/settings/service-accounts': typeof TTeamIdSettingsServiceAccountsRoute
   '/t/$teamId/templates/$templateId': typeof TTeamIdTemplatesTemplateIdRoute
+  '/t/$teamId/broadcasts': typeof TTeamIdBroadcastsIndexRoute
   '/t/$teamId/campaigns': typeof TTeamIdCampaignsIndexRoute
   '/t/$teamId/companies': typeof TTeamIdCompaniesIndexRoute
   '/t/$teamId/contacts': typeof TTeamIdContactsIndexRoute
@@ -302,6 +319,7 @@ export interface FileRoutesById {
   '/t/$teamId': typeof TTeamIdRouteWithChildren
   '/unsubscribe/$token': typeof UnsubscribeTokenRoute
   '/t/$teamId/settings': typeof TTeamIdSettingsRouteWithChildren
+  '/t/$teamId/broadcasts/$broadcastId': typeof TTeamIdBroadcastsBroadcastIdRoute
   '/t/$teamId/campaigns/$campaignId': typeof TTeamIdCampaignsCampaignIdRoute
   '/t/$teamId/companies/$companyId': typeof TTeamIdCompaniesCompanyIdRoute
   '/t/$teamId/contacts/$contactId': typeof TTeamIdContactsContactIdRoute
@@ -314,6 +332,7 @@ export interface FileRoutesById {
   '/t/$teamId/settings/members': typeof TTeamIdSettingsMembersRoute
   '/t/$teamId/settings/service-accounts': typeof TTeamIdSettingsServiceAccountsRoute
   '/t/$teamId/templates/$templateId': typeof TTeamIdTemplatesTemplateIdRoute
+  '/t/$teamId/broadcasts/': typeof TTeamIdBroadcastsIndexRoute
   '/t/$teamId/campaigns/': typeof TTeamIdCampaignsIndexRoute
   '/t/$teamId/companies/': typeof TTeamIdCompaniesIndexRoute
   '/t/$teamId/contacts/': typeof TTeamIdContactsIndexRoute
@@ -339,6 +358,7 @@ export interface FileRouteTypes {
     | '/t/$teamId'
     | '/unsubscribe/$token'
     | '/t/$teamId/settings'
+    | '/t/$teamId/broadcasts/$broadcastId'
     | '/t/$teamId/campaigns/$campaignId'
     | '/t/$teamId/companies/$companyId'
     | '/t/$teamId/contacts/$contactId'
@@ -351,6 +371,7 @@ export interface FileRouteTypes {
     | '/t/$teamId/settings/members'
     | '/t/$teamId/settings/service-accounts'
     | '/t/$teamId/templates/$templateId'
+    | '/t/$teamId/broadcasts/'
     | '/t/$teamId/campaigns/'
     | '/t/$teamId/companies/'
     | '/t/$teamId/contacts/'
@@ -373,6 +394,7 @@ export interface FileRouteTypes {
     | '/invite/$invitationId'
     | '/t/$teamId'
     | '/unsubscribe/$token'
+    | '/t/$teamId/broadcasts/$broadcastId'
     | '/t/$teamId/campaigns/$campaignId'
     | '/t/$teamId/companies/$companyId'
     | '/t/$teamId/contacts/$contactId'
@@ -385,6 +407,7 @@ export interface FileRouteTypes {
     | '/t/$teamId/settings/members'
     | '/t/$teamId/settings/service-accounts'
     | '/t/$teamId/templates/$templateId'
+    | '/t/$teamId/broadcasts'
     | '/t/$teamId/campaigns'
     | '/t/$teamId/companies'
     | '/t/$teamId/contacts'
@@ -408,6 +431,7 @@ export interface FileRouteTypes {
     | '/t/$teamId'
     | '/unsubscribe/$token'
     | '/t/$teamId/settings'
+    | '/t/$teamId/broadcasts/$broadcastId'
     | '/t/$teamId/campaigns/$campaignId'
     | '/t/$teamId/companies/$companyId'
     | '/t/$teamId/contacts/$contactId'
@@ -420,6 +444,7 @@ export interface FileRouteTypes {
     | '/t/$teamId/settings/members'
     | '/t/$teamId/settings/service-accounts'
     | '/t/$teamId/templates/$templateId'
+    | '/t/$teamId/broadcasts/'
     | '/t/$teamId/campaigns/'
     | '/t/$teamId/companies/'
     | '/t/$teamId/contacts/'
@@ -536,6 +561,20 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/t/$teamId/settings'
       preLoaderRoute: typeof TTeamIdSettingsRouteImport
+      parentRoute: typeof TTeamIdRoute
+    }
+    '/t/$teamId/broadcasts/': {
+      id: '/t/$teamId/broadcasts/'
+      path: '/broadcasts'
+      fullPath: '/t/$teamId/broadcasts/'
+      preLoaderRoute: typeof TTeamIdBroadcastsIndexRouteImport
+      parentRoute: typeof TTeamIdRoute
+    }
+    '/t/$teamId/broadcasts/$broadcastId': {
+      id: '/t/$teamId/broadcasts/$broadcastId'
+      path: '/broadcasts/$broadcastId'
+      fullPath: '/t/$teamId/broadcasts/$broadcastId'
+      preLoaderRoute: typeof TTeamIdBroadcastsBroadcastIdRouteImport
       parentRoute: typeof TTeamIdRoute
     }
     '/t/$teamId/campaigns/': {
@@ -714,11 +753,13 @@ const TTeamIdSettingsRouteWithChildren = TTeamIdSettingsRoute._addFileChildren(
 
 interface TTeamIdRouteChildren {
   TTeamIdSettingsRoute: typeof TTeamIdSettingsRouteWithChildren
+  TTeamIdBroadcastsBroadcastIdRoute: typeof TTeamIdBroadcastsBroadcastIdRoute
   TTeamIdCampaignsCampaignIdRoute: typeof TTeamIdCampaignsCampaignIdRoute
   TTeamIdCompaniesCompanyIdRoute: typeof TTeamIdCompaniesCompanyIdRoute
   TTeamIdContactsContactIdRoute: typeof TTeamIdContactsContactIdRoute
   TTeamIdSegmentsSegmentIdRoute: typeof TTeamIdSegmentsSegmentIdRoute
   TTeamIdTemplatesTemplateIdRoute: typeof TTeamIdTemplatesTemplateIdRoute
+  TTeamIdBroadcastsIndexRoute: typeof TTeamIdBroadcastsIndexRoute
   TTeamIdCampaignsIndexRoute: typeof TTeamIdCampaignsIndexRoute
   TTeamIdCompaniesIndexRoute: typeof TTeamIdCompaniesIndexRoute
   TTeamIdContactsIndexRoute: typeof TTeamIdContactsIndexRoute
@@ -728,11 +769,13 @@ interface TTeamIdRouteChildren {
 
 const TTeamIdRouteChildren: TTeamIdRouteChildren = {
   TTeamIdSettingsRoute: TTeamIdSettingsRouteWithChildren,
+  TTeamIdBroadcastsBroadcastIdRoute: TTeamIdBroadcastsBroadcastIdRoute,
   TTeamIdCampaignsCampaignIdRoute: TTeamIdCampaignsCampaignIdRoute,
   TTeamIdCompaniesCompanyIdRoute: TTeamIdCompaniesCompanyIdRoute,
   TTeamIdContactsContactIdRoute: TTeamIdContactsContactIdRoute,
   TTeamIdSegmentsSegmentIdRoute: TTeamIdSegmentsSegmentIdRoute,
   TTeamIdTemplatesTemplateIdRoute: TTeamIdTemplatesTemplateIdRoute,
+  TTeamIdBroadcastsIndexRoute: TTeamIdBroadcastsIndexRoute,
   TTeamIdCampaignsIndexRoute: TTeamIdCampaignsIndexRoute,
   TTeamIdCompaniesIndexRoute: TTeamIdCompaniesIndexRoute,
   TTeamIdContactsIndexRoute: TTeamIdContactsIndexRoute,

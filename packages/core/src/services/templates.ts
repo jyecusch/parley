@@ -14,7 +14,7 @@ export interface ContentInput {
   readonly body?: string | undefined
 }
 
-/** A template's or campaign's email style: undefined leaves it, null means the team's default (D117). */
+/** A template's or broadcast's email style: undefined leaves it, null means the team's default (D117). */
 export interface StyleChoice<T> {
   readonly style?: EmailStyleOfTeam<T> | null | undefined
 }
@@ -34,7 +34,7 @@ const toTemplate = (row: typeof schema.templates.$inferSelect): Template => ({
   updatedAt: row.updatedAt.toISOString(),
 })
 
-/** Templates (R41): reusable content a campaign starts from. Process tier. */
+/** Templates (R41): reusable content a broadcast starts from. Process tier. */
 export class Templates extends Context.Service<
   Templates,
   {

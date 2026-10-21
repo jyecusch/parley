@@ -2,7 +2,7 @@ import type { InputHTMLAttributes, ReactNode } from "react"
 import { cn } from "./cn.ts"
 import { Avatar } from "./data.tsx"
 
-/** A campaign, template or segment's mark in a list: its kind's icon on a square tile. */
+/** A broadcast, template or segment's mark in a list: its kind's icon on a square tile. */
 export function ItemTile({ icon }: { icon: ReactNode }) {
   return (
     <Avatar size="md" shape="square">

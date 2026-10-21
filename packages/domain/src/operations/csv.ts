@@ -1,5 +1,5 @@
 import { Schema } from "effect"
-import { SegmentNotFound } from "../errors/campaigns.ts"
+import { SegmentNotFound } from "../errors/broadcasts.ts"
 import { FieldProblem } from "../errors/input.ts"
 import { Filter } from "../filter.ts"
 import { SegmentId, TeamId, UserId } from "../ids.ts"

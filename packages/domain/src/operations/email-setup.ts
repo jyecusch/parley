@@ -19,7 +19,7 @@ import {
   SendingDomainNotFound,
   SendingDomainTaken,
   TopicNotFound,
-} from "../errors/campaigns.ts"
+} from "../errors/broadcasts.ts"
 import { ContactNotFound } from "../errors/contacts.ts"
 import { EmailErrors } from "../errors/email.ts"
 import { ContactId, SendingDomainId, TeamId, TopicId } from "../ids.ts"
@@ -36,7 +36,7 @@ const OneContact = { ...InTeam, contactId: ContactId.annotate({ description: "Th
 export const getEmailSettings = defineTeamOperation({
   name: "emailSettings.get",
   description:
-    "The team's sender and footer for marketing email, and what's still missing before it can send. Every campaign email ends with the footer.",
+    "The team's sender and footer for marketing email, and what's still missing before it can send. Every broadcast email ends with the footer.",
   input: Schema.Struct(InTeam),
   output: EmailSettings,
   errors: [],
@@ -120,7 +120,7 @@ export const deleteSendingDomain = defineTeamOperation({
 export const listTopics = defineTeamOperation({
   name: "topics.list",
   description:
-    "List the team's topics: kinds of marketing email a contact can unsubscribe from on its own. A campaign can have one.",
+    "List the team's topics: kinds of marketing email a contact can unsubscribe from on its own. A broadcast can have one.",
   input: Schema.Struct(InTeam),
   output: Schema.Array(Topic),
   errors: [],
@@ -162,7 +162,7 @@ export const updateTopic = defineTeamOperation({
 export const deleteTopic = defineTeamOperation({
   name: "topics.delete",
   description:
-    "Delete a topic. Unsubscribes from it are forgotten, and campaigns that had it no longer do. Contacts unsubscribed from all email stay unsubscribed.",
+    "Delete a topic. Unsubscribes from it are forgotten, and broadcasts that had it no longer do. Contacts unsubscribed from all email stay unsubscribed.",
   input: Schema.Struct(OneTopic),
   output: Topic,
   errors: [TopicNotFound],

@@ -16,7 +16,7 @@ import { proveMemberOf } from "../proofs/member-of.ts"
 import { proveCanManageEmail, proveCanWriteEmail } from "../proofs/permissions.ts"
 import { named } from "../proofs/proof.ts"
 import { checkCustomHtml, EmailStyles } from "../services/email-styles.ts"
-import { previewFooter } from "./campaigns.ts"
+import { previewFooter } from "./broadcasts.ts"
 
 /** What a style's preview shows: the parts of an email a style changes. */
 const SAMPLE_CONTENT = {

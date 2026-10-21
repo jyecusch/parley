@@ -1,10 +1,10 @@
 import { Database, schema } from "@parley/db"
-import type { CampaignId, ContactId, EmailError, TeamId, TopicId } from "@parley/domain"
+import type { BroadcastId, ContactId, EmailError, TeamId, TopicId } from "@parley/domain"
 import { eq, inArray, sql } from "drizzle-orm"
 import { Config, Context, Duration, Effect, Layer, Ref } from "effect"
 import { type MergeValues, renderEmail } from "../email/render.ts"
 import { Mailer, type OutgoingEmail } from "../mail/mailer.ts"
-import { styleSentWith } from "./campaigns.ts"
+import { styleSentWith } from "./broadcasts.ts"
 import type { Sender } from "./sending.ts"
 import { UnsubscribeLinks } from "./unsubscribe-links.ts"
 
@@ -15,7 +15,7 @@ const MAX_ATTEMPTS = 5
 
 interface Claimed {
   readonly id: string
-  readonly campaign_id: string
+  readonly broadcast_id: string
   readonly contact_id: string | null
   readonly address: string | null
   readonly name: string
@@ -28,33 +28,33 @@ const rowsOf = <A>(result: unknown): ReadonlyArray<A> =>
   Array.isArray(result) ? (result as ReadonlyArray<A>) : ((result as { readonly rows?: ReadonlyArray<A> }).rows ?? [])
 
 /**
- * Sends queued campaign email in the background (R43). Process tier: shared by every team, so it
+ * Sends queued broadcast email in the background (R43). Process tier: shared by every team, so it
  * holds no team's data. Each message carries its own team's sender and footer, copied onto the
- * campaign when it started (03-tiers). Postgres is the queue, so several servers can share it.
+ * broadcast when it started (03-tiers). Postgres is the queue, so several servers can share it.
  */
-export class CampaignSender extends Context.Service<
-  CampaignSender,
+export class BroadcastSender extends Context.Service<
+  BroadcastSender,
   {
     /** Sends one batch for the next team in turn, if any is due. How many recipients it handled. */
     readonly sendBatch: Effect.Effect<number>
     /** Sends until nothing is due. For tests and for draining on demand. */
     readonly drain: Effect.Effect<number>
   }
->()("@parley/core/CampaignSender") {
+>()("@parley/core/BroadcastSender") {
   static readonly layer = Layer.effect(
-    CampaignSender,
+    BroadcastSender,
     Effect.gen(function* () {
       const db = yield* Database
       const mailer = yield* Mailer
       const links = yield* UnsubscribeLinks
-      // Teams take turns, a batch each, so one big campaign doesn't hold up everyone else's.
+      // Teams take turns, a batch each, so one big broadcast doesn't hold up everyone else's.
       const lastTeam = yield* Ref.make("")
 
       const nextTeam = Effect.gen(function* () {
         const teams = rowsOf<{ team_id: string }>(
           yield* db.query((d) =>
-            d.execute(sql`select distinct r.team_id from "campaign_recipients" r
-              join "campaigns" c on c.id = r.campaign_id
+            d.execute(sql`select distinct r.team_id from "broadcast_recipients" r
+              join "broadcasts" c on c.id = r.broadcast_id
               where r.status = 'queued' and c.status = 'sending'
                 and (r.next_attempt_at is null or r.next_attempt_at <= now())
               order by r.team_id`),
@@ -69,23 +69,23 @@ export class CampaignSender extends Context.Service<
       const claim = (teamId: string) =>
         db
           .query((d) =>
-            d.execute(sql`update "campaign_recipients"
+            d.execute(sql`update "broadcast_recipients"
               set next_attempt_at = now() + make_interval(mins => ${LEASE_MINUTES}),
                 attempts = attempts + 1, updated_at = now()
               where id in (
-                select r.id from "campaign_recipients" r join "campaigns" c on c.id = r.campaign_id
+                select r.id from "broadcast_recipients" r join "broadcasts" c on c.id = r.broadcast_id
                 where r.team_id = ${teamId} and r.status = 'queued' and c.status = 'sending'
                   and (r.next_attempt_at is null or r.next_attempt_at <= now())
                 order by r.created_at limit ${BATCH}
                 for update of r skip locked)
-              returning id, campaign_id, contact_id, address, name, merge, attempts`),
+              returning id, broadcast_id, contact_id, address, name, merge, attempts`),
           )
           .pipe(Effect.map(rowsOf<Claimed>))
 
       const markSent = (claimed: Claimed, providerId: string) =>
         db.query((d) =>
           d
-            .update(schema.campaignRecipients)
+            .update(schema.broadcastRecipients)
             .set({
               status: "sent",
               providerId: providerId || null,
@@ -94,26 +94,26 @@ export class CampaignSender extends Context.Service<
               error: null,
               updatedAt: sql`now()`,
             })
-            .where(eq(schema.campaignRecipients.id, claimed.id)),
+            .where(eq(schema.broadcastRecipients.id, claimed.id)),
         )
 
       const markFailed = (ids: ReadonlyArray<string>, error: string) =>
         db.query((d) =>
           d
-            .update(schema.campaignRecipients)
+            .update(schema.broadcastRecipients)
             .set({ status: "failed", error, nextAttemptAt: null, updatedAt: sql`now()` })
-            .where(inArray(schema.campaignRecipients.id, [...ids])),
+            .where(inArray(schema.broadcastRecipients.id, [...ids])),
         )
 
       const retryLater = (ids: ReadonlyArray<string>, after: Duration.Duration) =>
         db.query((d) =>
           d
-            .update(schema.campaignRecipients)
+            .update(schema.broadcastRecipients)
             .set({
               nextAttemptAt: sql`now() + make_interval(secs => ${Math.ceil(Duration.toSeconds(after))})`,
               updatedAt: sql`now()`,
             })
-            .where(inArray(schema.campaignRecipients.id, [...ids])),
+            .where(inArray(schema.broadcastRecipients.id, [...ids])),
         )
 
       /** What happens to a batch the provider didn't take: wait and retry, or give up in our words. */
@@ -135,14 +135,14 @@ export class CampaignSender extends Context.Service<
           }
         })
 
-      /** A campaign with nothing left queued is sent. */
-      const finish = (campaignIds: ReadonlyArray<string>) =>
-        Effect.forEach(campaignIds, (campaignId) =>
+      /** A broadcast with nothing left queued is sent. */
+      const finish = (broadcastIds: ReadonlyArray<string>) =>
+        Effect.forEach(broadcastIds, (broadcastId) =>
           db.query((d) =>
-            d.execute(sql`update "campaigns" set status = 'sent', finished_at = now(), updated_at = now()
-              where id = ${campaignId} and status = 'sending'
-                and not exists (select 1 from "campaign_recipients" r
-                  where r.campaign_id = ${campaignId} and r.status = 'queued')`),
+            d.execute(sql`update "broadcasts" set status = 'sent', finished_at = now(), updated_at = now()
+              where id = ${broadcastId} and status = 'sending'
+                and not exists (select 1 from "broadcast_recipients" r
+                  where r.broadcast_id = ${broadcastId} and r.status = 'queued')`),
           ),
         )
 
@@ -151,25 +151,25 @@ export class CampaignSender extends Context.Service<
         if (!teamId) return 0
         const claimed = yield* claim(teamId)
         if (claimed.length === 0) return 0
-        const campaignIds = [...new Set(claimed.map((row) => row.campaign_id))]
-        const campaigns = yield* db.query((d) =>
-          d.select().from(schema.campaigns).where(inArray(schema.campaigns.id, campaignIds)),
+        const broadcastIds = [...new Set(claimed.map((row) => row.broadcast_id))]
+        const broadcasts = yield* db.query((d) =>
+          d.select().from(schema.broadcasts).where(inArray(schema.broadcasts.id, broadcastIds)),
         )
-        const byId = new Map(campaigns.map((campaign) => [campaign.id, campaign]))
+        const byId = new Map(broadcasts.map((broadcast) => [broadcast.id, broadcast]))
 
         const ready: Array<{ readonly row: Claimed; readonly email: OutgoingEmail }> = []
         for (const row of claimed) {
-          const campaign = byId.get(row.campaign_id)
-          const sender = campaign?.sentAs as Sender | null | undefined
-          if (!campaign || !sender || !row.address) {
-            yield* markFailed([row.id], "This campaign couldn't be prepared for sending.")
+          const broadcast = byId.get(row.broadcast_id)
+          const sender = broadcast?.sentAs as Sender | null | undefined
+          if (!broadcast || !sender || !row.address) {
+            yield* markFailed([row.id], "This broadcast couldn't be prepared for sending.")
             continue
           }
           const token = links.sign({
-            teamId: campaign.teamId as TeamId,
+            teamId: broadcast.teamId as TeamId,
             contactId: row.contact_id as ContactId | null,
-            topicId: campaign.topicId as TopicId | null,
-            campaignId: campaign.id as CampaignId,
+            topicId: broadcast.topicId as TopicId | null,
+            broadcastId: broadcast.id as BroadcastId,
             test: false,
           })
           const urls = links.urls(token)
@@ -182,7 +182,7 @@ export class CampaignSender extends Context.Service<
             company: merge.company ?? "",
           }
           const rendered = renderEmail(
-            campaign,
+            broadcast,
             values,
             {
               legalName: sender.legalName,
@@ -190,7 +190,7 @@ export class CampaignSender extends Context.Service<
               reason: sender.footerReason,
               unsubscribeUrl: urls.page,
             },
-            styleSentWith(campaign.sentAs),
+            styleSentWith(broadcast.sentAs),
           )
           ready.push({
             row,
@@ -222,22 +222,22 @@ export class CampaignSender extends Context.Service<
               Effect.forEach(ready, (entry, index) =>
                 Effect.gen(function* () {
                   yield* markSent(entry.row, outcome.success[index]?.providerId ?? "")
-                  const campaign = byId.get(entry.row.campaign_id)
-                  if (!campaign || !entry.row.contact_id) return
+                  const broadcast = byId.get(entry.row.broadcast_id)
+                  if (!broadcast || !entry.row.contact_id) return
                   // Credited to whoever pressed Send (R49).
                   yield* db.query((d) =>
                     d.insert(schema.activity).values({
                       id: crypto.randomUUID(),
-                      teamId: campaign.teamId,
+                      teamId: broadcast.teamId,
                       recordType: "contact",
                       recordId: entry.row.contact_id as string,
                       kind: "emailed",
                       changedFields: [],
-                      relatedRecordType: "campaign",
-                      relatedRecordId: campaign.id,
-                      relatedName: campaign.name,
-                      actorUserId: campaign.sentByUserId,
-                      actorName: campaign.sentByName ?? "Parley",
+                      relatedRecordType: "broadcast",
+                      relatedRecordId: broadcast.id,
+                      relatedName: broadcast.name,
+                      actorUserId: broadcast.sentByUserId,
+                      actorName: broadcast.sentByName ?? "Parley",
                     }),
                   )
                 }),
@@ -245,11 +245,11 @@ export class CampaignSender extends Context.Service<
             )
           }
         }
-        yield* finish(campaignIds)
+        yield* finish(broadcastIds)
         return claimed.length
       }).pipe(
-        Effect.catchTag("SqlError", (error) => Effect.logWarning("campaign sending failed", error).pipe(Effect.as(0))),
-        Effect.withSpan("CampaignSender.sendBatch"),
+        Effect.catchTag("SqlError", (error) => Effect.logWarning("broadcast sending failed", error).pipe(Effect.as(0))),
+        Effect.withSpan("BroadcastSender.sendBatch"),
       )
 
       const drain = Effect.gen(function* () {
@@ -268,7 +268,7 @@ export class CampaignSender extends Context.Service<
   /** Keeps sending: paced to EMAIL_BATCHES_PER_SECOND (default 2, Resend's limit), idle checks every 2s. */
   static readonly schedule = Layer.effectDiscard(
     Effect.gen(function* () {
-      const sender = yield* CampaignSender
+      const sender = yield* BroadcastSender
       const perSecond = yield* Config.withDefault(Config.Number("EMAIL_BATCHES_PER_SECOND"), 2).pipe(Effect.orDie)
       const pause = Duration.millis(Math.ceil(1000 / Math.max(perSecond, 0.1)))
       yield* Effect.forkScoped(
@@ -276,7 +276,7 @@ export class CampaignSender extends Context.Service<
           sender.sendBatch.pipe(
             Effect.flatMap((handled) => Effect.sleep(handled > 0 ? pause : Duration.seconds(2))),
             Effect.catchCause((cause) =>
-              Effect.logWarning("campaign sender failed", cause).pipe(
+              Effect.logWarning("broadcast sender failed", cause).pipe(
                 Effect.andThen(Effect.sleep(Duration.seconds(5))),
               ),
             ),

@@ -30,7 +30,7 @@ export const SAMPLE_VALUES: MergeValues = {
   company: "Example Co",
 }
 
-/** The footer every campaign email ends with (R40). Null link: a preview, which has none yet. */
+/** The footer every broadcast email ends with (R40). Null link: a preview, which has none yet. */
 export interface Footer {
   readonly legalName: string
   readonly postalAddress: string
@@ -386,7 +386,7 @@ const plainTextOf = (body: string) =>
     .replace(/!\[([^\]]*)\]\([^)\s]+(?:\s+"[^"]*")?\)/g, (_, alt: string) => `[${alt}]`)
 
 /**
- * A campaign as one recipient gets it (R40, R41): subject, HTML with the footer, and a plain-text
+ * A broadcast as one recipient gets it (R40, R41): subject, HTML with the footer, and a plain-text
  * part, in an email style (D116). Pure, so the preview, test sends and real sends all render the
  * same way.
  */

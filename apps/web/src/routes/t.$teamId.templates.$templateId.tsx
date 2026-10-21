@@ -93,14 +93,14 @@ function TemplateEditor(props: { readonly teamId: TeamId; readonly template: Tem
     }
   })
 
-  const startCampaign = async () => {
+  const startBroadcast = async () => {
     try {
-      const campaign = await call("campaigns.create", {
+      const broadcast = await call("broadcasts.create", {
         teamId,
-        name: draft.name || "Untitled campaign",
+        name: draft.name || "Untitled broadcast",
         templateId: saved.id,
       })
-      await navigate({ to: "/t/$teamId/campaigns/$campaignId", params: { teamId, campaignId: campaign.id } })
+      await navigate({ to: "/t/$teamId/broadcasts/$broadcastId", params: { teamId, broadcastId: broadcast.id } })
     } catch (failure) {
       setError(messageOf(failure))
     }
@@ -154,8 +154,8 @@ function TemplateEditor(props: { readonly teamId: TeamId; readonly template: Tem
               <Button variant="ghost" onClick={() => setConfirmDelete(true)}>
                 Delete
               </Button>
-              <Button variant="primary" onClick={() => void startCampaign()}>
-                Use in a campaign
+              <Button variant="primary" onClick={() => void startBroadcast()}>
+                Use in a broadcast
               </Button>
             </>
           )
@@ -177,7 +177,7 @@ function TemplateEditor(props: { readonly teamId: TeamId; readonly template: Tem
             value={draft.styleId}
             disabled={!props.canWrite}
             onChange={(styleId) => setDraft((current) => ({ ...current, styleId }))}
-            hint="Campaigns made from this template start with this style."
+            hint="Broadcasts made from this template start with this style."
           />
         }
       />

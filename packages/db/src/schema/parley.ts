@@ -141,7 +141,7 @@ export const activity = pgTable(
     }).notNull(),
     changedFields: text("changed_fields").array().notNull().default(sql`'{}'::text[]`),
     /** The other record an affiliation change was about, and its name at the time. */
-    relatedRecordType: text("related_record_type", { enum: ["contact", "company", "campaign"] }),
+    relatedRecordType: text("related_record_type", { enum: ["contact", "company", "broadcast"] }),
     relatedRecordId: uuid("related_record_id"),
     relatedName: text("related_name"),
     /** Set when Parley made the change itself (D105). */
@@ -433,13 +433,15 @@ export const topicUnsubscribes = pgTable(
   (t) => [unique("topic_unsubscribes_key").on(t.contactId, t.topicId)],
 )
 
-/** A group of contacts a campaign is sent to (D23): by filter, or hand-picked. */
+/** A group of contacts a broadcast is sent to (D23): by filter, or hand-picked. */
 export const segments = pgTable(
   "segments",
   {
     id: uuid("id").primaryKey(),
     teamId: teamId(),
     name: text("name").notNull(),
+    /** What the segment is for (D141), or null. */
+    description: text("description"),
     kind: text("kind", { enum: ["dynamic", "fixed"] }).notNull(),
     /** A dynamic segment's filter over contacts (D59). Null for a fixed segment. */
     filter: jsonb("filter").$type<unknown>(),
@@ -520,7 +522,7 @@ export const emailImages = pgTable(
   (t) => [index("email_images_team_idx").on(t.teamId)],
 )
 
-/** Reusable content a campaign starts from (R41). */
+/** Reusable content a broadcast starts from (R41). */
 export const templates = pgTable(
   "templates",
   {
@@ -538,8 +540,8 @@ export const templates = pgTable(
 )
 
 /** One marketing email (R42). A draft until sent; sent ones keep their sender and footer as sent. */
-export const campaigns = pgTable(
-  "campaigns",
+export const broadcasts = pgTable(
+  "broadcasts",
   {
     id: uuid("id").primaryKey(),
     teamId: teamId(),
@@ -547,14 +549,14 @@ export const campaigns = pgTable(
     subject: text("subject").notNull().default(""),
     previewText: text("preview_text").notNull().default(""),
     body: text("body").notNull().default(""),
-    /** Null uses the team's default style (D117). A sent campaign's look is in sent_as. */
+    /** Null uses the team's default style (D117). A sent broadcast's look is in sent_as. */
     styleId: uuid("style_id").references(() => emailStyles.id, { onDelete: "set null" }),
     segmentId: uuid("segment_id").references(() => segments.id, { onDelete: "set null" }),
     topicId: uuid("topic_id").references(() => topics.id, { onDelete: "set null" }),
     status: text("status", { enum: ["draft", "sending", "sent", "cancelled"] })
       .notNull()
       .default("draft"),
-    /** Copied when sending starts, so later settings changes don't alter a campaign in flight. */
+    /** Copied when sending starts, so later settings changes don't alter a broadcast in flight. */
     sentAs: jsonb("sent_as").$type<unknown>(),
     segmentName: text("segment_name"),
     topicName: text("topic_name"),
@@ -564,23 +566,23 @@ export const campaigns = pgTable(
     finishedAt: timestamp("finished_at", { withTimezone: true }),
     ...timestamps,
   },
-  (t) => [index("campaigns_team_idx").on(t.teamId, t.updatedAt)],
+  (t) => [index("broadcasts_team_idx").on(t.teamId, t.updatedAt)],
 )
 
-/** A contact a campaign is sent to, and what happened (R42, R46). */
-export const campaignRecipients = pgTable(
-  "campaign_recipients",
+/** A contact a broadcast is sent to, and what happened (R42, R46). */
+export const broadcastRecipients = pgTable(
+  "broadcast_recipients",
   {
     id: uuid("id").primaryKey(),
     teamId: teamId(),
-    campaignId: uuid("campaign_id")
+    broadcastId: uuid("broadcast_id")
       .notNull()
-      .references(() => campaigns.id, { onDelete: "cascade" }),
+      .references(() => broadcasts.id, { onDelete: "cascade" }),
     contactId: uuid("contact_id").references(() => contacts.id, { onDelete: "set null" }),
     /** Kept as sent, in case the contact changes or is purged. */
     address: text("address"),
     name: text("name").notNull(),
-    /** Merge tag values, taken when the campaign was queued. */
+    /** Merge tag values, taken when the broadcast was queued. */
     merge: jsonb("merge").$type<Record<string, string>>().notNull().default({}),
     status: text("status", {
       enum: ["queued", "sent", "delivered", "skipped", "failed", "bounced", "marked-as-spam", "cancelled"],
@@ -596,9 +598,9 @@ export const campaignRecipients = pgTable(
     ...timestamps,
   },
   (t) => [
-    unique("campaign_recipients_key").on(t.campaignId, t.contactId),
-    index("campaign_recipients_queue_idx").on(t.status, t.teamId, t.createdAt),
-    index("campaign_recipients_provider_idx").on(t.providerId),
+    unique("broadcast_recipients_key").on(t.broadcastId, t.contactId),
+    index("broadcast_recipients_queue_idx").on(t.status, t.teamId, t.createdAt),
+    index("broadcast_recipients_provider_idx").on(t.providerId),
   ],
 )
 

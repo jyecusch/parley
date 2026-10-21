@@ -67,10 +67,10 @@ export function SubscriptionSection(props: {
       </PropertyRow>
       {status === "bounced" ? (
         <p className="m-0 mt-1 text-sm text-subtle">
-          Email to this address bounced, so campaigns skip it. Fix the address, then subscribe again.
+          Email to this address bounced, so broadcasts skip it. Fix the address, then subscribe again.
         </p>
       ) : status === "marked-as-spam" ? (
-        <p className="m-0 mt-1 text-sm text-subtle">They marked a campaign as spam, so campaigns skip them.</p>
+        <p className="m-0 mt-1 text-sm text-subtle">They marked a broadcast as spam, so broadcasts skip them.</p>
       ) : null}
       {status === "subscribed" && topics.length > 0 ? (
         <div className="flex flex-col gap-0.5 px-1.5 pt-1">

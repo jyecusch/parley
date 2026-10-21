@@ -228,7 +228,7 @@ export class Subscriptions extends Context.Service<
 
       const apply = <L>(link: UnsubscribeLinkValid<L>, change: UnsubscribeChange) =>
         Effect.gen(function* () {
-          const { teamId, contactId, topicId, campaignId, test } = link.facts
+          const { teamId, contactId, topicId, broadcastId, test } = link.facts
           const contact = contactId && !test ? yield* contactOf(teamId, contactId) : undefined
           if (!contact || !contactId) return yield* page(link)
           const name = [contact.firstName, contact.lastName].filter(Boolean).join(" ") || contact.address || "Contact"
@@ -243,7 +243,7 @@ export class Subscriptions extends Context.Service<
                 kind,
                 changedFields: [],
                 topicName,
-                ...(campaignId ? { relatedRecordType: "campaign" as const, relatedRecordId: campaignId } : {}),
+                ...(broadcastId ? { relatedRecordType: "broadcast" as const, relatedRecordId: broadcastId } : {}),
                 ...actor,
               }),
             )
@@ -279,7 +279,7 @@ export class Subscriptions extends Context.Service<
               Effect.gen(function* () {
                 switch (change.kind) {
                   case "one-click":
-                    // RFC 8058: one request, no questions. The campaign's topic if it had one, else everything.
+                    // RFC 8058: one request, no questions. The broadcast's topic if it had one, else everything.
                     if (topicId) {
                       const [exists] = yield* db.query((d) =>
                         d

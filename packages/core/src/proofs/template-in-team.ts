@@ -26,7 +26,7 @@ export const proveTemplateInTeam = <P, T, K>(
 
 const TemplateOfTeamProver = defineProof("TemplateOfTeam")
 
-/** A template belongs to team T. For starting a campaign from it, where its id needn't be named. */
+/** A template belongs to team T. For starting a broadcast from it, where its id needn't be named. */
 export interface TemplateOfTeam<T> extends Proof<"TemplateOfTeam", [T]> {
   readonly team: Named<T, TeamId>
   readonly found: Template

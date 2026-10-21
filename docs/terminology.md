@@ -25,7 +25,7 @@ How to pick a name: choose the most common name for the concept. Reject anything
 | **Record type** | Contact or company. | entity type, object type, model |
 | **Field** | A property of a record, either built-in (first name, emails) or custom. | attribute, property, column (outside SQL) |
 | **Custom field** | A field a team defines on contacts or companies, with a type (text, number, date, checkbox, single select, multi select, URL, email, phone). | custom property, user field, extra field |
-| **Primary email** | The one email address of a contact that's marked primary. Campaigns are sent to it. | main email, default email |
+| **Primary email** | The one email address of a contact that's marked primary. Broadcasts are sent to it. | main email, default email |
 | **Display name** | The name shown for a record: a contact's first and last name (falling back to the primary email), or a company's name. Becomes a `DisplayName` value in user messages. | label, title (title is an affiliation's job title) |
 | **Delete** | Hide a record immediately. It can be restored for 30 days, then it's purged. | archive, trash, remove, soft-delete (as a separate word) |
 | **Restore** | Bring back a deleted record within 30 days. | undelete, recover, unarchive |
@@ -108,22 +108,22 @@ How to pick a name: choose the most common name for the concept. Reject anything
 
 | Term | Meaning | Banned synonyms |
 | --- | --- | --- |
-| **Segment** | A group of contacts that a campaign is sent to. It comes in two kinds: a **dynamic segment** is defined by filters and its contacts change as records change; a **fixed segment** is a hand-picked set of contacts. It matches Resend's current term (Resend replaced "Audiences" with "Segments" in Nov 2025). | audience, list, group, cohort, contact set |
+| **Segment** | A group of contacts that a broadcast is sent to. It comes in two kinds: a **dynamic segment** is defined by filters and its contacts change as records change; a **fixed segment** is a hand-picked set of contacts. It matches Resend's current term (Resend replaced "Audiences" with "Segments" in Nov 2025). | audience, list, group, cohort, contact set |
 
-| **Campaign** | One marketing email: its subject, content, segment and topic, and, once sent, its recipients and results. | broadcast, blast, newsletter (as a noun for the thing sent), mailing, send |
-| **Draft** | A campaign that hasn't been sent. A status of a campaign, not a separate thing. | unsent campaign, pending campaign |
-| **Template** | Reusable content (subject and body) that a new campaign starts from. The campaign takes a copy; editing the template later doesn't change it. | layout, design (for email content), theme |
-| **Email style** | A reusable look for emails: logo and header, colours, font, footer alignment, plain or card, or custom HTML (D116, D121). A team has a default; templates and campaigns can use another. Not a template, which is content. | layout, brand, theme, letterhead, email design |
-| **Preview text** | The line inbox apps show after a campaign's subject. | preheader, snippet, teaser |
+| **Broadcast** | One marketing email sent to a segment at once: its subject, content, segment and topic, and, once sent, its recipients and results (D140). | campaign (reserved: in marketing it means something broader), blast, newsletter (as a noun for the thing sent), mailing, send |
+| **Draft** | A broadcast that hasn't been sent. A status of a broadcast, not a separate thing. | unsent broadcast, pending broadcast |
+| **Template** | Reusable content (subject and body) that a new broadcast starts from. The broadcast takes a copy; editing the template later doesn't change it. | layout, design (for email content), theme |
+| **Email style** | A reusable look for emails: logo and header, colours, font, footer alignment, plain or card, or custom HTML (D116, D121). A team has a default; templates and broadcasts can use another. Not a template, which is content. | layout, brand, theme, letterhead, email design |
+| **Preview text** | The line inbox apps show after a broadcast's subject. | preheader, snippet, teaser |
 | **Merge tag** | A placeholder in a subject or body, like `{{first_name}}`, filled in per recipient. | variable, placeholder, token, personalization tag |
 | **Test send** | Sending a draft to members of the team (not contacts) to check it. | preview email, proof, test email |
-| **Recipient** | A contact a campaign was sent, or is being sent, to. | subscriber (as a noun for a contact), target |
-| **Topic** | A kind of marketing email a team sends (for example "Product updates"). A campaign can have one; a contact can unsubscribe from a single topic. Kept by Parley, not Resend. | category, list, channel, preference |
+| **Recipient** | A contact a broadcast was sent, or is being sent, to. | subscriber (as a noun for a contact), target |
+| **Topic** | A kind of marketing email a team sends (for example "Product updates"). A broadcast can have one; a contact can unsubscribe from a single topic. Kept by Parley, not Resend. | category, list, channel, preference |
 | **Subscription status** | Whether a contact receives marketing email: subscribed, unsubscribed, bounced or marked as spam. | opt-in status, consent status, email status |
 | **Unsubscribe** | A contact choosing to stop getting marketing email, from one topic or all of them, through the unsubscribe link. | opt out (as a verb), remove me |
-| **Unsubscribe link** | The link in every campaign email (and its List-Unsubscribe header) that unsubscribes the recipient. | opt-out link, manage preferences link |
-| **Footer** | What Parley adds to the end of every campaign email: the sender's legal name and postal address, and the unsubscribe link. Required by anti-spam law. | signature, compliance block, legal text |
-| **Sender** | Who a campaign email is from: a name and an address on a sending domain. | from, sender identity, mailbox |
+| **Unsubscribe link** | The link in every broadcast email (and its List-Unsubscribe header) that unsubscribes the recipient. | opt-out link, manage preferences link |
+| **Footer** | What Parley adds to the end of every broadcast email: the sender's legal name and postal address, and the unsubscribe link. Required by anti-spam law. | signature, compliance block, legal text |
+| **Sender** | Who a broadcast email is from: a name and an address on a sending domain. | from, sender identity, mailbox |
 | **Sending domain** | A domain the team has verified with DNS records so Parley can send email from it. Not a company's domain. | email domain (here), verified domain, DKIM domain |
 
 ## Changelog
@@ -132,7 +132,7 @@ How to pick a name: choose the most common name for the concept. Reject anything
 | --- | --- |
 | 2026-10-19 | Created. Tenant is **team** (was "org"), the credential is **API key** (was "token"), the non-human identity is **service account** (was "agent principal"), the relation is **membership**, the entrypoint is **entrypoint** (was "door"/"adapter"), and lifetimes are **tiers** (was "scope tiers"). |
 | 2026-10-19 | **Member** replaces "membership". The `member` role is understood as the default role, so the overlap is low-risk (owner's call). |
-| 2026-10-19 | **Segment** (dynamic or fixed) is the term for a group of contacts a campaign is sent to (owner's call). |
+| 2026-10-19 | **Segment** (dynamic or fixed) is the term for a group of contacts a broadcast is sent to (owner's call). |
 | 2026-10-19 | Added affiliation, field, custom field, primary email, display name, delete, restore and purge (schema decisions D24–D34). **Affiliation** is Claude's pick, open to veto. |
 | 2026-10-19 | Added record type, reference id, command menu and shortcut. |
 | 2026-10-19 | Added saved view, filter, import/export and toast. |
@@ -146,6 +146,7 @@ How to pick a name: choose the most common name for the concept. Reject anything
 | 2026-10-21 | Added **social profile** (D133). |
 | 2026-10-21 | Added **import** (D135). |
 | 2026-10-20 | Added **domain**, **free email domain** and **domain matching** (D105, D106). |
-| 2026-10-20 | Added the v2 email terms: campaign, draft, template, merge tag, test send, recipient, topic, subscription status, unsubscribe, unsubscribe link, footer, sender and sending domain. Claude's picks, open to veto (see `docs/review.md`). Later: **preview text**. |
+| 2026-10-20 | Added the v2 email terms: broadcast, draft, template, merge tag, test send, recipient, topic, subscription status, unsubscribe, unsubscribe link, footer, sender and sending domain. Claude's picks, open to veto (see `docs/review.md`). Later: **preview text**. |
 | 2026-10-20 | Added **access token**, and removed it from API key's banned synonyms (P5, D97). |
 | 2026-10-21 | Added **selection** (D137). |
+| 2026-10-21 | **Broadcast** replaces **campaign** for one marketing email (D140); "campaign" is now banned for it. |

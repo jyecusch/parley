@@ -32,7 +32,7 @@ export const proveEmailStyleInTeam = <P, T, S>(
 
 const EmailStyleOfTeamProver = defineProof("EmailStyleOfTeam")
 
-/** An email style belongs to team T. For a template or campaign choosing it, where its id needn't be named. */
+/** An email style belongs to team T. For a template or broadcast choosing it, where its id needn't be named. */
 export interface EmailStyleOfTeam<T> extends Proof<"EmailStyleOfTeam", [T]> {
   readonly team: Named<T, TeamId>
   readonly found: EmailStyle
@@ -50,7 +50,7 @@ export const proveEmailStyleOfTeam = <P, T>(
   })
 
 /**
- * A template's or campaign's choice of style: undefined leaves it, null means the team's default,
+ * A template's or broadcast's choice of style: undefined leaves it, null means the team's default,
  * and an id must be a style in the team.
  */
 export const proveStyleChoice = <P, T>(member: MemberOf<P, T>, styleId: EmailStyleId | null | undefined) =>

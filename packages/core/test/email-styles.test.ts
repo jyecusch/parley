@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm"
 import { Effect } from "effect"
 import sharp from "sharp"
 import {
-  CampaignSender,
+  BroadcastSender,
   CoreLive,
   type Principal,
   implementations as run,
@@ -128,7 +128,7 @@ describe("email styles", () => {
     }).pipe(Effect.provide(CoreLive)),
   )
 
-  it.effect("templates and campaigns choose a style; a style in use can't be deleted", () =>
+  it.effect("templates and broadcasts choose a style; a style in use can't be deleted", () =>
     Effect.gen(function* () {
       const f = yield* Fixture
       const newsletter = yield* run["emailStyles.create"](f.jane, { teamId: f.acme, name: "Newsletter" })
@@ -138,20 +138,20 @@ describe("email styles", () => {
         styleId: newsletter.id,
       })
       expect(template.styleId).toBe(newsletter.id)
-      const fromTemplate = yield* run["campaigns.create"](f.sam, {
+      const fromTemplate = yield* run["broadcasts.create"](f.sam, {
         teamId: f.acme,
         name: "October",
         templateId: template.id,
       })
       expect(fromTemplate.styleId).toBe(newsletter.id)
-      const overridden = yield* run["campaigns.create"](f.sam, {
+      const overridden = yield* run["broadcasts.create"](f.sam, {
         teamId: f.acme,
         name: "October, plain",
         templateId: template.id,
         styleId: null,
       })
       expect(overridden.styleId).toBeNull()
-      const copy = yield* run["campaigns.duplicate"](f.sam, { teamId: f.acme, campaignId: fromTemplate.id })
+      const copy = yield* run["broadcasts.duplicate"](f.sam, { teamId: f.acme, broadcastId: fromTemplate.id })
       expect(copy.styleId).toBe(newsletter.id)
 
       const foreign = yield* run["emailStyles.list"](f.bob, { teamId: f.globex })
@@ -165,11 +165,11 @@ describe("email styles", () => {
       const [listed] = (yield* run["emailStyles.list"](f.jane, { teamId: f.acme })).filter(
         (style) => style.id === newsletter.id,
       )
-      expect(listed?.usedBy).toEqual({ templates: 1, campaigns: 2 })
+      expect(listed?.usedBy).toEqual({ templates: 1, broadcasts: 2 })
       const inUse = yield* run["emailStyles.delete"](f.jane, { teamId: f.acme, styleId: newsletter.id }).pipe(
         Effect.flip,
       )
-      expect(inUse).toMatchObject({ _tag: "EmailStyleInUse", templates: 1, campaigns: 2 })
+      expect(inUse).toMatchObject({ _tag: "EmailStyleInUse", templates: 1, broadcasts: 2 })
 
       const preview = yield* run["templates.preview"](f.sam, {
         teamId: f.acme,
@@ -180,11 +180,11 @@ describe("email styles", () => {
     }).pipe(Effect.provide(CoreLive)),
   )
 
-  it.effect("a sent campaign keeps the look it was sent with, and reports who unsubscribed", () =>
+  it.effect("a sent broadcast keeps the look it was sent with, and reports who unsubscribed", () =>
     Effect.gen(function* () {
       const f = yield* Fixture
       const db = yield* Database
-      const sender = yield* CampaignSender
+      const sender = yield* BroadcastSender
       const links = yield* UnsubscribeLinks
       yield* setUpSending(f.jane, f.acme)
       const style = yield* run["emailStyles.create"](f.jane, {
@@ -211,7 +211,7 @@ describe("email styles", () => {
         kind: "dynamic",
         filter: { match: "all", conditions: [{ field: "email", operator: "contains", value: tag }] },
       })
-      const campaign = yield* run["campaigns.create"](f.jane, {
+      const broadcast = yield* run["broadcasts.create"](f.jane, {
         teamId: f.acme,
         name: "Launch",
         segmentId: segment.id,
@@ -220,7 +220,7 @@ describe("email styles", () => {
         subject: "We launched",
         body: "It's out.",
       })
-      yield* run["campaigns.send"](f.jane, { teamId: f.acme, campaignId: campaign.id })
+      yield* run["broadcasts.send"](f.jane, { teamId: f.acme, broadcastId: broadcast.id })
       yield* sender.drain
 
       // Editing the style afterwards doesn't change what was sent.
@@ -228,9 +228,9 @@ describe("email styles", () => {
       const [row] = yield* db
         .query((d) =>
           d
-            .select({ sentAs: schema.campaigns.sentAs })
-            .from(schema.campaigns)
-            .where(eq(schema.campaigns.id, campaign.id)),
+            .select({ sentAs: schema.broadcasts.sentAs })
+            .from(schema.broadcasts)
+            .where(eq(schema.broadcasts.id, broadcast.id)),
         )
         .pipe(Effect.orDie)
       expect((row?.sentAs as { style?: { headerText: string; layout: string } } | undefined)?.style).toMatchObject({
@@ -244,7 +244,7 @@ describe("email styles", () => {
             teamId: f.acme,
             contactId: contactId as ContactId,
             topicId: topic.id,
-            campaignId: campaign.id,
+            broadcastId: broadcast.id,
             test: false,
           }),
           change,
@@ -252,9 +252,9 @@ describe("email styles", () => {
       yield* unsubscribe(ada.id, { kind: "all", subscribed: false })
       yield* unsubscribe(bo.id, { kind: "topic", topicId: topic.id, subscribed: false })
 
-      const done = yield* run["campaigns.get"](f.jane, { teamId: f.acme, campaignId: campaign.id })
+      const done = yield* run["broadcasts.get"](f.jane, { teamId: f.acme, broadcastId: broadcast.id })
       expect(done.counts?.unsubscribed).toBe(2)
-      const recipients = yield* run["campaigns.recipients"](f.jane, { teamId: f.acme, campaignId: campaign.id })
+      const recipients = yield* run["broadcasts.recipients"](f.jane, { teamId: f.acme, broadcastId: broadcast.id })
       expect(Object.fromEntries(recipients.items.map((item) => [item.name, item.unsubscribed]))).toEqual({
         Ada: "everything",
         Bo: "topic",

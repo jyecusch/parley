@@ -152,13 +152,13 @@ const describe = (entry: ActivityEntry, recordType: RecordType): ReactNode => {
     case "bounced":
       return entry.related ? (
         <>
-          recorded that {other} bounced, so campaigns skip {self}
+          recorded that {other} bounced, so broadcasts skip {self}
         </>
       ) : (
         `recorded a bounce`
       )
     case "marked-as-spam":
-      return entry.related ? <>marked {other} as spam</> : "marked a campaign as spam"
+      return entry.related ? <>marked {other} as spam</> : "marked a broadcast as spam"
   }
 }
 

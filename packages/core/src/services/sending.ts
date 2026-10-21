@@ -31,7 +31,7 @@ export interface EmailSettingsInput {
   readonly footerReason?: string | null | undefined
 }
 
-/** Who a team's campaign email is from, and its footer, as sent (R40). Copied onto a campaign when it starts. */
+/** Who a team's broadcast email is from, and its footer, as sent (R40). Copied onto a broadcast when it starts. */
 export interface Sender {
   readonly from: string
   readonly replyTo: string | null

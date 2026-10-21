@@ -60,8 +60,8 @@ export const SCOPE_LABELS: Readonly<Record<Permission, string>> = {
   "members:manage": "Manage members",
   "service-accounts:manage": "Manage service accounts",
   "team:manage": "Manage the team",
-  "email:write": "Write campaigns, templates and segments",
-  "email:send": "Send campaigns",
+  "email:write": "Write broadcasts, templates and segments",
+  "email:send": "Send broadcasts",
   "email:manage": "Manage email settings",
 }
 
