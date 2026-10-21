@@ -1,17 +1,20 @@
 import type { Affiliation, Company, CompanyId, Contact, ContactAffiliation, ContactId, TeamId } from "@parley/domain"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react"
+import { type ReactNode, type RefObject, useMemo, useRef, useState } from "react"
 import { call, messageOf } from "../lib/client.ts"
 import { companyApi, primaryDomainOf, refreshCompanies } from "../lib/companies.ts"
 import { contactApi, refreshContacts } from "../lib/contacts.ts"
 import { useRecordSearch } from "../lib/records.ts"
-import { CloseIcon, PlusIcon, SearchIcon } from "./icons.tsx"
+import { ChoiceItem, ChoiceList } from "./choice-list.tsx"
+import { CloseIcon, PlusIcon } from "./icons.tsx"
+import { PopoverAnchor } from "./popover-anchor.tsx"
 import { initialsOfName } from "./record.tsx"
 import { Dialog } from "./settings.tsx"
+import { Button as PlainButton } from "./ui/button.tsx"
+import { Command, CommandFooter, CommandGroup, CommandInput, CommandItem, CommandList } from "./ui/command.tsx"
 import {
   Avatar,
-  Box,
   Button,
   cn,
   ErrorText,
@@ -19,18 +22,12 @@ import {
   Hint,
   IconButton,
   Input,
-  Popover,
-  PopoverFooter,
-  PopoverHeading,
-  PopoverItem,
-  PopoverList,
-  PopoverSearch,
   Section,
   SectionHeader,
   Skeleton,
   SmallInput,
-  TextButton,
 } from "./ui/index.ts"
+import { Popover, PopoverContent } from "./ui/popover.tsx"
 
 /** A message for the screen's toast, optionally with an undo. */
 export interface ToastRequest {
@@ -155,7 +152,10 @@ export interface PickerItem {
   readonly avatar: ReactNode
 }
 
-/** A searchable list in a popover. Arrow keys move, Enter picks, Escape closes. */
+/**
+ * A searchable list in a popover (shadcn's Popover and Command). Arrow keys move, Enter picks,
+ * Escape and clicks outside close it.
+ */
 export function Picker(props: {
   readonly label: string
   readonly placeholder: string
@@ -165,22 +165,17 @@ export function Picker(props: {
   readonly onCreate?: (name: string) => void
   readonly createLabel?: (name: string) => string
   readonly onClose: () => void
-  /** Where it opens, relative to the positioned element around it. Defaults to below, from the right. */
+  /**
+   * Where its top-right corner sits, as classes relative to the positioned element around it.
+   * Defaults to below the section header, from the right.
+   */
   readonly placement?: string
   /** For items searched on the server (D136): gets what's typed, and `items` are taken as matches. */
   readonly onQueryChange?: (query: string) => void
+  /** The button that opened it, which gets focus back when it closes. */
+  readonly returnFocus?: RefObject<HTMLElement | null>
 }) {
   const [query, setQuery] = useState("")
-  const [active, setActive] = useState(0)
-  const ref = useRef<HTMLDivElement>(null)
-  const { onClose } = props
-  useEffect(() => {
-    const onPointer = (event: PointerEvent) => {
-      if (ref.current && !ref.current.contains(event.target as Node)) onClose()
-    }
-    document.addEventListener("pointerdown", onPointer)
-    return () => document.removeEventListener("pointerdown", onPointer)
-  }, [onClose])
   const q = query.trim().toLowerCase()
   const matches = (
     props.onQueryChange
@@ -188,74 +183,44 @@ export function Picker(props: {
       : props.items.filter((item) => !q || item.name.toLowerCase().includes(q) || item.sub?.toLowerCase().includes(q))
   ).slice(0, 8)
   const canCreate = props.onCreate !== undefined && query.trim() !== ""
-  const total = matches.length + (canCreate ? 1 : 0)
-  const choose = (index: number) => {
-    const item = matches[index]
-    if (item) props.onPick(item.id)
-    else if (canCreate) props.onCreate?.(query.trim())
-  }
   return (
-    <Popover role="dialog" aria-label={props.label} ref={ref} className={props.placement ?? "top-10 right-2"}>
-      <PopoverSearch icon={<SearchIcon className="size-4" />}>
-        <input
-          // biome-ignore lint/a11y/noAutofocus: the picker opens for typing
-          autoFocus
-          aria-label={props.placeholder}
-          placeholder={props.placeholder}
-          autoComplete="off"
-          value={query}
-          onChange={(event) => {
-            setQuery(event.target.value)
-            props.onQueryChange?.(event.target.value)
-            setActive(0)
-          }}
-          onKeyDown={(event) => {
-            if (event.key === "ArrowDown") {
-              event.preventDefault()
-              setActive((index) => Math.min(index + 1, total - 1))
-            } else if (event.key === "ArrowUp") {
-              event.preventDefault()
-              setActive((index) => Math.max(index - 1, 0))
-            } else if (event.key === "Enter") {
-              event.preventDefault()
-              choose(active)
-            } else if (event.key === "Escape") {
-              event.stopPropagation()
-              props.onClose()
-            }
-          }}
-        />
-      </PopoverSearch>
-      <PopoverList>
-        <PopoverHeading>{props.heading}</PopoverHeading>
-        {matches.length === 0 ? <PopoverHeading>Nothing matches.</PopoverHeading> : null}
-        {matches.map((item, index) => (
-          <PopoverItem
-            key={item.id}
-            active={index === active}
-            trailing={item.sub}
-            onMouseEnter={() => setActive(index)}
-            onClick={() => props.onPick(item.id)}
-          >
-            {item.avatar}
-            <span className="truncate">{item.name}</span>
-          </PopoverItem>
-        ))}
-      </PopoverList>
-      {canCreate ? (
-        <PopoverFooter>
-          <PopoverItem
-            active={active === matches.length}
-            onMouseEnter={() => setActive(matches.length)}
-            onClick={() => props.onCreate?.(query.trim())}
-          >
-            <span className="grid size-5.5 shrink-0 place-items-center">
-              <PlusIcon className="size-4" />
-            </span>
-            <span className="truncate">{props.createLabel?.(query.trim())}</span>
-          </PopoverItem>
-        </PopoverFooter>
-      ) : null}
+    <Popover open onOpenChange={(open) => (open ? undefined : props.onClose())}>
+      <PopoverAnchor className={props.placement ?? "top-10 right-2"} />
+      <PopoverContent align="end" sideOffset={0} aria-label={props.label} finalFocus={props.returnFocus ?? true}>
+        <Command shouldFilter={false} label={props.label}>
+          <CommandInput
+            placeholder={props.placeholder}
+            aria-label={props.placeholder}
+            autoComplete="off"
+            value={query}
+            onValueChange={(value) => {
+              setQuery(value)
+              props.onQueryChange?.(value)
+            }}
+          />
+          <CommandList>
+            <CommandGroup heading={props.heading} forceMount>
+              {matches.map((item) => (
+                <CommandItem key={item.id} value={item.id} trailing={item.sub} onSelect={() => props.onPick(item.id)}>
+                  {item.avatar}
+                  <span className="truncate">{item.name}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+            {matches.length === 0 ? <p className="m-0 px-2 pt-2 pb-1 text-sm text-subtle">Nothing matches.</p> : null}
+          </CommandList>
+          {canCreate ? (
+            <CommandFooter>
+              <CommandItem value="create" onSelect={() => props.onCreate?.(query.trim())}>
+                <span className="grid size-5.5 shrink-0 place-items-center">
+                  <PlusIcon className="size-4" />
+                </span>
+                <span className="truncate">{props.createLabel?.(query.trim())}</span>
+              </CommandItem>
+            </CommandFooter>
+          ) : null}
+        </Command>
+      </PopoverContent>
     </Popover>
   )
 }
@@ -269,6 +234,7 @@ export function ContactCompanies(props: {
   const { contact, teamId } = props
   const refresh = useRefreshAfterChange(teamId)
   const [picking, setPicking] = useState(false)
+  const opener = useRef<HTMLButtonElement>(null)
   const [query, setQuery] = useState("")
   const found = useRecordSearch(companyApi, teamId, query, { enabled: picking })
   const [editing, setEditing] = useState<string>()
@@ -308,10 +274,19 @@ export function ContactCompanies(props: {
           Companies
           <SectionCount count={contact.affiliations.length} />
         </span>
-        <TextButton className="text-sm" aria-expanded={picking} onClick={() => setPicking((open) => !open)}>
+        <PlainButton
+          ref={opener}
+          type="button"
+          variant="text"
+          size="none"
+          className="text-sm"
+          aria-haspopup="dialog"
+          aria-expanded={picking}
+          onClick={() => setPicking((open) => !open)}
+        >
           <PlusIcon className="size-3.5" />
           Add to company
-        </TextButton>
+        </PlainButton>
       </SectionHeader>
       {contact.affiliations.length === 0 ? <SectionEmpty>Not affiliated with a company.</SectionEmpty> : null}
       {contact.affiliations.map((affiliation) =>
@@ -386,6 +361,7 @@ export function ContactCompanies(props: {
           heading="Companies"
           items={items}
           onQueryChange={setQuery}
+          returnFocus={opener}
           onClose={() => setPicking(false)}
           onPick={(id) => {
             setPicking(false)
@@ -414,6 +390,7 @@ export function CompanyContacts(props: {
   const { company, teamId } = props
   const refresh = useRefreshAfterChange(teamId)
   const [picking, setPicking] = useState(false)
+  const opener = useRef<HTMLButtonElement>(null)
   const [query, setQuery] = useState("")
   const found = useRecordSearch(contactApi, teamId, query, { enabled: picking })
   const affiliations = useQuery({
@@ -457,10 +434,19 @@ export function CompanyContacts(props: {
           Contacts
           <SectionCount count={rows.length} />
         </span>
-        <TextButton className="text-sm" aria-expanded={picking} onClick={() => setPicking((open) => !open)}>
+        <PlainButton
+          ref={opener}
+          type="button"
+          variant="text"
+          size="none"
+          className="text-sm"
+          aria-haspopup="dialog"
+          aria-expanded={picking}
+          onClick={() => setPicking((open) => !open)}
+        >
           <PlusIcon className="size-3.5" />
           Add contact
-        </TextButton>
+        </PlainButton>
       </SectionHeader>
       {affiliations.isLoading ? <Skeleton className="my-2 w-[60%]" /> : null}
       {affiliations.isError ? <ErrorText className="my-1">{messageOf(affiliations.error)}</ErrorText> : null}
@@ -508,6 +494,7 @@ export function CompanyContacts(props: {
           heading="Contacts"
           items={items}
           onQueryChange={setQuery}
+          returnFocus={opener}
           onClose={() => setPicking(false)}
           onPick={(id) => {
             setPicking(false)
@@ -631,15 +618,15 @@ export function AffiliateDialog(props: {
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />
-        <Box className="max-h-60 overflow-auto p-1">
+        <ChoiceList label="Company" value={companyId} onChange={setCompanyId} className="max-h-60 overflow-auto p-1">
           {matches.length === 0 && !found.isSearching ? <Hint className="p-1.5">No companies match.</Hint> : null}
           {matches.map((company) => (
-            <PopoverItem key={company.id} active={companyId === company.id} onClick={() => setCompanyId(company.id)}>
+            <ChoiceItem key={company.id} value={company.id}>
               <Avatar shape="square">{initialsOfName(company.label)}</Avatar>
               <span className="truncate">{company.label}</span>
-            </PopoverItem>
+            </ChoiceItem>
           ))}
-        </Box>
+        </ChoiceList>
       </Field>
       <Field
         label={

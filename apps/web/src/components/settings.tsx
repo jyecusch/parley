@@ -1,14 +1,13 @@
 import type { Permission, Team } from "@parley/domain"
 import type { UserText } from "@parley/errors"
 import { Link } from "@tanstack/react-router"
-import { type ReactNode, useCallback, useEffect, useRef, useState } from "react"
+import { type ReactNode, useEffect, useRef, useState } from "react"
 import { relative } from "../lib/time.ts"
 import { useCrt } from "./crt.tsx"
 import {
   AlertIcon,
   BackIcon,
   CheckIcon,
-  CloseIcon,
   ConnectionIcon,
   CopyIcon,
   DisplayIcon,
@@ -30,18 +29,27 @@ import {
   Dialog,
   EmptyState,
   IconButton,
-  NavGroup,
   NavIcon,
   NavLabel,
-  navItemActiveClass,
-  navItemClass,
   PageHeader,
+  PortalContainer,
   Skeleton,
+  showToast,
   Table,
   Td,
-  Toast,
   Tr,
 } from "./ui/index.ts"
+import {
+  Sidebar,
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  sidebarMenuButtonActiveClass,
+} from "./ui/sidebar.tsx"
+import { Toaster } from "./ui/sonner.tsx"
 
 /** What each scope lets a key or connection do, in the words the dialogs use. */
 export const SCOPE_LABELS: Readonly<Record<Permission, string>> = {
@@ -103,33 +111,52 @@ export function SettingsShell(props: { readonly team: Team; readonly children: R
   const crt = useCrt()
   const links = (group: "team" | "you") =>
     SETTINGS_PAGES.filter((page) => page.group === group).map((page) => (
-      <Link
-        key={page.to}
-        className={navItemClass()}
-        activeProps={{ className: navItemActiveClass, "aria-current": "page" }}
-        to={page.to}
-        params={params}
-      >
-        <NavIcon>{page.icon}</NavIcon>
-        <NavLabel>{page.label}</NavLabel>
-      </Link>
+      <SidebarMenuItem key={page.to}>
+        <SidebarMenuButton
+          render={
+            <Link
+              activeProps={{ className: sidebarMenuButtonActiveClass, "aria-current": "page" }}
+              to={page.to}
+              params={params}
+            />
+          }
+        >
+          <NavIcon>{page.icon}</NavIcon>
+          <NavLabel>{page.label}</NavLabel>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
     ))
   return (
     <>
       <div ref={crt.screenRef} className="relative flex h-dvh w-full overflow-hidden">
-        <nav className="flex w-64 shrink-0 flex-col p-2" aria-label="Settings">
-          <Link className={cn(navItemClass(), "mb-3")} to="/t/$teamId/contacts" params={params} search={{}}>
-            <NavIcon>
-              <BackIcon />
-            </NavIcon>
-            <NavLabel>Back to Contacts</NavLabel>
-          </Link>
-          <NavGroup label={props.team.name}>{links("team")}</NavGroup>
-          <NavGroup label="You">{links("you")}</NavGroup>
-        </nav>
-        <div className="@container/content relative flex min-w-0 flex-[999_1_35rem] gap-1.5 py-1.5 pr-1.5">
-          {props.children}
-        </div>
+        <PortalContainer.Provider value={crt.screen}>
+          {/* Settings' sidebar doesn't collapse. */}
+          <SidebarProvider open>
+            <Sidebar aria-label="Settings">
+              <SidebarMenuButton
+                className="mb-3"
+                render={<Link to="/t/$teamId/contacts" params={params} search={{}} />}
+              >
+                <NavIcon>
+                  <BackIcon />
+                </NavIcon>
+                <NavLabel>Back to Contacts</NavLabel>
+              </SidebarMenuButton>
+              <SidebarGroup>
+                <SidebarGroupLabel>{props.team.name}</SidebarGroupLabel>
+                <SidebarMenu>{links("team")}</SidebarMenu>
+              </SidebarGroup>
+              <SidebarGroup>
+                <SidebarGroupLabel>You</SidebarGroupLabel>
+                <SidebarMenu>{links("you")}</SidebarMenu>
+              </SidebarGroup>
+            </Sidebar>
+          </SidebarProvider>
+          <div className="@container/content relative flex min-w-0 flex-[999_1_35rem] gap-1.5 py-1.5 pr-1.5">
+            {props.children}
+          </div>
+          <Toaster />
+        </PortalContainer.Provider>
       </div>
       {crt.overlay}
     </>
@@ -252,26 +279,11 @@ export function RevokeButton(props: { readonly name: string; readonly onRevoke: 
 
 export { Dialog }
 
-/** One toast at a time, dismissed after a while or by hand. */
-export const useToast = () => {
-  const [text, setText] = useState<string>()
-  const timer = useRef<number>(undefined)
-  useEffect(() => () => window.clearTimeout(timer.current), [])
-  const show = useCallback((next: string) => {
-    setText(next)
-    window.clearTimeout(timer.current)
-    timer.current = window.setTimeout(() => setText(undefined), 6000)
-  }, [])
-  const node = text ? (
-    <Toast>
-      <span>{text}</span>
-      <IconButton label="Dismiss" size="xs" onClick={() => setText(undefined)}>
-        <CloseIcon className="size-4" />
-      </IconButton>
-    </Toast>
-  ) : null
-  return [node, show] as const
-}
+/**
+ * Shows a toast (D139: sonner, through showToast). Kept as a hook for the settings pages: the first
+ * value is always null now, as the Toaster in SettingsShell draws the toast.
+ */
+export const useToast = () => [null, (text: string) => void showToast(text)] as const
 
 export function LoadingRows() {
   const rows = [

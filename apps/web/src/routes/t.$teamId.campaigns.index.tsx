@@ -4,10 +4,10 @@ import { createFileRoute, getRouteApi, Link, useNavigate } from "@tanstack/react
 import { useState } from "react"
 import { SendIcon } from "../components/icons.tsx"
 import { LoadFailed } from "../components/record.tsx"
+import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage } from "../components/ui/breadcrumb.tsx"
 import { ItemTile, NameText, nameLinkClass, wideColumnClass } from "../components/ui/email.tsx"
 import {
   Badge,
-  Breadcrumb,
   Button,
   Card,
   Centered,
@@ -57,7 +57,11 @@ function CampaignsScreen() {
     <Card as="main" className="flex-[999_1_35rem]">
       <PageHeader>
         <Breadcrumb>
-          <span>Campaigns</span>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbPage render={(props) => <h1 {...props} />}>Campaigns</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
         </Breadcrumb>
         {items.length > 0 ? <Count>{items.length}</Count> : null}
         <Spacer />

@@ -1,4 +1,7 @@
-import type { ButtonHTMLAttributes, ReactNode } from "react"
+import { type ButtonHTMLAttributes, type ReactNode, useState } from "react"
+import { AvatarBadge, Avatar as AvatarBase, AvatarFallback, AvatarImage } from "./avatar.tsx"
+import { Badge as BadgeBase } from "./badge.tsx"
+import { Button as ButtonBase } from "./button.tsx"
 import { cn } from "./cn.ts"
 
 /** A short status in a rounded pill: Draft, Sent, Verified. */
@@ -12,54 +15,36 @@ export function Badge({
   className?: string | undefined
 }) {
   return (
-    <span
-      className={cn(
-        "inline-flex h-6 shrink-0 items-center rounded-full px-2.5 text-sm whitespace-nowrap",
-        tone === "strong"
-          ? "bg-primary text-on-primary"
-          : tone === "danger"
-            ? "bg-danger-soft text-danger"
-            : "bg-fill text-muted",
-        className,
-      )}
-    >
+    <BadgeBase variant={tone} className={className}>
       {children}
-    </span>
+    </BadgeBase>
   )
 }
 
 /** A value shown as a chip, such as a multi-select option. */
 export function Chip({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <span className={cn("inline-flex h-6 items-center rounded-md bg-fill px-2 text-fg", className)}>{children}</span>
+    <BadgeBase variant="chip" className={className}>
+      {children}
+    </BadgeBase>
   )
 }
 
 /** A permission or code-like tag, in mono. */
 export function CodeTag({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <span
-      className={cn(
-        "inline-flex h-6 items-center rounded-sm bg-fill px-1.5 font-mono text-xs font-medium text-muted",
-        className,
-      )}
-    >
+    <BadgeBase variant="code" className={className}>
       {children}
-    </span>
+    </BadgeBase>
   )
 }
 
 /** A quiet outlined tag, such as "Revoked" or "You". */
 export function OutlineTag({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <span
-      className={cn(
-        "inline-flex h-6 items-center rounded-sm px-1.5 text-xs text-subtle inset-ring inset-ring-line-strong",
-        className,
-      )}
-    >
+    <BadgeBase variant="outline" className={className}>
       {children}
-    </span>
+    </BadgeBase>
   )
 }
 
@@ -72,13 +57,21 @@ const AVATAR_SIZES: Readonly<Record<MarkSize, string>> = {
 }
 const TILE_RADII: Readonly<Record<MarkSize, string>> = { sm: "rounded-sm", md: "rounded-md", lg: "rounded-lg" }
 
+/** How a mark is filled: by an image, or by initials or an icon. */
+const IMAGE_FILL =
+  "bg-surface inset-ring inset-ring-line [&>img]:size-full [&>img]:rounded-[inherit] [&>img]:object-cover"
+const INITIALS_FILL = "bg-fill text-muted"
+
 /**
- * A person's or company's mark: initials, or an image when `image` is set. Round for people,
- * square (`shape="square"`) for companies and service accounts. `dashed` for "new".
+ * A person's or company's mark: initials (`children`), or an image. `src` loads one, showing the
+ * initials until it has loaded and if it fails; `image` shows an element as given. Round for
+ * people, square (`shape="square"`) for companies and service accounts. `dashed` for "new".
  */
 export function Avatar({
   size = "sm",
   shape = "round",
+  src,
+  crossOrigin,
   image,
   dashed,
   badge,
@@ -87,33 +80,43 @@ export function Avatar({
 }: {
   size?: MarkSize | undefined
   shape?: "round" | "square" | undefined
+  src?: string | undefined
+  /** "anonymous" for images from other sites that CRT mode (D81) must be able to draw. */
+  crossOrigin?: "anonymous" | undefined
   image?: ReactNode | undefined
   dashed?: boolean | undefined
   badge?: ReactNode | undefined
   children?: ReactNode | undefined
   className?: string | undefined
 }) {
+  const [loaded, setLoaded] = useState<string>()
+  const showsImage = image !== undefined || (src !== undefined && loaded === src)
   return (
-    <span
+    <AvatarBase
       aria-hidden="true"
       className={cn(
-        "relative inline-grid shrink-0 place-items-center leading-none font-semibold tracking-normal",
         AVATAR_SIZES[size],
         shape === "round" ? "rounded-full" : TILE_RADII[size],
-        image
-          ? "bg-surface inset-ring inset-ring-line [&>img]:size-full [&>img]:rounded-[inherit] [&>img]:object-cover"
-          : "bg-fill text-muted",
+        showsImage ? IMAGE_FILL : INITIALS_FILL,
         dashed && "border border-dashed border-control bg-transparent",
         className,
       )}
     >
-      {image ?? children}
-      {badge ? (
-        <span className="absolute -right-1.5 -bottom-1.5 grid size-3.5 place-items-center rounded-xs bg-surface text-fg ring ring-line-strong">
-          {badge}
-        </span>
-      ) : null}
-    </span>
+      {src !== undefined ? (
+        <>
+          <AvatarImage
+            src={src}
+            alt=""
+            crossOrigin={crossOrigin}
+            onLoadingStatusChange={(status) => setLoaded(status === "loaded" ? src : undefined)}
+          />
+          <AvatarFallback>{children}</AvatarFallback>
+        </>
+      ) : (
+        (image ?? children)
+      )}
+      {badge ? <AvatarBadge>{badge}</AvatarBadge> : null}
+    </AvatarBase>
   )
 }
 
@@ -127,17 +130,15 @@ export function StatTile({
   ...props
 }: Omit<ButtonHTMLAttributes<HTMLButtonElement>, "value"> & { value: ReactNode; label: ReactNode; active?: boolean }) {
   return (
-    <button
+    <ButtonBase
       type={type}
-      className={cn(
-        "flex cursor-pointer flex-col items-start gap-0.5 rounded-lg bg-surface px-3 py-2.5 text-left inset-ring inset-ring-line-strong disabled:cursor-default",
-        active && "inset-ring-2 inset-ring-muted",
-        className,
-      )}
+      variant="tile"
+      size="none"
+      className={cn(active && "inset-ring-2 inset-ring-muted", className)}
       {...props}
     >
       <span className="text-xl font-semibold tabular-nums">{value}</span>
       <span className="text-sm text-subtle">{label}</span>
-    </button>
+    </ButtonBase>
   )
 }

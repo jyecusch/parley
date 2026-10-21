@@ -28,6 +28,7 @@ import {
   Notice,
   Option,
   RadioCard,
+  RadioCards,
   Select,
   Skeleton,
 } from "../components/ui/index.ts"
@@ -402,35 +403,35 @@ function ConsentForm(props: {
         </Field>
 
         <Fieldset legend="Act as">
-          {actors.map((option) => (
-            <RadioCard
-              key={option.id}
-              name="actor"
-              checked={chosen === option.id}
-              onChange={() => setActor(option.id)}
-              label={
-                <>
-                  <Avatar shape={option.kind === "you" ? "round" : "square"} dashed={option.kind === "new"}>
-                    {option.initials}
-                  </Avatar>
-                  {option.label}
-                </>
-              }
-              description={option.description}
-            >
-              {option.id === NEW && chosen === NEW ? (
-                <Input
-                  className="mt-1.5 bg-surface"
-                  type="text"
-                  aria-label="Service account name"
-                  placeholder="e.g. Sales Agent"
-                  maxLength={60}
-                  value={newName}
-                  onChange={(event) => setNewName(event.target.value)}
-                />
-              ) : null}
-            </RadioCard>
-          ))}
+          <RadioCards name="actor" value={chosen} onChange={setActor}>
+            {actors.map((option) => (
+              <RadioCard
+                key={option.id}
+                value={option.id}
+                label={
+                  <>
+                    <Avatar shape={option.kind === "you" ? "round" : "square"} dashed={option.kind === "new"}>
+                      {option.initials}
+                    </Avatar>
+                    {option.label}
+                  </>
+                }
+                description={option.description}
+              >
+                {option.id === NEW && chosen === NEW ? (
+                  <Input
+                    className="mt-1.5 bg-surface"
+                    type="text"
+                    aria-label="Service account name"
+                    placeholder="e.g. Sales Agent"
+                    maxLength={60}
+                    value={newName}
+                    onChange={(event) => setNewName(event.target.value)}
+                  />
+                ) : null}
+              </RadioCard>
+            ))}
+          </RadioCards>
         </Fieldset>
 
         <Fieldset legend="Scopes">

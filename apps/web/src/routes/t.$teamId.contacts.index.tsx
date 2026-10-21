@@ -37,11 +37,17 @@ import { RecordOwnerCell, RecordOwnerField } from "../components/record-owner.ts
 import { AddToSegmentDialog } from "../components/segments.tsx"
 import { isTyping, useShell } from "../components/shell.tsx"
 import {
-  Avatar,
   Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
   BreadcrumbSeparator,
+} from "../components/ui/breadcrumb.tsx"
+import { Button as ButtonBase } from "../components/ui/button.tsx"
+import {
+  Avatar,
   Button,
-  breadcrumbRootClass,
   Card,
   Centered,
   Checkbox,
@@ -70,6 +76,8 @@ import {
   Th,
   Toolbar,
   Tooltip,
+  TooltipContent,
+  TooltipTrigger,
   Tr,
   ViewBody,
 } from "../components/ui/index.ts"
@@ -315,21 +323,30 @@ function ContactsScreen() {
       <Card as="main" className="flex-[999_1_39rem]">
         <PageHeader>
           <Breadcrumb>
-            {search.deleted ? (
-              <>
-                <button
-                  className={cn(breadcrumbRootClass, "cursor-pointer")}
-                  type="button"
-                  onClick={() => void setSearch({})}
-                >
-                  Contacts
-                </button>
-                <BreadcrumbSeparator />
-                <span>Deleted</span>
-              </>
-            ) : (
-              <span>{indexView.viewName ?? "Contacts"}</span>
-            )}
+            <BreadcrumbList>
+              {search.deleted ? (
+                <>
+                  <BreadcrumbItem>
+                    <BreadcrumbLink
+                      className="cursor-pointer"
+                      render={<button type="button" onClick={() => void setSearch({})} />}
+                    >
+                      Contacts
+                    </BreadcrumbLink>
+                  </BreadcrumbItem>
+                  <BreadcrumbSeparator />
+                  <BreadcrumbItem>
+                    <BreadcrumbPage render={(props) => <h1 {...props} />}>Deleted</BreadcrumbPage>
+                  </BreadcrumbItem>
+                </>
+              ) : (
+                <BreadcrumbItem>
+                  <BreadcrumbPage render={(props) => <h1 {...props} />}>
+                    {indexView.viewName ?? "Contacts"}
+                  </BreadcrumbPage>
+                </BreadcrumbItem>
+              )}
+            </BreadcrumbList>
           </Breadcrumb>
           {!search.deleted && !isLoading && !isEmpty && list.total !== null ? (
             <Count>{list.total.toLocaleString()}</Count>
@@ -555,10 +572,15 @@ function ContactsScreen() {
             >
               Export
             </Button>
-            <Tooltip text="Delete  ⌫">
-              <Button variant="danger" size="sm" onClick={() => void remove(selection.selections())}>
-                Delete
-              </Button>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button variant="danger" size="sm" onClick={() => void remove(selection.selections())}>
+                    Delete
+                  </Button>
+                }
+              />
+              <TooltipContent>{"Delete  ⌫"}</TooltipContent>
             </Tooltip>
             <FloatingBarDivider />
             <IconButton label="Clear selection" tip="Clear selection  Esc" size="xs" onClick={selection.clear}>
@@ -758,10 +780,10 @@ function ContactRow(props: {
         />
       </Td>
       <Td>
-        <button className={nameButtonClass} type="button" onClick={props.onOpen}>
+        <ButtonBase variant={null} size="none" className={nameButtonClass} onClick={props.onOpen}>
           <ContactAvatar contact={contact} />
           <span className={nameTextClass}>{contact.displayName}</span>
-        </button>
+        </ButtonBase>
       </Td>
       <Td className={cn(wideColumnClass, email ? "text-muted" : "text-subtle")}>{email ?? "—"}</Td>
       <Td>
@@ -1063,9 +1085,9 @@ function CreatePanel(props: {
             </p>
           ) : null}
         </Section>
-        <button type="submit" className="sr-only" tabIndex={-1}>
+        <ButtonBase variant={null} size="none" type="submit" className="sr-only" tabIndex={-1}>
           Create contact
-        </button>
+        </ButtonBase>
       </form>
       <PanelFooter>
         <Button variant="primary" disabled={busy} onClick={() => void submit()}>

@@ -1,3 +1,4 @@
+import { Radio as RadioPrimitive } from "@base-ui/react/radio"
 import {
   type EmailFont,
   type EmailStyle,
@@ -17,9 +18,14 @@ import { readAsDataUrl } from "../components/markdown-toolbar.tsx"
 import { LoadFailed } from "../components/record.tsx"
 import {
   Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
   BreadcrumbSeparator,
+} from "../components/ui/breadcrumb.tsx"
+import {
   Button,
-  breadcrumbRootClass,
   Card,
   cn,
   Dialog,
@@ -35,6 +41,7 @@ import {
   Textarea,
   ViewBody,
 } from "../components/ui/index.ts"
+import { RadioGroup } from "../components/ui/radio-group.tsx"
 import { call, messageOf } from "../lib/client.ts"
 
 export const Route = createFileRoute("/t/$teamId/settings/email-styles/$styleId")({ component: StyleScreen })
@@ -183,13 +190,23 @@ function StyleEditor(props: {
     <Card as="main" className="flex-1">
       <PageHeader>
         <Breadcrumb>
-          <span className="text-muted">Settings</span>
-          <BreadcrumbSeparator />
-          <Link className={breadcrumbRootClass} to="/t/$teamId/settings/email-styles" params={{ teamId }}>
-            Email styles
-          </Link>
-          <BreadcrumbSeparator />
-          <span className="truncate">{saved ? saved.name : "New email style"}</span>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <span className="text-muted">Settings</span>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbLink render={<Link to="/t/$teamId/settings/email-styles" params={{ teamId }} />}>
+                Email styles
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage render={(props) => <h1 {...props} />} className="truncate">
+                {saved ? saved.name : "New email style"}
+              </BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
         </Breadcrumb>
         <Spacer />
         {dirty && saved ? (
@@ -235,29 +252,33 @@ function StyleEditor(props: {
           </Field>
 
           <Fieldset legend="Layout">
-            <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Layout">
+            <RadioGroup
+              className="grid grid-cols-3 gap-2"
+              aria-label="Layout"
+              name="layout"
+              disabled={disabled}
+              value={draft.layout}
+              onValueChange={(value) => {
+                const layout = value as EmailStyleLayout
+                set("layout", layout)
+                if (layout === "custom" && !draft.customHtml) set("customHtml", STARTING_HTML)
+              }}
+            >
               {LAYOUTS.map((option) => (
-                <label
+                // Each card is the radio itself, so the whole card is focused and chosen.
+                <RadioPrimitive.Root
                   key={option.value}
-                  className="flex cursor-pointer flex-col gap-1.5 rounded-lg p-2.5 text-sm inset-ring inset-ring-line-strong hover:bg-hover has-checked:inset-ring-2 has-checked:inset-ring-fg has-focus-visible:outline-2 has-focus-visible:outline-focus"
+                  value={option.value}
+                  nativeButton={false}
+                  render={<div />}
+                  className="flex cursor-pointer flex-col gap-1.5 rounded-lg p-2.5 text-sm inset-ring inset-ring-line-strong hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus data-checked:inset-ring-2 data-checked:inset-ring-fg"
                 >
-                  <input
-                    type="radio"
-                    name="layout"
-                    className="sr-only"
-                    disabled={disabled}
-                    checked={draft.layout === option.value}
-                    onChange={() => {
-                      set("layout", option.value)
-                      if (option.value === "custom" && !draft.customHtml) set("customHtml", STARTING_HTML)
-                    }}
-                  />
                   <LayoutSketch layout={option.value} />
                   <span className="font-medium">{option.label}</span>
                   <span className="text-subtle">{option.hint}</span>
-                </label>
+                </RadioPrimitive.Root>
               ))}
-            </div>
+            </RadioGroup>
           </Fieldset>
 
           {draft.layout === "custom" ? (

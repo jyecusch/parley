@@ -1,18 +1,11 @@
 import type { HTMLAttributes, ReactNode } from "react"
+import { Card as CardBase } from "./card.tsx"
 import { cn } from "./cn.ts"
 
 /** A raised surface: the main list, a record panel, a settings page. */
-export function Card({ className, ...props }: HTMLAttributes<HTMLElement> & { as?: "main" | "aside" | "div" }) {
-  const { as: Tag = "div", ...rest } = props as HTMLAttributes<HTMLElement> & { as?: "main" | "aside" | "div" }
-  return (
-    <Tag
-      className={cn(
-        "relative flex min-h-0 min-w-0 flex-col overflow-hidden rounded-xl bg-surface shadow-card",
-        className,
-      )}
-      {...rest}
-    />
-  )
+export function Card({ as, ...props }: HTMLAttributes<HTMLElement> & { as?: "main" | "aside" | "div" }) {
+  const Tag = as ?? "div"
+  return <CardBase render={<Tag />} {...props} />
 }
 
 /** The top bar of a view: breadcrumb, count, then actions on the right. */

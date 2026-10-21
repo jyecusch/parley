@@ -2,9 +2,10 @@ import type { ContactId, SegmentId, Selection, TeamId } from "@parley/domain"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useState } from "react"
 import { call, messageOf } from "../lib/client.ts"
+import { ChoiceItem, ChoiceList } from "./choice-list.tsx"
 import { SegmentIcon } from "./icons.tsx"
 import { ItemTile } from "./ui/email.tsx"
-import { Box, Button, Dialog, ErrorText, Field, Input, PopoverItem } from "./ui/index.ts"
+import { Button, Dialog, ErrorText, Field, Input } from "./ui/index.ts"
 
 /** Adds selected contacts to a fixed segment, or to a new one (D23). */
 export function AddToSegmentDialog(props: {
@@ -72,23 +73,22 @@ export function AddToSegmentDialog(props: {
         label="Fixed segment"
         hint="Dynamic segments follow their filter, so contacts can't be added to them by hand."
       >
-        <Box className="max-h-64 overflow-auto p-1">
+        <ChoiceList label="Fixed segment" value={choice} onChange={setChoice} className="max-h-64 overflow-auto p-1">
           {fixed.map((segment) => (
-            <PopoverItem
+            <ChoiceItem
               key={segment.id}
-              active={choice === segment.id}
+              value={segment.id}
               trailing={<span className="text-sm">{segment.contactCount}</span>}
-              onClick={() => setChoice(segment.id)}
             >
               <ItemTile icon={<SegmentIcon className="size-4" />} />
               <span>{segment.name}</span>
-            </PopoverItem>
+            </ChoiceItem>
           ))}
-          <PopoverItem active={choice === "new"} onClick={() => setChoice("new")}>
+          <ChoiceItem value="new">
             <ItemTile icon="+" />
             <span>New fixed segment</span>
-          </PopoverItem>
-        </Box>
+          </ChoiceItem>
+        </ChoiceList>
       </Field>
       {choice === "new" ? (
         <Field label="Name" htmlFor="new-segment-name">

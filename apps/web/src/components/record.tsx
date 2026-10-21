@@ -13,6 +13,8 @@ import {
   ExpandIcon,
   MoreIcon,
 } from "./icons.tsx"
+import { Button as ButtonPrimitive } from "./ui/button.tsx"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "./ui/dropdown-menu.tsx"
 import {
   Avatar,
   Button,
@@ -21,7 +23,6 @@ import {
   EmptyState,
   IconButton,
   InlineInput,
-  Menu,
   PropertyRow,
   propertyValueClass,
   RecordTitle,
@@ -245,7 +246,7 @@ export function PanelBar(props: {
   readonly layout: "panel" | "full" | undefined
   readonly onToggleLayout: (() => void) | undefined
   readonly onClose: () => void
-  /** The items of the More menu; picking one should close it with `closeMenu`. */
+  /** The More menu's items (DropdownMenuItem); `closeMenu` closes it, for items that don't on their own. */
   readonly menu: (closeMenu: () => void) => ReactNode
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
@@ -275,10 +276,16 @@ export function PanelBar(props: {
         </IconButton>
       ) : null}
       <div className="relative">
-        <IconButton label="More actions" tip="More" onClick={() => setMenuOpen((open) => !open)}>
-          <MoreIcon />
-        </IconButton>
-        {menuOpen ? <Menu className="top-full right-0 mt-1">{props.menu(() => setMenuOpen(false))}</Menu> : null}
+        <DropdownMenu modal={false} open={menuOpen} onOpenChange={setMenuOpen}>
+          <DropdownMenuTrigger
+            render={
+              <IconButton label="More actions" tip="More">
+                <MoreIcon />
+              </IconButton>
+            }
+          />
+          <DropdownMenuContent align="end">{props.menu(() => setMenuOpen(false))}</DropdownMenuContent>
+        </DropdownMenu>
       </div>
       <IconButton label="Close panel" tip="Close  Esc" onClick={props.onClose}>
         <CloseIcon />
@@ -357,9 +364,9 @@ export function EditableText(props: {
   }
   return (
     <PropertyRow label={props.label}>
-      <button className={propertyValueClass} type="button" onClick={() => setEditing(true)}>
+      <ButtonPrimitive variant={null} size="none" className={propertyValueClass} onClick={() => setEditing(true)}>
         {props.value ?? <EmptyValue />}
-      </button>
+      </ButtonPrimitive>
     </PropertyRow>
   )
 }
@@ -424,12 +431,12 @@ export function EditableList(props: {
   }
   return (
     <PropertyRow label={props.label}>
-      <button className={propertyValueClass} type="button" onClick={begin}>
+      <ButtonPrimitive variant={null} size="none" className={propertyValueClass} onClick={begin}>
         {props.items.length === 0 ? <EmptyValue /> : null}
         {props.items.map((item) => (
           <ValueLine key={item.value} value={item.value} tag={item.tag} />
         ))}
-      </button>
+      </ButtonPrimitive>
     </PropertyRow>
   )
 }

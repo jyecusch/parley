@@ -23,6 +23,7 @@ import {
   Fieldset,
   Notice,
   RadioCard,
+  RadioCards,
   Select,
   Table,
   Td,
@@ -344,16 +345,11 @@ function InviteDialog(props: {
         />
       </Field>
       <Fieldset legend="Role">
-        {ROLES.filter((entry) => entry.role !== "owner" || props.isOwner).map((entry) => (
-          <RadioCard
-            key={entry.role}
-            name="invite-role"
-            label={entry.label}
-            description={entry.description}
-            checked={role === entry.role}
-            onChange={() => setRole(entry.role)}
-          />
-        ))}
+        <RadioCards name="invite-role" value={role} onChange={setRole}>
+          {ROLES.filter((entry) => entry.role !== "owner" || props.isOwner).map((entry) => (
+            <RadioCard key={entry.role} value={entry.role} label={entry.label} description={entry.description} />
+          ))}
+        </RadioCards>
       </Fieldset>
       {error ? <ErrorText>{error}</ErrorText> : null}
     </Dialog>

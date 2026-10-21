@@ -2,6 +2,7 @@ import { type CustomField, type CustomValue, checkCustomValue } from "@parley/do
 import { useState } from "react"
 import { formatValue } from "../lib/custom-fields.ts"
 import { EmptyValue, propertyFieldsetClass, toE164, ValueLine } from "./record.tsx"
+import { Button as PlainButton } from "./ui/button.tsx"
 import {
   Checkbox,
   Chip,
@@ -141,7 +142,13 @@ function CustomFieldRow(props: {
             ))}
           </fieldset>
         ) : (
-          <button className={propertyValueClass} type="button" onClick={() => setEditing(true)}>
+          <PlainButton
+            variant={null}
+            size={null}
+            className={propertyValueClass}
+            type="button"
+            onClick={() => setEditing(true)}
+          >
             {chosen.size > 0 ? (
               <span className="flex flex-wrap gap-1">
                 {field.options
@@ -155,7 +162,7 @@ function CustomFieldRow(props: {
             ) : (
               <EmptyValue />
             )}
-          </button>
+          </PlainButton>
         )}
       </PropertyRow>
     )
@@ -198,9 +205,15 @@ function CustomFieldRow(props: {
   const shown = formatValue(field, value)
   return (
     <PropertyRow label={field.name}>
-      <button className={propertyValueClass} type="button" onClick={() => setEditing(true)}>
+      <PlainButton
+        variant={null}
+        size={null}
+        className={propertyValueClass}
+        type="button"
+        onClick={() => setEditing(true)}
+      >
         {shown ? <ValueLine value={shown} /> : <EmptyValue />}
-      </button>
+      </PlainButton>
     </PropertyRow>
   )
 }

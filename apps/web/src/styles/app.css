@@ -1,4 +1,7 @@
 @import "tailwindcss";
+/* Animation utilities and variants shadcn components use; neither styles anything on its own. */
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
 /*
  * Ink, the approved design (D80), as Tailwind tokens. Components use only utilities built from

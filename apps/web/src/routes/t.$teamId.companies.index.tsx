@@ -42,11 +42,17 @@ import { PlaceholderRow, SelectionCount, SpacerRow, useSelection, useVirtualRows
 import { RecordOwnerCell, RecordOwnerField } from "../components/record-owner.tsx"
 import { isTyping, useShell } from "../components/shell.tsx"
 import {
-  Avatar,
   Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
   BreadcrumbSeparator,
+} from "../components/ui/breadcrumb.tsx"
+import { Button as ButtonBase } from "../components/ui/button.tsx"
+import {
+  Avatar,
   Button,
-  breadcrumbRootClass,
   Card,
   Centered,
   Checkbox,
@@ -77,6 +83,8 @@ import {
   Th,
   Toolbar,
   Tooltip,
+  TooltipContent,
+  TooltipTrigger,
   Tr,
   ViewBody,
 } from "../components/ui/index.ts"
@@ -335,21 +343,30 @@ function CompaniesScreen() {
       <Card as="main" className="flex-[999_1_39rem]">
         <PageHeader>
           <Breadcrumb>
-            {search.deleted ? (
-              <>
-                <button
-                  className={cn(breadcrumbRootClass, "cursor-pointer")}
-                  type="button"
-                  onClick={() => void setSearch({})}
-                >
-                  Companies
-                </button>
-                <BreadcrumbSeparator />
-                <span>Deleted</span>
-              </>
-            ) : (
-              <span>{indexView.view?.name ?? "Companies"}</span>
-            )}
+            <BreadcrumbList>
+              {search.deleted ? (
+                <>
+                  <BreadcrumbItem>
+                    <BreadcrumbLink
+                      className="cursor-pointer"
+                      render={<button type="button" onClick={() => void setSearch({})} />}
+                    >
+                      Companies
+                    </BreadcrumbLink>
+                  </BreadcrumbItem>
+                  <BreadcrumbSeparator />
+                  <BreadcrumbItem>
+                    <BreadcrumbPage render={(props) => <h1 {...props} />}>Deleted</BreadcrumbPage>
+                  </BreadcrumbItem>
+                </>
+              ) : (
+                <BreadcrumbItem>
+                  <BreadcrumbPage render={(props) => <h1 {...props} />}>
+                    {indexView.view?.name ?? "Companies"}
+                  </BreadcrumbPage>
+                </BreadcrumbItem>
+              )}
+            </BreadcrumbList>
           </Breadcrumb>
           {!search.deleted && !isLoading && !isEmpty && list.total !== null ? (
             <Count>{list.total.toLocaleString()}</Count>
@@ -565,9 +582,10 @@ function CompaniesScreen() {
                           />
                         </Td>
                         <Td className={TALL}>
-                          <button
+                          <ButtonBase
+                            variant={null}
+                            size="none"
                             className={nameButtonClass}
-                            type="button"
                             onClick={() => void setSearch({ company: company.id })}
                           >
                             <CompanyLogo company={company} size="md" />
@@ -577,7 +595,7 @@ function CompaniesScreen() {
                                 <span className="truncate text-sm font-normal text-subtle">{domain}</span>
                               ) : null}
                             </span>
-                          </button>
+                          </ButtonBase>
                         </Td>
                         <Td className={cn(TALL, "tabular-nums", company.contactCount === 0 && "text-subtle")}>
                           {contactsLabel(company.contactCount)}
@@ -643,10 +661,15 @@ function CompaniesScreen() {
             >
               Export
             </Button>
-            <Tooltip text="Delete  ⌫">
-              <Button variant="danger" size="sm" onClick={() => void remove(selection.selections())}>
-                Delete
-              </Button>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button variant="danger" size="sm" onClick={() => void remove(selection.selections())}>
+                    Delete
+                  </Button>
+                }
+              />
+              <TooltipContent>{"Delete  ⌫"}</TooltipContent>
             </Tooltip>
             <FloatingBarDivider />
             <IconButton label="Clear selection" tip="Clear selection  Esc" size="xs" onClick={selection.clear}>
@@ -1108,9 +1131,9 @@ function CreatePanel(props: {
             </p>
           ) : null}
         </Section>
-        <button type="submit" className="sr-only" tabIndex={-1}>
+        <ButtonBase variant={null} size="none" type="submit" className="sr-only" tabIndex={-1}>
           Create company
-        </button>
+        </ButtonBase>
       </form>
       <PanelFooter>
         <Button

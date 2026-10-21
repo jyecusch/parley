@@ -5,7 +5,8 @@
     "rootDir": ".",
     "jsx": "react-jsx",
     "types": ["bun", "vite/client"],
-    "noUnusedLocals": false
+    "noUnusedLocals": false,
+    "paths": { "@/*": ["./src/*"] }
   },
   "include": ["src", "vite.config.ts"],
   "references": [

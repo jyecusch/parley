@@ -15,6 +15,13 @@ import {
   When,
 } from "../components/settings.tsx"
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../components/ui/dropdown-menu.tsx"
+import {
   Avatar,
   Box,
   Button,
@@ -25,11 +32,9 @@ import {
   Hint,
   IconButton,
   Input,
-  Menu,
-  MenuItem,
-  MenuSeparator,
   Notice,
   RadioCard,
+  RadioCards,
   Table,
   Td,
   Th,
@@ -237,16 +242,11 @@ function NewServiceAccount(props: {
         />
       </Field>
       <Fieldset legend="Role">
-        {ROLES.map((option) => (
-          <RadioCard
-            key={option.role}
-            name="sa-role"
-            label={option.label}
-            description={option.description}
-            checked={role === option.role}
-            onChange={() => setRole(option.role)}
-          />
-        ))}
+        <RadioCards name="sa-role" value={role} onChange={setRole}>
+          {ROLES.map((option) => (
+            <RadioCard key={option.role} value={option.role} label={option.label} description={option.description} />
+          ))}
+        </RadioCards>
         <Hint className="mt-1.5">
           An agent acting as it gets the lower of this role and the role of whoever connects it.
         </Hint>
@@ -263,7 +263,6 @@ function ServiceAccountMenu(props: {
   readonly onDone: (text: string | undefined) => Promise<void>
 }) {
   const { serviceAccount, teamId } = props
-  const [open, setOpen] = useState(false)
   const [mode, setMode] = useState<"rename" | "delete">()
   const [name, setName] = useState(serviceAccount.name)
   const [error, setError] = useState<UserText>()
@@ -281,27 +280,25 @@ function ServiceAccountMenu(props: {
 
   return (
     <span className="relative inline-flex">
-      <IconButton
-        label={`More actions for ${serviceAccount.name}`}
-        aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
-      >
-        <MoreIcon />
-      </IconButton>
-      {open ? (
-        <Menu className="top-full right-0 mt-1 text-left">
-          <MenuItem
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={
+            <IconButton label={`More actions for ${serviceAccount.name}`}>
+              <MoreIcon />
+            </IconButton>
+          }
+        />
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem
             onClick={() => {
-              setOpen(false)
               setName(serviceAccount.name)
               setMode("rename")
             }}
           >
             Rename
-          </MenuItem>
-          <MenuItem
+          </DropdownMenuItem>
+          <DropdownMenuItem
             onClick={() => {
-              setOpen(false)
               const role = serviceAccount.role === "admin" ? "member" : "admin"
               void act(
                 () => call("serviceAccounts.update", { teamId, serviceAccountId: serviceAccount.id, role }),
@@ -310,19 +307,13 @@ function ServiceAccountMenu(props: {
             }}
           >
             {serviceAccount.role === "admin" ? "Make member" : "Make admin"}
-          </MenuItem>
-          <MenuSeparator />
-          <MenuItem
-            danger
-            onClick={() => {
-              setOpen(false)
-              setMode("delete")
-            }}
-          >
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem variant="destructive" onClick={() => setMode("delete")}>
             Delete
-          </MenuItem>
-        </Menu>
-      ) : null}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
       {mode === "rename" ? (
         <Dialog
           title={`Rename ${serviceAccount.name}`}

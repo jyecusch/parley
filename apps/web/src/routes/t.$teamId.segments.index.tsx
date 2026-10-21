@@ -4,9 +4,9 @@ import { createFileRoute, getRouteApi, Link, useNavigate } from "@tanstack/react
 import { useState } from "react"
 import { SegmentIcon } from "../components/icons.tsx"
 import { LoadFailed } from "../components/record.tsx"
+import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage } from "../components/ui/breadcrumb.tsx"
 import { ItemTile, NameText, nameLinkClass, wideColumnClass } from "../components/ui/email.tsx"
 import {
-  Breadcrumb,
   Button,
   Card,
   Centered,
@@ -19,6 +19,7 @@ import {
   Input,
   PageHeader,
   RadioCard,
+  RadioCards,
   Spacer,
   Table,
   TableScroll,
@@ -53,7 +54,11 @@ function SegmentsScreen() {
     <Card as="main" className="flex-[999_1_35rem]">
       <PageHeader>
         <Breadcrumb>
-          <span>Segments</span>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbPage render={(props) => <h1 {...props} />}>Segments</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
         </Breadcrumb>
         {items.length > 0 ? <Count>{items.length}</Count> : null}
         <Spacer />
@@ -172,20 +177,14 @@ function NewSegmentDialog(props: { readonly teamId: TeamId; readonly onClose: ()
         />
       </Field>
       <Fieldset legend="Kind">
-        <RadioCard
-          name="kind"
-          label="Dynamic"
-          description="Everyone matching a filter. It keeps up as contacts change."
-          checked={kind === "dynamic"}
-          onChange={() => setKind("dynamic")}
-        />
-        <RadioCard
-          name="kind"
-          label="Fixed"
-          description="Contacts you pick by hand."
-          checked={kind === "fixed"}
-          onChange={() => setKind("fixed")}
-        />
+        <RadioCards name="kind" value={kind} onChange={setKind}>
+          <RadioCard
+            value="dynamic"
+            label="Dynamic"
+            description="Everyone matching a filter. It keeps up as contacts change."
+          />
+          <RadioCard value="fixed" label="Fixed" description="Contacts you pick by hand." />
+        </RadioCards>
       </Fieldset>
       {error ? <ErrorText>{error}</ErrorText> : null}
     </Dialog>

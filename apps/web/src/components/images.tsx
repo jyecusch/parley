@@ -4,7 +4,8 @@ import { type ReactNode, useEffect, useRef, useState } from "react"
 import { initialsOf } from "../lib/contacts.ts"
 import { CloseIcon } from "./icons.tsx"
 import { initialsOfName } from "./record.tsx"
-import { Avatar, cn, type MarkSize, Tooltip } from "./ui/index.ts"
+import { Button as PlainButton } from "./ui/button.tsx"
+import { Avatar, cn, type MarkSize, Tooltip, TooltipContent, TooltipTrigger, tipPlacement } from "./ui/index.ts"
 
 const teamRoute = getRouteApi("/t/$teamId")
 
@@ -24,32 +25,21 @@ const gravatarOf = (email: string) => {
   return url
 }
 
-/** A person's or company's mark showing an image, or the fallback when there's none or it fails to load. */
+/** A person's or company's mark showing an image, or the fallback until it loads, when there's none, or if it fails. */
 function RecordImage(props: {
   readonly src: string | null
   readonly size: MarkSize | undefined
   readonly shape: "round" | "square"
   readonly fallback: ReactNode
 }) {
-  const [failed, setFailed] = useState<string | null>(null)
-  const showImage = props.src !== null && failed !== props.src
   return (
     <Avatar
       size={props.size}
       shape={props.shape}
-      image={
-        showImage ? (
-          // Requested with CORS so CRT mode can draw it: the shader only draws images from other
-          // sites (Gravatar) that allow it. Gravatar does; uploaded files are Parley's own.
-          <img
-            src={props.src ?? undefined}
-            alt=""
-            loading="lazy"
-            crossOrigin="anonymous"
-            onError={() => setFailed(props.src)}
-          />
-        ) : undefined
-      }
+      src={props.src ?? undefined}
+      // Requested with CORS so CRT mode can draw it: the shader only draws images from other sites
+      // (Gravatar) that allow it. Gravatar does; uploaded files are Parley's own.
+      crossOrigin="anonymous"
     >
       {props.fallback}
     </Avatar>
@@ -134,19 +124,28 @@ export function ImageEditor(props: {
   }
   return (
     <span className={cn("group/img relative inline-flex shrink-0", busy && "opacity-50")}>
-      <Tooltip text={`Upload ${props.label}`} side="bottom-start">
-        <button
-          className="inline-flex cursor-pointer rounded-lg p-0 hover:[&>*]:ring-2 hover:[&>*]:ring-line-strong focus-visible:[&>*]:ring-2 focus-visible:[&>*]:ring-line-strong"
-          type="button"
-          aria-label={`Upload ${props.label}`}
-          disabled={busy}
-          onClick={() => input.current?.click()}
-        >
-          {props.children}
-        </button>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <PlainButton
+              variant={null}
+              size={null}
+              className="inline-flex cursor-pointer rounded-lg p-0 hover:[&>*]:ring-2 hover:[&>*]:ring-line-strong focus-visible:[&>*]:ring-2 focus-visible:[&>*]:ring-line-strong"
+              type="button"
+              aria-label={`Upload ${props.label}`}
+              disabled={busy}
+              onClick={() => input.current?.click()}
+            >
+              {props.children}
+            </PlainButton>
+          }
+        />
+        <TooltipContent {...tipPlacement("bottom-start")}>{`Upload ${props.label}`}</TooltipContent>
       </Tooltip>
       {props.hasUpload ? (
-        <button
+        <PlainButton
+          variant={null}
+          size={null}
           className="absolute -top-1.5 -right-1.5 grid size-5 cursor-pointer place-items-center rounded-full bg-surface p-0 text-muted opacity-0 ring ring-line-strong group-hover/img:opacity-100 focus-visible:opacity-100"
           type="button"
           aria-label={`Remove ${props.label}`}
@@ -155,7 +154,7 @@ export function ImageEditor(props: {
           onClick={() => void run(props.onRemove)}
         >
           <CloseIcon className="size-3" />
-        </button>
+        </PlainButton>
       ) : null}
       <input
         ref={input}

@@ -11,32 +11,37 @@ import {
 } from "@parley/domain"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { createFileRoute, getRouteApi, Link, useNavigate } from "@tanstack/react-router"
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import { Picker, type PickerItem } from "../components/affiliations.tsx"
 import { FilterBar } from "../components/filters.tsx"
 import { CloseIcon, DownloadIcon, PlusIcon, SegmentIcon } from "../components/icons.tsx"
 import { ContactAvatar } from "../components/images.tsx"
 import { LoadFailed } from "../components/record.tsx"
 import { PlaceholderRow, SpacerRow, useVirtualRows } from "../components/record-index.tsx"
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "../components/ui/breadcrumb.tsx"
 import { NameText, nameLinkClass, TitleInput, wideColumnClass } from "../components/ui/email.tsx"
 import {
   Badge,
-  Breadcrumb,
-  BreadcrumbSeparator,
   Button,
-  breadcrumbRootClass,
   Card,
   Centered,
   EmptyState,
   IconButton,
   PageHeader,
   Spacer,
+  showToast,
   Table,
   TableScroll,
   Td,
   TextButton,
   Th,
-  Toast,
   Toolbar,
   Tr,
   ViewBody,
@@ -67,12 +72,6 @@ function SegmentScreen() {
     queryKey: key,
     queryFn: () => call("segments.get", { teamId, segmentId: segmentId as SegmentId }),
   })
-  const [toast, setToast] = useState<string>()
-  useEffect(() => {
-    if (!toast) return
-    const timer = window.setTimeout(() => setToast(undefined), 5000)
-    return () => window.clearTimeout(timer)
-  }, [toast])
 
   const refresh = async (next?: Segment) => {
     if (next) queryClient.setQueryData(key, next)
@@ -101,8 +100,7 @@ function SegmentScreen() {
       segment={segment.data}
       canWrite={canWrite}
       onChanged={refresh}
-      onToast={setToast}
-      toast={toast}
+      onToast={(text) => showToast(text, { duration: 5000, dismissible: false })}
     />
   )
 }
@@ -113,7 +111,6 @@ function SegmentView(props: {
   readonly canWrite: boolean
   readonly onChanged: (next?: Segment) => Promise<void>
   readonly onToast: (text: string) => void
-  readonly toast: string | undefined
 }) {
   const { segment, teamId } = props
   const { userId } = teamRoute.useRouteContext()
@@ -196,36 +193,43 @@ function SegmentView(props: {
     <Card as="main" className="flex-[999_1_35rem]">
       <PageHeader>
         <Breadcrumb>
-          <Link className={breadcrumbRootClass} to="/t/$teamId/segments" params={{ teamId }}>
-            Segments
-          </Link>
-          <BreadcrumbSeparator />
-          {renaming ? (
-            <TitleInput
-              className="w-80 bg-fill"
-              aria-label="Segment name"
-              defaultValue={segment.name}
-              maxLength={80}
-              autoFocus
-              onBlur={(event) => {
-                setRenaming(false)
-                const name = event.currentTarget.value.trim()
-                if (name && name !== segment.name) {
-                  void run(() => call("segments.update", { teamId, segmentId: segment.id, name }))
-                }
-              }}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") event.currentTarget.blur()
-                if (event.key === "Escape") setRenaming(false)
-              }}
-            />
-          ) : props.canWrite ? (
-            <TextButton className="self-auto text-fg" title="Rename" onClick={() => setRenaming(true)}>
-              {segment.name}
-            </TextButton>
-          ) : (
-            <span>{segment.name}</span>
-          )}
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink render={<Link to="/t/$teamId/segments" params={{ teamId }} />}>Segments</BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              {/* A flex box, so the name's input or button sits as it did in the row. */}
+              <BreadcrumbPage render={(props) => <h1 {...props} className="flex min-w-0" />}>
+                {renaming ? (
+                  <TitleInput
+                    className="w-80 bg-fill"
+                    aria-label="Segment name"
+                    defaultValue={segment.name}
+                    maxLength={80}
+                    autoFocus
+                    onBlur={(event) => {
+                      setRenaming(false)
+                      const name = event.currentTarget.value.trim()
+                      if (name && name !== segment.name) {
+                        void run(() => call("segments.update", { teamId, segmentId: segment.id, name }))
+                      }
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") event.currentTarget.blur()
+                      if (event.key === "Escape") setRenaming(false)
+                    }}
+                  />
+                ) : props.canWrite ? (
+                  <TextButton className="self-auto text-fg" title="Rename" onClick={() => setRenaming(true)}>
+                    {segment.name}
+                  </TextButton>
+                ) : (
+                  <span>{segment.name}</span>
+                )}
+              </BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
         </Breadcrumb>
         <Badge className="ml-2">{segment.kind === "dynamic" ? "Dynamic" : "Fixed"}</Badge>
         <Spacer />
@@ -412,11 +416,6 @@ function SegmentView(props: {
           </TableScroll>
         )}
       </ViewBody>
-      {props.toast ? (
-        <Toast>
-          <span>{props.toast}</span>
-        </Toast>
-      ) : null}
     </Card>
   )
 }

@@ -1,25 +1,50 @@
-import type { HTMLAttributes, Ref, TdHTMLAttributes, ThHTMLAttributes } from "react"
+import type { ComponentProps } from "react"
 import { cn } from "./cn.ts"
 
-/**
- * Tables come in two densities: `list` for the record lists (sticky header, compact rows) and
- * `settings` for the boxed tables on settings pages (taller rows).
+/*
+ * Tables, in Parley's look (D80). `data-kind` on the table picks a density: `list` for the record
+ * lists (sticky header, compact rows) and `settings` for the boxed tables on settings pages. The
+ * table isn't wrapped in a scroller: the view scrolls it, which keeps the list header sticky.
  */
-export type TableKind = "list" | "settings"
 
-export function Table({ kind = "list", className, ...props }: HTMLAttributes<HTMLTableElement> & { kind?: TableKind }) {
+function Table({ className, ...props }: ComponentProps<"table">) {
   return (
     <table
-      data-kind={kind}
+      data-slot="table"
       className={cn("group/table w-full table-fixed border-separate border-spacing-0", className)}
       {...props}
     />
   )
 }
 
-export function Th({ className, ...props }: ThHTMLAttributes<HTMLTableCellElement>) {
+function TableHeader(props: ComponentProps<"thead">) {
+  return <thead data-slot="table-header" {...props} />
+}
+
+function TableBody(props: ComponentProps<"tbody">) {
+  return <tbody data-slot="table-body" {...props} />
+}
+
+function TableRow({ className, ...props }: ComponentProps<"tr">) {
+  return (
+    <tr
+      data-slot="table-row"
+      className={cn(
+        "group/row [&>td]:transition-colors hover:[&>td]:bg-hover",
+        "group-data-[kind=settings]/table:last:[&>td]:border-b-0",
+        // The box's rounded corners, so a hovered last row doesn't poke out of them.
+        "group-data-[kind=settings]/table:last:[&>td:first-child]:rounded-bl-[calc(var(--radius-lg)-1px)] group-data-[kind=settings]/table:last:[&>td:last-child]:rounded-br-[calc(var(--radius-lg)-1px)]",
+        className,
+      )}
+      {...props}
+    />
+  )
+}
+
+function TableHead({ className, ...props }: ComponentProps<"th">) {
   return (
     <th
+      data-slot="table-head"
       className={cn(
         "h-9 border-b border-line bg-surface px-2.5 text-left text-sm font-medium whitespace-nowrap text-subtle",
         "group-data-[kind=list]/table:sticky group-data-[kind=list]/table:top-0 group-data-[kind=list]/table:z-1",
@@ -31,9 +56,10 @@ export function Th({ className, ...props }: ThHTMLAttributes<HTMLTableCellElemen
   )
 }
 
-export function Td({ className, ...props }: TdHTMLAttributes<HTMLTableCellElement>) {
+function TableCell({ className, ...props }: ComponentProps<"td">) {
   return (
     <td
+      data-slot="table-cell"
       className={cn(
         "h-10 overflow-hidden border-b border-line/55 px-2.5 text-ellipsis whitespace-nowrap",
         "group-data-[kind=settings]/table:h-14 group-data-[kind=settings]/table:first:pl-4",
@@ -44,54 +70,4 @@ export function Td({ className, ...props }: TdHTMLAttributes<HTMLTableCellElemen
   )
 }
 
-/**
- * A row. `checked` and `open` highlight it; `cursor` marks it for the keyboard. The first cell
- * gets a bar on the left for open and cursor rows.
- */
-export function Tr({
-  checked,
-  open,
-  cursor,
-  className,
-  ...props
-}: HTMLAttributes<HTMLTableRowElement> & {
-  checked?: boolean | undefined
-  open?: boolean | undefined
-  cursor?: boolean
-}) {
-  return (
-    <tr
-      className={cn(
-        "group/row [&>td]:transition-colors hover:[&>td]:bg-hover",
-        "group-data-[kind=settings]/table:last:[&>td]:border-b-0",
-        // The box's rounded corners, so a hovered last row doesn't poke out of them.
-        "group-data-[kind=settings]/table:last:[&>td:first-child]:rounded-bl-[calc(var(--radius-lg)-1px)] group-data-[kind=settings]/table:last:[&>td:last-child]:rounded-br-[calc(var(--radius-lg)-1px)]",
-        cursor && "[&>td]:bg-hover [&>td:first-child]:shadow-[inset_0.125rem_0_0_var(--color-subtle)]",
-        (checked || open) && "[&>td]:bg-selected hover:[&>td]:bg-selected",
-        open && "[&>td:first-child]:shadow-[inset_0.125rem_0_0_var(--color-mark)]",
-        className,
-      )}
-      {...props}
-    />
-  )
-}
-
-/** Scrolls a list table inside its view. `padForBar` leaves room for the bulk-action bar. */
-export function TableScroll({
-  padForBar,
-  className,
-  ...props
-}: HTMLAttributes<HTMLDivElement> & { padForBar?: boolean; ref?: Ref<HTMLDivElement> }) {
-  // No scroll anchoring: a virtual list (D136) sets its own scroll position as its rows change.
-  return (
-    <div
-      className={cn("min-h-0 flex-1 overflow-auto [overflow-anchor:none]", padForBar && "pb-20", className)}
-      {...props}
-    />
-  )
-}
-
-/** A bordered box around a settings table, list or empty state. */
-export function Box({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("rounded-lg border border-line-strong", className)} {...props} />
-}
+export { Table, TableBody, TableCell, TableHead, TableHeader, TableRow }

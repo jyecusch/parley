@@ -18,14 +18,19 @@ import { Composer, type Content, SaveState, useAutosave } from "../components/co
 import { EMAIL_FRAME_CLASS, EmailPreview } from "../components/email-preview.tsx"
 import { EmailStyleSelect } from "../components/email-style-select.tsx"
 import { LoadFailed } from "../components/record.tsx"
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "../components/ui/breadcrumb.tsx"
 import { TitleInput } from "../components/ui/email.tsx"
 import {
   Badge,
   Box,
-  Breadcrumb,
-  BreadcrumbSeparator,
   Button,
-  breadcrumbRootClass,
   Card,
   Checkbox,
   Dialog,
@@ -39,10 +44,10 @@ import {
   Select,
   Spacer,
   StatTile,
+  showToast,
   Table,
   Td,
   Th,
-  Toast,
   Tr,
   ViewBody,
 } from "../components/ui/index.ts"
@@ -127,7 +132,6 @@ function DraftEditor(props: {
   const [dialog, setDialog] = useState<"test" | "send">()
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [previewAs, setPreviewAs] = useState<ContactId | "">("")
-  const [toast, setToast] = useState<string>()
   const segments = useQuery({ queryKey: ["segments", teamId], queryFn: () => call("segments.list", { teamId }) })
   const topics = useQuery({ queryKey: ["topics", teamId], queryFn: () => call("topics.list", { teamId }) })
   // Who to preview as: the first 50 of the chosen segment, else of the team (D136).
@@ -171,17 +175,24 @@ function DraftEditor(props: {
     <Card as="main" className="flex-[999_1_35rem]">
       <PageHeader>
         <Breadcrumb>
-          <Link className={breadcrumbRootClass} to="/t/$teamId/campaigns" params={{ teamId }}>
-            Campaigns
-          </Link>
-          <BreadcrumbSeparator />
-          <TitleInput
-            aria-label="Campaign name"
-            maxLength={120}
-            readOnly={readOnly}
-            value={draft.name}
-            onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
-          />
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink render={<Link to="/t/$teamId/campaigns" params={{ teamId }} />}>Campaigns</BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              {/* A flex box, so the input sits as it did in the row. */}
+              <BreadcrumbPage render={(props) => <h1 {...props} className="flex min-w-0" />}>
+                <TitleInput
+                  aria-label="Campaign name"
+                  maxLength={120}
+                  readOnly={readOnly}
+                  value={draft.name}
+                  onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
+                />
+              </BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
         </Breadcrumb>
         <Badge className="ml-2">Draft</Badge>
         <SaveState state={state} />
@@ -331,7 +342,8 @@ function DraftEditor(props: {
           onClose={() => setDialog(undefined)}
           onSent={(text) => {
             setDialog(undefined)
-            setToast(text)
+            // It stays until it's acknowledged, as the test send's result.
+            showToast(text, { dismissLabel: "OK", duration: Number.POSITIVE_INFINITY })
           }}
         />
       ) : dialog === "send" ? (
@@ -345,14 +357,6 @@ function DraftEditor(props: {
             await queryClient.invalidateQueries({ queryKey: ["campaigns", teamId] })
           }}
         />
-      ) : null}
-      {toast ? (
-        <Toast>
-          <span>{toast}</span>
-          <Button variant="ghost" size="sm" onClick={() => setToast(undefined)}>
-            OK
-          </Button>
-        </Toast>
       ) : null}
     </Card>
   )
@@ -621,11 +625,15 @@ function Report(props: { readonly teamId: TeamId; readonly campaign: Campaign; r
     <Card as="main" className="flex-[999_1_35rem]">
       <PageHeader>
         <Breadcrumb>
-          <Link className={breadcrumbRootClass} to="/t/$teamId/campaigns" params={{ teamId }}>
-            Campaigns
-          </Link>
-          <BreadcrumbSeparator />
-          <span>{campaign.name}</span>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink render={<Link to="/t/$teamId/campaigns" params={{ teamId }} />}>Campaigns</BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage render={(props) => <h1 {...props} />}>{campaign.name}</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
         </Breadcrumb>
         <Badge className="ml-2" tone={campaign.status === "sent" ? "strong" : "neutral"}>
           {CAMPAIGN_STATUS_LABELS[campaign.status]}

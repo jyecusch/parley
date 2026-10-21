@@ -7,7 +7,12 @@ import { crtSettings } from "../lib/crt-settings.ts"
  * so clicks, focus, selection and typing keep working. Everywhere else, the CSS layer draws the same effect over
  * the app. With CRT mode off there is no canvas, no timer and no WebGL context.
  */
-export function useCrt(): { readonly screenRef: RefCallback<HTMLElement>; readonly overlay: ReactNode } {
+export function useCrt(): {
+  readonly screenRef: RefCallback<HTMLElement>
+  /** The element the app is drawn in, for popups to render into (so CRT mode draws them too). */
+  readonly screen: HTMLElement | null
+  readonly overlay: ReactNode
+} {
   const on = useCrtMode()
   const still = useReducedMotion()
   const [screen, setScreen] = useState<HTMLElement | null>(null)
@@ -38,7 +43,7 @@ export function useCrt(): { readonly screenRef: RefCallback<HTMLElement>; readon
     }
   }, [shaderOn, screen, still])
 
-  return { screenRef, overlay: on && !shaderOn ? <CssLayer /> : null }
+  return { screenRef, screen, overlay: on && !shaderOn ? <CssLayer /> : null }
 }
 
 /** The CSS layer: pointer-transparent, over the real UI, for browsers that can't run the shader. */

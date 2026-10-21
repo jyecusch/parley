@@ -23,11 +23,12 @@ import {
 import { RecordOwnerField } from "./record-owner.tsx"
 import { EditableDescription, EditableNumber, SocialProfilesField } from "./record-profile.tsx"
 import { Timeline } from "./timeline.tsx"
+import { Button as ButtonPrimitive } from "./ui/button.tsx"
+import { DropdownMenuItem } from "./ui/dropdown-menu.tsx"
 import {
   Button,
   cn,
   InlineInput,
-  MenuItem,
   PanelBody,
   PanelHeader,
   PropertyRow,
@@ -175,10 +176,10 @@ export function CompanyPanel(props: {
           onToggleLayout={props.onToggleLayout}
           onClose={props.onClose}
           menu={() => (
-            <MenuItem danger onClick={props.onDelete}>
+            <DropdownMenuItem variant="destructive" onClick={props.onDelete}>
               <TrashIcon className="size-4" />
               Delete company
-            </MenuItem>
+            </DropdownMenuItem>
           )}
         />
         <PanelIdentity
@@ -412,7 +413,7 @@ export function EditableAddress(props: {
   const locality = value ? [value.city, value.region, value.postcode].filter(Boolean).join(" ") : ""
   return (
     <PropertyRow label="Address">
-      <button className={propertyValueClass} type="button" onClick={() => setEditing(true)}>
+      <ButtonPrimitive variant={null} size="none" className={propertyValueClass} onClick={() => setEditing(true)}>
         {value ? (
           <span className="flex flex-col">
             {value.line1 ? <span>{value.line1}</span> : null}
@@ -423,7 +424,7 @@ export function EditableAddress(props: {
         ) : (
           <EmptyValue />
         )}
-      </button>
+      </ButtonPrimitive>
     </PropertyRow>
   )
 }

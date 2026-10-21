@@ -6,18 +6,8 @@ import { useState } from "react"
 import { call, messageOf } from "../lib/client.ts"
 import { MoreIcon } from "./icons.tsx"
 import { ActivityRow, TimelineRow } from "./record.tsx"
-import {
-  Button,
-  ErrorText,
-  IconButton,
-  Kbd,
-  Menu,
-  MenuItem,
-  Section,
-  SectionHeader,
-  Skeleton,
-  Textarea,
-} from "./ui/index.ts"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./ui/dropdown-menu.tsx"
+import { Button, ErrorText, IconButton, Kbd, Section, SectionHeader, Skeleton, Textarea } from "./ui/index.ts"
 
 const team = getRouteApi("/t/$teamId")
 
@@ -167,7 +157,6 @@ function NoteRow(props: {
   readonly onDelete: () => Promise<void>
 }) {
   const { note } = props
-  const [menu, setMenu] = useState(false)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(note.body)
   const edited = note.updatedAt !== note.createdAt
@@ -222,35 +211,33 @@ function NoteRow(props: {
       aside={
         props.canEdit || props.canDelete ? (
           <span className="relative">
-            <IconButton label="Note actions" size="xs" aria-expanded={menu} onClick={() => setMenu((open) => !open)}>
-              <MoreIcon className="size-3.5" />
-            </IconButton>
-            {menu ? (
-              <Menu className="top-full right-0 mt-1">
+            <DropdownMenu modal={false}>
+              <DropdownMenuTrigger
+                render={
+                  <IconButton label="Note actions" size="xs">
+                    <MoreIcon className="size-3.5" />
+                  </IconButton>
+                }
+              />
+              {/* Editing focuses the note's text box, so focus doesn't go back to this button. */}
+              <DropdownMenuContent align="end" finalFocus={false}>
                 {props.canEdit ? (
-                  <MenuItem
+                  <DropdownMenuItem
                     onClick={() => {
-                      setMenu(false)
                       setDraft(note.body)
                       setEditing(true)
                     }}
                   >
                     Edit note
-                  </MenuItem>
+                  </DropdownMenuItem>
                 ) : null}
                 {props.canDelete ? (
-                  <MenuItem
-                    danger
-                    onClick={() => {
-                      setMenu(false)
-                      void props.onDelete()
-                    }}
-                  >
+                  <DropdownMenuItem variant="destructive" onClick={() => void props.onDelete()}>
                     Delete note
-                  </MenuItem>
+                  </DropdownMenuItem>
                 ) : null}
-              </Menu>
-            ) : null}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </span>
         ) : null
       }

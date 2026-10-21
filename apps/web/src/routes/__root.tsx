@@ -1,6 +1,7 @@
 import { type QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { createRootRouteWithContext, HeadContent, Outlet, Scripts } from "@tanstack/react-router"
 import type { ReactNode } from "react"
+import { TooltipProvider } from "../components/ui/tooltip.tsx"
 import { CRT_SETTINGS_SCRIPT } from "../lib/crt-settings.ts"
 import appCss from "../styles/app.css?url"
 
@@ -51,7 +52,10 @@ function Root() {
   const { queryClient } = Route.useRouteContext()
   return (
     <QueryClientProvider client={queryClient}>
-      <Outlet />
+      {/* Tips show after a short hover, as they always have (D80). */}
+      <TooltipProvider delay={400}>
+        <Outlet />
+      </TooltipProvider>
     </QueryClientProvider>
   )
 }

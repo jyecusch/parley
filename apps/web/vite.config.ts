@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url"
 import tailwindcss from "@tailwindcss/vite"
 import { tanstackStart } from "@tanstack/react-start/plugin/vite"
 import react from "@vitejs/plugin-react"
@@ -13,5 +14,7 @@ export default defineConfig({
   },
   // Native modules load their binaries at runtime, so the server build leaves them in node_modules.
   ssr: { external: ["sharp"] },
+  // "@/…" is src/, as shadcn's components import it.
+  resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
   plugins: [tailwindcss(), tanstackStart(), react()],
 })

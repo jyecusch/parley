@@ -1,4 +1,5 @@
 import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from "react"
+import { Button } from "./button.tsx"
 import { cn } from "./cn.ts"
 
 /**
@@ -26,12 +27,6 @@ export function AuthHeading({ title, children }: { title: ReactNode; children?: 
 }
 
 /** A button that reads as a link in a sentence, such as "Use another account". */
-export function LinkButton({ className, type = "button", ...props }: ButtonHTMLAttributes<HTMLButtonElement>) {
-  return (
-    <button
-      type={type}
-      className={cn("cursor-pointer p-0 text-fg underline underline-offset-2 hover:text-muted", className)}
-      {...props}
-    />
-  )
+export function LinkButton({ type = "button", ...props }: ButtonHTMLAttributes<HTMLButtonElement>) {
+  return <Button type={type} variant="link" size="none" {...props} />
 }

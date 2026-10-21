@@ -2,6 +2,7 @@ import { type SocialNetworkId, socialNetworkOf } from "@parley/domain"
 import { type ReactNode, useState } from "react"
 import { CloseIcon, PlusIcon } from "./icons.tsx"
 import { EmptyValue } from "./record.tsx"
+import { Button as PlainButton } from "./ui/button.tsx"
 import { cn, IconButton, InlineInput, PropertyRow, propertyValueClass, Textarea, TextButton } from "./ui/index.ts"
 
 /** Longer than this, a description shows clamped with "Show more". */
@@ -52,7 +53,9 @@ export function EditableDescription(props: {
   const long = props.value.length > LONG_DESCRIPTION
   return (
     <div className="flex flex-col items-start gap-1">
-      <button
+      <PlainButton
+        variant={null}
+        size={null}
         type="button"
         disabled={props.disabled}
         className={cn(
@@ -62,7 +65,7 @@ export function EditableDescription(props: {
         onClick={() => setEditing(true)}
       >
         {props.value}
-      </button>
+      </PlainButton>
       {long ? (
         <TextButton className="text-sm" onClick={() => setExpanded((open) => !open)}>
           {expanded ? "Show less" : "Show more"}
@@ -116,7 +119,13 @@ export function EditableNumber(props: {
   }
   return (
     <PropertyRow label={props.label}>
-      <button className={cn(propertyValueClass, "tabular-nums")} type="button" onClick={() => setEditing(true)}>
+      <PlainButton
+        variant={null}
+        size={null}
+        className={cn(propertyValueClass, "tabular-nums")}
+        type="button"
+        onClick={() => setEditing(true)}
+      >
         {props.value === null ? (
           <EmptyValue />
         ) : props.grouped === false ? (
@@ -124,7 +133,7 @@ export function EditableNumber(props: {
         ) : (
           props.value.toLocaleString()
         )}
-      </button>
+      </PlainButton>
     </PropertyRow>
   )
 }

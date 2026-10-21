@@ -6,7 +6,9 @@ import { call, messageOf } from "../lib/client.ts"
 import { absolute, ago } from "../lib/time.ts"
 import { LineProblems } from "./index-view.tsx"
 import { Dialog } from "./settings.tsx"
+import { Button as PlainButton } from "./ui/button.tsx"
 import { Badge, Button, cn, ErrorText, Hint, Skeleton } from "./ui/index.ts"
+import { Progress } from "./ui/progress.tsx"
 
 /** Imports that are still going (D135). */
 const isActive = (entry: Import) =>
@@ -59,22 +61,9 @@ const outcome = (entry: Import) =>
 const fileOf = (entry: Import) => entry.fileName ?? "a CSV file"
 
 function ProgressBar(props: { readonly done: number; readonly total: number; readonly label: string }) {
-  const percent = props.total > 0 ? Math.min(100, (props.done / props.total) * 100) : 0
-  return (
-    <div
-      role="progressbar"
-      aria-label={props.label}
-      aria-valuemin={0}
-      aria-valuemax={props.total}
-      aria-valuenow={props.done}
-      className="h-1.5 overflow-hidden rounded-full bg-fill"
-    >
-      <div
-        className="h-full rounded-full bg-primary transition-[width] duration-500"
-        style={{ width: `${percent}%` }}
-      />
-    </div>
-  )
+  // An empty bar until the total is known.
+  const max = Math.max(props.total, 1)
+  return <Progress value={Math.min(props.done, max)} max={max} aria-label={props.label} />
 }
 
 /**
@@ -361,7 +350,9 @@ export function PastImportsDialog(props: {
         <ul className="m-0 flex list-none flex-col p-0">
           {imports.data.map((entry) => (
             <li key={entry.id} className="border-b border-line last:border-b-0">
-              <button
+              <PlainButton
+                variant={null}
+                size={null}
                 type="button"
                 className="-mx-2 flex w-[calc(100%+1rem)] cursor-pointer items-center gap-3 rounded-md px-2 py-2.5 text-left hover:bg-hover"
                 onClick={() => setOpen(entry.id)}
@@ -375,7 +366,7 @@ export function PastImportsDialog(props: {
                   </span>
                 </span>
                 <Badge tone={entry.status === "failed" ? "danger" : "neutral"}>{STATUS_LABEL[entry.status]}</Badge>
-              </button>
+              </PlainButton>
             </li>
           ))}
         </ul>

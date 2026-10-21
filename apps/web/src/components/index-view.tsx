@@ -14,12 +14,24 @@ import {
 } from "@parley/domain"
 import { type UserText, userText } from "@parley/errors"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { useEffect, useMemo, useRef, useState } from "react"
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react"
 import { call, messageOf } from "../lib/client.ts"
 import { type Person, personLabel, usePeople } from "../lib/people.ts"
 import { CustomFieldsSection } from "./custom-fields.tsx"
 import { CloseIcon, DisplayIcon, DownloadIcon } from "./icons.tsx"
 import { Dialog } from "./settings.tsx"
+import { Button as ButtonPrimitive } from "./ui/button.tsx"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuShortcut,
+  DropdownMenuTrigger,
+  menuItemClassName,
+} from "./ui/dropdown-menu.tsx"
 import {
   Box,
   Button,
@@ -31,28 +43,20 @@ import {
   Hint,
   IconButton,
   Input,
-  Menu,
-  MenuHeading,
-  MenuItem,
-  MenuSeparator,
   Notice,
   Option,
   Select,
   TextButton,
 } from "./ui/index.ts"
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover.tsx"
+import { Separator } from "./ui/separator.tsx"
 
-const useDismiss = (open: boolean, close: () => void) => {
-  const ref = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    if (!open) return
-    const onPointer = (event: PointerEvent) => {
-      if (ref.current && !ref.current.contains(event.target as Node)) close()
-    }
-    document.addEventListener("pointerdown", onPointer)
-    return () => document.removeEventListener("pointerdown", onPointer)
-  }, [open, close])
-  return ref
+/** A heading in the Display popover, as a menu's (it holds form controls, so it isn't a menu). */
+function DisplayHeading(props: { readonly children: ReactNode }) {
+  return <p className="m-0 px-2.5 pt-2 pb-0.5 text-sm text-subtle">{props.children}</p>
 }
+
+const displaySeparatorClass = "mx-0.5 my-1 h-px"
 
 /** The Display menu of an index view (D65): sort, columns, deleted records, and CSV in and out. */
 export function DisplayMenu(props: {
@@ -69,16 +73,30 @@ export function DisplayMenu(props: {
   readonly onToggleDeleted: () => void
 }) {
   const [open, setOpen] = useState(false)
-  const ref = useDismiss(open, () => setOpen(false))
+  const panel = useRef<HTMLDivElement>(null)
   return (
-    <div className="relative" ref={ref}>
-      <Button variant="ghost" size="sm" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
-        <DisplayIcon />
-        Display
-      </Button>
-      {open ? (
-        <Menu className="top-full right-0 mt-1 w-72">
-          <MenuHeading>Sort</MenuHeading>
+    // The block wrapper keeps the button exactly where it sat before (a line box half a pixel taller).
+    <div>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger
+          render={
+            <Button variant="ghost" size="sm">
+              <DisplayIcon />
+              Display
+            </Button>
+          }
+        />
+        <PopoverContent
+          ref={panel}
+          align="end"
+          // 5px: the old menu hung 4px below a wrapper a pixel taller than the button.
+          sideOffset={5}
+          // Focus goes to the panel, so keyboard users are inside it without a ring lighting up the select.
+          initialFocus={panel}
+          tabIndex={-1}
+          className="flex w-72 min-w-60 flex-col gap-px overflow-visible rounded-lg p-1"
+        >
+          <DisplayHeading>Sort</DisplayHeading>
           <div className="flex gap-1 px-1.5 pb-1.5">
             <div className="min-w-0 flex-1">
               <Select
@@ -121,16 +139,20 @@ export function DisplayMenu(props: {
           </div>
           {props.customFields.length > 0 || (props.builtInColumns ?? []).length > 0 ? (
             <>
-              <MenuSeparator />
-              <MenuHeading>Columns</MenuHeading>
+              <Separator className={displaySeparatorClass} />
+              <DisplayHeading>Columns</DisplayHeading>
               {[
                 ...(props.builtInColumns ?? []),
                 ...props.customFields.map((field) => ({ ref: `custom:${field.id}`, label: field.name })),
               ].map((column) => {
                 const on = props.columns.includes(column.ref)
                 return (
-                  <MenuItem
+                  <ButtonPrimitive
                     key={column.ref}
+                    variant={null}
+                    size="none"
+                    className={menuItemClassName}
+                    aria-pressed={on}
                     onClick={() =>
                       props.onColumns(
                         on ? props.columns.filter((id) => id !== column.ref) : [...props.columns, column.ref],
@@ -139,13 +161,17 @@ export function DisplayMenu(props: {
                   >
                     {column.label}
                     {on ? <span className="ml-auto text-subtle">✓</span> : null}
-                  </MenuItem>
+                  </ButtonPrimitive>
                 )
               })}
             </>
           ) : null}
-          <MenuSeparator />
-          <MenuItem
+          <Separator className={displaySeparatorClass} />
+          <ButtonPrimitive
+            variant={null}
+            size="none"
+            className={menuItemClassName}
+            aria-pressed={props.showingDeleted}
             onClick={() => {
               setOpen(false)
               props.onToggleDeleted()
@@ -153,9 +179,9 @@ export function DisplayMenu(props: {
           >
             Show deleted {props.plural}
             {props.showingDeleted ? <span className="ml-auto text-subtle">✓</span> : null}
-          </MenuItem>
-        </Menu>
-      ) : null}
+          </ButtonPrimitive>
+        </PopoverContent>
+      </Popover>
     </div>
   )
 }
@@ -173,50 +199,45 @@ export function ExportMenu(props: {
   readonly segments?: ReadonlyArray<{ readonly id: string; readonly name: string; readonly contactCount: number }>
   readonly onExportSegment?: (segmentId: string) => void
 }) {
-  const [open, setOpen] = useState(false)
-  const ref = useDismiss(open, () => setOpen(false))
   const segments = props.segments ?? []
   return (
-    <div className="relative" ref={ref}>
-      <Button variant="ghost" size="sm" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
-        <DownloadIcon className="size-4" />
-        Export
-      </Button>
-      {open ? (
-        <Menu className="top-full right-0 mt-1 w-72">
-          <MenuHeading>Download as CSV</MenuHeading>
-          <MenuItem
-            onClick={() => {
-              setOpen(false)
-              props.onExportShowing()
-            }}
-          >
-            {props.showing === 1
-              ? `The 1 ${props.singular} showing`
-              : props.filtered
-                ? `The ${props.showing.toLocaleString()} ${props.plural} showing`
-                : `All ${props.showing.toLocaleString()} ${props.plural}`}
-          </MenuItem>
+    <div>
+      <DropdownMenu modal={false}>
+        <DropdownMenuTrigger
+          render={
+            <Button variant="ghost" size="sm">
+              <DownloadIcon className="size-4" />
+              Export
+            </Button>
+          }
+        />
+        <DropdownMenuContent align="end" sideOffset={5} className="w-72">
+          <DropdownMenuGroup>
+            <DropdownMenuLabel>Download as CSV</DropdownMenuLabel>
+            <DropdownMenuItem onClick={props.onExportShowing}>
+              {props.showing === 1
+                ? `The 1 ${props.singular} showing`
+                : props.filtered
+                  ? `The ${props.showing.toLocaleString()} ${props.plural} showing`
+                  : `All ${props.showing.toLocaleString()} ${props.plural}`}
+            </DropdownMenuItem>
+          </DropdownMenuGroup>
           {segments.length > 0 && props.onExportSegment ? (
             <>
-              <MenuSeparator />
-              <MenuHeading>A segment</MenuHeading>
-              {segments.map((segment) => (
-                <MenuItem
-                  key={segment.id}
-                  onClick={() => {
-                    setOpen(false)
-                    props.onExportSegment?.(segment.id)
-                  }}
-                >
-                  <span className="truncate">{segment.name}</span>
-                  <span className="ml-auto text-subtle tabular-nums">{segment.contactCount}</span>
-                </MenuItem>
-              ))}
+              <DropdownMenuSeparator />
+              <DropdownMenuGroup>
+                <DropdownMenuLabel>A segment</DropdownMenuLabel>
+                {segments.map((segment) => (
+                  <DropdownMenuItem key={segment.id} onClick={() => props.onExportSegment?.(segment.id)}>
+                    <span className="truncate">{segment.name}</span>
+                    <DropdownMenuShortcut className="tabular-nums">{segment.contactCount}</DropdownMenuShortcut>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuGroup>
             </>
           ) : null}
-        </Menu>
-      ) : null}
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   )
 }

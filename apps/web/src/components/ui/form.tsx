@@ -1,116 +1,80 @@
 import {
+  createContext,
   type InputHTMLAttributes,
   type LabelHTMLAttributes,
   type ReactNode,
   type Ref,
   type SelectHTMLAttributes,
   type TextareaHTMLAttributes,
-  useEffect,
+  useContext,
   useId,
-  useRef,
   useState,
 } from "react"
-import { ChevronDown } from "../icons.tsx"
+import { Checkbox as CheckboxBase } from "./checkbox.tsx"
 import { cn } from "./cn.ts"
+import {
+  FieldDescription,
+  FieldError,
+  FieldLegend,
+  Field as FieldRoot,
+  FieldSet,
+  FieldLabel as FieldTitle,
+} from "./field.tsx"
+import { Input as InputBase } from "./input.tsx"
+import { Label } from "./label.tsx"
+import { NativeSelect } from "./native-select.tsx"
+import { RadioGroup, RadioGroupItem } from "./radio-group.tsx"
+import { Slider as SliderBase } from "./slider.tsx"
+import { Textarea as TextareaBase } from "./textarea.tsx"
 
-const BOXED =
-  "w-full rounded-md bg-transparent text-fg inset-ring inset-ring-control focus:outline-none focus:inset-ring-muted aria-invalid:inset-ring-danger disabled:opacity-60"
+/*
+ * Parley's form controls (D80), built on shadcn's (D139): the same props and look as before, with
+ * Base UI's behaviour and accessibility underneath.
+ */
+
+type InputProps = InputHTMLAttributes<HTMLInputElement> & { ref?: Ref<HTMLInputElement> | undefined }
 
 /** A text box with an outline, for forms and dialogs. */
-export function Input({
-  className,
-  ...props
-}: InputHTMLAttributes<HTMLInputElement> & { ref?: Ref<HTMLInputElement> | undefined }) {
-  return <input className={cn(BOXED, "h-10 px-3", className)} {...props} />
+export function Input(props: InputProps) {
+  return <InputBase variant="boxed" {...props} />
 }
 
 /** A small outlined text box, for editing inside a row (such as a title). */
-export function SmallInput({
-  className,
-  ...props
-}: InputHTMLAttributes<HTMLInputElement> & { ref?: Ref<HTMLInputElement> | undefined }) {
-  return <input className={cn(BOXED, "h-7 bg-surface px-2 text-sm", className)} {...props} />
+export function SmallInput(props: InputProps) {
+  return <InputBase variant="small" {...props} />
 }
 
-export function Textarea({
-  className,
-  ...props
-}: TextareaHTMLAttributes<HTMLTextAreaElement> & { ref?: Ref<HTMLTextAreaElement> | undefined }) {
-  return <textarea className={cn(BOXED, "resize-y px-3 py-2 leading-6", className)} {...props} />
+export function Textarea(
+  props: TextareaHTMLAttributes<HTMLTextAreaElement> & { ref?: Ref<HTMLTextAreaElement> | undefined },
+) {
+  return <TextareaBase {...props} />
 }
 
 /**
  * A text box that looks like plain text until hovered or focused: how record panels edit a value
  * in place.
  */
-export function InlineInput({
-  className,
-  ...props
-}: InputHTMLAttributes<HTMLInputElement> & { ref?: Ref<HTMLInputElement> | undefined }) {
-  return (
-    <input
-      className={cn(
-        "-mx-1.5 h-8 w-full rounded-md bg-transparent px-1.5 text-fg hover:bg-hover focus:bg-transparent focus:inset-ring focus:inset-ring-control focus:outline-none aria-invalid:inset-ring aria-invalid:inset-ring-danger",
-        className,
-      )}
-      {...props}
-    />
-  )
+export function InlineInput(props: InputProps) {
+  return <InputBase variant="inline" {...props} />
 }
 
 /** A filter-style text box on a tinted background, like "Filter by name or email". */
-export function SearchInput({
-  className,
-  ...props
-}: InputHTMLAttributes<HTMLInputElement> & { ref?: Ref<HTMLInputElement> | undefined }) {
-  return (
-    <input
-      className={cn(
-        "ml-2 h-8 w-72 rounded-md bg-fill px-2.5 text-sm text-fg focus:inset-ring focus:inset-ring-control focus:outline-none",
-        className,
-      )}
-      {...props}
-    />
-  )
+export function SearchInput(props: InputProps) {
+  return <InputBase variant="search" {...props} />
 }
 
 /**
- * A dropdown. `variant="inline"` looks like plain text until hovered (record panels);
- * `leading` puts something before the value, such as a team's logo.
+ * A dropdown: the browser's own `<select>`. `variant="inline"` looks like plain text until hovered
+ * (record panels); `leading` puts something before the value, such as a team's logo.
  */
-export function Select({
-  variant = "boxed",
-  leading,
-  className,
-  children,
-  ...props
-}: SelectHTMLAttributes<HTMLSelectElement> & { variant?: "boxed" | "inline" | undefined; leading?: ReactNode }) {
-  if (variant === "inline") {
-    return (
-      <select
-        className={cn(
-          "-mx-1.5 h-8 w-full cursor-pointer appearance-none rounded-md bg-transparent px-1.5 text-fg hover:bg-hover",
-          className,
-        )}
-        {...props}
-      >
-        {children}
-      </select>
-    )
-  }
-  return (
-    <div className="relative">
-      {leading ? <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2">{leading}</span> : null}
-      <select
-        className={cn(BOXED, "h-10 cursor-pointer appearance-none pr-9 pl-3", leading && "pl-11", className)}
-        {...props}
-      >
-        {children}
-      </select>
-      <ChevronDown className="pointer-events-none absolute top-1/2 right-3 size-3.5 -translate-y-1/2 text-subtle" />
-    </div>
-  )
+export function Select(
+  props: SelectHTMLAttributes<HTMLSelectElement> & { variant?: "boxed" | "inline" | undefined; leading?: ReactNode },
+) {
+  return <NativeSelect {...props} />
 }
+
+/** What a checkbox's `onChange` gets: the new state, where a native checkbox's event had it. */
+export type CheckboxChange = { readonly target: { readonly checked: boolean } }
 
 /**
  * A checkbox. `reveal` hides it until its row (`group/row`) is hovered, it's focused, or it's
@@ -119,25 +83,28 @@ export function Select({
 export function Checkbox({
   reveal,
   mixed,
+  onChange,
   className,
   ...props
-}: InputHTMLAttributes<HTMLInputElement> & { reveal?: boolean | undefined; mixed?: boolean }) {
-  const ref = useRef<HTMLInputElement>(null)
-  useEffect(() => {
-    if (ref.current) ref.current.indeterminate = mixed ?? false
-  }, [mixed])
+}: {
+  checked?: boolean | undefined
+  disabled?: boolean | undefined
+  id?: string | undefined
+  name?: string | undefined
+  className?: string | undefined
+  "aria-label"?: string | undefined
+  autoFocus?: boolean | undefined
+  reveal?: boolean | undefined
+  mixed?: boolean | undefined
+  onChange?: ((change: CheckboxChange) => void) | undefined
+}) {
   return (
-    <input
-      ref={ref}
-      type="checkbox"
+    <CheckboxBase
+      indeterminate={mixed ?? false}
+      onCheckedChange={(checked) => onChange?.({ target: { checked } })}
       className={cn(
-        "m-0 grid size-4 shrink-0 cursor-pointer appearance-none place-items-center rounded align-middle inset-ring inset-ring-control transition-opacity motion-reduce:transition-none",
-        "after:h-2 after:w-1 after:-translate-y-px after:rotate-45 after:border-r-2 after:border-b-2 after:border-on-primary after:opacity-0 after:content-['']",
-        "checked:bg-primary checked:inset-ring-0 checked:after:opacity-100",
-        "indeterminate:bg-primary indeterminate:inset-ring-0 indeterminate:after:h-0.5 indeterminate:after:w-2 indeterminate:after:translate-y-0 indeterminate:after:rotate-0 indeterminate:after:rounded-full indeterminate:after:border-0 indeterminate:after:bg-on-primary indeterminate:after:opacity-100",
-        "disabled:cursor-default disabled:opacity-40",
         reveal &&
-          "opacity-0 group-hover/row:opacity-100 group-hover/table:opacity-100 checked:opacity-100 indeterminate:opacity-100 focus-visible:opacity-100",
+          "opacity-0 group-hover/row:opacity-100 group-hover/table:opacity-100 focus-visible:opacity-100 data-checked:opacity-100 data-indeterminate:opacity-100",
         className,
       )}
       {...props}
@@ -145,16 +112,57 @@ export function Checkbox({
   )
 }
 
-export function Radio({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
+/** The radio group RadioCards are in, when they're given one (see RadioCards). */
+const InRadioCards = createContext(false)
+
+/**
+ * Radio cards that make one choice: arrow keys move between them and screen readers count them.
+ * Give each RadioCard a `value`.
+ */
+export function RadioCards<Value extends string>(props: {
+  name?: string | undefined
+  value: Value
+  onChange: (value: Value) => void
+  children: ReactNode
+  className?: string | undefined
+}) {
   return (
-    <input
-      type="radio"
-      className={cn(
-        "m-0 mt-0.5 size-4 shrink-0 cursor-pointer appearance-none rounded-full inset-ring inset-ring-control checked:inset-ring-4 checked:inset-ring-primary",
-        className,
-      )}
-      {...props}
-    />
+    <RadioGroup
+      name={props.name}
+      value={props.value}
+      onValueChange={(value) => props.onChange(value as Value)}
+      className={cn("flex flex-col gap-1.5", props.className)}
+    >
+      <InRadioCards.Provider value={true}>{props.children}</InRadioCards.Provider>
+    </RadioGroup>
+  )
+}
+
+type RadioProps = {
+  /** Its value in RadioCards. */
+  value?: string | undefined
+  /** Outside RadioCards: whether it's chosen, and what choosing it does. */
+  checked?: boolean | undefined
+  onChange?: (() => void) | undefined
+  name?: string | undefined
+  disabled?: boolean | undefined
+  className?: string | undefined
+}
+
+/** A radio. Outside RadioCards it stands alone, chosen by `checked`. */
+export function Radio({ value, checked, onChange, name, className, disabled }: RadioProps) {
+  const item = <RadioGroupItem value={value ?? "on"} disabled={disabled} className={className} />
+  if (useContext(InRadioCards)) return item
+  return (
+    <RadioGroup
+      name={name}
+      value={checked ? "on" : ""}
+      onValueChange={() => onChange?.()}
+      render={<span />}
+      className="flex shrink-0"
+    >
+      {item}
+    </RadioGroup>
   )
 }
 
@@ -165,16 +173,15 @@ export function RadioCard({
   children,
   className,
   ...props
-}: InputHTMLAttributes<HTMLInputElement> & {
+}: RadioProps & {
   label: ReactNode
   description?: ReactNode | undefined
   children?: ReactNode
 }) {
   return (
-    // biome-ignore lint/a11y/noLabelWithoutControl: the radio is rendered inside the label
-    <label
+    <Label
       className={cn(
-        "flex cursor-pointer items-start gap-3 rounded-md px-3 py-2.5 inset-ring inset-ring-line-strong hover:bg-hover has-checked:inset-ring-muted",
+        "flex cursor-pointer items-start gap-3 rounded-md px-3 py-2.5 inset-ring inset-ring-line-strong hover:bg-hover has-data-checked:inset-ring-muted",
         className,
       )}
     >
@@ -184,14 +191,13 @@ export function RadioCard({
         {description ? <span className="text-sm text-muted">{description}</span> : null}
         {children}
       </span>
-    </label>
+    </Label>
   )
 }
 
 /** A checkbox or radio with its label, in a list of options. */
 export function Option({ className, ...props }: LabelHTMLAttributes<HTMLLabelElement>) {
-  // biome-ignore lint/a11y/noLabelWithoutControl: the control is passed in as a child
-  return <label className={cn("flex min-h-8 cursor-pointer items-center gap-2.5", className)} {...props} />
+  return <Label className={cn("flex min-h-8 cursor-pointer items-center gap-2.5", className)} {...props} />
 }
 
 /** A labelled form field: label, control, then a hint or an error. */
@@ -211,21 +217,11 @@ export function Field({
   className?: string | undefined
 }) {
   return (
-    <div className={cn("flex min-w-0 flex-col gap-1.5", className)}>
-      {label ? (
-        <label htmlFor={htmlFor} className="font-medium">
-          {label}
-        </label>
-      ) : null}
+    <FieldRoot className={className}>
+      {label ? <FieldTitle htmlFor={htmlFor}>{label}</FieldTitle> : null}
       {children}
-      {error ? (
-        <p className="m-0 text-sm text-danger" role="alert">
-          {error}
-        </p>
-      ) : hint ? (
-        <Hint>{hint}</Hint>
-      ) : null}
-    </div>
+      {error ? <FieldError>{error}</FieldError> : hint ? <Hint>{hint}</Hint> : null}
+    </FieldRoot>
   )
 }
 
@@ -240,29 +236,24 @@ export function Fieldset({
   className?: string
 }) {
   return (
-    <fieldset className={cn("m-0 flex min-w-0 flex-col gap-1.5 border-0 p-0", className)}>
-      <legend className="mb-0.5 p-0 font-medium">{legend}</legend>
+    <FieldSet className={className}>
+      <FieldLegend>{legend}</FieldLegend>
       {children}
-    </fieldset>
+    </FieldSet>
   )
 }
 
 export function Hint({ children, className }: { children: ReactNode; className?: string }) {
-  return <p className={cn("m-0 text-sm text-subtle", className)}>{children}</p>
+  return <FieldDescription className={className}>{children}</FieldDescription>
 }
 
 export function ErrorText({ children, className }: { children: ReactNode; className?: string }) {
-  return (
-    <p className={cn("m-0 text-sm text-danger", className)} role="alert">
-      {children}
-    </p>
-  )
+  return <FieldError className={className}>{children}</FieldError>
 }
 
 /** A small label above a field, as on the sign-in form. */
 export function FieldLabel({ className, ...props }: LabelHTMLAttributes<HTMLLabelElement>) {
-  // biome-ignore lint/a11y/noLabelWithoutControl: htmlFor is passed by the caller
-  return <label className={cn("block pb-1.5 text-sm text-subtle", className)} {...props} />
+  return <Label className={cn("block pb-1.5 text-sm text-subtle", className)} {...props} />
 }
 
 /** A slider with its label and current value, such as a strength from 0 to 100%. */
@@ -288,22 +279,18 @@ export function Slider({
   const id = useId()
   return (
     <div className={cn("grid grid-cols-[12rem_minmax(0,1fr)_3.5rem] items-center gap-3", className)}>
-      <label htmlFor={id} className="text-muted">
+      <span id={id} className="text-muted">
         {label}
-      </label>
-      <input
-        id={id}
-        type="range"
-        className="h-5 w-full cursor-pointer accent-primary"
+      </span>
+      <SliderBase
+        aria-labelledby={id}
         min={min}
         max={max}
         step={step}
         value={value}
-        onChange={(event) => onChange(Number(event.target.value))}
+        onValueChange={(next) => onChange(next)}
       />
-      <output htmlFor={id} className="text-right text-sm text-subtle tabular-nums">
-        {format(value)}
-      </output>
+      <output className="text-right text-sm text-subtle tabular-nums">{format(value)}</output>
     </div>
   )
 }
@@ -329,7 +316,7 @@ export function FilePicker({
 }) {
   const [over, setOver] = useState(false)
   return (
-    <label
+    <Label
       htmlFor={id}
       onDragOver={(event) => {
         event.preventDefault()
@@ -371,6 +358,6 @@ export function FilePicker({
           <span className="text-sm text-subtle">or drop it here</span>
         </>
       )}
-    </label>
+    </Label>
   )
 }

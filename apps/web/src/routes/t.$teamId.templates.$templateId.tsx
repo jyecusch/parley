@@ -5,18 +5,16 @@ import { useState } from "react"
 import { Composer, SaveState, useAutosave } from "../components/composer.tsx"
 import { EmailStyleSelect } from "../components/email-style-select.tsx"
 import { LoadFailed } from "../components/record.tsx"
-import { TitleInput } from "../components/ui/email.tsx"
 import {
   Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
   BreadcrumbSeparator,
-  Button,
-  breadcrumbRootClass,
-  Card,
-  ErrorText,
-  PageHeader,
-  Spacer,
-  ViewBody,
-} from "../components/ui/index.ts"
+} from "../components/ui/breadcrumb.tsx"
+import { TitleInput } from "../components/ui/email.tsx"
+import { Button, Card, ErrorText, PageHeader, Spacer, ViewBody } from "../components/ui/index.ts"
 import { call, messageOf } from "../lib/client.ts"
 
 export const Route = createFileRoute("/t/$teamId/templates/$templateId")({ component: TemplateScreen })
@@ -112,17 +110,24 @@ function TemplateEditor(props: { readonly teamId: TeamId; readonly template: Tem
     <Card as="main" className="flex-[999_1_35rem]">
       <PageHeader>
         <Breadcrumb>
-          <Link className={breadcrumbRootClass} to="/t/$teamId/templates" params={{ teamId }}>
-            Templates
-          </Link>
-          <BreadcrumbSeparator />
-          <TitleInput
-            aria-label="Template name"
-            maxLength={120}
-            readOnly={!props.canWrite}
-            value={draft.name}
-            onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
-          />
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink render={<Link to="/t/$teamId/templates" params={{ teamId }} />}>Templates</BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              {/* A flex box, so the input sits as it did in the row. */}
+              <BreadcrumbPage render={(props) => <h1 {...props} className="flex min-w-0" />}>
+                <TitleInput
+                  aria-label="Template name"
+                  maxLength={120}
+                  readOnly={!props.canWrite}
+                  value={draft.name}
+                  onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
+                />
+              </BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
         </Breadcrumb>
         <SaveState state={state} />
         <Spacer />

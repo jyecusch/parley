@@ -5,7 +5,9 @@ import { useComposerLayout } from "./composer-layout.ts"
 import { EMAIL_FRAME_CLASS, EmailPreview } from "./email-preview.tsx"
 import { SideBySideIcon, StackedIcon } from "./icons.tsx"
 import { type BodyTransform, imageMarkdown, insertBlock, MarkdownToolbar, readAsDataUrl } from "./markdown-toolbar.tsx"
+import { Button as PlainButton } from "./ui/button.tsx"
 import { cn, ErrorText, FieldLabel, Hint, IconButton, Input, Notice, Spacer, Textarea } from "./ui/index.ts"
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "./ui/resizable.tsx"
 
 /** Subject, preview text and body: what a template and a campaign both hold (R41). */
 export interface Content {
@@ -153,115 +155,142 @@ export function Composer(props: {
   // Side by side, the content and the preview scroll on their own, split by a handle that can be
   // dragged. Stacked, only the whole composer scrolls: the panes, the preview and the body grow to fit.
   const stacked = layout.stacked
-  return (
-    <div
-      ref={frame}
-      className={cn("grid min-h-0 flex-1 overflow-auto border-t border-line", stacked && "grid-cols-1")}
-      style={stacked ? undefined : { gridTemplateColumns: `${layout.split}% auto minmax(0, 1fr)` }}
-    >
-      <div className={cn("flex min-w-0 flex-col gap-3.5 p-4", stacked ? "overflow-visible" : "overflow-auto")}>
-        {props.settings}
-        <div className="flex min-w-0 flex-col">
-          <FieldLabel htmlFor="cmp-subject">Subject</FieldLabel>
-          <Input
-            id="cmp-subject"
-            maxLength={200}
-            readOnly={props.readOnly}
-            placeholder="What's this email about?"
-            defaultValue={content.subject}
-            onChange={(event) => props.onChange({ subject: event.target.value })}
-          />
-        </div>
-        <div className="flex min-w-0 flex-col">
-          <FieldLabel htmlFor="cmp-preview-text">
-            Preview text <span className="text-subtle">(optional)</span>
-          </FieldLabel>
-          <Input
-            id="cmp-preview-text"
-            maxLength={200}
-            readOnly={props.readOnly}
-            placeholder="Shown after the subject in most inboxes"
-            defaultValue={content.previewText}
-            onChange={(event) => props.onChange({ previewText: event.target.value })}
-          />
-        </div>
-        <div className="flex min-h-80 min-w-0 flex-1 flex-col gap-1.5">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <FieldLabel htmlFor="cmp-body" className="pb-0">
-              Body <span className="text-subtle">· Markdown</span>
-            </FieldLabel>
-            {props.readOnly ? null : (
-              <span className="flex flex-wrap gap-1" title="Insert a merge tag">
-                {MERGE_TAGS.map((entry) => (
-                  <button
-                    key={entry.tag}
-                    className="h-6 cursor-pointer rounded-full bg-fill px-2.5 text-sm text-muted hover:text-fg"
-                    type="button"
-                    title={`Insert ${entry.tag}`}
-                    onClick={() => insert(entry.tag)}
-                  >
-                    {entry.label}
-                  </button>
-                ))}
-              </span>
-            )}
-          </div>
-          {props.readOnly ? null : <MarkdownToolbar teamId={props.teamId} disabled={props.readOnly} onEdit={edit} />}
-          <Textarea
-            id="cmp-body"
-            onPaste={onPaste}
-            ref={body}
-            className={cn("min-h-64 flex-1 resize-none py-2.5 font-mono", stacked && "[field-sizing:content]")}
-            readOnly={props.readOnly}
-            placeholder={
-              "# A heading\n\nWrite in Markdown: **bold**, _italic_, [links](https://example.com) and lists.\n\nHi {{first_name|there}},"
-            }
-            defaultValue={content.body}
-            onChange={(event) => props.onChange({ body: event.target.value })}
-          />
-          {pasteError ? <ErrorText>{pasteError}</ErrorText> : null}
-          <Hint>Parley adds your footer, with the unsubscribe link, to the end of every email.</Hint>
-        </div>
-      </div>
-      {stacked ? null : (
-        <div
-          {...layout.separator}
-          className="relative w-3 cursor-col-resize touch-none bg-canvas before:absolute before:inset-y-0 before:left-1/2 before:w-px before:-translate-x-1/2 before:bg-line before:transition-colors hover:before:w-0.5 hover:before:bg-control focus-visible:outline-none focus-visible:before:w-0.5 focus-visible:before:bg-focus motion-reduce:before:transition-none"
+  const contentPane = (
+    <>
+      {props.settings}
+      <div className="flex min-w-0 flex-col">
+        <FieldLabel htmlFor="cmp-subject">Subject</FieldLabel>
+        <Input
+          id="cmp-subject"
+          maxLength={200}
+          readOnly={props.readOnly}
+          placeholder="What's this email about?"
+          defaultValue={content.subject}
+          onChange={(event) => props.onChange({ subject: event.target.value })}
         />
-      )}
-      <div className={cn("flex min-h-0 min-w-0 flex-col bg-canvas", stacked && "border-t border-line")}>
-        <div className="flex h-11 shrink-0 items-center gap-2 px-3.5">
-          <span className="text-sm text-subtle">Preview</span>
-          <Spacer />
-          {props.previewBar}
-          <IconButton
-            label={stacked ? "Show the preview beside the content" : "Show the preview under the content"}
-            tip={stacked ? "Side by side" : "Stacked"}
-            size="xs"
-            onClick={layout.toggle}
-          >
-            {stacked ? <SideBySideIcon className="size-4" /> : <StackedIcon className="size-4" />}
-          </IconButton>
-        </div>
-        {rendered ? (
-          <div className="mx-3.5 mb-2.5 rounded-md bg-surface px-3 py-2.5 inset-ring inset-ring-line">
-            <div className="font-semibold">{rendered.subject || "No subject"}</div>
-            {rendered.previewText ? <div className="text-sm text-subtle">{rendered.previewText}</div> : null}
-          </div>
-        ) : null}
-        {rendered && rendered.unknownMergeTags.length > 0 ? (
-          <Notice tone="warn" className="mx-3.5 mb-2.5 text-sm">
-            Parley doesn't know {rendered.unknownMergeTags.map((tag) => `{{${tag}}}`).join(", ")}, so{" "}
-            {rendered.unknownMergeTags.length === 1 ? "it's" : "they're"} sent as typed.
-          </Notice>
-        ) : null}
-        {previewError ? <ErrorText className="mx-3.5 mb-2.5">{previewError}</ErrorText> : null}
-        {rendered ? (
-          <EmailPreview html={rendered.html} label="Email preview" grow={stacked} />
-        ) : (
-          <div className={EMAIL_FRAME_CLASS} />
-        )}
       </div>
-    </div>
+      <div className="flex min-w-0 flex-col">
+        <FieldLabel htmlFor="cmp-preview-text">
+          Preview text <span className="text-subtle">(optional)</span>
+        </FieldLabel>
+        <Input
+          id="cmp-preview-text"
+          maxLength={200}
+          readOnly={props.readOnly}
+          placeholder="Shown after the subject in most inboxes"
+          defaultValue={content.previewText}
+          onChange={(event) => props.onChange({ previewText: event.target.value })}
+        />
+      </div>
+      <div className="flex min-h-80 min-w-0 flex-1 flex-col gap-1.5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <FieldLabel htmlFor="cmp-body" className="pb-0">
+            Body <span className="text-subtle">· Markdown</span>
+          </FieldLabel>
+          {props.readOnly ? null : (
+            <span className="flex flex-wrap gap-1" title="Insert a merge tag">
+              {MERGE_TAGS.map((entry) => (
+                <PlainButton
+                  variant={null}
+                  size={null}
+                  key={entry.tag}
+                  className="h-6 cursor-pointer rounded-full bg-fill px-2.5 text-sm text-muted hover:text-fg"
+                  type="button"
+                  title={`Insert ${entry.tag}`}
+                  onClick={() => insert(entry.tag)}
+                >
+                  {entry.label}
+                </PlainButton>
+              ))}
+            </span>
+          )}
+        </div>
+        {props.readOnly ? null : <MarkdownToolbar teamId={props.teamId} disabled={props.readOnly} onEdit={edit} />}
+        <Textarea
+          id="cmp-body"
+          onPaste={onPaste}
+          ref={body}
+          className={cn("min-h-64 flex-1 resize-none py-2.5 font-mono", stacked && "[field-sizing:content]")}
+          readOnly={props.readOnly}
+          placeholder={
+            "# A heading\n\nWrite in Markdown: **bold**, _italic_, [links](https://example.com) and lists.\n\nHi {{first_name|there}},"
+          }
+          defaultValue={content.body}
+          onChange={(event) => props.onChange({ body: event.target.value })}
+        />
+        {pasteError ? <ErrorText>{pasteError}</ErrorText> : null}
+        <Hint>Parley adds your footer, with the unsubscribe link, to the end of every email.</Hint>
+      </div>
+    </>
+  )
+  const previewPane = (
+    <>
+      <div className="flex h-11 shrink-0 items-center gap-2 px-3.5">
+        <span className="text-sm text-subtle">Preview</span>
+        <Spacer />
+        {props.previewBar}
+        <IconButton
+          label={stacked ? "Show the preview beside the content" : "Show the preview under the content"}
+          tip={stacked ? "Side by side" : "Stacked"}
+          size="xs"
+          onClick={layout.toggle}
+        >
+          {stacked ? <SideBySideIcon className="size-4" /> : <StackedIcon className="size-4" />}
+        </IconButton>
+      </div>
+      {rendered ? (
+        <div className="mx-3.5 mb-2.5 rounded-md bg-surface px-3 py-2.5 inset-ring inset-ring-line">
+          <div className="font-semibold">{rendered.subject || "No subject"}</div>
+          {rendered.previewText ? <div className="text-sm text-subtle">{rendered.previewText}</div> : null}
+        </div>
+      ) : null}
+      {rendered && rendered.unknownMergeTags.length > 0 ? (
+        <Notice tone="warn" className="mx-3.5 mb-2.5 text-sm">
+          Parley doesn't know {rendered.unknownMergeTags.map((tag) => `{{${tag}}}`).join(", ")}, so{" "}
+          {rendered.unknownMergeTags.length === 1 ? "it's" : "they're"} sent as typed.
+        </Notice>
+      ) : null}
+      {previewError ? <ErrorText className="mx-3.5 mb-2.5">{previewError}</ErrorText> : null}
+      {rendered ? (
+        <EmailPreview html={rendered.html} label="Email preview" grow={stacked} />
+      ) : (
+        <div className={EMAIL_FRAME_CLASS} />
+      )}
+    </>
+  )
+  // Stacked: one column that scrolls as a whole.
+  if (stacked) {
+    return (
+      <div ref={frame} className="grid min-h-0 flex-1 grid-cols-1 overflow-auto border-t border-line">
+        <div className="flex min-w-0 flex-col gap-3.5 overflow-visible p-4">{contentPane}</div>
+        <div className="flex min-h-0 min-w-0 flex-col border-t border-line bg-canvas">{previewPane}</div>
+      </div>
+    )
+  }
+  // Side by side (shadcn's Resizable): drag the handle, or focus it and use the arrow keys.
+  return (
+    <ResizablePanelGroup
+      elementRef={frame}
+      orientation="horizontal"
+      defaultLayout={{ content: layout.split, preview: 100 - layout.split }}
+      onLayoutChanged={(next) => {
+        const split = next.content
+        if (split !== undefined) layout.commitSplit(split)
+      }}
+      className="h-auto min-h-0 flex-1 overflow-auto border-t border-line"
+    >
+      <ResizablePanel id="content" minSize="30" maxSize="70" className="flex min-w-0 flex-col gap-3.5 p-4">
+        {contentPane}
+      </ResizablePanel>
+      <ResizableHandle
+        aria-label="Resize the content and preview"
+        // No width of its own, so the content is split% of the whole width, as it was; the 12px
+        // grab strip (::after) and its line (::before) sit over the preview's left padding.
+        className="relative z-10 w-0 cursor-col-resize touch-none bg-transparent before:absolute before:inset-y-0 before:left-1.5 before:w-px before:-translate-x-1/2 before:bg-line before:transition-colors after:absolute after:inset-y-0 after:left-0 after:w-3 after:translate-x-0 hover:before:w-0.5 hover:before:bg-control focus-visible:bg-transparent focus-visible:outline-none focus-visible:before:w-0.5 focus-visible:before:bg-focus motion-reduce:before:transition-none"
+      />
+      <ResizablePanel id="preview" className="flex min-h-0 min-w-0 flex-col bg-canvas pl-3">
+        {previewPane}
+      </ResizablePanel>
+    </ResizablePanelGroup>
   )
 }

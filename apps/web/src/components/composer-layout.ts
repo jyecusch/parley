@@ -1,4 +1,4 @@
-import { type KeyboardEvent, type PointerEvent, type RefObject, useEffect, useState } from "react"
+import { type RefObject, useEffect, useState } from "react"
 
 /** How the composer lays out its content and preview: chosen, or "auto" by the space it has. */
 export type ComposerLayout = "auto" | "side" | "stacked"
@@ -27,8 +27,8 @@ const write = (key: string, value: string) => {
 const clamp = (value: number) => Math.min(SPLIT.max, Math.max(SPLIT.min, Math.round(value)))
 
 /**
- * The composer's layout, remembered in this browser: side by side with a draggable split, or the
- * preview stacked under the content. Until someone chooses, it stacks when the composer is narrow.
+ * The composer's layout, remembered in this browser: side by side with a split (`commitSplit`
+ * remembers where the handle was left), or the preview stacked under the content. Until someone chooses, it stacks when the composer is narrow.
  */
 export const useComposerLayout = (container: RefObject<HTMLElement | null>) => {
   const [choice, setChoice] = useState<ComposerLayout>(() => {
@@ -66,41 +66,5 @@ export const useComposerLayout = (container: RefObject<HTMLElement | null>) => {
     write(SPLIT_KEY, String(next))
   }
 
-  /** Props for the handle between the panes: drag it, or focus it and use the arrow keys. */
-  const separator = {
-    role: "separator" as const,
-    "aria-orientation": "vertical" as const,
-    "aria-label": "Resize the content and preview",
-    "aria-valuemin": SPLIT.min,
-    "aria-valuemax": SPLIT.max,
-    "aria-valuenow": split,
-    tabIndex: 0,
-    onPointerDown: (event: PointerEvent<HTMLElement>) => {
-      const box = container.current?.getBoundingClientRect()
-      if (!box) return
-      event.preventDefault()
-      const handle = event.currentTarget
-      handle.setPointerCapture(event.pointerId)
-      const onMove = (move: globalThis.PointerEvent) => {
-        setSplit(clamp(((move.clientX - box.left) / box.width) * 100))
-      }
-      const onUp = (up: globalThis.PointerEvent) => {
-        handle.removeEventListener("pointermove", onMove)
-        handle.removeEventListener("pointerup", onUp)
-        commitSplit(((up.clientX - box.left) / box.width) * 100)
-      }
-      handle.addEventListener("pointermove", onMove)
-      handle.addEventListener("pointerup", onUp)
-    },
-    onKeyDown: (event: KeyboardEvent<HTMLElement>) => {
-      if (event.key === "ArrowLeft") commitSplit(split - SPLIT.step)
-      else if (event.key === "ArrowRight") commitSplit(split + SPLIT.step)
-      else if (event.key === "Home") commitSplit(SPLIT.min)
-      else if (event.key === "End") commitSplit(SPLIT.max)
-      else return
-      event.preventDefault()
-    },
-  }
-
-  return { stacked, toggle, split, separator }
+  return { stacked, toggle, split, commitSplit }
 }

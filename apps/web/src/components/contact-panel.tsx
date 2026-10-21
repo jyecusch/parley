@@ -14,16 +14,8 @@ import { RecordOwnerField } from "./record-owner.tsx"
 import { SocialProfilesField } from "./record-profile.tsx"
 import { SubscriptionSection } from "./subscriptions.tsx"
 import { Timeline } from "./timeline.tsx"
-import {
-  cn,
-  MenuItem,
-  MenuSeparator,
-  PanelBody,
-  PanelHeader,
-  RecordPanel,
-  readableColumnClass,
-  Section,
-} from "./ui/index.ts"
+import { DropdownMenuItem, DropdownMenuSeparator } from "./ui/dropdown-menu.tsx"
+import { cn, PanelBody, PanelHeader, RecordPanel, readableColumnClass, Section } from "./ui/index.ts"
 
 /** A toast the contacts screen shows, with an optional undo. */
 export interface Toast {
@@ -87,7 +79,7 @@ export function ContactPanel(props: {
           onClose={props.onClose}
           menu={(closeMenu) => (
             <>
-              <MenuItem
+              <DropdownMenuItem
                 onClick={() => {
                   const email = contact.emails[0]?.address
                   if (email) void navigator.clipboard?.writeText(email)
@@ -95,12 +87,12 @@ export function ContactPanel(props: {
                 }}
               >
                 Copy email
-              </MenuItem>
-              <MenuSeparator />
-              <MenuItem danger onClick={props.onDelete}>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem variant="destructive" onClick={props.onDelete}>
                 <TrashIcon className="size-4" />
                 Delete contact
-              </MenuItem>
+              </DropdownMenuItem>
             </>
           )}
         />

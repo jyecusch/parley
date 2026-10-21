@@ -4,9 +4,9 @@ import { createFileRoute, getRouteApi, Link, useNavigate } from "@tanstack/react
 import { useState } from "react"
 import { TemplateIcon } from "../components/icons.tsx"
 import { LoadFailed } from "../components/record.tsx"
+import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage } from "../components/ui/breadcrumb.tsx"
 import { ItemTile, NameText, nameLinkClass, wideColumnClass } from "../components/ui/email.tsx"
 import {
-  Breadcrumb,
   Button,
   Card,
   Centered,
@@ -58,7 +58,11 @@ function TemplatesScreen() {
     <Card as="main" className="flex-[999_1_35rem]">
       <PageHeader>
         <Breadcrumb>
-          <span>Templates</span>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbPage render={(props) => <h1 {...props} />}>Templates</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
         </Breadcrumb>
         {items.length > 0 ? <Count>{items.length}</Count> : null}
         <Spacer />
