@@ -71,7 +71,6 @@ export const ERROR_STATUS: { readonly [Tag in ErrorTag]: Status } = {
   InvitationNotFound: 404,
   InvitationExpired: 410,
   InvitationForAnotherEmail: 403,
-  EmailNotVerified: 403,
   ServiceAccountCannotBeOwner: 422,
   EmailServiceUnavailable: 502,
   EmailRejected: 502,

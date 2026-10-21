@@ -35,6 +35,7 @@ import {
   TuneIcon,
 } from "./icons.tsx"
 import { ContactAvatar } from "./images.tsx"
+import { PendingInvitations, usePendingInvitations } from "./pending-invitations.tsx"
 import {
   Avatar,
   cn,
@@ -110,6 +111,8 @@ export function AppShell(props: {
   const [teamMenu, setTeamMenu] = useState(false)
   const [accountMenu, setAccountMenu] = useState(false)
   const [crtSettingsOpen, setCrtSettingsOpen] = useState(false)
+  // Invitations waiting for this person, shown in the team menu (D131).
+  const invitations = usePendingInvitations().data ?? []
   const crt = useCrt()
   const closeTeamMenu = useCallback(() => setTeamMenu(false), [])
   const closeAccountMenu = useCallback(() => setAccountMenu(false), [])
@@ -211,11 +214,19 @@ export function AppShell(props: {
                   collapsed && "justify-center px-0",
                 )}
                 type="button"
-                aria-label={`Switch team (current: ${props.team.name})`}
+                aria-label={`Switch team (current: ${props.team.name})${invitations.length > 0 ? `, ${invitations.length} pending ${invitations.length === 1 ? "invitation" : "invitations"}` : ""}`}
                 aria-expanded={teamMenu}
                 onClick={() => setTeamMenu((open) => !open)}
               >
-                <TeamLogo name={props.team.name} />
+                <span className="relative">
+                  <TeamLogo name={props.team.name} />
+                  {invitations.length > 0 ? (
+                    <span
+                      aria-hidden="true"
+                      className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-focus ring-2 ring-canvas"
+                    />
+                  ) : null}
+                </span>
                 <NavLabel collapsed={collapsed}>{props.team.name}</NavLabel>
                 {collapsed ? null : <ChevronDown className="text-subtle" />}
               </button>
@@ -235,6 +246,22 @@ export function AppShell(props: {
                       {team.name}
                     </Link>
                   ))}
+                  {invitations.length > 0 ? (
+                    <>
+                      <MenuSeparator />
+                      <MenuHeading>Invitations</MenuHeading>
+                      <div className="w-80">
+                        <PendingInvitations
+                          compact
+                          invitations={invitations}
+                          onJoined={(team) => {
+                            closeTeamMenu()
+                            void navigate({ to: "/t/$teamId/contacts", params: { teamId: team.id }, search: {} })
+                          }}
+                        />
+                      </div>
+                    </>
+                  ) : null}
                   <MenuSeparator />
                   <Link role="menuitem" className={menuItemClass()} to="/new-team" onClick={closeTeamMenu}>
                     <NavIcon>

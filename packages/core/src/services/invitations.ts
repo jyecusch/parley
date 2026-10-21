@@ -37,6 +37,8 @@ const statusOf = (row: Row["invitation"]): Invitation["status"] => {
   if (row.status === "accepted" || row.status === "revoked" || row.status === "canceled") {
     return row.status === "canceled" ? "revoked" : row.status
   }
+  // Better-Auth's word for an invitation its recipient turned down.
+  if (row.status === "rejected") return "declined"
   return row.expiresAt.getTime() < Date.now() ? "expired" : "pending"
 }
 
@@ -69,6 +71,13 @@ export class Invitations extends Context.Service<
     ) => Effect.Effect<Invitation, InvitationNotFound | DatabaseUnavailable>
     /** For the person it was sent to: their email must match. */
     readonly forRecipient: (
+      invitationId: InvitationId,
+      email: string,
+    ) => Effect.Effect<Invitation, InvitationNotFound | InvitationForAnotherEmail | DatabaseUnavailable>
+    /** Invitations still open to this address, newest first (D131). */
+    readonly pendingFor: (email: string) => Effect.Effect<ReadonlyArray<Invitation>, DatabaseUnavailable>
+    /** The recipient turns it down (D131). Only a pending invitation can be declined. */
+    readonly decline: (
       invitationId: InvitationId,
       email: string,
     ) => Effect.Effect<Invitation, InvitationNotFound | InvitationForAnotherEmail | DatabaseUnavailable>
@@ -196,6 +205,29 @@ export class Invitations extends Context.Service<
           return summarize(row)
         })
 
+      const pendingFor = (email: string) =>
+        Effect.map(
+          select(
+            and(
+              eq(schema.invitation.status, "pending"),
+              sql`lower(${schema.invitation.email}) = ${email.toLowerCase()}`,
+            ),
+          ),
+          (rows) => rows.map(summarize).filter((invitation) => invitation.status === "pending"),
+        )
+
+      const decline = (invitationId: InvitationId, email: string) =>
+        Effect.gen(function* () {
+          const invitation = yield* forRecipient(invitationId, email)
+          if (invitation.status !== "pending") return yield* new InvitationNotFound({ invitationId })
+          yield* run(
+            db.query((d) =>
+              d.update(schema.invitation).set({ status: "rejected" }).where(eq(schema.invitation.id, invitationId)),
+            ),
+          )
+          return summarize(yield* byId(invitationId))
+        })
+
       const accept = (invitationId: InvitationId, user: { readonly id: UserId; readonly email: string }) =>
         Effect.gen(function* () {
           const invitation = yield* forRecipient(invitationId, user.email)
@@ -241,7 +273,7 @@ export class Invitations extends Context.Service<
           } satisfies Team
         }).pipe(Effect.withSpan("Invitations.accept"))
 
-      return { list, create, revoke, forRecipient, accept }
+      return { list, create, revoke, forRecipient, pendingFor, decline, accept }
     }),
   )
 }

@@ -135,6 +135,8 @@ What we decided, who decided it, and what's still open. Nothing becomes "decided
 | D127 | Reviewing an import | Before importing, the dialog lists what it doesn't recognise: each record owner name maps to a member or to no one (so contacts of people who've left get a current owner), and each opt-out column ("Opted out of email: X") maps to a topic, creating missing topics if confirmed. Topic columns unsubscribe a contact from that topic when true | Owner | 2026-10-21 |
 | D128 | Contact addresses | Contacts have a postal address, the same shape as a company's (street, city, state or region, postcode, country code), filterable by city and country. Imports accept a country's code or English name | Owner | 2026-10-21 |
 | D129 | Created date on import | A "Created" column sets a new record's created date (HubSpot's "Create Date"), so records keep their history; existing records keep theirs | Owner | 2026-10-21 |
+| D130 | Invitations confirm email | Accepting an invitation from its link confirms the person's email address: the link was sent to that address, which proves they read it, as a confirmation link would. Signing up from an invitation sends the confirmation link back to the invitation | Owner (asked) | 2026-10-21 |
+| D131 | Pending invitations | Signed-in people see their pending invitations, for a confirmed email address only (so nobody can sign up with someone else's address to learn which teams invited it): on "Name your team" before creating one, and in the team menu, each with Accept and Decline. Declining marks the invitation declined; the team sees it's no longer pending | Owner (asked) | 2026-10-21 |
 
 ## Implementation choices made during milestones 1 and 2 (Claude; low-stakes, open to veto)
 

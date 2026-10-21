@@ -13,6 +13,8 @@ export function AuthForm(props: {
   readonly onSubmit: (form: FormData) => void
   readonly children: ReactNode
   readonly footer: ReactNode
+  /** Shown between the heading and the fields, such as invitations to join instead (D131). */
+  readonly before?: ReactNode
 }) {
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -23,6 +25,7 @@ export function AuthForm(props: {
       <form className="flex flex-col gap-4" onSubmit={submit} noValidate>
         <ParleyMark className="h-8 self-start" />
         <AuthHeading title={props.title}>{props.intro}</AuthHeading>
+        {props.before}
         {props.children}
         {props.error ? <ErrorText className="text-base">{props.error}</ErrorText> : null}
         <Button variant="primary" size="lg" wide type="submit" disabled={props.busy}>

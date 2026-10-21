@@ -112,18 +112,3 @@ export class InvitationForAnotherEmail
     return userText`This invitation was sent to a different email address. Sign in with the address it was sent to.`
   }
 }
-
-/** Only someone who proved they own the invited address may accept: confirm it first. */
-export class EmailNotVerified
-  extends Schema.TaggedError<EmailNotVerified>()("EmailNotVerified", {})
-  implements DomainError
-{
-  readonly isRetryable = false
-  override readonly [ErrorReporter.severity] = "Info" as const
-  override get message() {
-    return "email address not verified"
-  }
-  get userMessage() {
-    return userText`Confirm your email address first, using the link we emailed you when you signed up. Then open this invitation again.`
-  }
-}

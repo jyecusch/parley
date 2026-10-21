@@ -159,18 +159,33 @@ describe("members and invitations", () => {
     }).pipe(Effect.provide(CoreLive)),
   )
 
-  it.effect("only someone who confirmed the invited address can accept", () =>
+  it.effect("lists invitations only for a confirmed address; accepting from the link confirms it", () =>
     Effect.gen(function* () {
       const f = yield* Fixture
-      const email = `unverified-${crypto.randomUUID().slice(0, 8)}@example.com`
+      const email = `unconfirmed-${crypto.randomUUID().slice(0, 8)}@example.com`
       const invitation = yield* run["invitations.create"](f.jane, {
         teamId: f.acme,
         email: email as never,
         role: "admin",
       })
-      const squatter = yield* signUp("Squatter", email, false)
-      const refused = yield* run["invitations.accept"](squatter, { invitationId: invitation.id }).pipe(Effect.flip)
-      expect(refused._tag).toBe("EmailNotVerified")
+      const newcomer = yield* signUp("Newcomer", email, false)
+      // Not confirmed yet: nothing is listed, so signing up with someone's address reveals nothing (D131).
+      expect(yield* run["invitations.mine"](newcomer, {})).toEqual([])
+      // The link went to this address, so accepting from it confirms the address (D130).
+      const joined = yield* run["invitations.accept"](newcomer, { invitationId: invitation.id })
+      expect(joined.id).toBe(f.acme)
+      expect(yield* run["invitations.mine"](newcomer, {})).toEqual([])
+
+      // A confirmed person sees what's pending, and can decline it.
+      const other = `invited-${crypto.randomUUID().slice(0, 8)}@example.com`
+      const second = yield* run["invitations.create"](f.jane, { teamId: f.acme, email: other as never, role: "member" })
+      const invited = yield* signUp("Invited", other, true)
+      expect((yield* run["invitations.mine"](invited, {})).map((entry) => entry.id)).toEqual([second.id])
+      const declined = yield* run["invitations.decline"](invited, { invitationId: second.id })
+      expect(declined.status).toBe("declined")
+      expect(yield* run["invitations.mine"](invited, {})).toEqual([])
+      const again = yield* run["invitations.decline"](invited, { invitationId: second.id }).pipe(Effect.flip)
+      expect(again._tag).toBe("InvitationNotFound")
     }).pipe(Effect.provide(CoreLive)),
   )
 

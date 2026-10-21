@@ -92,6 +92,8 @@ export const implementations: { readonly [Name in OperationName]: Implementation
   "invitations.revoke": members.revoke,
   "invitations.get": members.get,
   "invitations.accept": members.accept,
+  "invitations.mine": members.mine,
+  "invitations.decline": members.decline,
   "contacts.list": contacts.list,
   "contacts.get": contacts.get,
   "contacts.create": contacts.create,

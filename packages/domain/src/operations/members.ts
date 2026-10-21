@@ -5,7 +5,6 @@ import { SignInRequired } from "../errors/access.ts"
 import { EmailErrors } from "../errors/email.ts"
 import {
   AlreadyAMember,
-  EmailNotVerified,
   InvitationExpired,
   InvitationForAnotherEmail,
   InvitationNotFound,
@@ -111,10 +110,32 @@ export const getInvitation = defineOperation({
 
 export const acceptInvitation = defineOperation({
   name: "invitations.accept",
-  description: "Accept an invitation you were sent and join the team. Only a signed-in person can.",
+  description:
+    "Accept an invitation you were sent and join the team. Only a signed-in person can. Accepting also confirms your email address, since the invitation was sent to it.",
   input: Schema.Struct({ invitationId: InvitationId.annotate({ description: "From the invitation link." }) }),
   output: Team,
-  errors: [SignInRequired, InvitationNotFound, InvitationExpired, InvitationForAnotherEmail, EmailNotVerified],
+  errors: [SignInRequired, InvitationNotFound, InvitationExpired, InvitationForAnotherEmail],
   http: { method: "POST", path: "/invitations/:invitationId/accept" },
   hints: { readOnly: false, destructive: false, idempotent: true },
+})
+
+export const myInvitations = defineOperation({
+  name: "invitations.mine",
+  description:
+    "Your pending invitations to join teams. Empty until you confirm your email address, so nobody can see invitations meant for an address they don't own.",
+  input: Schema.Struct({}),
+  output: Schema.Array(Invitation),
+  errors: [SignInRequired],
+  http: { method: "GET", path: "/invitations" },
+  hints: { readOnly: true, destructive: false, idempotent: true },
+})
+
+export const declineInvitation = defineOperation({
+  name: "invitations.decline",
+  description: "Turn down an invitation you were sent. The team sees it's no longer pending.",
+  input: Schema.Struct({ invitationId: InvitationId.annotate({ description: "From invitations.mine." }) }),
+  output: Invitation,
+  errors: [SignInRequired, InvitationNotFound, InvitationForAnotherEmail],
+  http: { method: "POST", path: "/invitations/:invitationId/decline" },
+  hints: { readOnly: false, destructive: true, idempotent: false },
 })

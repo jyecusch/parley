@@ -19,7 +19,7 @@ export const Invitation = Schema.Struct({
   id: InvitationId,
   email: Schema.String,
   role: Role,
-  status: Schema.Literals(["pending", "accepted", "revoked", "expired"]),
+  status: Schema.Literals(["pending", "accepted", "declined", "revoked", "expired"]),
   invitedBy: Schema.NullOr(Schema.String),
   teamName: Schema.String,
   createdAt: Timestamp,

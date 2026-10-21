@@ -171,6 +171,8 @@ export class SignInRequired
       "create an API key",
       "connect an agent",
       "accept an invitation",
+      "see your invitations",
+      "decline an invitation",
       "leave a team",
       "revoke an API key",
       "revoke a connection",

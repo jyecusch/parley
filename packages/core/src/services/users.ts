@@ -15,7 +15,11 @@ export interface UserRecord {
 /** Reads users. Used by the Authenticator to name the principal behind an API key. */
 export class Users extends Context.Service<
   Users,
-  { readonly find: (userId: UserId) => Effect.Effect<UserRecord | undefined, DatabaseUnavailable> }
+  {
+    readonly find: (userId: UserId) => Effect.Effect<UserRecord | undefined, DatabaseUnavailable>
+    /** Records that the person proved they own their address, such as by an invitation's link (D130). */
+    readonly markEmailVerified: (userId: UserId) => Effect.Effect<void, DatabaseUnavailable>
+  }
 >()("@parley/core/Users") {
   static readonly layer = Layer.effect(
     Users,
@@ -43,7 +47,14 @@ export class Users extends Context.Service<
           emailVerified: row.emailVerified,
         } satisfies UserRecord
       })
-      return { find }
+      const markEmailVerified = Effect.fn("Users.markEmailVerified")(function* (userId: UserId) {
+        yield* db
+          .query((d) =>
+            d.update(schema.user).set({ emailVerified: true, updatedAt: new Date() }).where(eq(schema.user.id, userId)),
+          )
+          .pipe(Effect.catchTag("SqlError", classifySqlError))
+      })
+      return { find, markEmailVerified }
     }),
   )
 }

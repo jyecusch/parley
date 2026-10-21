@@ -21,7 +21,13 @@ function SignUp() {
   const [error, setError] = useState<UserText>()
   const submit = async (form: FormData) => {
     setBusy(true)
-    const outcome = await signUp(String(form.get("name")), String(form.get("email")), String(form.get("password")))
+    const outcome = await signUp(
+      String(form.get("name")),
+      String(form.get("email")),
+      String(form.get("password")),
+      // The confirmation email leads back to the invitation, not to "Name your team" (D130).
+      search.redirect,
+    )
     setBusy(false)
     if (outcome.failure) return setError(outcome.failure)
     // A new account has no team yet, so an agent's request waits until one is created.

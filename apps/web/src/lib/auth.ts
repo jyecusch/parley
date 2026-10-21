@@ -1,7 +1,13 @@
 import { type UserText, userText } from "@parley/errors"
 
 export interface Session {
-  readonly user: { readonly id: string; readonly name: string; readonly email: string }
+  readonly user: {
+    readonly id: string
+    readonly name: string
+    readonly email: string
+    /** Whether they've confirmed the address; pending invitations are only listed once they have (D131). */
+    readonly emailVerified: boolean
+  }
 }
 
 /** Better-Auth's error codes and statuses, in our words. Its own message text is never shown (docs/02). */
@@ -81,8 +87,9 @@ const forgetSession = <A>(result: A): A => {
 
 export const signIn = (email: string, password: string) =>
   post("/sign-in/email", { email, password }).then(forgetSession)
-export const signUp = (name: string, email: string, password: string) =>
-  post("/sign-up/email", { name, email, password }).then(forgetSession)
+/** `returnTo` is where the email-confirmation link leads, such as back to an invitation (D130). */
+export const signUp = (name: string, email: string, password: string, returnTo?: string) =>
+  post("/sign-up/email", { name, email, password, ...(returnTo ? { callbackURL: returnTo } : {}) }).then(forgetSession)
 export const signOut = () => post("/sign-out", {}).then(forgetSession)
 
 /**

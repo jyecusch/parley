@@ -1,10 +1,11 @@
 import {
   type acceptInvitation,
   type createInvitation,
-  EmailNotVerified,
+  type declineInvitation,
   type getInvitation,
   type listInvitations,
   type listMembers,
+  type myInvitations,
   type OperationInput,
   OwnerChangeNeedsOwner,
   type removeMember,
@@ -95,7 +96,10 @@ export const revoke = (principal: Principal, input: OperationInput<typeof revoke
   )
 
 /** The invitation is the proof here: it names the person, and only they may see or accept it. */
-const recipient = (principal: Principal, action: "accept an invitation") =>
+const recipient = (
+  principal: Principal,
+  action: "accept an invitation" | "see your invitations" | "decline an invitation",
+) =>
   Effect.gen(function* () {
     if (principal._tag !== "UserSession") return yield* new SignInRequired({ action })
     const users = yield* Users
@@ -116,9 +120,27 @@ export const get = (principal: Principal, input: OperationInput<typeof getInvita
 export const accept = (principal: Principal, input: OperationInput<typeof acceptInvitation>) =>
   Effect.gen(function* () {
     const invitations = yield* Invitations
+    const users = yield* Users
     const user = yield* recipient(principal, "accept an invitation")
     yield* invitations.forRecipient(input.invitationId, user.email)
-    // The invitation names an address; only someone who proved they own it may take it.
-    if (!user.emailVerified) return yield* new EmailNotVerified()
+    // The invitation's link was sent to this address, so following it proves the person owns it,
+    // as a confirmation link would (D130).
+    if (!user.emailVerified) yield* users.markEmailVerified(user.id)
     return yield* invitations.accept(input.invitationId, user)
+  })
+
+/** Invitations waiting for the signed-in person, only once their address is confirmed (D131). */
+export const mine = (principal: Principal, _input: OperationInput<typeof myInvitations>) =>
+  Effect.gen(function* () {
+    const invitations = yield* Invitations
+    const user = yield* recipient(principal, "see your invitations")
+    if (!user.emailVerified) return []
+    return yield* invitations.pendingFor(user.email)
+  })
+
+export const decline = (principal: Principal, input: OperationInput<typeof declineInvitation>) =>
+  Effect.gen(function* () {
+    const invitations = yield* Invitations
+    const user = yield* recipient(principal, "decline an invitation")
+    return yield* invitations.decline(input.invitationId, user.email)
   })
