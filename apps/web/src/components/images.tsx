@@ -51,8 +51,12 @@ function RecordImage(props: {
  * initials.
  */
 export function ContactAvatar(props: {
-  readonly contact: Pick<Contact, "firstName" | "lastName" | "displayName" | "avatarUrl" | "emails">
+  readonly contact: Pick<Contact, "firstName" | "lastName" | "displayName" | "avatarUrl"> & {
+    readonly emails: ReadonlyArray<{ readonly address: string }>
+  }
   readonly size?: MarkSize
+  /** Initials for when there's no image, if not the contact's own (such as from a name alone). */
+  readonly initials?: string
 }) {
   const { team } = teamRoute.useLoaderData()
   const email = props.contact.emails[0]?.address
@@ -71,7 +75,7 @@ export function ContactAvatar(props: {
       src={props.contact.avatarUrl ?? gravatar}
       size={props.size}
       shape="round"
-      fallback={initialsOf(props.contact)}
+      fallback={props.initials ?? initialsOf(props.contact)}
     />
   )
 }

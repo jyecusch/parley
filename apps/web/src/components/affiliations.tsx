@@ -8,13 +8,13 @@ import { contactApi, refreshContacts } from "../lib/contacts.ts"
 import { useRecordSearch } from "../lib/records.ts"
 import { ChoiceItem, ChoiceList } from "./choice-list.tsx"
 import { CloseIcon, PlusIcon } from "./icons.tsx"
+import { CompanyLogo, ContactAvatar } from "./images.tsx"
 import { PopoverAnchor } from "./popover-anchor.tsx"
 import { initialsOfName } from "./record.tsx"
 import { Dialog } from "./settings.tsx"
 import { Button as PlainButton } from "./ui/button.tsx"
 import { Command, CommandFooter, CommandGroup, CommandInput, CommandItem, CommandList } from "./ui/command.tsx"
 import {
-  Avatar,
   Button,
   cn,
   ErrorText,
@@ -52,6 +52,7 @@ const useRefreshAfterChange = (teamId: TeamId) => {
 /** A company as a chip: its mark and name, and in the panel the contact's title there. */
 function AffiliationChip(props: {
   readonly companyName: string
+  readonly logoUrl: string | null
   readonly title?: string | null | undefined
   readonly tooltip?: string | undefined
 }) {
@@ -60,7 +61,7 @@ function AffiliationChip(props: {
       className="inline-flex h-7 max-w-full min-w-0 shrink-0 items-center gap-1.5 rounded-md bg-fill pr-2 pl-1 text-sm"
       title={props.tooltip}
     >
-      <Avatar shape="square">{initialsOfName(props.companyName)}</Avatar>
+      <CompanyLogo company={{ name: props.companyName, logoUrl: props.logoUrl }} />
       <span className="truncate">{props.companyName}</span>
       {props.title ? <span className="truncate text-subtle">{props.title}</span> : null}
     </span>
@@ -77,7 +78,12 @@ export function AffiliationChips(props: { readonly affiliations: ReadonlyArray<C
   return (
     <span className="flex min-w-0 items-center gap-1 overflow-hidden">
       {shown.map((affiliation) => (
-        <AffiliationChip key={affiliation.id} companyName={affiliation.companyName} tooltip={label(affiliation)} />
+        <AffiliationChip
+          key={affiliation.id}
+          companyName={affiliation.companyName}
+          logoUrl={affiliation.companyLogoUrl}
+          tooltip={label(affiliation)}
+        />
       ))}
       {rest.length > 0 ? (
         <span
@@ -97,7 +103,12 @@ export function AffiliationTags(props: { readonly affiliations: ReadonlyArray<Co
   return (
     <div className="flex flex-wrap gap-1">
       {props.affiliations.map((affiliation) => (
-        <AffiliationChip key={affiliation.id} companyName={affiliation.companyName} title={affiliation.title} />
+        <AffiliationChip
+          key={affiliation.id}
+          companyName={affiliation.companyName}
+          logoUrl={affiliation.companyLogoUrl}
+          title={affiliation.title}
+        />
       ))}
     </div>
   )
@@ -262,7 +273,7 @@ export function ContactCompanies(props: {
           id: company.id,
           name: company.name,
           sub: primaryDomainOf(company),
-          avatar: <Avatar shape="square">{initialsOfName(company.name)}</Avatar>,
+          avatar: <CompanyLogo company={company} />,
         }),
       )
   }, [found.items, contact.affiliations])
@@ -294,6 +305,7 @@ export function ContactCompanies(props: {
           <TitleEditor
             key={affiliation.id}
             name={affiliation.companyName}
+            logoUrl={affiliation.companyLogoUrl}
             title={affiliation.title}
             onCancel={() => setEditing(undefined)}
             onSave={(title) => {
@@ -308,9 +320,7 @@ export function ContactCompanies(props: {
           <AffiliationRow
             key={affiliation.id}
             mark={
-              <Avatar size="md" shape="square">
-                {initialsOfName(affiliation.companyName)}
-              </Avatar>
+              <CompanyLogo company={{ name: affiliation.companyName, logoUrl: affiliation.companyLogoUrl }} size="md" />
             }
             actions={
               <>
@@ -422,7 +432,7 @@ export function CompanyContacts(props: {
           id: contact.id,
           name: contact.displayName,
           sub: contact.emails[0]?.address,
-          avatar: <Avatar>{initialsOfName(contact.displayName)}</Avatar>,
+          avatar: <ContactAvatar contact={contact} />,
         }),
       )
   }, [found.items, rows])
@@ -456,7 +466,18 @@ export function CompanyContacts(props: {
       {rows.map((affiliation: Affiliation) => (
         <AffiliationRow
           key={affiliation.id}
-          mark={<Avatar>{initialsOfName(affiliation.contactName)}</Avatar>}
+          mark={
+            <ContactAvatar
+              contact={{
+                firstName: null,
+                lastName: null,
+                displayName: affiliation.contactName,
+                avatarUrl: affiliation.contactAvatarUrl,
+                emails: affiliation.contactEmail ? [{ address: affiliation.contactEmail }] : [],
+              }}
+              initials={initialsOfName(affiliation.contactName)}
+            />
+          }
           actions={
             <IconButton
               size="xs"
@@ -517,6 +538,7 @@ function SectionEmpty(props: { readonly children: ReactNode }) {
 
 function TitleEditor(props: {
   readonly name: string
+  readonly logoUrl: string | null
   readonly title: string | null
   readonly onSave: (title: string | null) => void
   readonly onCancel: () => void
@@ -530,11 +552,7 @@ function TitleEditor(props: {
   return (
     <AffiliationRow
       editing
-      mark={
-        <Avatar size="md" shape="square">
-          {initialsOfName(props.name)}
-        </Avatar>
-      }
+      mark={<CompanyLogo company={{ name: props.name, logoUrl: props.logoUrl }} size="md" />}
       actions={
         <Button size="sm" variant="primary" onClick={save}>
           Save
@@ -590,7 +608,11 @@ export function AffiliateDialog(props: {
   const [title, setTitle] = useState("")
   // Searched on the server as you type (D136).
   const found = useRecordSearch(companyApi, props.teamId, query, { limit: 50 })
-  const matches = found.items.map((company) => ({ id: company.id as string, label: company.name }))
+  const matches = found.items.map((company) => ({
+    id: company.id as string,
+    label: company.name,
+    logoUrl: company.logoUrl,
+  }))
   return (
     <Dialog
       title={`Add ${props.count.toLocaleString()} ${props.count === 1 ? "contact" : "contacts"} to a company`}
@@ -622,7 +644,7 @@ export function AffiliateDialog(props: {
           {matches.length === 0 && !found.isSearching ? <Hint className="p-1.5">No companies match.</Hint> : null}
           {matches.map((company) => (
             <ChoiceItem key={company.id} value={company.id}>
-              <Avatar shape="square">{initialsOfName(company.label)}</Avatar>
+              <CompanyLogo company={{ name: company.label, logoUrl: company.logoUrl }} />
               <span className="truncate">{company.label}</span>
             </ChoiceItem>
           ))}

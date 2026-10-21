@@ -129,8 +129,14 @@ export const Affiliation = Schema.Struct({
   id: AffiliationId,
   contactId: ContactId,
   contactName: Schema.String,
+  /** The contact's uploaded avatar (D75), or null. */
+  contactAvatarUrl: Schema.NullOr(Schema.String),
+  /** The contact's primary email, for its Gravatar when the team allows it (D75), or null. */
+  contactEmail: Schema.NullOr(Schema.String),
   companyId: CompanyId,
   companyName: Schema.String,
+  /** The company's logo (D75), as Company.logoUrl, or null. */
+  companyLogoUrl: Schema.NullOr(Schema.String),
   title: Schema.NullOr(Schema.String),
   createdAt: Timestamp,
 })

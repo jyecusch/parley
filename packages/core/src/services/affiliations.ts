@@ -20,6 +20,7 @@ import type { ContactInTeam, ContactsInTeam } from "../proofs/contact-in-team.ts
 import type { CanReadRecords, CanWriteRecords } from "../proofs/permissions.ts"
 import type { Named } from "../proofs/proof.ts"
 import { activityRow } from "./activity.ts"
+import { fileUrl } from "./file-store.ts"
 import { classifySqlError } from "./sql-errors.ts"
 
 /** A record named as it is now, for activity on the other side of an affiliation. */
@@ -35,6 +36,10 @@ export const contactNameSql: SQL<string> = sql<string>`coalesce(
     order by e.is_primary desc, e.position limit 1),
   'Unnamed contact'
 )`
+
+/** A contact's primary email, for its Gravatar (D75), or null. */
+const contactEmailSql: SQL<string | null> = sql<string | null>`(select e.address from "contact_emails" e
+  where e.contact_id = "contacts"."id" and e.active order by e.is_primary desc, e.position limit 1)`
 
 const bothLive = and(isNull(schema.contacts.deletedAt), isNull(schema.companies.deletedAt))
 
@@ -118,8 +123,11 @@ export class Affiliations extends Context.Service<
               id: schema.affiliations.id,
               contactId: schema.affiliations.contactId,
               contactName: contactNameSql,
+              contactAvatarKey: schema.contacts.avatarKey,
+              contactEmail: contactEmailSql,
               companyId: schema.affiliations.companyId,
               companyName: schema.companies.name,
+              companyLogoKey: schema.companies.logoKey,
               title: schema.affiliations.title,
               createdAt: schema.affiliations.createdAt,
             })
@@ -134,16 +142,22 @@ export class Affiliations extends Context.Service<
         readonly id: string
         readonly contactId: string
         readonly contactName: string
+        readonly contactAvatarKey: string | null
+        readonly contactEmail: string | null
         readonly companyId: string
         readonly companyName: string
+        readonly companyLogoKey: string | null
         readonly title: string | null
         readonly createdAt: Date
       }): Affiliation => ({
         id: row.id as AffiliationId,
         contactId: row.contactId as ContactId,
         contactName: row.contactName,
+        contactAvatarUrl: fileUrl(row.contactAvatarKey),
+        contactEmail: row.contactEmail,
         companyId: row.companyId as CompanyId,
         companyName: row.companyName,
+        companyLogoUrl: fileUrl(row.companyLogoKey),
         title: row.title,
         createdAt: row.createdAt.toISOString(),
       })
@@ -201,6 +215,7 @@ export class Affiliations extends Context.Service<
               id: row.id as AffiliationId,
               companyId: row.companyId as CompanyId,
               companyName: row.companyName,
+              companyLogoUrl: fileUrl(row.companyLogoKey),
               title: row.title,
             })
             result.set(row.contactId, list)

@@ -33,7 +33,7 @@ import {
   TemplateIcon,
   TuneIcon,
 } from "./icons.tsx"
-import { ContactAvatar } from "./images.tsx"
+import { CompanyLogo, ContactAvatar } from "./images.tsx"
 import { PendingInvitations, usePendingInvitations } from "./pending-invitations.tsx"
 import {
   Command,
@@ -531,7 +531,7 @@ function CommandMenu(props: { readonly onClose: () => void }) {
         label: company.name,
         ...(domain ? { sub: domain } : {}),
         hint: "Company",
-        icon: <Avatar shape="square">{company.name[0]?.toUpperCase()}</Avatar>,
+        icon: <CompanyLogo company={company} />,
         run: go(() =>
           navigate({ to: "/t/$teamId/companies", params: { teamId: team.id }, search: { company: company.id } }),
         ),

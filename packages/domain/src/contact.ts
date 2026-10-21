@@ -37,6 +37,8 @@ export const ContactAffiliation = Schema.Struct({
   id: AffiliationId,
   companyId: CompanyId,
   companyName: Schema.String,
+  /** The company's logo (D75), as Company.logoUrl, or null. */
+  companyLogoUrl: Schema.NullOr(Schema.String),
   title: Schema.NullOr(Schema.String),
 })
 export type ContactAffiliation = typeof ContactAffiliation.Type
