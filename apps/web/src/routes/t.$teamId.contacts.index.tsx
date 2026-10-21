@@ -32,7 +32,7 @@ import {
   ViewActions,
 } from "../components/index-view.tsx"
 import { LoadFailed, problemFor, problemsOf, toE164 } from "../components/record.tsx"
-import { LoadingMoreRow, SelectionCount, SpacerRow, useSelection, useVirtualRows } from "../components/record-index.tsx"
+import { PlaceholderRow, SelectionCount, SpacerRow, useSelection, useVirtualRows } from "../components/record-index.tsx"
 import { RecordOwnerCell, RecordOwnerField } from "../components/record-owner.tsx"
 import { AddToSegmentDialog } from "../components/segments.tsx"
 import { isTyping, useShell } from "../components/shell.tsx"
@@ -156,16 +156,16 @@ function ContactsScreen() {
   const selection = useSelection({ loadedIds, total: list.total, matching })
   const scrollRef = useRef<HTMLDivElement>(null)
   const virtual = useVirtualRows({
-    count: contacts.length,
+    count: list.count,
     scrollRef,
-    onNearEnd: list.fetchNextPage,
+    onRange: list.ensure,
     resetKey: JSON.stringify(listParams),
   })
 
   // The open contact comes from the server, so a link to one past the loaded pages works.
   const openRecord = useRecord(contactApi, teamId, search.contact)
   const open = search.contact && openRecord.data && !openRecord.data.deletedAt ? openRecord.data : undefined
-  const openIndex = open ? contacts.findIndex((contact) => contact.id === open.id) : -1
+  const openIndex = open ? list.indexOf(open.id) : -1
 
   /**
    * Exports as CSV (D62): a selection, everything matching the view, or a segment's contacts.
@@ -258,14 +258,14 @@ function ContactsScreen() {
   /** Moves the keyboard cursor, or the open panel, through the list, loading more near its end. */
   const moveTo = useCallback(
     (index: number) => {
-      const next = contacts[index]
-      if (!next) return
-      if (index >= contacts.length - 10) list.fetchNextPage()
+      // A row not loaded yet is scrolled to, which loads it; the next press moves onto it.
       virtual.scrollTo(index)
+      const next = list.at(index)
+      if (!next) return
       if (search.contact) void setSearch({ contact: next.id })
       else setCursor(next.id)
     },
-    [contacts, list, search.contact, setSearch, virtual],
+    [list, search.contact, setSearch, virtual],
   )
 
   // Keyboard: j/k move, Enter opens, x selects, ⌫ deletes the selection, / filters, ⌘Z undoes.
@@ -278,10 +278,11 @@ function ContactsScreen() {
         return
       }
       if (isTyping(event) || event.metaKey || event.ctrlKey || event.altKey) return
-      const index = contacts.findIndex((contact) => contact.id === (search.contact ?? cursor))
+      const current = search.contact ?? cursor
+      const index = current ? list.indexOf(current) : -1
       if (event.key === "j" || event.key === "ArrowDown") {
         event.preventDefault()
-        moveTo(index < 0 ? 0 : Math.min(index + 1, contacts.length - 1))
+        moveTo(index < 0 ? 0 : Math.min(index + 1, list.count - 1))
       } else if (event.key === "k" || event.key === "ArrowUp") {
         event.preventDefault()
         moveTo(index < 0 ? 0 : Math.max(index - 1, 0))
@@ -302,7 +303,7 @@ function ContactsScreen() {
     }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
-  }, [contacts, cursor, moveTo, remove, search, selection, setSearch, toast])
+  }, [cursor, moveTo, remove, search, selection, setSearch, toast, list.count, list.indexOf])
 
   const narrowed = searchText !== "" || indexView.state.filter.conditions.length > 0
   const isLoading = list.isLoading
@@ -451,7 +452,7 @@ function ContactsScreen() {
               onNew={() => void setSearch({ new: true })}
               onImport={canWrite ? () => setDialog("import") : undefined}
             />
-          ) : contacts.length === 0 ? (
+          ) : list.count === 0 ? (
             <Centered>
               <EmptyState title={searchText ? `No contacts match “${searchText}”` : "No contacts match these filters"}>
                 {searchText ? "Try part of a name or an email address." : "Change or remove a filter to see more."}
@@ -502,8 +503,8 @@ function ContactsScreen() {
                 <tbody>
                   <SpacerRow height={virtual.before} />
                   {virtual.rows.map((row) => {
-                    const contact = contacts[row.index]
-                    if (!contact) return null
+                    const contact = list.at(row.index)
+                    if (!contact) return <PlaceholderRow key={`loading-${row.index}`} />
                     return (
                       <ContactRow
                         key={contact.id}
@@ -520,7 +521,6 @@ function ContactsScreen() {
                     )
                   })}
                   <SpacerRow height={virtual.after} />
-                  {list.isFetchingNextPage ? <LoadingMoreRow /> : null}
                 </tbody>
               </Table>
             </TableScroll>

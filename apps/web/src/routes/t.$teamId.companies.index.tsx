@@ -38,7 +38,7 @@ import {
   ViewActions,
 } from "../components/index-view.tsx"
 import { initialsOfName, LoadFailed, problemFor, problemsOf, toE164 } from "../components/record.tsx"
-import { LoadingMoreRow, SelectionCount, SpacerRow, useSelection, useVirtualRows } from "../components/record-index.tsx"
+import { PlaceholderRow, SelectionCount, SpacerRow, useSelection, useVirtualRows } from "../components/record-index.tsx"
 import { RecordOwnerCell, RecordOwnerField } from "../components/record-owner.tsx"
 import { isTyping, useShell } from "../components/shell.tsx"
 import {
@@ -188,9 +188,9 @@ function CompaniesScreen() {
   const selection = useSelection({ loadedIds, total: list.total, matching })
   const scrollRef = useRef<HTMLDivElement>(null)
   const virtual = useVirtualRows({
-    count: companies.length,
+    count: list.count,
     scrollRef,
-    onNearEnd: list.fetchNextPage,
+    onRange: list.ensure,
     resetKey: JSON.stringify(listParams),
     rowHeight: TALL_HEIGHT,
   })
@@ -198,7 +198,7 @@ function CompaniesScreen() {
   // The open company comes from the server, so a link to one past the loaded pages works.
   const openRecord = useRecord(companyApi, teamId, search.company)
   const open = search.company && openRecord.data && !openRecord.data.deletedAt ? openRecord.data : undefined
-  const openIndex = open ? companies.findIndex((company) => company.id === open.id) : -1
+  const openIndex = open ? list.indexOf(open.id) : -1
 
   /** Exports as CSV (D62): a selection, or everything matching the view. */
   const exportCsv = async (what: { readonly selection: Selection } | { readonly matching: Matching }) => {
@@ -278,14 +278,14 @@ function CompaniesScreen() {
   /** Moves the keyboard cursor, or the open panel, through the list, loading more near its end. */
   const moveTo = useCallback(
     (index: number) => {
-      const next = companies[index]
-      if (!next) return
-      if (index >= companies.length - 10) list.fetchNextPage()
+      // A row not loaded yet is scrolled to, which loads it; the next press moves onto it.
       virtual.scrollTo(index)
+      const next = list.at(index)
+      if (!next) return
       if (search.company) void setSearch({ company: next.id })
       else setCursor(next.id)
     },
-    [companies, list, search.company, setSearch, virtual],
+    [list, search.company, setSearch, virtual],
   )
 
   // Keyboard, as on Contacts: j/k move, Enter opens, x selects, ⌫ deletes, / filters, ⌘Z undoes.
@@ -298,10 +298,11 @@ function CompaniesScreen() {
         return
       }
       if (isTyping(event) || event.metaKey || event.ctrlKey || event.altKey) return
-      const index = companies.findIndex((company) => company.id === (search.company ?? cursor))
+      const current = search.company ?? cursor
+      const index = current ? list.indexOf(current) : -1
       if (event.key === "j" || event.key === "ArrowDown") {
         event.preventDefault()
-        moveTo(index < 0 ? 0 : Math.min(index + 1, companies.length - 1))
+        moveTo(index < 0 ? 0 : Math.min(index + 1, list.count - 1))
       } else if (event.key === "k" || event.key === "ArrowUp") {
         event.preventDefault()
         moveTo(index < 0 ? 0 : Math.max(index - 1, 0))
@@ -322,7 +323,7 @@ function CompaniesScreen() {
     }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
-  }, [companies, cursor, moveTo, remove, search, selection, setSearch, toast])
+  }, [cursor, moveTo, remove, search, selection, setSearch, toast, list.count, list.indexOf])
 
   const narrowed = searchText !== "" || indexView.state.filter.conditions.length > 0
   const isLoading = list.isLoading
@@ -487,7 +488,7 @@ function CompaniesScreen() {
                 email there are affiliated with it on their own.
               </EmptyState>
             </Centered>
-          ) : companies.length === 0 ? (
+          ) : list.count === 0 ? (
             <Centered>
               <EmptyState
                 title={searchText ? `No companies match “${searchText}”` : "No companies match these filters"}
@@ -545,8 +546,8 @@ function CompaniesScreen() {
                 <tbody>
                   <SpacerRow height={virtual.before} />
                   {virtual.rows.map((row) => {
-                    const company = companies[row.index]
-                    if (!company) return null
+                    const company = list.at(row.index)
+                    if (!company) return <PlaceholderRow key={`loading-${row.index}`} height={TALL_HEIGHT} />
                     const domain = primaryDomainOf(company)
                     return (
                       <Tr
@@ -616,7 +617,6 @@ function CompaniesScreen() {
                     )
                   })}
                   <SpacerRow height={virtual.after} />
-                  {list.isFetchingNextPage ? <LoadingMoreRow /> : null}
                 </tbody>
               </Table>
             </TableScroll>

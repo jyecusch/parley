@@ -21,6 +21,12 @@ export const listContacts = defineTeamOperation({
       Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 200 })).annotate({ title: "Limit" }),
     ),
     cursor: Schema.optional(Schema.String.annotate({ title: "Cursor" })),
+    offset: Schema.optional(
+      Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 1_000_000 })).annotate({
+        title: "Offset",
+        description: "Start this many records into the sorted list, instead of passing a cursor.",
+      }),
+    ),
     filter: Schema.optional(Filter),
     sort: Schema.optional(Sort),
     deleted: Schema.optional(

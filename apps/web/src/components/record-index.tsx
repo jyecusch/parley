@@ -1,7 +1,7 @@
 import type { Matching, Selection } from "@parley/domain"
 import { useVirtualizer } from "@tanstack/react-virtual"
-import { type RefObject, useCallback, useEffect, useMemo, useState } from "react"
-import { TextButton } from "./ui/index.ts"
+import { type RefObject, useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react"
+import { Skeleton, TextButton } from "./ui/index.ts"
 
 /*
  * What the contacts and companies index views share (D136, D137): rows drawn only while on screen,
@@ -12,13 +12,14 @@ import { TextButton } from "./ui/index.ts"
 const ROW_HEIGHT = 40
 
 /**
- * Draws only the rows near the screen, inside a scrolling table. Render `rows` between the two
- * spacers; `onNearEnd` asks for the next page when the last loaded rows come into view.
+ * Draws only the rows near the screen, inside a scrolling table (D136). `count` is every row the
+ * list has, loaded or not, so the table is its full height from the start; `onRange` hears which
+ * rows are on screen, to load them. Render `rows` between the two spacers.
  */
 export const useVirtualRows = (props: {
   readonly count: number
   readonly scrollRef: RefObject<HTMLDivElement | null>
-  readonly onNearEnd: () => void
+  readonly onRange: (first: number, last: number) => void
   /** Rows taller than a list row's 40px, such as companies' with their domain. */
   readonly rowHeight?: number
   /** What the rows are, such as the search, filter and sort: a change starts back at the top. */
@@ -32,14 +33,18 @@ export const useVirtualRows = (props: {
     overscan: 15,
   })
   const rows = virtualizer.getVirtualItems()
-  const lastIndex = rows.at(-1)?.index ?? -1
-  const { count, onNearEnd, resetKey, scrollRef } = props
-  useEffect(() => {
-    if (resetKey !== undefined) scrollRef.current?.scrollTo({ top: 0 })
-  }, [resetKey, scrollRef])
-  useEffect(() => {
-    if (count > 0 && lastIndex >= count - 40) onNearEnd()
-  }, [lastIndex, count, onNearEnd])
+  const firstIndex = rows[0]?.index ?? 0
+  const lastIndex = rows.at(-1)?.index ?? 0
+  const { onRange, resetKey, scrollRef } = props
+  // Before paint, so the new rows never show at the old position. The virtualizer is told too: it
+  // puts back its own position whenever the table's scrolling box is drawn afresh.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only when the rows change
+  useLayoutEffect(() => {
+    if (resetKey === undefined) return
+    if (scrollRef.current) scrollRef.current.scrollTop = 0
+    virtualizer.scrollToOffset(0)
+  }, [resetKey])
+  useEffect(() => onRange(firstIndex, lastIndex), [firstIndex, lastIndex, onRange])
   return {
     rows,
     before: rows[0]?.start ?? 0,
@@ -59,12 +64,12 @@ export function SpacerRow(props: { readonly height: number }) {
   )
 }
 
-/** The row under the last loaded one while the next page loads. */
-export function LoadingMoreRow() {
+/** A row whose record is still loading: the height of a real one, so nothing below it moves. */
+export function PlaceholderRow(props: { readonly height?: number }) {
   return (
-    <tr>
-      <td colSpan={99} className="h-10 px-4 text-sm text-subtle">
-        Loading more…
+    <tr aria-hidden style={{ height: props.height ?? ROW_HEIGHT }}>
+      <td colSpan={99} className="px-4">
+        <Skeleton className="w-40 max-w-full" />
       </td>
     </tr>
   )

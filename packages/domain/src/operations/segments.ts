@@ -91,6 +91,11 @@ export const listSegmentContacts = defineTeamOperation({
     ...OneSegment,
     limit: Schema.optional(Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 200 }))),
     cursor: Schema.optional(Schema.String),
+    offset: Schema.optional(
+      Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 1_000_000 })).annotate({
+        description: "Start this many contacts in, instead of passing a cursor.",
+      }),
+    ),
   }),
   output: ContactPage,
   errors: [SegmentNotFound],

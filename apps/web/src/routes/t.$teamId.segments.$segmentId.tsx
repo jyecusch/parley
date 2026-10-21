@@ -17,7 +17,7 @@ import { FilterBar } from "../components/filters.tsx"
 import { CloseIcon, DownloadIcon, PlusIcon, SegmentIcon } from "../components/icons.tsx"
 import { ContactAvatar } from "../components/images.tsx"
 import { LoadFailed } from "../components/record.tsx"
-import { SpacerRow, useVirtualRows } from "../components/record-index.tsx"
+import { PlaceholderRow, SpacerRow, useVirtualRows } from "../components/record-index.tsx"
 import { NameText, nameLinkClass, TitleInput, wideColumnClass } from "../components/ui/email.tsx"
 import {
   Badge,
@@ -149,13 +149,12 @@ function SegmentView(props: {
     filter: segment.kind === "dynamic" ? filter : EMPTY_FILTER,
     sort: null,
   })
-  const shown = list.items
-  const total = list.total ?? (dirty ? shown.length : segment.contactCount)
+  const total = list.total ?? (dirty ? list.count : segment.contactCount)
   const scrollRef = useRef<HTMLDivElement>(null)
   const virtual = useVirtualRows({
-    count: shown.length,
+    count: list.count,
     scrollRef,
-    onNearEnd: list.fetchNextPage,
+    onRange: list.ensure,
     resetKey: JSON.stringify(filter),
   })
   const found = useRecordSearch(contactApi, teamId, pickQuery, { enabled: picking })
@@ -330,7 +329,7 @@ function SegmentView(props: {
             message={messageOf(list.error)}
             onRetry={() => void list.refetch()}
           />
-        ) : list.isLoading ? null : shown.length === 0 ? (
+        ) : list.isLoading ? null : list.count === 0 ? (
           <Centered>
             <EmptyState
               icon={<SegmentIcon />}
@@ -364,8 +363,8 @@ function SegmentView(props: {
               <tbody>
                 <SpacerRow height={virtual.before} />
                 {virtual.rows.map((row) => {
-                  const contact = shown[row.index]
-                  if (!contact) return null
+                  const contact = list.at(row.index)
+                  if (!contact) return <PlaceholderRow key={`loading-${row.index}`} />
                   return (
                     <Tr key={contact.id}>
                       <Td className="pl-4">

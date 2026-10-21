@@ -31,11 +31,13 @@ function CompanyRecord() {
   const list = useRecordList(companyApi, teamId, DEFAULT_ORDER)
   const company = record.data
   const [toast, setToast] = useState<Toast>()
-  const index = list.items.findIndex((entry) => entry.id === companyId)
+  const index = list.indexOf(companyId)
   const back = () => void navigate({ to: "/t/$teamId/companies", params: { teamId }, search: { company: companyId } })
   const move = (delta: number) => {
-    const next = list.items[index + delta]
-    if (index + delta >= list.items.length - 5) list.fetchNextPage()
+    if (index < 0) return
+    const next = list.at(index + delta)
+    // Loads the rows around the next one, so moving on doesn't wait.
+    list.ensure(index + delta - 5, index + delta + 5)
     if (next) void navigate({ to: "/t/$teamId/companies/$companyId", params: { teamId, companyId: next.id } })
   }
 
@@ -68,7 +70,7 @@ function CompanyRecord() {
         key={company.id}
         company={company}
         teamId={teamId}
-        position={{ index, total: list.total ?? list.items.length }}
+        position={{ index, total: list.count }}
         onMove={move}
         onClose={() => void navigate({ to: "/t/$teamId/companies", params: { teamId }, search: {} })}
         onDelete={() => {

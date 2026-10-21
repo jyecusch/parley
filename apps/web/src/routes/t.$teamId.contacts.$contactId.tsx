@@ -30,11 +30,13 @@ function ContactRecord() {
   const list = useRecordList(contactApi, teamId, DEFAULT_ORDER)
   const contact = record.data
   const [toast, setToast] = useState<Toast>()
-  const index = list.items.findIndex((entry) => entry.id === contactId)
+  const index = list.indexOf(contactId)
   const back = () => void navigate({ to: "/t/$teamId/contacts", params: { teamId }, search: { contact: contactId } })
   const move = (delta: number) => {
-    const next = list.items[index + delta]
-    if (index + delta >= list.items.length - 5) list.fetchNextPage()
+    if (index < 0) return
+    const next = list.at(index + delta)
+    // Loads the rows around the next one, so moving on doesn't wait.
+    list.ensure(index + delta - 5, index + delta + 5)
     if (next) void navigate({ to: "/t/$teamId/contacts/$contactId", params: { teamId, contactId: next.id } })
   }
 
@@ -67,7 +69,7 @@ function ContactRecord() {
         key={contact.id}
         contact={contact}
         teamId={teamId}
-        position={{ index, total: list.total ?? list.items.length }}
+        position={{ index, total: list.count }}
         onMove={move}
         onClose={() => void navigate({ to: "/t/$teamId/contacts", params: { teamId }, search: {} })}
         onDelete={() => {

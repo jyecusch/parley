@@ -49,6 +49,8 @@ export interface CompanyQuery {
   readonly sort?: Sort | undefined
   readonly limit?: number | undefined
   readonly cursor?: string | undefined
+  /** A position in the sorted list to start at, instead of a cursor (D136). */
+  readonly offset?: number | undefined
   readonly deleted?: boolean | undefined
 }
 
@@ -94,13 +96,15 @@ const encodeCursor = (updatedAt: Date, id: string) => btoa(`${updatedAt.toISOStr
 const encodeOffset = (offset: number) => btoa(`o:${offset}`)
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
+/** Deep offsets get slower; past this many records a filter is the better tool. */
+const MAX_OFFSET = 1_000_000
+
 const decodeOffset = (cursor: string | undefined): number => {
   if (!cursor) return 0
   try {
     const text = atob(cursor)
     const offset = text.startsWith("o:") ? Number(text.slice(2)) : 0
-    // Deep offsets get slow; past 100,000 records a filter is the better tool.
-    return Number.isInteger(offset) && offset > 0 ? Math.min(offset, 100_000) : 0
+    return Number.isInteger(offset) && offset > 0 ? Math.min(offset, MAX_OFFSET) : 0
   } catch {
     return 0
   }
@@ -521,9 +525,10 @@ export class Companies extends Context.Service<
             query.deleted ? restorableSql : isNull(schema.companies.deletedAt),
             searchSql(query.search),
           )
-          // A custom sort pages by position; the default sort pages by (updated, id).
-          const offset = query.sort ? decodeOffset(query.cursor) : 0
-          const cursor = !query.sort && query.cursor ? decodeCursor(query.cursor) : undefined
+          // An offset, or a custom sort's cursor, pages by position; otherwise pages go by (updated, id).
+          const byPosition = query.offset !== undefined || Boolean(query.sort)
+          const offset = query.offset !== undefined ? Math.min(query.offset, MAX_OFFSET) : decodeOffset(query.cursor)
+          const cursor = !byPosition && query.cursor ? decodeCursor(query.cursor) : undefined
           const [rows, total] = yield* Effect.all(
             [
               run(
@@ -563,7 +568,7 @@ export class Companies extends Context.Service<
           return {
             items,
             nextCursor: more
-              ? query.sort
+              ? byPosition
                 ? encodeOffset(offset + limit)
                 : encodeCursor(last.updatedAt, last.id)
               : null,

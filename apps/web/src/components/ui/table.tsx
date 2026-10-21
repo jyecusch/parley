@@ -82,7 +82,13 @@ export function TableScroll({
   className,
   ...props
 }: HTMLAttributes<HTMLDivElement> & { padForBar?: boolean; ref?: Ref<HTMLDivElement> }) {
-  return <div className={cn("min-h-0 flex-1 overflow-auto", padForBar && "pb-20", className)} {...props} />
+  // No scroll anchoring: a virtual list (D136) sets its own scroll position as its rows change.
+  return (
+    <div
+      className={cn("min-h-0 flex-1 overflow-auto [overflow-anchor:none]", padForBar && "pb-20", className)}
+      {...props}
+    />
+  )
 }
 
 /** A bordered box around a settings table, list or empty state. */

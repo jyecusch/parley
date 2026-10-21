@@ -45,6 +45,42 @@ describe("paged lists and selections (D136, D137)", () => {
     }).pipe(Effect.provide(CoreLive)),
   )
 
+  it.effect("lists from a position, with the total, for blocks of rows (D136)", () =>
+    Effect.gen(function* () {
+      const f = yield* Fixture
+      const tag = tagged()
+      for (const name of ["Ana", "Ben", "Cal", "Dee", "Eve"]) {
+        yield* run["contacts.create"](f.jane, { teamId: f.acme, firstName: name, lastName: tag })
+      }
+      const all = yield* run["contacts.list"](f.jane, { teamId: f.acme, search: tag })
+      const block = yield* run["contacts.list"](f.jane, { teamId: f.acme, search: tag, offset: 2, limit: 2 })
+      expect(block.items.map((contact) => contact.id)).toEqual(all.items.slice(2, 4).map((contact) => contact.id))
+      expect(block.total).toBe(5)
+      // Its cursor carries on from the position, under the default sort too.
+      const rest = yield* run["contacts.list"](f.jane, {
+        teamId: f.acme,
+        search: tag,
+        limit: 2,
+        cursor: block.nextCursor ?? "",
+      })
+      expect(rest.items.map((contact) => contact.id)).toEqual(all.items.slice(4).map((contact) => contact.id))
+
+      const sorted = yield* run["contacts.list"](f.jane, {
+        teamId: f.acme,
+        search: tag,
+        sort: { field: "name", direction: "asc" },
+        offset: 3,
+      })
+      expect(sorted.items.map((contact) => contact.firstName)).toEqual(["Dee", "Eve"])
+
+      yield* run["companies.create"](f.jane, { teamId: f.acme, name: `${tag} One` })
+      yield* run["companies.create"](f.jane, { teamId: f.acme, name: `${tag} Two` })
+      const companies = yield* run["companies.list"](f.jane, { teamId: f.acme, search: tag, offset: 1 })
+      expect(companies.items).toHaveLength(1)
+      expect(companies.total).toBe(2)
+    }).pipe(Effect.provide(CoreLive)),
+  )
+
   it.effect("sets a field and the owner on picked ids or on every matching contact", () =>
     Effect.gen(function* () {
       const f = yield* Fixture

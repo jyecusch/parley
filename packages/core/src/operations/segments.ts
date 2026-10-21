@@ -86,7 +86,7 @@ export const contacts = (principal: Principal, input: OperationInput<typeof list
       const target = yield* proveSegmentInTeam(member, segment)
       const scope = yield* segments.scope(target)
       return yield* contacts
-        .list(team, { limit: input.limit, cursor: input.cursor }, canRead, scope)
+        .list(team, { limit: input.limit, cursor: input.cursor, offset: input.offset }, canRead, scope)
         // A cursor is the only input a segment's listing can reject, and only one we gave out.
         .pipe(Effect.catchTag("InputRejected", () => Effect.succeed({ items: [], nextCursor: null, total: null })))
     }),
