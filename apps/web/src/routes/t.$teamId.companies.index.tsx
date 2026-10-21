@@ -1,18 +1,17 @@
 import {
   type Company,
   type CompanyId,
-  companyFieldReader,
   type FieldProblem,
   filterFields,
   isFreeEmailDomain,
-  matchesFilter,
+  type Matching,
   normalizeDomain,
   ROLE_PERMISSIONS,
+  type Selection,
   type TeamId,
   type UserId,
 } from "@parley/domain"
 import type { UserText } from "@parley/errors"
-import { useLiveQuery } from "@tanstack/react-db"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { createFileRoute, getRouteApi, useNavigate } from "@tanstack/react-router"
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react"
@@ -38,7 +37,8 @@ import {
   SetFieldDialog,
   ViewActions,
 } from "../components/index-view.tsx"
-import { initialsOfName, LoadFailed, problemFor, problemsOf, toE164, toggle } from "../components/record.tsx"
+import { initialsOfName, LoadFailed, problemFor, problemsOf, toE164 } from "../components/record.tsx"
+import { LoadingMoreRow, SelectionCount, SpacerRow, useSelection, useVirtualRows } from "../components/record-index.tsx"
 import { RecordOwnerCell, RecordOwnerField } from "../components/record-owner.tsx"
 import { isTyping, useShell } from "../components/shell.tsx"
 import {
@@ -90,10 +90,11 @@ import {
   wideColumnClass,
 } from "../components/ui/record-list.tsx"
 import { call, isApiFailure, messageOf } from "../lib/client.ts"
-import { companiesCollection, primaryDomainOf } from "../lib/companies.ts"
+import { companyApi, deleteCompanies, primaryDomainOf, refreshCompanies, restoreCompanies } from "../lib/companies.ts"
 import { useFields } from "../lib/custom-fields.ts"
-import { compareBy, download, useIndexView } from "../lib/index-view.ts"
-import { sortReaderOf, usePeople, usePeopleOptions } from "../lib/people.ts"
+import { download, useIndexView } from "../lib/index-view.ts"
+import { usePeople, usePeopleOptions } from "../lib/people.ts"
+import { patchCached, useDebounced, useRecord, useRecordList } from "../lib/records.ts"
 import { absolute, relative } from "../lib/time.ts"
 
 const teamRoute = getRouteApi("/t/$teamId")
@@ -152,13 +153,10 @@ function CompaniesScreen() {
   const search = Route.useSearch()
   const navigate = useNavigate({ from: Route.fullPath })
   const queryClient = useQueryClient()
-  const collection = companiesCollection(teamId, queryClient)
-  const live = useLiveQuery((q) => q.from({ company: collection }), [collection])
   const [filter, setFilter] = useState("")
-  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
   const [cursor, setCursor] = useState<string>()
   const [toast, setToast] = useState<ToastRequest>()
-  const [dialog, setDialog] = useState<"save-view" | "import" | "set-field" | "affiliate" | "past-imports">()
+  const [dialog, setDialog] = useState<"save-view" | "import" | "set-field" | "past-imports">()
   const { fields } = useFields(teamId, "company")
   const indexView = useIndexView(teamId, "company", search.view)
   const filterInfo = useMemo(() => filterFields("company", fields), [fields])
@@ -171,40 +169,55 @@ function CompaniesScreen() {
   const peopleOptions = usePeopleOptions(teamId, userId)
   const canWrite = ROLE_PERMISSIONS[team.role].has("records:write")
 
-  /**
-   * Exports as CSV (D62): the given companies, what's showing or a selection. More than the export
-   * takes by id falls back to the view's filter.
-   */
-  const exportCsv = async (ids: ReadonlyArray<string>) => {
+  // The server searches, filters and sorts, and sends a page at a time (D136).
+  const searchText = useDebounced(filter.trim())
+  const listParams = useMemo(
+    () => ({ search: searchText, filter: indexView.state.filter, sort: indexView.state.sort }),
+    [searchText, indexView.state.filter, indexView.state.sort],
+  )
+  const list = useRecordList(companyApi, teamId, listParams, { enabled: !search.deleted })
+  const companies = list.items
+  const loadedIds = useMemo(() => companies.map((company) => company.id as string), [companies])
+  const matching: Matching = useMemo(
+    () => ({
+      ...(searchText ? { search: searchText } : {}),
+      ...(indexView.state.filter.conditions.length > 0 ? { filter: indexView.state.filter } : {}),
+    }),
+    [searchText, indexView.state.filter],
+  )
+  const selection = useSelection({ loadedIds, total: list.total, matching })
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const virtual = useVirtualRows({
+    count: companies.length,
+    scrollRef,
+    onNearEnd: list.fetchNextPage,
+    resetKey: JSON.stringify(listParams),
+    rowHeight: TALL_HEIGHT,
+  })
+
+  // The open company comes from the server, so a link to one past the loaded pages works.
+  const openRecord = useRecord(companyApi, teamId, search.company)
+  const open = search.company && openRecord.data && !openRecord.data.deletedAt ? openRecord.data : undefined
+  const openIndex = open ? companies.findIndex((company) => company.id === open.id) : -1
+
+  /** Exports as CSV (D62): a selection, or everything matching the view. */
+  const exportCsv = async (what: { readonly selection: Selection } | { readonly matching: Matching }) => {
+    const scope =
+      "matching" in what
+        ? what.matching
+        : "ids" in what.selection
+          ? { ids: [...what.selection.ids] }
+          : what.selection.matching
     try {
-      const result = await call("companies.export", {
-        teamId,
-        ...(ids.length <= 10_000 ? { ids: [...ids] } : { filter: indexView.state.filter }),
-      })
+      const result = await call("companies.export", { teamId, ...scope })
       download(`companies-${new Date().toISOString().slice(0, 10)}.csv`, result.csv)
-      showToast({ text: `Exported ${result.count} ${result.count === 1 ? "company" : "companies"}.` })
+      showToast({ text: `Exported ${countOf(result.count)}.` })
     } catch (failure) {
       showToast({ text: messageOf(failure) })
     }
   }
   const filterRef = useRef<HTMLInputElement>(null)
 
-  const companies = useMemo(() => {
-    const q = filter.trim().toLowerCase()
-    return [...(live.data ?? [])]
-      .filter(
-        (company) =>
-          !q || company.name.toLowerCase().includes(q) || company.domains.some((entry) => entry.domain.includes(q)),
-      )
-      .filter((record) => matchesFilter(indexView.state.filter, companyFieldReader(record)))
-      .sort(
-        indexView.state.sort
-          ? compareBy(sortReaderOf(companyFieldReader), indexView.state.sort)
-          : (a, b) => b.updatedAt.localeCompare(a.updatedAt) || b.id.localeCompare(a.id),
-      )
-  }, [live.data, filter, indexView.state])
-
-  const open = search.company ? companies.find((company) => company.id === search.company) : undefined
   const setSearch = useCallback(
     (next: Search) => navigate({ search: { ...(search.view ? { view: search.view } : {}), ...next } }),
     [navigate, search.view],
@@ -215,30 +228,64 @@ function CompaniesScreen() {
     window.setTimeout(() => setToast((current) => (current === next ? undefined : current)), 8000)
   }, [])
 
+  /** Undoes a delete: restores what each deleteMany call deleted (D137). */
   const restore = useCallback(
-    async (ids: ReadonlyArray<string>) => {
+    async (deletedAts: ReadonlyArray<string>) => {
       try {
-        for (const id of ids) await call("companies.restore", { teamId, companyId: id as CompanyId })
+        for (const deletedAt of deletedAts) await restoreCompanies(queryClient, teamId, deletedAt)
       } catch (failure) {
         showToast({ text: messageOf(failure) })
       }
-      await collection.utils.refetch()
-      await queryClient.invalidateQueries({ queryKey: ["companies-deleted", teamId] })
     },
-    [collection, queryClient, showToast, teamId],
+    [queryClient, showToast, teamId],
   )
 
-  const remove = useCallback(
-    (ids: ReadonlyArray<string>) => {
-      if (ids.length === 0) return
-      const transaction = collection.delete(ids.map((id) => id as CompanyId))
-      setSelected(new Set())
-      if (search.company && ids.includes(search.company)) void setSearch({})
-      const text = ids.length === 1 ? "1 company deleted" : `${ids.length} companies deleted`
-      showToast({ text, undo: () => void restore(ids) })
-      transaction.isPersisted.promise.catch((failure: unknown) => showToast({ text: messageOf(failure) }))
+  const restoreOne = useCallback(
+    async (id: string) => {
+      try {
+        await call("companies.restore", { teamId, companyId: id as CompanyId })
+      } catch (failure) {
+        showToast({ text: messageOf(failure) })
+      }
+      await refreshCompanies(queryClient, teamId)
+      await queryClient.invalidateQueries({ queryKey: ["companies-deleted", teamId] })
     },
-    [collection, restore, search.company, setSearch, showToast],
+    [queryClient, showToast, teamId],
+  )
+
+  /** Deletes a selection: picked rows leave the list at once, and the toast can undo it (D137). */
+  const remove = useCallback(
+    async (selections: ReadonlyArray<Selection>) => {
+      if (selections.length === 0) return
+      selection.clear()
+      const picked = selections.flatMap((entry) => ("ids" in entry ? entry.ids : []))
+      if (search.company && (picked.includes(search.company) || selections.some((entry) => "matching" in entry))) {
+        void setSearch({})
+      }
+      try {
+        const results = []
+        for (const entry of selections) results.push(await deleteCompanies(queryClient, teamId, entry))
+        const count = results.reduce((sum, result) => sum + result.count, 0)
+        const deletedAts = results.map((result) => result.deletedAt)
+        showToast({ text: `${countOf(count)} deleted`, undo: () => void restore(deletedAts) })
+      } catch (failure) {
+        showToast({ text: messageOf(failure) })
+      }
+    },
+    [queryClient, restore, search.company, selection, setSearch, showToast, teamId],
+  )
+
+  /** Moves the keyboard cursor, or the open panel, through the list, loading more near its end. */
+  const moveTo = useCallback(
+    (index: number) => {
+      const next = companies[index]
+      if (!next) return
+      if (index >= companies.length - 10) list.fetchNextPage()
+      virtual.scrollTo(index)
+      if (search.company) void setSearch({ company: next.id })
+      else setCursor(next.id)
+    },
+    [companies, list, search.company, setSearch, virtual],
   )
 
   // Keyboard, as on Contacts: j/k move, Enter opens, x selects, ⌫ deletes, / filters, ⌘Z undoes.
@@ -251,43 +298,36 @@ function CompaniesScreen() {
         return
       }
       if (isTyping(event) || event.metaKey || event.ctrlKey || event.altKey) return
-      const index = companies.findIndex((company) => company.id === (open?.id ?? cursor))
-      const move = (delta: number) => {
-        const next = companies[Math.min(Math.max(index + delta, 0), companies.length - 1)]
-        if (!next) return
-        if (open) void setSearch({ company: next.id })
-        else setCursor(next.id)
-      }
+      const index = companies.findIndex((company) => company.id === (search.company ?? cursor))
       if (event.key === "j" || event.key === "ArrowDown") {
         event.preventDefault()
-        move(index < 0 ? 0 : 1)
+        moveTo(index < 0 ? 0 : Math.min(index + 1, companies.length - 1))
       } else if (event.key === "k" || event.key === "ArrowUp") {
         event.preventDefault()
-        move(index < 0 ? 0 : -1)
-      } else if (event.key === "Enter" && cursor && !open) {
+        moveTo(index < 0 ? 0 : Math.max(index - 1, 0))
+      } else if (event.key === "Enter" && cursor && !search.company) {
         void setSearch({ company: cursor })
       } else if (event.key === "x" && cursor) {
-        setSelected((current) => toggle(current, cursor))
-      } else if ((event.key === "Backspace" || event.key === "Delete") && selected.size > 0) {
+        selection.toggle(cursor)
+      } else if ((event.key === "Backspace" || event.key === "Delete") && selection.count > 0) {
         event.preventDefault()
-        remove([...selected])
+        void remove(selection.selections())
       } else if (event.key === "/") {
         event.preventDefault()
         filterRef.current?.focus()
       } else if (event.key === "Escape") {
         if (search.company || search.new) void setSearch({})
-        else if (selected.size > 0) setSelected(new Set())
+        else if (selection.count > 0) selection.clear()
       }
     }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
-  }, [companies, cursor, open, remove, search, selected, setSearch, toast])
+  }, [companies, cursor, moveTo, remove, search, selection, setSearch, toast])
 
-  const allChecked = companies.length > 0 && companies.every((company) => selected.has(company.id))
-  const someChecked = !allChecked && companies.some((company) => selected.has(company.id))
-  const isLoading = live.isLoading
-  const loadError = live.isError ? collection.utils.lastError : undefined
-  const isEmpty = !isLoading && !loadError && (live.data?.length ?? 0) === 0
+  const narrowed = searchText !== "" || indexView.state.filter.conditions.length > 0
+  const isLoading = list.isLoading
+  const loadError = list.isError ? list.error : undefined
+  const isEmpty = !isLoading && !loadError && !narrowed && list.total === 0
 
   return (
     <>
@@ -310,7 +350,9 @@ function CompaniesScreen() {
               <span>{indexView.view?.name ?? "Companies"}</span>
             )}
           </Breadcrumb>
-          {!search.deleted && !isLoading && !isEmpty ? <Count>{companies.length}</Count> : null}
+          {!search.deleted && !isLoading && !isEmpty && list.total !== null ? (
+            <Count>{list.total.toLocaleString()}</Count>
+          ) : null}
           <Spacer />
           {search.deleted ? null : (
             <ViewActions
@@ -365,6 +407,7 @@ function CompaniesScreen() {
             )}
             {search.deleted ? null : (
               <FilterBar
+                teamId={teamId}
                 fields={filterInfo}
                 filter={indexView.state.filter}
                 onChange={indexView.setFilter}
@@ -393,9 +436,9 @@ function CompaniesScreen() {
             <ExportMenu
               singular="company"
               plural="companies"
-              showing={companies.length}
-              filtered={filter.trim() !== "" || indexView.state.filter.conditions.length > 0}
-              onExportShowing={() => void exportCsv(companies.map((company) => company.id))}
+              showing={list.total ?? companies.length}
+              filtered={narrowed}
+              onExportShowing={() => void exportCsv({ matching })}
             />
           </Toolbar>
         )}
@@ -406,20 +449,20 @@ function CompaniesScreen() {
             recordType="company"
             plural="companies"
             canWrite={canWrite}
-            onRecordsChanged={() => void collection.utils.refetch()}
+            onRecordsChanged={() => void refreshCompanies(queryClient, teamId)}
           />
         )}
 
         <ViewBody>
           {search.deleted ? (
-            <DeletedCompanies teamId={teamId} onRestore={restore} />
+            <DeletedCompanies teamId={teamId} onRestore={restoreOne} />
           ) : isLoading ? (
             <LoadingRows />
           ) : loadError ? (
             <LoadFailed
               title="Companies didn't load"
               message={messageOf(loadError)}
-              onRetry={() => void collection.utils.refetch()}
+              onRetry={() => void list.refetch()}
             />
           ) : isEmpty ? (
             <Centered>
@@ -446,21 +489,25 @@ function CompaniesScreen() {
             </Centered>
           ) : companies.length === 0 ? (
             <Centered>
-              <EmptyState title={`No companies match “${filter}”`}>Try part of a name or a domain.</EmptyState>
+              <EmptyState
+                title={searchText ? `No companies match “${searchText}”` : "No companies match these filters"}
+              >
+                {searchText ? "Try part of a name or a domain." : "Change or remove a filter to see more."}
+              </EmptyState>
             </Centered>
           ) : (
-            <TableScroll padForBar={selected.size > 0}>
+            <TableScroll ref={scrollRef} padForBar={selection.count > 0} className={cn(list.isStale && "opacity-60")}>
               <Table>
                 <caption className="sr-only">Companies</caption>
                 <thead>
                   <tr>
                     <Th className={checkCellClass} scope="col">
                       <Checkbox
-                        reveal={selected.size === 0}
-                        mixed={someChecked}
+                        reveal={selection.count === 0}
+                        mixed={selection.someLoaded}
                         aria-label="Select all companies"
-                        checked={allChecked}
-                        onChange={() => setSelected(allChecked ? new Set() : new Set(companies.map((c) => c.id)))}
+                        checked={selection.allLoaded}
+                        onChange={selection.toggleAllLoaded}
                       />
                     </Th>
                     <Th className={NAME_COLUMN} scope="col">
@@ -496,21 +543,24 @@ function CompaniesScreen() {
                   </tr>
                 </thead>
                 <tbody>
-                  {companies.map((company) => {
+                  <SpacerRow height={virtual.before} />
+                  {virtual.rows.map((row) => {
+                    const company = companies[row.index]
+                    if (!company) return null
                     const domain = primaryDomainOf(company)
                     return (
                       <Tr
                         key={company.id}
-                        checked={selected.has(company.id)}
+                        checked={selection.isPicked(company.id)}
                         open={open?.id === company.id}
                         cursor={!open && cursor === company.id}
                       >
                         <Td className={cn(checkCellClass, TALL)}>
                           <Checkbox
-                            reveal={selected.size === 0}
+                            reveal={selection.count === 0}
                             aria-label={`Select ${company.name}`}
-                            checked={selected.has(company.id)}
-                            onChange={() => setSelected((current) => toggle(current, company.id))}
+                            checked={selection.isPicked(company.id)}
+                            onChange={() => selection.toggle(company.id)}
                           />
                         </Td>
                         <Td className={TALL}>
@@ -565,36 +615,41 @@ function CompaniesScreen() {
                       </Tr>
                     )
                   })}
+                  <SpacerRow height={virtual.after} />
+                  {list.isFetchingNextPage ? <LoadingMoreRow /> : null}
                 </tbody>
               </Table>
             </TableScroll>
           )}
         </ViewBody>
 
-        {selected.size > 0 ? (
-          <FloatingBar role="toolbar" aria-label="Bulk actions">
-            <span className="mr-1.5 text-muted tabular-nums">
-              <b className="font-medium text-fg">{selected.size}</b> selected
-            </span>
+        {selection.count > 0 ? (
+          <FloatingBar role="toolbar" aria-label="Actions on the selection">
+            <SelectionCount selection={selection} total={list.total} plural="companies" />
             <FloatingBarDivider />
             <Button variant="ghost" size="sm" onClick={() => setDialog("set-field")}>
               Set field
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => void exportCsv([...selected])}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() =>
+                void exportCsv(
+                  selection.ids && selection.ids.length <= 10_000
+                    ? { selection: { ids: selection.ids } }
+                    : { matching },
+                )
+              }
+            >
               Export
             </Button>
             <Tooltip text="Delete  ⌫">
-              <Button variant="danger" size="sm" onClick={() => remove([...selected])}>
+              <Button variant="danger" size="sm" onClick={() => void remove(selection.selections())}>
                 Delete
               </Button>
             </Tooltip>
             <FloatingBarDivider />
-            <IconButton
-              label="Clear selection"
-              tip="Clear selection  Esc"
-              size="xs"
-              onClick={() => setSelected(new Set())}
-            >
+            <IconButton label="Clear selection" tip="Clear selection  Esc" size="xs" onClick={selection.clear}>
               <CloseIcon className="size-3.5" />
             </IconButton>
           </FloatingBar>
@@ -653,27 +708,39 @@ function CompaniesScreen() {
         />
       ) : dialog === "set-field" ? (
         <SetFieldDialog
-          count={selected.size}
-          noun={selected.size === 1 ? "company" : "companies"}
+          count={selection.count}
+          noun={selection.count === 1 ? "company" : "companies"}
           fields={fields}
           onClose={() => setDialog(undefined)}
           onApply={async (field, value) => {
-            const ids = [...selected]
-            const transaction = collection.update(
-              ids.map((id) => id as CompanyId),
-              (drafts) => {
-                for (const draft of drafts) {
-                  const next = { ...draft.custom }
-                  if (value === null) delete next[field.id]
-                  else next[field.id] = value as (typeof next)[string]
-                  draft.custom = next
-                }
-              },
-            )
+            const selections = selection.selections()
+            // Picked rows show the value at once; the server's answer then refreshes the list.
+            const undo = selection.ids
+              ? patchCached<Company>(queryClient, "companies", teamId, new Set(selection.ids), (company) => {
+                  const custom = { ...company.custom }
+                  if (value === null) delete custom[field.id]
+                  else custom[field.id] = value
+                  return { ...company, custom }
+                })
+              : () => {}
             setDialog(undefined)
-            setSelected(new Set())
-            showToast({ text: `${field.name} is set on ${ids.length} ${ids.length === 1 ? "company" : "companies"}.` })
-            transaction.isPersisted.promise.catch((failure: unknown) => showToast({ text: messageOf(failure) }))
+            selection.clear()
+            try {
+              let count = 0
+              for (const entry of selections) {
+                const result = await call("companies.updateMany", {
+                  teamId,
+                  selection: entry,
+                  custom: { [field.id]: value },
+                })
+                count += result.count
+              }
+              showToast({ text: `${field.name} is set on ${countOf(count)}.` })
+            } catch (failure) {
+              undo()
+              showToast({ text: messageOf(failure) })
+            }
+            await refreshCompanies(queryClient, teamId)
           }}
         />
       ) : null}
@@ -683,7 +750,7 @@ function CompaniesScreen() {
           teamName={team.name}
           onClose={() => void setSearch({})}
           onCreated={async (company) => {
-            await collection.utils.refetch()
+            await refreshCompanies(queryClient, teamId)
             void setSearch({ company: company.id })
           }}
           onOpenExisting={(id) => void setSearch({ company: id })}
@@ -693,15 +760,11 @@ function CompaniesScreen() {
           key={open.id}
           company={open}
           teamId={teamId}
-          position={{ index: companies.indexOf(open), total: companies.length }}
-          onMove={(delta) => {
-            const next = companies[companies.indexOf(open) + delta]
-            if (next) void setSearch({ company: next.id })
-          }}
+          position={{ index: openIndex, total: list.total ?? companies.length }}
+          onMove={(delta) => moveTo(openIndex + delta)}
           onClose={() => void setSearch({})}
-          onDelete={() => remove([open.id])}
+          onDelete={() => void remove([{ ids: [open.id] }])}
           onToast={showToast}
-          collection={collection}
           canWrite={canWrite}
           layout="panel"
           onToggleLayout={() =>
@@ -715,6 +778,9 @@ function CompaniesScreen() {
 
 /** Company rows are taller: a name and a domain. */
 const TALL = "h-12"
+const TALL_HEIGHT = 48
+
+const countOf = (count: number) => `${count.toLocaleString()} ${count === 1 ? "company" : "companies"}`
 const NAME_COLUMN = "w-[34%]"
 const COUNT_COLUMN = "w-32"
 
@@ -761,10 +827,7 @@ function LoadingRows() {
   )
 }
 
-function DeletedCompanies(props: {
-  readonly teamId: TeamId
-  readonly onRestore: (ids: ReadonlyArray<string>) => Promise<void>
-}) {
+function DeletedCompanies(props: { readonly teamId: TeamId; readonly onRestore: (id: string) => Promise<void> }) {
   const deleted = useQuery({
     queryKey: ["companies-deleted", props.teamId],
     queryFn: () => call("companies.list", { teamId: props.teamId, deleted: true, limit: 200 }),
@@ -827,7 +890,7 @@ function DeletedCompanies(props: {
                 {company.deletedAt ? relative(company.deletedAt) : ""}
               </Td>
               <Td className={cn(TALL, "text-right")}>
-                <Button size="sm" onClick={() => void props.onRestore([company.id])}>
+                <Button size="sm" onClick={() => void props.onRestore(company.id)}>
                   <RestoreIcon className="size-3.5" />
                   Restore
                 </Button>

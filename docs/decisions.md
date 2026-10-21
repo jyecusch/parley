@@ -9,7 +9,7 @@ What we decided, who decided it, and what's still open. Nothing becomes "decided
 | D1 | Product scope v1 | Contacts and companies | Owner | 2026-10-19 |
 | D2 | Product scope v2 | Marketing email: filter-based dynamic segments, fixed lists, templates, drafts, test sends to CRM users, subscription management, compliant unsubscribe footer (Spam Act etc.) | Owner | 2026-10-19 |
 | D3 | Agent parity | Everything a user can do in the web UI, an agent can do via API/MCP | Owner | 2026-10-19 |
-| D4 | Tech stack | TanStack Start, Postgres, Effect v4 (backend at least), TanStack DB/Query, Better-Auth + organizations plugin, Drizzle, Tailwind | Owner | 2026-10-19 |
+| D4 | Tech stack | TanStack Start, Postgres, Effect v4 (backend at least), TanStack DB/Query (TanStack DB later dropped for paged loading, D136), Better-Auth + organizations plugin, Drizzle, Tailwind | Owner | 2026-10-19 |
 | D5 | Tenancy | Multi-team: a user can be a member of many teams and switch between them | Owner | 2026-10-19 |
 | D6 | Record visibility | Team-wide visibility. Roles decide actions | Owner | 2026-10-19 |
 | D7 | Roles | Better-Auth defaults: `owner`, `admin`, `member` | Owner | 2026-10-19 |
@@ -141,6 +141,8 @@ What we decided, who decided it, and what's still open. Nothing becomes "decided
 | D133 | Social profiles | Contacts and companies have a list of social profile links. Parley recognises the network from the address (LinkedIn, X, Facebook, Instagram, YouTube, GitHub, Bluesky, Threads, Mastodon-style and others) to show its name and icon; anything else is kept as a plain link. Imports take a column per network, and a bare handle (HubSpot's "Twitter Handle") becomes that network's address | Owner | 2026-10-21 |
 | D134 | Logos on import | A company import can take a logo's address (HubSpot's "Logo URL"): Parley fetches it safely, as it does favicons, and stores it as the company's uploaded logo. An image that can't be fetched is a warning, not a failed row | Owner | 2026-10-21 |
 | D135 | Imports run on the server | An import is a job: the file is uploaded once (only its mapped columns) and Parley imports it in the background, in small batches that survive a restart, so the person can close the tab. Progress counts rows; the list shows it while it runs, and each import's results (created, updated, warnings, failures) stay in a history. Logos are fetched afterwards, one at a time. An import can be cancelled; rows already imported stay. Up to 100,000 rows. contacts.import and companies.import stay for small imports by agents | Owner | 2026-10-21 |
+| D136 | Index views load in pages | Contacts and companies index views no longer load every record into the browser. The server searches, filters and sorts, and sends 100 records at a time as the person scrolls; only the rows on screen are drawn. The list's first page carries the total matching ("5,166 companies"). Edits still show at once and roll back on error. Record views and panels load their own record. Pickers (company picker, affiliations, segment contacts) and search find records on the server as the person types | Owner | 2026-10-21 |
+| D137 | Selection covers all matching | Picking every row on screen offers "Select all 5,166 matching". Actions on a selection (delete, set a field, affiliate, add to a segment, export) take either the picked ids or the index view's search and filter, and run on the server for every matching record. Deleting a selection can be undone | Owner | 2026-10-21 |
 
 ## Implementation choices made during milestones 1 and 2 (Claude; low-stakes, open to veto)
 

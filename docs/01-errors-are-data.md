@@ -402,7 +402,7 @@ The MCP server has its own exhaustive `Record<UpdateContactError["_tag"], …>` 
 
 ### Web
 
-The web app is a client of `/api/v1` (see 00). TanStack Query and TanStack DB mutations receive the decoded `PublicError` and branch on `_tag`:
+The web app is a client of `/api/v1` (see 00). TanStack Query queries and mutations receive the decoded `PublicError` and branch on `_tag`:
 
 - `InputRejected` → put each `problems[i].userMessage` under the matching field.
 - `ContactEmailTaken` → highlight the email field and link to `details.existing`.

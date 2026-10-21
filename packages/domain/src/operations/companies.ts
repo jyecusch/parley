@@ -6,6 +6,7 @@ import { MemberNotFound } from "../errors/members.ts"
 import { Filter, Sort } from "../filter.ts"
 import { CompanyId, TeamId } from "../ids.ts"
 import { defineTeamOperation } from "../operation.ts"
+import { DeletedSelection, Selection, SelectionResult } from "../selection.ts"
 
 const InTeam = { teamId: TeamId.annotate({ description: "The team, from teams.list." }) }
 const OneCompany = { ...InTeam, companyId: CompanyId.annotate({ description: "The company's id." }) }
@@ -103,4 +104,55 @@ export const companyActivity = defineTeamOperation({
   http: { method: "GET", path: "/teams/:teamId/companies/:companyId/activity" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: ["records:read"],
+})
+
+const companySelection = {
+  ...InTeam,
+  selection: Selection.annotate({
+    description:
+      'The companies: {"ids":[...]} with up to 1,000 ids, or {"matching":{"search":"...","filter":{...}}} for every company companies.list would return for that search and filter.',
+  }),
+}
+
+export const updateManyCompanies = defineTeamOperation({
+  name: "companies.updateMany",
+  description:
+    "Set the same custom field values or company owner on many companies at once (D137): picked ids, or every company matching a search and filter. Only the fields you send change.",
+  input: Schema.Struct({
+    ...companySelection,
+    custom: Schema.optional(CompanyFields.fields.custom),
+    ownerId: CompanyFields.fields.ownerId,
+  }),
+  output: SelectionResult,
+  errors: [MemberNotFound],
+  http: { method: "POST", path: "/teams/:teamId/companies/update-many" },
+  hints: { readOnly: false, destructive: true, idempotent: true },
+  permissions: ["records:read", "records:write"],
+})
+
+export const deleteManyCompanies = defineTeamOperation({
+  name: "companies.deleteMany",
+  description:
+    "Delete many companies at once (D137): picked ids, or every company matching a search and filter. They can be restored together with companies.restoreMany and the deletedAt this returns, for 30 days.",
+  input: Schema.Struct(companySelection),
+  output: DeletedSelection,
+  errors: [],
+  http: { method: "POST", path: "/teams/:teamId/companies/delete-many" },
+  hints: { readOnly: false, destructive: true, idempotent: false },
+  permissions: ["records:read", "records:delete"],
+})
+
+export const restoreManyCompanies = defineTeamOperation({
+  name: "companies.restoreMany",
+  description:
+    "Restore the companies one companies.deleteMany deleted, by the deletedAt it returned. Companies that can't be restored (purged, or whose domains were taken since) are left deleted and not counted.",
+  input: Schema.Struct({
+    ...InTeam,
+    deletedAt: Schema.String.annotate({ description: "The deletedAt companies.deleteMany returned." }),
+  }),
+  output: SelectionResult,
+  errors: [],
+  http: { method: "POST", path: "/teams/:teamId/companies/restore-many" },
+  hints: { readOnly: false, destructive: false, idempotent: true },
+  permissions: ["records:read", "records:delete"],
 })

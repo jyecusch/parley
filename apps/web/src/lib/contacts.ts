@@ -1,24 +1,17 @@
-import type { Contact, ContactFields, ContactId, TeamId } from "@parley/domain"
-import { queryCollectionOptions } from "@tanstack/query-db-collection"
-import { createCollection } from "@tanstack/react-db"
+import type { Contact, ContactFields, ContactId, Selection, TeamId } from "@parley/domain"
 import type { QueryClient } from "@tanstack/react-query"
 import { call } from "./client.ts"
 import { customPatch } from "./custom-fields.ts"
+import { patchCached, type RecordApi, refreshRecords, writeCached } from "./records.ts"
 
-/** Loads every live contact in a team, page by page. Fine for v1 team sizes; paging in the view comes later. */
-const loadAll = async (teamId: TeamId) => {
-  const items: Array<Contact> = []
-  let cursor: string | undefined
-  for (let page = 0; page < 50; page++) {
-    const result = await call("contacts.list", { teamId, limit: 200, ...(cursor ? { cursor } : {}) })
-    items.push(...result.items)
-    if (!result.nextCursor) break
-    cursor = result.nextCursor
-  }
-  return items
+/** Contacts over the API, for the paged lists and record caches (D136). */
+export const contactApi: RecordApi<Contact> = {
+  plural: "contacts",
+  list: (teamId, input) => call("contacts.list", { teamId, ...input }),
+  get: (teamId, id) => call("contacts.get", { teamId, contactId: id as ContactId }),
 }
 
-const EDITABLE: ReadonlyArray<keyof ContactFields> = [
+const EDITABLE: ReadonlyArray<keyof ContactFields & keyof Contact> = [
   "firstName",
   "lastName",
   "emails",
@@ -29,52 +22,80 @@ const EDITABLE: ReadonlyArray<keyof ContactFields> = [
   "socialProfiles",
 ]
 
-const fieldsOf = (changes: Partial<Contact>, original: Contact): ContactFields => {
+/** The fields that differ between two copies of a contact, as contacts.update takes them. */
+const fieldsOf = (next: Contact, original: Contact): ContactFields => {
   const fields: Record<string, unknown> = {}
-  for (const key of EDITABLE) if (key in changes) fields[key] = changes[key as keyof Contact]
+  for (const key of EDITABLE) {
+    if (JSON.stringify(next[key]) !== JSON.stringify(original[key])) fields[key] = next[key]
+  }
   // Custom values are a patch: send what changed, and null for what was cleared.
-  if (changes.custom) fields.custom = customPatch(original.custom, changes.custom)
+  const custom = customPatch(original.custom, next.custom)
+  if (Object.keys(custom).length > 0) fields.custom = custom
   return fields as ContactFields
 }
 
-const makeCollection = (teamId: TeamId, queryClient: QueryClient) =>
-  createCollection(
-    queryCollectionOptions({
-      id: `contacts:${teamId}`,
-      queryKey: ["contacts", teamId],
-      queryFn: () => loadAll(teamId),
-      queryClient,
-      getKey: (contact: Contact) => contact.id,
-      // Edits and deletes apply locally at once, then persist; a server error rolls them back (D53).
-      onUpdate: async ({ transaction }) => {
-        for (const mutation of transaction.mutations) {
-          await call("contacts.update", {
-            teamId,
-            contactId: mutation.key as ContactId,
-            ...fieldsOf(mutation.changes, mutation.original as Contact),
-          })
-        }
-      },
-      onDelete: async ({ transaction }) => {
-        for (const mutation of transaction.mutations) {
-          await call("contacts.delete", { teamId, contactId: mutation.key as ContactId })
-        }
-      },
-    }),
-  )
+export type ContactDraft = { -readonly [K in keyof Contact]: Contact[K] }
 
-export type ContactsCollection = ReturnType<typeof makeCollection>
-
-/** One collection per team, kept for the session. Client-side, keyed by TeamId. */
-const collections = new Map<TeamId, ContactsCollection>()
-
-export const contactsCollection = (teamId: TeamId, queryClient: QueryClient): ContactsCollection => {
-  let collection = collections.get(teamId)
-  if (!collection) {
-    collection = makeCollection(teamId, queryClient)
-    collections.set(teamId, collection)
+/**
+ * Saves a change to a contact: it shows everywhere at once and rolls back if the server refuses it
+ * (D53). Resolves to the server's copy.
+ */
+export const saveContact = async (
+  queryClient: QueryClient,
+  teamId: TeamId,
+  contact: Contact,
+  change: (draft: ContactDraft) => void,
+): Promise<Contact> => {
+  const draft = structuredClone(contact) as ContactDraft
+  change(draft)
+  const primary = draft.emails.find((email) => email.isPrimary)?.address ?? draft.emails[0]?.address
+  draft.displayName = displayNameOf(draft.firstName, draft.lastName, primary)
+  const fields = fieldsOf(draft, contact)
+  if (Object.keys(fields).length === 0) return contact
+  const undo = patchCached<Contact>(queryClient, "contacts", teamId, new Set([contact.id]), () => draft)
+  try {
+    const saved = await call("contacts.update", { teamId, contactId: contact.id, ...fields })
+    writeCached(queryClient, "contacts", teamId, saved)
+    return saved
+  } catch (failure) {
+    undo()
+    throw failure
   }
-  return collection
+}
+
+/** Puts a contact the server returned (after an avatar change, say) into every cached copy. */
+export const writeContact = (queryClient: QueryClient, teamId: TeamId, contact: Contact) =>
+  writeCached(queryClient, "contacts", teamId, contact)
+
+export const refreshContacts = (queryClient: QueryClient, teamId: TeamId) =>
+  refreshRecords(queryClient, "contacts", teamId)
+
+/**
+ * Deletes a selection (D137). Picked rows leave the lists at once; the result's deletedAt restores
+ * them with restoreContacts.
+ */
+export const deleteContacts = async (queryClient: QueryClient, teamId: TeamId, selection: Selection) => {
+  const undo =
+    "ids" in selection
+      ? patchCached<Contact>(queryClient, "contacts", teamId, new Set(selection.ids), () => undefined)
+      : () => {}
+  try {
+    return await call("contacts.deleteMany", { teamId, selection })
+  } catch (failure) {
+    undo()
+    throw failure
+  } finally {
+    void refreshContacts(queryClient, teamId)
+  }
+}
+
+export const restoreContacts = async (queryClient: QueryClient, teamId: TeamId, deletedAt: string) => {
+  try {
+    return await call("contacts.restoreMany", { teamId, deletedAt })
+  } finally {
+    void refreshContacts(queryClient, teamId)
+    void queryClient.invalidateQueries({ queryKey: ["contacts-deleted", teamId] })
+  }
 }
 
 export const initialsOf = (contact: Pick<Contact, "firstName" | "lastName" | "displayName">) => {

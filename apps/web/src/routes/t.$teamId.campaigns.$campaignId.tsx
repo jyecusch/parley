@@ -11,7 +11,6 @@ import {
   type TopicId,
   type UserId,
 } from "@parley/domain"
-import { useLiveQuery } from "@tanstack/react-db"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { createFileRoute, getRouteApi, Link, useNavigate } from "@tanstack/react-router"
 import { type ReactNode, useMemo, useState } from "react"
@@ -49,7 +48,6 @@ import {
 } from "../components/ui/index.ts"
 import { CAMPAIGN_STATUS_LABELS } from "../lib/campaigns.ts"
 import { call, messageOf } from "../lib/client.ts"
-import { contactsCollection } from "../lib/contacts.ts"
 import { absolute, ago } from "../lib/time.ts"
 
 export const Route = createFileRoute("/t/$teamId/campaigns/$campaignId")({ component: CampaignScreen })
@@ -132,14 +130,20 @@ function DraftEditor(props: {
   const [toast, setToast] = useState<string>()
   const segments = useQuery({ queryKey: ["segments", teamId], queryFn: () => call("segments.list", { teamId }) })
   const topics = useQuery({ queryKey: ["topics", teamId], queryFn: () => call("topics.list", { teamId }) })
-  const contacts = contactsCollection(teamId, queryClient)
-  const live = useLiveQuery((q) => q.from({ contact: contacts }), [contacts])
+  // Who to preview as: the first 50 of the chosen segment, else of the team (D136).
+  const previewPeople = useQuery({
+    queryKey: ["contacts", teamId, "preview-as", draft.segmentId ?? "team"],
+    queryFn: () =>
+      draft.segmentId
+        ? call("segments.contacts", { teamId, segmentId: draft.segmentId, limit: 50 })
+        : call("contacts.list", { teamId, limit: 50 }),
+  })
   const people = useMemo(
     () =>
-      ([...(live.data ?? [])] as Array<Contact>)
-        .sort((a, b) => a.displayName.localeCompare(b.displayName))
-        .slice(0, 300),
-    [live.data],
+      ([...(previewPeople.data?.items ?? [])] as Array<Contact>).sort((a, b) =>
+        a.displayName.localeCompare(b.displayName),
+      ),
+    [previewPeople.data],
   )
 
   const state = useAutosave(draft, fieldsOf(saved), async (value) => {

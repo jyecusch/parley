@@ -1,5 +1,6 @@
 import type {
   createAffiliation,
+  createManyAffiliations,
   deleteAffiliation,
   listAffiliations,
   OperationInput,
@@ -9,7 +10,7 @@ import { Effect } from "effect"
 import type { Principal } from "../principal.ts"
 import { proveAffiliationInTeam } from "../proofs/affiliation-in-team.ts"
 import { proveCompanyInTeam } from "../proofs/company-in-team.ts"
-import { proveContactInTeam } from "../proofs/contact-in-team.ts"
+import { forEachSelectedContact, proveContactInTeam } from "../proofs/contact-in-team.ts"
 import { proveMemberOf } from "../proofs/member-of.ts"
 import { proveCanReadRecords, proveCanWriteRecords } from "../proofs/permissions.ts"
 import { named } from "../proofs/proof.ts"
@@ -63,5 +64,21 @@ export const remove = (principal: Principal, input: OperationInput<typeof delete
       const canWrite = yield* proveCanWriteRecords(member)
       const target = yield* proveAffiliationInTeam(team, affiliation, canRead)
       return yield* affiliations.delete(target, canWrite)
+    }),
+  )
+
+/** Affiliates every selected contact with the company, a chunk at a time (D137). */
+export const createMany = (principal: Principal, input: OperationInput<typeof createManyAffiliations>) =>
+  named(principal, input.teamId, input.companyId, (principal, team, company) =>
+    Effect.gen(function* () {
+      const affiliations = yield* Affiliations
+      const member = yield* proveMemberOf(principal, team)
+      const canRead = yield* proveCanReadRecords(member)
+      const canWrite = yield* proveCanWriteRecords(member)
+      const companyInTeam = yield* proveCompanyInTeam(team, company, canRead)
+      const count = yield* forEachSelectedContact(team, input.contacts, canRead, (chunk) =>
+        affiliations.createMany(chunk, companyInTeam, input.title, canWrite),
+      )
+      return { count }
     }),
   )

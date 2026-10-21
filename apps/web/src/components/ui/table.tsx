@@ -1,4 +1,4 @@
-import type { HTMLAttributes, TdHTMLAttributes, ThHTMLAttributes } from "react"
+import type { HTMLAttributes, Ref, TdHTMLAttributes, ThHTMLAttributes } from "react"
 import { cn } from "./cn.ts"
 
 /**
@@ -81,7 +81,7 @@ export function TableScroll({
   padForBar,
   className,
   ...props
-}: HTMLAttributes<HTMLDivElement> & { padForBar?: boolean }) {
+}: HTMLAttributes<HTMLDivElement> & { padForBar?: boolean; ref?: Ref<HTMLDivElement> }) {
   return <div className={cn("min-h-0 flex-1 overflow-auto", padForBar && "pb-20", className)} {...props} />
 }
 

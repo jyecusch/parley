@@ -1,16 +1,21 @@
-import type {
-  contactActivity,
-  createContact,
-  deleteContact,
-  getContact,
-  listContacts,
-  OperationInput,
-  restoreContact,
-  updateContact,
+import {
+  type contactActivity,
+  type createContact,
+  type deleteContact,
+  type deleteManyContacts,
+  type getContact,
+  InputRejected,
+  type listContacts,
+  type OperationInput,
+  type restoreContact,
+  type restoreManyContacts,
+  type updateContact,
+  type updateManyContacts,
 } from "@parley/domain"
+import { userText } from "@parley/errors"
 import { Effect } from "effect"
 import type { Principal } from "../principal.ts"
-import { proveContactInTeam, proveContactRestorable } from "../proofs/contact-in-team.ts"
+import { forEachSelectedContact, proveContactInTeam, proveContactRestorable } from "../proofs/contact-in-team.ts"
 import { proveMemberOf } from "../proofs/member-of.ts"
 import {
   proveCanDeleteRecords,
@@ -21,6 +26,7 @@ import {
 import { named } from "../proofs/proof.ts"
 import { recordOwnerChange } from "../proofs/record-owner.ts"
 import { Contacts } from "../services/contacts.ts"
+import { CustomFields } from "../services/custom-fields.ts"
 
 export const list = (principal: Principal, input: OperationInput<typeof listContacts>) =>
   named(principal, input.teamId, (principal, team) =>
@@ -103,5 +109,69 @@ export const activity = (principal: Principal, input: OperationInput<typeof cont
       const canRead = yield* proveCanReadRecords(member)
       const target = yield* proveContactInTeam(team, contact, canRead)
       return yield* contacts.activity(target)
+    }),
+  )
+
+/** A deletedAt from contacts.deleteMany, or InputRejected. */
+const deletedAtOf = (text: string) => {
+  const deletedAt = new Date(text)
+  return Number.isNaN(deletedAt.getTime())
+    ? Effect.fail(
+        new InputRejected({
+          problems: [
+            {
+              field: "deletedAt",
+              problem: "invalid-format",
+              userMessage: userText`Give the deletedAt that contacts.deleteMany returned.`,
+            },
+          ],
+        }),
+      )
+    : Effect.succeed(deletedAt)
+}
+
+export const updateMany = (principal: Principal, input: OperationInput<typeof updateManyContacts>) =>
+  named(principal, input.teamId, (principal, team) =>
+    Effect.gen(function* () {
+      const contacts = yield* Contacts
+      const customFields = yield* CustomFields
+      const member = yield* proveMemberOf(principal, team)
+      const canRead = yield* proveCanReadRecords(member)
+      const canWrite = yield* proveCanWriteRecords(member)
+      const owner = yield* recordOwnerChange(member, input.ownerId)
+      // Bad values are refused before anything changes, even when nothing matches.
+      if (input.custom) yield* customFields.apply(team.value, "contact", {}, input.custom)
+      const count = yield* forEachSelectedContact(team, input.selection, canRead, (chunk) =>
+        contacts.updateMany(chunk, { custom: input.custom, owner }, canWrite),
+      )
+      return { count }
+    }),
+  )
+
+export const deleteMany = (principal: Principal, input: OperationInput<typeof deleteManyContacts>) =>
+  named(principal, input.teamId, (principal, team) =>
+    Effect.gen(function* () {
+      const contacts = yield* Contacts
+      const member = yield* proveMemberOf(principal, team)
+      const canRead = yield* proveCanReadRecords(member)
+      const canDelete = yield* proveCanDeleteRecords(member)
+      // One timestamp for every record, so restoreMany brings back exactly these (D137).
+      const deletedAt = new Date()
+      const count = yield* forEachSelectedContact(team, input.selection, canRead, (chunk) =>
+        contacts.deleteMany(chunk, deletedAt, canDelete),
+      )
+      return { count, deletedAt: deletedAt.toISOString() }
+    }),
+  )
+
+export const restoreMany = (principal: Principal, input: OperationInput<typeof restoreManyContacts>) =>
+  named(principal, input.teamId, (principal, team) =>
+    Effect.gen(function* () {
+      const contacts = yield* Contacts
+      const member = yield* proveMemberOf(principal, team)
+      yield* proveCanReadRecords(member)
+      const canDelete = yield* proveCanDeleteRecords(member)
+      const deletedAt = yield* deletedAtOf(input.deletedAt)
+      return { count: yield* contacts.restoreMany(team, deletedAt, canDelete) }
     }),
   )

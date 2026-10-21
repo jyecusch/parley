@@ -25,6 +25,7 @@ export type ImportResult = typeof ImportResult.Type
 
 const exportInput = Schema.Struct({
   ...InTeam,
+  search: Schema.optional(Schema.String.check(Schema.isMaxLength(200)).annotate({ title: "Search" })),
   filter: Schema.optional(Filter),
   ids: Schema.optional(
     Schema.Array(Schema.String)

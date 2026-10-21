@@ -1,11 +1,11 @@
 import type { Affiliation, Company, CompanyId, Contact, ContactAffiliation, ContactId, TeamId } from "@parley/domain"
-import { useLiveQuery } from "@tanstack/react-db"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react"
 import { call, messageOf } from "../lib/client.ts"
-import { companiesCollection, primaryDomainOf } from "../lib/companies.ts"
-import { contactsCollection } from "../lib/contacts.ts"
+import { companyApi, primaryDomainOf, refreshCompanies } from "../lib/companies.ts"
+import { contactApi, refreshContacts } from "../lib/contacts.ts"
+import { useRecordSearch } from "../lib/records.ts"
 import { CloseIcon, PlusIcon, SearchIcon } from "./icons.tsx"
 import { initialsOfName } from "./record.tsx"
 import { Dialog } from "./settings.tsx"
@@ -43,8 +43,8 @@ const useRefreshAfterChange = (teamId: TeamId) => {
   const queryClient = useQueryClient()
   return async () => {
     await Promise.all([
-      contactsCollection(teamId, queryClient).utils.refetch(),
-      companiesCollection(teamId, queryClient).utils.refetch(),
+      refreshContacts(queryClient, teamId),
+      refreshCompanies(queryClient, teamId),
       queryClient.invalidateQueries({ queryKey: ["affiliations", teamId] }),
       queryClient.invalidateQueries({ queryKey: ["contact-activity", teamId] }),
       queryClient.invalidateQueries({ queryKey: ["company-activity", teamId] }),
@@ -167,6 +167,8 @@ export function Picker(props: {
   readonly onClose: () => void
   /** Where it opens, relative to the positioned element around it. Defaults to below, from the right. */
   readonly placement?: string
+  /** For items searched on the server (D136): gets what's typed, and `items` are taken as matches. */
+  readonly onQueryChange?: (query: string) => void
 }) {
   const [query, setQuery] = useState("")
   const [active, setActive] = useState(0)
@@ -180,9 +182,11 @@ export function Picker(props: {
     return () => document.removeEventListener("pointerdown", onPointer)
   }, [onClose])
   const q = query.trim().toLowerCase()
-  const matches = props.items
-    .filter((item) => !q || item.name.toLowerCase().includes(q) || item.sub?.toLowerCase().includes(q))
-    .slice(0, 8)
+  const matches = (
+    props.onQueryChange
+      ? props.items
+      : props.items.filter((item) => !q || item.name.toLowerCase().includes(q) || item.sub?.toLowerCase().includes(q))
+  ).slice(0, 8)
   const canCreate = props.onCreate !== undefined && query.trim() !== ""
   const total = matches.length + (canCreate ? 1 : 0)
   const choose = (index: number) => {
@@ -202,6 +206,7 @@ export function Picker(props: {
           value={query}
           onChange={(event) => {
             setQuery(event.target.value)
+            props.onQueryChange?.(event.target.value)
             setActive(0)
           }}
           onKeyDown={(event) => {
@@ -262,11 +267,10 @@ export function ContactCompanies(props: {
   readonly onToast: (toast: ToastRequest) => void
 }) {
   const { contact, teamId } = props
-  const queryClient = useQueryClient()
   const refresh = useRefreshAfterChange(teamId)
-  const companies = companiesCollection(teamId, queryClient)
-  const all = useLiveQuery((q) => q.from({ company: companies }), [companies])
   const [picking, setPicking] = useState(false)
+  const [query, setQuery] = useState("")
+  const found = useRecordSearch(companyApi, teamId, query, { enabled: picking })
   const [editing, setEditing] = useState<string>()
 
   const affiliate = async (companyId: CompanyId, title: string | null) => {
@@ -285,9 +289,8 @@ export function ContactCompanies(props: {
 
   const items = useMemo(() => {
     const linked = new Set(contact.affiliations.map((affiliation) => affiliation.companyId))
-    return [...(all.data ?? [])]
+    return found.items
       .filter((company: Company) => !linked.has(company.id))
-      .sort((a, b) => a.name.localeCompare(b.name))
       .map(
         (company): PickerItem => ({
           id: company.id,
@@ -296,7 +299,7 @@ export function ContactCompanies(props: {
           avatar: <Avatar shape="square">{initialsOfName(company.name)}</Avatar>,
         }),
       )
-  }, [all.data, contact.affiliations])
+  }, [found.items, contact.affiliations])
 
   return (
     <Section className="relative">
@@ -382,6 +385,7 @@ export function ContactCompanies(props: {
           placeholder="Search companies…"
           heading="Companies"
           items={items}
+          onQueryChange={setQuery}
           onClose={() => setPicking(false)}
           onPick={(id) => {
             setPicking(false)
@@ -408,11 +412,10 @@ export function CompanyContacts(props: {
   readonly onToast: (toast: ToastRequest) => void
 }) {
   const { company, teamId } = props
-  const queryClient = useQueryClient()
   const refresh = useRefreshAfterChange(teamId)
-  const contacts = contactsCollection(teamId, queryClient)
-  const all = useLiveQuery((q) => q.from({ contact: contacts }), [contacts])
   const [picking, setPicking] = useState(false)
+  const [query, setQuery] = useState("")
+  const found = useRecordSearch(contactApi, teamId, query, { enabled: picking })
   const affiliations = useQuery({
     queryKey: ["affiliations", teamId, company.id, company.contactCount],
     queryFn: () => call("affiliations.list", { teamId, companyId: company.id }),
@@ -435,9 +438,8 @@ export function CompanyContacts(props: {
   const rows = affiliations.data ?? []
   const items = useMemo(() => {
     const linked = new Set(rows.map((affiliation) => affiliation.contactId as string))
-    return [...(all.data ?? [])]
+    return found.items
       .filter((contact: Contact) => !linked.has(contact.id))
-      .sort((a, b) => a.displayName.localeCompare(b.displayName))
       .map(
         (contact): PickerItem => ({
           id: contact.id,
@@ -446,7 +448,7 @@ export function CompanyContacts(props: {
           avatar: <Avatar>{initialsOfName(contact.displayName)}</Avatar>,
         }),
       )
-  }, [all.data, rows])
+  }, [found.items, rows])
 
   return (
     <Section className="relative">
@@ -505,6 +507,7 @@ export function CompanyContacts(props: {
           placeholder="Search contacts…"
           heading="Contacts"
           items={items}
+          onQueryChange={setQuery}
           onClose={() => setPicking(false)}
           onPick={(id) => {
             setPicking(false)
@@ -590,19 +593,20 @@ const PencilIcon = () => (
 
 /** Bulk "affiliate with a company" for selected contacts (D71). */
 export function AffiliateDialog(props: {
+  readonly teamId: TeamId
   readonly count: number
-  readonly companies: ReadonlyArray<{ readonly id: string; readonly label: string }>
   readonly onApply: (companyId: string, title: string | null) => Promise<void>
   readonly onClose: () => void
 }) {
   const [query, setQuery] = useState("")
   const [companyId, setCompanyId] = useState<string>()
   const [title, setTitle] = useState("")
-  const q = query.trim().toLowerCase()
-  const matches = props.companies.filter((company) => !q || company.label.toLowerCase().includes(q)).slice(0, 50)
+  // Searched on the server as you type (D136).
+  const found = useRecordSearch(companyApi, props.teamId, query, { limit: 50 })
+  const matches = found.items.map((company) => ({ id: company.id as string, label: company.name }))
   return (
     <Dialog
-      title={`Add ${props.count} ${props.count === 1 ? "contact" : "contacts"} to a company`}
+      title={`Add ${props.count.toLocaleString()} ${props.count === 1 ? "contact" : "contacts"} to a company`}
       onClose={props.onClose}
       footer={
         <>
@@ -628,7 +632,7 @@ export function AffiliateDialog(props: {
           onChange={(event) => setQuery(event.target.value)}
         />
         <Box className="max-h-60 overflow-auto p-1">
-          {matches.length === 0 ? <Hint className="p-1.5">No companies match.</Hint> : null}
+          {matches.length === 0 && !found.isSearching ? <Hint className="p-1.5">No companies match.</Hint> : null}
           {matches.map((company) => (
             <PopoverItem key={company.id} active={companyId === company.id} onClick={() => setCompanyId(company.id)}>
               <Avatar shape="square">{initialsOfName(company.label)}</Avatar>

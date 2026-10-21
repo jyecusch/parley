@@ -6,6 +6,7 @@ import { ContactNotFound } from "../errors/contacts.ts"
 import { Filter } from "../filter.ts"
 import { ContactId, SegmentId, TeamId } from "../ids.ts"
 import { defineTeamOperation } from "../operation.ts"
+import { Matching } from "../selection.ts"
 
 const InTeam = { teamId: TeamId.annotate({ description: "The team, from teams.list." }) }
 const OneSegment = {
@@ -100,8 +101,13 @@ export const listSegmentContacts = defineTeamOperation({
 
 export const addSegmentContacts = defineTeamOperation({
   name: "segments.addContacts",
-  description: "Add contacts to a fixed segment. Contacts already in it are left as they are.",
-  input: Schema.Struct({ ...OneSegment, contactIds: ContactIds }),
+  description:
+    "Add contacts to a fixed segment: contactIds, or every contact matching a search and filter (D137). Give one or the other. Contacts already in it are left as they are.",
+  input: Schema.Struct({
+    ...OneSegment,
+    contactIds: Schema.optional(ContactIds),
+    matching: Schema.optional(Matching),
+  }),
   output: Segment,
   errors: [SegmentNotFound, SegmentIsDynamic, ContactNotFound],
   http: { method: "POST", path: "/teams/:teamId/segments/:segmentId/contacts" },

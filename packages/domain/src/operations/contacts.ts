@@ -5,6 +5,7 @@ import { MemberNotFound } from "../errors/members.ts"
 import { Filter, Sort } from "../filter.ts"
 import { ContactId, TeamId } from "../ids.ts"
 import { defineTeamOperation } from "../operation.ts"
+import { DeletedSelection, Selection, SelectionResult } from "../selection.ts"
 
 const InTeam = { teamId: TeamId.annotate({ description: "The team, from teams.list." }) }
 const OneContact = { ...InTeam, contactId: ContactId.annotate({ description: "The contact's id." }) }
@@ -101,4 +102,55 @@ export const contactActivity = defineTeamOperation({
   http: { method: "GET", path: "/teams/:teamId/contacts/:contactId/activity" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: ["records:read"],
+})
+
+const contactSelection = {
+  ...InTeam,
+  selection: Selection.annotate({
+    description:
+      'The contacts: {"ids":[...]} with up to 1,000 ids, or {"matching":{"search":"...","filter":{...}}} for every contact contacts.list would return for that search and filter.',
+  }),
+}
+
+export const updateManyContacts = defineTeamOperation({
+  name: "contacts.updateMany",
+  description:
+    "Set the same custom field values or contact owner on many contacts at once (D137): picked ids, or every contact matching a search and filter. Only the fields you send change.",
+  input: Schema.Struct({
+    ...contactSelection,
+    custom: Schema.optional(ContactFields.fields.custom),
+    ownerId: ContactFields.fields.ownerId,
+  }),
+  output: SelectionResult,
+  errors: [MemberNotFound],
+  http: { method: "POST", path: "/teams/:teamId/contacts/update-many" },
+  hints: { readOnly: false, destructive: true, idempotent: true },
+  permissions: ["records:read", "records:write"],
+})
+
+export const deleteManyContacts = defineTeamOperation({
+  name: "contacts.deleteMany",
+  description:
+    "Delete many contacts at once (D137): picked ids, or every contact matching a search and filter. They can be restored together with contacts.restoreMany and the deletedAt this returns, for 30 days.",
+  input: Schema.Struct(contactSelection),
+  output: DeletedSelection,
+  errors: [],
+  http: { method: "POST", path: "/teams/:teamId/contacts/delete-many" },
+  hints: { readOnly: false, destructive: true, idempotent: false },
+  permissions: ["records:read", "records:delete"],
+})
+
+export const restoreManyContacts = defineTeamOperation({
+  name: "contacts.restoreMany",
+  description:
+    "Restore the contacts one contacts.deleteMany deleted, by the deletedAt it returned. Contacts that can't be restored (purged, or whose emails were taken since) are left deleted and not counted.",
+  input: Schema.Struct({
+    ...InTeam,
+    deletedAt: Schema.String.annotate({ description: "The deletedAt contacts.deleteMany returned." }),
+  }),
+  output: SelectionResult,
+  errors: [],
+  http: { method: "POST", path: "/teams/:teamId/contacts/restore-many" },
+  hints: { readOnly: false, destructive: false, idempotent: true },
+  permissions: ["records:read", "records:delete"],
 })

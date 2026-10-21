@@ -6,22 +6,26 @@ import {
   type ContactFields,
   type ContactId,
   type ContactPage,
+  type CustomValues,
+  type CustomValuesPatch,
   type DatabaseUnavailable,
   type FieldProblem,
   type Filter,
   filterFields,
   InputRejected,
+  type Matching,
   type PostalAddress,
+  type Selection,
   type Sort,
   type TeamId,
   type UserId,
 } from "@parley/domain"
 import { DisplayName, EchoedInput, userText } from "@parley/errors"
-import { and, asc, desc, eq, exists, ilike, inArray, isNotNull, isNull, ne, or, type SQL, sql } from "drizzle-orm"
+import { and, asc, desc, eq, ilike, inArray, isNotNull, isNull, ne, or, type SQL, sql } from "drizzle-orm"
 import { Context, Effect, Layer } from "effect"
 import type { SqlError } from "effect/sql"
 import type { Principal } from "../principal.ts"
-import type { ContactInTeam, ContactRestorable } from "../proofs/contact-in-team.ts"
+import type { ContactInTeam, ContactRestorable, ContactsInTeam } from "../proofs/contact-in-team.ts"
 import type { CanDeleteRecords, CanManageEmail, CanReadRecords, CanWriteRecords } from "../proofs/permissions.ts"
 import type { Named } from "../proofs/proof.ts"
 import type { RecordOwnerChange } from "../proofs/record-owner.ts"
@@ -51,6 +55,18 @@ export interface ContactScope {
   readonly where: SQL
 }
 
+/**
+ * The live contacts in team T a selection covers (D137), as a condition. Made by `selection`;
+ * read a chunk at a time with `selectChunk`.
+ */
+export interface ContactSelection<T> {
+  readonly team: Named<T, TeamId>
+  readonly where: SQL
+}
+
+/** How many records an action on a selection handles at once (D137). */
+export const SELECTION_CHUNK = 1000
+
 /** Which contacts a lookup may find: live ones, or deleted ones still inside the restore window. */
 export type ContactState = "live" | "restorable"
 
@@ -61,6 +77,23 @@ export interface LocatedContact {
 }
 
 const EMAILS_KEY = "contact_emails_team_id_address_key"
+
+/** Contacts whose name or any email contains the search, case-insensitively. Undefined for no search. */
+const searchSql = (search: string | undefined): SQL | undefined => {
+  const trimmed = search?.trim()
+  if (!trimmed) return undefined
+  const pattern = `%${trimmed.replace(/[\\%_]/g, (c) => `\\${c}`)}%`
+  return or(
+    ilike(sql`coalesce(${schema.contacts.firstName}, '') || ' ' || coalesce(${schema.contacts.lastName}, '')`, pattern),
+    sql`exists (select 1 from ${schema.contactEmails} where ${schema.contactEmails.contactId} = ${schema.contacts.id} and ${schema.contactEmails.address} ilike ${pattern})`,
+  )
+}
+
+/** Deleted contacts that can still be restored. */
+const restorableSql = and(
+  isNotNull(schema.contacts.deletedAt),
+  sql`${schema.contacts.deletedAt} > now() - make_interval(days => ${RESTORE_WINDOW_DAYS})`,
+)
 
 const displayNameOf = (firstName: string | null, lastName: string | null, primaryEmail: string | undefined) =>
   [firstName, lastName].filter(Boolean).join(" ") || primaryEmail || "Unnamed contact"
@@ -171,6 +204,38 @@ export class Contacts extends Context.Service<
       access: CanReadRecords<P, T>,
       within?: ContactScope,
     ) => Effect.Effect<ContactPage, InputRejected | DatabaseUnavailable>
+    /** The contacts a selection covers (D137). Fails on a filter the list would refuse. */
+    readonly selection: <P, T>(
+      team: Named<T, TeamId>,
+      selection: Selection,
+      access: CanReadRecords<P, T>,
+    ) => Effect.Effect<ContactSelection<T>, InputRejected | DatabaseUnavailable>
+    /** Used only by the ContactsInTeam prover: the next ids of a selection, in id order, after `after`. */
+    readonly selectChunk: <T>(
+      selection: ContactSelection<T>,
+      after: ContactId | undefined,
+    ) => Effect.Effect<ReadonlyArray<ContactId>, DatabaseUnavailable>
+    /**
+     * Sets custom field values (as a patch, like update) and the record owner on many contacts.
+     * Returns how many live contacts it looked at.
+     */
+    readonly updateMany: <P, T>(
+      contacts: ContactsInTeam<T>,
+      change: { readonly custom?: CustomValuesPatch | undefined; readonly owner?: RecordOwnerChange<T> },
+      access: CanWriteRecords<P, T>,
+    ) => Effect.Effect<number, InputRejected | DatabaseUnavailable>
+    /** Deletes many contacts with one shared `deletedAt`, so restoreMany can bring back exactly those. */
+    readonly deleteMany: <P, T>(
+      contacts: ContactsInTeam<T>,
+      deletedAt: Date,
+      access: CanDeleteRecords<P, T>,
+    ) => Effect.Effect<number, DatabaseUnavailable>
+    /** Restores the contacts deleted at `deletedAt` that can be; returns how many. */
+    readonly restoreMany: <P, T>(
+      team: Named<T, TeamId>,
+      deletedAt: Date,
+      access: CanDeleteRecords<P, T>,
+    ) => Effect.Effect<number, DatabaseUnavailable>
     /** Used only by the ContactsInTeam prover: which of these ids are live contacts in the team. */
     readonly locateMany: <P, T>(
       team: Named<T, TeamId>,
@@ -457,60 +522,44 @@ export class Contacts extends Context.Service<
           const fields = query.filter
             ? yield* checkFilter("contact", query.filter, custom)
             : filterFields("contact", custom)
-          const filtered = query.filter ? filterSql("contact", query.filter, fields) : undefined
+          const matching = and(
+            eq(schema.contacts.teamId, team.value),
+            query.filter ? filterSql("contact", query.filter, fields) : undefined,
+            within?.where,
+            query.deleted ? restorableSql : isNull(schema.contacts.deletedAt),
+            searchSql(query.search),
+          )
           // A custom sort pages by position; the default sort pages by (updated, id).
           const offset = query.sort ? decodeOffset(query.cursor) : 0
           const cursor = !query.sort && query.cursor ? decodeCursor(query.cursor) : undefined
-          const search = query.search?.trim()
-          const pattern = search ? `%${search.replace(/[\\%_]/g, (c) => `\\${c}`)}%` : undefined
-          const rows = yield* run(
-            db.query((d) =>
-              d
-                .select({ id: schema.contacts.id, updatedAt: schema.contacts.updatedAt })
-                .from(schema.contacts)
-                .where(
-                  and(
-                    eq(schema.contacts.teamId, team.value),
-                    filtered,
-                    within?.where,
-                    query.deleted
-                      ? and(
-                          isNotNull(schema.contacts.deletedAt),
-                          sql`${schema.contacts.deletedAt} > now() - make_interval(days => ${RESTORE_WINDOW_DAYS})`,
-                        )
-                      : isNull(schema.contacts.deletedAt),
-                    cursor
-                      ? sql`(${schema.contacts.updatedAt}, ${schema.contacts.id}) < (${cursor.updatedAt.toISOString()}::timestamptz, ${cursor.id}::uuid)`
-                      : undefined,
-                    pattern
-                      ? or(
-                          ilike(
-                            sql`coalesce(${schema.contacts.firstName}, '') || ' ' || coalesce(${schema.contacts.lastName}, '')`,
-                            pattern,
-                          ),
-                          exists(
-                            d
-                              .select({ one: sql`1` })
-                              .from(schema.contactEmails)
-                              .where(
-                                and(
-                                  eq(schema.contactEmails.contactId, schema.contacts.id),
-                                  ilike(schema.contactEmails.address, pattern),
-                                ),
-                              ),
-                          ),
-                        )
-                      : undefined,
-                  ),
-                )
-                .orderBy(
-                  ...(query.sort
-                    ? [sortSql("contact", query.sort, fields)]
-                    : [desc(schema.contacts.updatedAt), desc(schema.contacts.id)]),
-                )
-                .limit(limit + 1)
-                .offset(offset),
-            ),
+          const [rows, total] = yield* Effect.all(
+            [
+              run(
+                db.query((d) =>
+                  d
+                    .select({ id: schema.contacts.id, updatedAt: schema.contacts.updatedAt })
+                    .from(schema.contacts)
+                    .where(
+                      and(
+                        matching,
+                        cursor
+                          ? sql`(${schema.contacts.updatedAt}, ${schema.contacts.id}) < (${cursor.updatedAt.toISOString()}::timestamptz, ${cursor.id}::uuid)`
+                          : undefined,
+                      ),
+                    )
+                    .orderBy(
+                      ...(query.sort
+                        ? [sortSql("contact", query.sort, fields)]
+                        : [desc(schema.contacts.updatedAt), desc(schema.contacts.id)]),
+                    )
+                    .limit(limit + 1)
+                    .offset(offset),
+                ),
+              ),
+              // Only the first page counts (D136): later pages would count the same again.
+              query.cursor ? Effect.succeed(null) : count(matching),
+            ],
+            { concurrency: 2 },
           )
           const page = rows.slice(0, limit)
           const last = page[page.length - 1]
@@ -526,8 +575,299 @@ export class Contacts extends Context.Service<
                 ? encodeOffset(offset + limit)
                 : encodeCursor(last.updatedAt, last.id)
               : null,
+            total,
           }
         })
+
+      const count = (where: SQL | undefined) =>
+        Effect.map(
+          run(db.query((d) => d.select({ count: sql<number>`count(*)::int` }).from(schema.contacts).where(where))),
+          ([row]) => row?.count ?? 0,
+        )
+
+      /** Live contacts matching a search and filter, as the list would find them (D137). */
+      const matchingWhere = (teamId: TeamId, matching: Matching) =>
+        Effect.gen(function* () {
+          const filter = matching.filter
+          const filtered = filter
+            ? filterSql(
+                "contact",
+                filter,
+                yield* checkFilter("contact", filter, yield* customFields.ofTeam(teamId, "contact")),
+              )
+            : undefined
+          return (
+            and(
+              eq(schema.contacts.teamId, teamId),
+              isNull(schema.contacts.deletedAt),
+              filtered,
+              searchSql(matching.search),
+            ) ?? sql`false`
+          )
+        })
+
+      const selection = <P, T>(team: Named<T, TeamId>, selected: Selection, _access: CanReadRecords<P, T>) => {
+        if (!("ids" in selected)) {
+          return Effect.map(
+            matchingWhere(team.value, selected.matching),
+            (where): ContactSelection<T> => ({ team, where }),
+          )
+        }
+        // Ids that aren't uuids can't be contacts; leaving them out keeps them away from the query.
+        const ids = selected.ids.filter((id) => UUID.test(id))
+        const where =
+          ids.length === 0
+            ? sql`false`
+            : (and(
+                eq(schema.contacts.teamId, team.value),
+                isNull(schema.contacts.deletedAt),
+                inArray(schema.contacts.id, ids),
+              ) ?? sql`false`)
+        return Effect.succeed<ContactSelection<T>>({ team, where })
+      }
+
+      const selectChunk = <T>(selected: ContactSelection<T>, after: ContactId | undefined) =>
+        Effect.map(
+          run(
+            db.query((d) =>
+              d
+                .select({ id: schema.contacts.id })
+                .from(schema.contacts)
+                .where(and(selected.where, after ? sql`${schema.contacts.id} > ${after}::uuid` : undefined))
+                .orderBy(asc(schema.contacts.id))
+                .limit(SELECTION_CHUNK),
+            ),
+          ),
+          (rows) => rows.map((row) => row.id as ContactId),
+        )
+
+      const updateMany = <P, T>(
+        chunk: ContactsInTeam<T>,
+        change: { readonly custom?: CustomValuesPatch | undefined; readonly owner?: RecordOwnerChange<T> },
+        access: CanWriteRecords<P, T>,
+      ) =>
+        Effect.gen(function* () {
+          const teamId = chunk.team.value
+          if (chunk.contactIds.length === 0) return 0
+          const patch = change.custom ?? {}
+          const patched = Object.keys(patch)
+          // Checks the values as contacts.update would; `values` then holds the ones being set.
+          const applied = yield* customFields.apply(teamId, "contact", {}, patch)
+          const cleared = patched.filter((fieldId) => !(fieldId in applied.values))
+          const nameOf = new Map(
+            patched.length > 0
+              ? (yield* customFields.ofTeam(teamId, "contact")).map((field) => [field.id as string, field.name])
+              : [],
+          )
+          const ownerId = change.owner === undefined ? undefined : (change.owner?.userId ?? null)
+          const rows = yield* run(
+            db.query((d) =>
+              d
+                .select({ id: schema.contacts.id, custom: schema.contacts.custom, ownerId: schema.contacts.ownerId })
+                .from(schema.contacts)
+                .where(
+                  and(
+                    eq(schema.contacts.teamId, teamId),
+                    inArray(schema.contacts.id, [...chunk.contactIds]),
+                    isNull(schema.contacts.deletedAt),
+                  ),
+                ),
+            ),
+          )
+          const changes = rows.flatMap((row) => {
+            const current = row.custom as CustomValues
+            const changed = [
+              ...patched
+                .filter((fieldId) =>
+                  fieldId in applied.values
+                    ? JSON.stringify(current[fieldId]) !== JSON.stringify(applied.values[fieldId])
+                    : fieldId in current,
+                )
+                .map((fieldId) => nameOf.get(fieldId) ?? fieldId),
+              ...(ownerId !== undefined && ownerId !== row.ownerId ? ["ownerId"] : []),
+            ]
+            return changed.length > 0 ? [{ id: row.id, changed }] : []
+          })
+          if (changes.length === 0) return rows.length
+          const principal = access.member.principal.value
+          const kept =
+            cleared.length > 0
+              ? sql`(${schema.contacts.custom} - array[${sql.join(
+                  cleared.map((fieldId) => sql`${fieldId}`),
+                  sql`, `,
+                )}]::text[])`
+              : sql`${schema.contacts.custom}`
+          yield* run(
+            db.transaction(
+              Effect.gen(function* () {
+                yield* db.query((d) =>
+                  d
+                    .update(schema.contacts)
+                    .set({
+                      ...(patched.length > 0
+                        ? { custom: sql`${kept} || ${JSON.stringify(applied.values)}::jsonb` }
+                        : {}),
+                      ...(ownerId !== undefined ? { ownerId } : {}),
+                      updatedAt: sql`now()`,
+                    })
+                    .where(
+                      and(
+                        eq(schema.contacts.teamId, teamId),
+                        inArray(
+                          schema.contacts.id,
+                          changes.map((entry) => entry.id),
+                        ),
+                      ),
+                    ),
+                )
+                yield* db.query((d) =>
+                  d.insert(schema.activity).values(
+                    changes.map((entry) =>
+                      activityRow(principal, {
+                        teamId,
+                        recordType: "contact",
+                        recordId: entry.id,
+                        kind: "updated",
+                        changedFields: entry.changed,
+                      }),
+                    ),
+                  ),
+                )
+              }),
+            ),
+          )
+          return rows.length
+        }).pipe(Effect.withSpan("Contacts.updateMany"))
+
+      const deleteMany = <P, T>(chunk: ContactsInTeam<T>, deletedAt: Date, access: CanDeleteRecords<P, T>) =>
+        Effect.gen(function* () {
+          const teamId = chunk.team.value
+          if (chunk.contactIds.length === 0) return 0
+          const principal = access.member.principal.value
+          return yield* run(
+            db.transaction(
+              Effect.gen(function* () {
+                const deleted = yield* db.query((d) =>
+                  d
+                    .update(schema.contacts)
+                    .set({ deletedAt, updatedAt: sql`now()` })
+                    .where(
+                      and(
+                        eq(schema.contacts.teamId, teamId),
+                        inArray(schema.contacts.id, [...chunk.contactIds]),
+                        isNull(schema.contacts.deletedAt),
+                      ),
+                    )
+                    .returning({ id: schema.contacts.id }),
+                )
+                if (deleted.length === 0) return 0
+                const ids = deleted.map((row) => row.id)
+                yield* db.query((d) =>
+                  d
+                    .update(schema.contactEmails)
+                    .set({ active: false })
+                    .where(inArray(schema.contactEmails.contactId, ids)),
+                )
+                yield* db.query((d) =>
+                  d.insert(schema.activity).values(
+                    ids.map((id) =>
+                      activityRow(principal, {
+                        teamId,
+                        recordType: "contact",
+                        recordId: id,
+                        kind: "deleted",
+                        changedFields: [],
+                      }),
+                    ),
+                  ),
+                )
+                return deleted.length
+              }),
+            ),
+          )
+        }).pipe(Effect.withSpan("Contacts.deleteMany"))
+
+      const restoreMany = <P, T>(team: Named<T, TeamId>, deletedAt: Date, access: CanDeleteRecords<P, T>) =>
+        Effect.gen(function* () {
+          const teamId = team.value
+          const principal = access.member.principal.value
+          let restored = 0
+          let after: string | undefined
+          for (;;) {
+            const chunk = yield* run(
+              db.query((d) =>
+                d
+                  .select({ id: schema.contacts.id })
+                  .from(schema.contacts)
+                  .where(
+                    and(
+                      eq(schema.contacts.teamId, teamId),
+                      eq(schema.contacts.deletedAt, deletedAt),
+                      restorableSql,
+                      after ? sql`${schema.contacts.id} > ${after}::uuid` : undefined,
+                    ),
+                  )
+                  .orderBy(asc(schema.contacts.id))
+                  .limit(SELECTION_CHUNK),
+              ),
+            )
+            const last = chunk[chunk.length - 1]
+            if (!last) return restored
+            after = last.id
+            const ids = chunk.map((row) => row.id)
+            // A contact whose email another contact has taken since stays deleted, as contacts.restore refuses it.
+            const blocked = yield* run(
+              db.query((d) =>
+                d
+                  .selectDistinct({ contactId: schema.contactEmails.contactId })
+                  .from(schema.contactEmails)
+                  .where(
+                    and(
+                      inArray(schema.contactEmails.contactId, ids),
+                      sql`exists (select 1 from ${schema.contactEmails} taken where taken.team_id = ${teamId} and taken.active and taken.address = ${schema.contactEmails.address})`,
+                    ),
+                  ),
+              ),
+            )
+            const skip = new Set(blocked.map((row) => row.contactId))
+            const restorable = ids.filter((id) => !skip.has(id))
+            if (restorable.length > 0) {
+              yield* run(
+                db.transaction(
+                  Effect.gen(function* () {
+                    yield* db.query((d) =>
+                      d
+                        .update(schema.contacts)
+                        .set({ deletedAt: null, updatedAt: sql`now()` })
+                        .where(and(eq(schema.contacts.teamId, teamId), inArray(schema.contacts.id, restorable))),
+                    )
+                    yield* db.query((d) =>
+                      d
+                        .update(schema.contactEmails)
+                        .set({ active: true })
+                        .where(inArray(schema.contactEmails.contactId, restorable)),
+                    )
+                    yield* db.query((d) =>
+                      d.insert(schema.activity).values(
+                        restorable.map((id) =>
+                          activityRow(principal, {
+                            teamId,
+                            recordType: "contact",
+                            recordId: id,
+                            kind: "restored",
+                            changedFields: [],
+                          }),
+                        ),
+                      ),
+                    )
+                  }),
+                ),
+              )
+            }
+            restored += restorable.length
+            if (chunk.length < SELECTION_CHUNK) return restored
+          }
+        }).pipe(Effect.withSpan("Contacts.restoreMany"))
 
       const locate = <P, T>(
         team: Named<T, TeamId>,
@@ -850,6 +1190,11 @@ export class Contacts extends Context.Service<
 
       return {
         list,
+        selection,
+        selectChunk,
+        updateMany,
+        deleteMany,
+        restoreMany,
         locateMany,
         matchEmails,
         locate,

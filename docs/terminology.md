@@ -6,7 +6,7 @@ Every concept in Parley has exactly one name. It is used in code, docs, UI copy,
 
 How to pick a name: choose the most common name for the concept. Reject anything vague, or anything that overlaps with another term here, with a concept our users already have (a CRM user thinks "organization" means a customer), or with a term from our stack (Effect, TanStack, Better-Auth, MCP).
 
-**Third-party names stay third-party.** Better-Auth's `organization`, Effect's `Scope`, TanStack DB's `collection` and MCP's `tool` are used *only* when talking about that library's API, never as Parley concepts.
+**Third-party names stay third-party.** Better-Auth's `organization`, Effect's `Scope`, a library's `collection` and MCP's `tool` are used *only* when talking about that library's API, never as Parley concepts.
 
 ---
 
@@ -92,7 +92,7 @@ How to pick a name: choose the most common name for the concept. Reject anything
 | --- | --- | --- |
 | **Screen** | A routable place in the web UI. | page, route (in UI talk), view (alone) |
 | **View type** | A reusable screen pattern: **index view**, **record view**, **panel**, **composer**, **settings**. Every screen is one of these. | layout, template (taken by email) |
-| **Index view** | A view type that shows many records of one type. | collection (TanStack DB term), list view, table view, grid |
+| **Index view** | A view type that shows many records of one type. | collection, list view, table view, grid |
 | **Record view** | A view type that shows one record. | detail page, profile |
 | **Theme variable** | A named, semantic style value (`surface`, `text-muted`, `accent`, …) generated from the theme inputs (base, accent, contrast) and exposed to Tailwind. Components use only theme variables. | design token, token, CSS variable (for this meaning) |
 | **Command menu** | The ⌘K menu that reaches every operation. | command palette, quick switcher, omnibar |
@@ -100,6 +100,7 @@ How to pick a name: choose the most common name for the concept. Reject anything
 | **Saved view** | A named combination of filters, sort and columns on an index view. Either personal or shared with the team. | view (alone), filter preset, smart list, list |
 | **Filter** | A condition that narrows the records an index view shows. The same component builds v2 dynamic segments. | query, rule, condition (as a UI noun) |
 | **Import** / **Export** | Moving records into or out of Parley as CSV. | upload, download, sync, migrate |
+| **Selection** | The records an action on an index view applies to: the rows picked, or every record matching its search and filter (D137). | bulk selection, batch, checked rows |
 | **Toast** | A brief, non-blocking message (e.g. "Contact deleted · Undo"). | snackbar, notification, flash |
 | **Design asset** | The artifact we agree on before building a screen. | mockup, wireframe, concept, comp |
 
@@ -147,3 +148,4 @@ How to pick a name: choose the most common name for the concept. Reject anything
 | 2026-10-20 | Added **domain**, **free email domain** and **domain matching** (D105, D106). |
 | 2026-10-20 | Added the v2 email terms: campaign, draft, template, merge tag, test send, recipient, topic, subscription status, unsubscribe, unsubscribe link, footer, sender and sending domain. Claude's picks, open to veto (see `docs/review.md`). Later: **preview text**. |
 | 2026-10-20 | Added **access token**, and removed it from API key's banned synonyms (P5, D97). |
+| 2026-10-21 | Added **selection** (D137). |

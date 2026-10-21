@@ -1,6 +1,4 @@
-import type { Contact, Team, TeamId } from "@parley/domain"
-import { useLiveQuery } from "@tanstack/react-db"
-import { useQueryClient } from "@tanstack/react-query"
+import type { Team, TeamId } from "@parley/domain"
 import { Link, useMatchRoute, useNavigate } from "@tanstack/react-router"
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
 import {
@@ -13,9 +11,10 @@ import {
   themeChoice,
 } from "../lib/appearance.ts"
 import { signOut } from "../lib/auth.ts"
-import { companiesCollection, primaryDomainOf } from "../lib/companies.ts"
-import { contactsCollection } from "../lib/contacts.ts"
+import { companyApi, primaryDomainOf } from "../lib/companies.ts"
+import { contactApi } from "../lib/contacts.ts"
 import { MY_CONTACTS_VIEW, useSavedViews } from "../lib/index-view.ts"
+import { useRecordSearch } from "../lib/records.ts"
 import { useCrt } from "./crt.tsx"
 import { CrtSettingsDialog } from "./crt-settings.tsx"
 import {
@@ -502,12 +501,10 @@ interface CommandItem {
 function CommandMenu(props: { readonly onClose: () => void }) {
   const { team, teams } = useShell()
   const navigate = useNavigate()
-  const queryClient = useQueryClient()
-  const collection = contactsCollection(team.id as TeamId, queryClient)
-  const { data: contacts } = useLiveQuery((q) => q.from({ contact: collection }), [collection])
-  const companyCollection = companiesCollection(team.id as TeamId, queryClient)
-  const { data: companies } = useLiveQuery((q) => q.from({ company: companyCollection }), [companyCollection])
   const [query, setQuery] = useState("")
+  // Records are searched on the server as you type (D136): the most recently updated when empty.
+  const contacts = useRecordSearch(contactApi, team.id as TeamId, query, { limit: 8 }).items
+  const companies = useRecordSearch(companyApi, team.id as TeamId, query, { limit: 6 }).items
   const [active, setActive] = useState(0)
 
   const items = useMemo<ReadonlyArray<CommandItem>>(() => {
@@ -517,41 +514,33 @@ function CommandMenu(props: { readonly onClose: () => void }) {
       props.onClose()
       void fn()
     }
-    const contactItems = [...(contacts ?? [])]
-      .filter((contact: Contact) => matches(contact.displayName) || contact.emails.some((e) => matches(e.address)))
-      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-      .slice(0, q ? 8 : 4)
-      .map(
-        (contact): CommandItem => ({
-          id: `contact:${contact.id}`,
-          group: "Contacts",
-          label: contact.displayName,
-          ...(contact.emails[0] ? { sub: contact.emails[0].address } : {}),
-          hint: "Contact",
-          icon: <ContactAvatar contact={contact} />,
-          run: go(() =>
-            navigate({ to: "/t/$teamId/contacts", params: { teamId: team.id }, search: { contact: contact.id } }),
-          ),
-        }),
-      )
-    const companyItems = [...(companies ?? [])]
-      .filter((company) => matches(company.name) || company.domains.some((entry) => matches(entry.domain)))
-      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-      .slice(0, q ? 6 : 3)
-      .map((company): CommandItem => {
-        const domain = primaryDomainOf(company)
-        return {
-          id: `company:${company.id}`,
-          group: "Companies",
-          label: company.name,
-          ...(domain ? { sub: domain } : {}),
-          hint: "Company",
-          icon: <Avatar shape="square">{company.name[0]?.toUpperCase()}</Avatar>,
-          run: go(() =>
-            navigate({ to: "/t/$teamId/companies", params: { teamId: team.id }, search: { company: company.id } }),
-          ),
-        }
-      })
+    const contactItems = contacts.slice(0, q ? 8 : 4).map(
+      (contact): CommandItem => ({
+        id: `contact:${contact.id}`,
+        group: "Contacts",
+        label: contact.displayName,
+        ...(contact.emails[0] ? { sub: contact.emails[0].address } : {}),
+        hint: "Contact",
+        icon: <ContactAvatar contact={contact} />,
+        run: go(() =>
+          navigate({ to: "/t/$teamId/contacts", params: { teamId: team.id }, search: { contact: contact.id } }),
+        ),
+      }),
+    )
+    const companyItems = companies.slice(0, q ? 6 : 3).map((company): CommandItem => {
+      const domain = primaryDomainOf(company)
+      return {
+        id: `company:${company.id}`,
+        group: "Companies",
+        label: company.name,
+        ...(domain ? { sub: domain } : {}),
+        hint: "Company",
+        icon: <Avatar shape="square">{company.name[0]?.toUpperCase()}</Avatar>,
+        run: go(() =>
+          navigate({ to: "/t/$teamId/companies", params: { teamId: team.id }, search: { company: company.id } }),
+        ),
+      }
+    })
     const operations: Array<CommandItem> = [
       {
         id: "op:new-contact",

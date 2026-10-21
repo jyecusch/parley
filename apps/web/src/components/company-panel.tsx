@@ -2,7 +2,8 @@ import { type Company, normalizeDomain, type PostalAddress, type TeamId } from "
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useRef, useState } from "react"
 import { call, messageOf } from "../lib/client.ts"
-import { type companiesCollection, primaryDomainOf } from "../lib/companies.ts"
+import { type CompanyDraft, primaryDomainOf, refreshCompanies, saveCompany, writeCompany } from "../lib/companies.ts"
+import { refreshContacts } from "../lib/contacts.ts"
 import { COUNTRIES, countryName } from "../lib/countries.ts"
 import { useFields } from "../lib/custom-fields.ts"
 import { CompanyContacts, type ToastRequest } from "./affiliations.tsx"
@@ -37,7 +38,7 @@ import {
   Select,
 } from "./ui/index.ts"
 
-export type Draft = { -readonly [K in keyof Company]: Company[K] }
+export type Draft = CompanyDraft
 export type Domain = Company["domains"][number]["domain"]
 
 /** What people type into a website field, as a URL: "acme.com" → "https://acme.com". */
@@ -120,13 +121,12 @@ export function CompanyPanel(props: {
   readonly onClose: () => void
   readonly onDelete: () => void
   readonly onToast: (toast: ToastRequest) => void
-  readonly collection: ReturnType<typeof companiesCollection>
   readonly canWrite: boolean
   /** A panel beside the list, or the full record view at its own URL (D55). */
   readonly layout?: "panel" | "full"
   readonly onToggleLayout?: () => void
 }) {
-  const { company, collection } = props
+  const { company } = props
   const queryClient = useQueryClient()
   const { fields } = useFields(props.teamId, "company")
   const activity = useQuery({
@@ -136,14 +136,15 @@ export function CompanyPanel(props: {
   const domain = primaryDomainOf(company)
 
   const save = (change: (draft: Draft) => void) => {
-    const transaction = collection.update(company.id, (draft) => change(draft as Draft))
-    transaction.isPersisted.promise
-      .then(async () => {
-        // Adding a domain can affiliate contacts (D105), so contacts and counts are refreshed.
-        await collection.utils.refetch()
+    saveCompany(queryClient, props.teamId, company, change)
+      .then(async (saved) => {
         await queryClient.invalidateQueries({ queryKey: ["company-activity", props.teamId, company.id] })
-        await queryClient.invalidateQueries({ queryKey: ["affiliations", props.teamId, company.id] })
-        await queryClient.invalidateQueries({ queryKey: ["contacts", props.teamId] })
+        // Adding a domain can affiliate contacts (D105), so contacts and counts are refreshed.
+        if (JSON.stringify(saved.domains) !== JSON.stringify(company.domains)) {
+          await refreshCompanies(queryClient, props.teamId)
+          await refreshContacts(queryClient, props.teamId)
+          await queryClient.invalidateQueries({ queryKey: ["affiliations", props.teamId, company.id] })
+        }
       })
       .catch((failure: unknown) => props.onToast({ text: messageOf(failure) }))
   }
@@ -155,7 +156,7 @@ export function CompanyPanel(props: {
         image === null
           ? await call("companies.removeLogo", { teamId: props.teamId, companyId: company.id })
           : await call("companies.setLogo", { teamId: props.teamId, companyId: company.id, image })
-      collection.utils.writeUpsert(updated)
+      writeCompany(queryClient, props.teamId, updated)
       await queryClient.invalidateQueries({ queryKey: ["company-activity", props.teamId, company.id] })
     } catch (failure) {
       props.onToast({ text: messageOf(failure) })

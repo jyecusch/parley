@@ -116,6 +116,8 @@ export type ContactFields = typeof ContactFields.Type
 export const ContactPage = Schema.Struct({
   items: Schema.Array(Contact),
   nextCursor: Schema.NullOr(Schema.String),
+  /** How many records match, counted on the first page only (no cursor); null on later pages (D136). */
+  total: Schema.NullOr(Schema.Number),
 })
 export type ContactPage = typeof ContactPage.Type
 

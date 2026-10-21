@@ -258,9 +258,12 @@ export function PanelBar(props: {
       <IconButton label={`Next ${props.noun}`} tip="Next  J" onClick={() => props.onMove(1)}>
         <ChevronDown className="size-5" />
       </IconButton>
-      <span className="ml-1 text-sm text-subtle tabular-nums">
-        {props.position.index + 1} of {props.position.total}
-      </span>
+      {/* A record opened from a link may be past the loaded pages (D136); then there's no position. */}
+      {props.position.index >= 0 ? (
+        <span className="ml-1 text-sm text-subtle tabular-nums">
+          {(props.position.index + 1).toLocaleString()} of {props.position.total.toLocaleString()}
+        </span>
+      ) : null}
       <Spacer />
       {props.onToggleLayout ? (
         <IconButton

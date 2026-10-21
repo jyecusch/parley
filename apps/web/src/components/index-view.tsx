@@ -194,8 +194,8 @@ export function ExportMenu(props: {
             {props.showing === 1
               ? `The 1 ${props.singular} showing`
               : props.filtered
-                ? `The ${props.showing} ${props.plural} showing`
-                : `All ${props.showing} ${props.plural}`}
+                ? `The ${props.showing.toLocaleString()} ${props.plural} showing`
+                : `All ${props.showing.toLocaleString()} ${props.plural}`}
           </MenuItem>
           {segments.length > 0 && props.onExportSegment ? (
             <>
@@ -793,7 +793,7 @@ export function SetFieldDialog(props: {
   const [values, setValues] = useState<Record<string, CustomValue>>({})
   return (
     <Dialog
-      title={`Set a field on ${props.count} ${props.noun}`}
+      title={`Set a field on ${props.count.toLocaleString()} ${props.noun}`}
       onClose={props.onClose}
       footer={
         <>

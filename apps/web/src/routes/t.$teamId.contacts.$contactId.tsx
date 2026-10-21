@@ -1,17 +1,20 @@
-import { type Contact, ROLE_PERMISSIONS, type TeamId } from "@parley/domain"
-import { useLiveQuery } from "@tanstack/react-db"
+import { ROLE_PERMISSIONS, type TeamId } from "@parley/domain"
 import { useQueryClient } from "@tanstack/react-query"
 import { createFileRoute, getRouteApi, useNavigate } from "@tanstack/react-router"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 import { ContactPanel, type Toast } from "../components/contact-panel.tsx"
 import { isTyping } from "../components/shell.tsx"
 import { Card, Centered, EmptyState, FloatingBar } from "../components/ui/index.ts"
 import { messageOf } from "../lib/client.ts"
-import { contactsCollection } from "../lib/contacts.ts"
+import { contactApi, deleteContacts } from "../lib/contacts.ts"
+import { EMPTY_FILTER } from "../lib/index-view.ts"
+import { useRecord, useRecordList } from "../lib/records.ts"
 
 export const Route = createFileRoute("/t/$teamId/contacts/$contactId")({ component: ContactRecord })
 
 const teamRoute = getRouteApi("/t/$teamId")
+
+const DEFAULT_ORDER = { search: "", filter: EMPTY_FILTER, sort: null }
 
 /**
  * A contact's full record view at its own URL (D55): the panel at full width. J and K move
@@ -23,18 +26,15 @@ function ContactRecord() {
   const teamId = team.id as TeamId
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const collection = contactsCollection(teamId, queryClient)
-  const live = useLiveQuery((q) => q.from({ contact: collection }), [collection])
-  const contacts = useMemo(
-    () => ([...(live.data ?? [])] as Array<Contact>).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
-    [live.data],
-  )
-  const contact = contacts.find((entry) => entry.id === contactId)
+  const record = useRecord(contactApi, teamId, contactId)
+  const list = useRecordList(contactApi, teamId, DEFAULT_ORDER)
+  const contact = record.data
   const [toast, setToast] = useState<Toast>()
-  const index = contact ? contacts.indexOf(contact) : -1
+  const index = list.items.findIndex((entry) => entry.id === contactId)
   const back = () => void navigate({ to: "/t/$teamId/contacts", params: { teamId }, search: { contact: contactId } })
   const move = (delta: number) => {
-    const next = contacts[index + delta]
+    const next = list.items[index + delta]
+    if (index + delta >= list.items.length - 5) list.fetchNextPage()
     if (next) void navigate({ to: "/t/$teamId/contacts/$contactId", params: { teamId, contactId: next.id } })
   }
 
@@ -49,8 +49,8 @@ function ContactRecord() {
     return () => window.removeEventListener("keydown", onKey)
   })
 
-  if (live.isLoading) return <Card as="main" className="flex-1" />
-  if (!contact) {
+  if (record.isLoading) return <Card as="main" className="flex-1" />
+  if (!contact || contact.deletedAt) {
     return (
       <Card as="main" className="flex-1">
         <Centered>
@@ -67,18 +67,16 @@ function ContactRecord() {
         key={contact.id}
         contact={contact}
         teamId={teamId}
-        position={{ index, total: contacts.length }}
+        position={{ index, total: list.total ?? list.items.length }}
         onMove={move}
         onClose={() => void navigate({ to: "/t/$teamId/contacts", params: { teamId }, search: {} })}
         onDelete={() => {
-          const transaction = collection.delete(contact.id)
-          transaction.isPersisted.promise
+          deleteContacts(queryClient, teamId, { ids: [contact.id] })
             .then(() => navigate({ to: "/t/$teamId/contacts", params: { teamId }, search: {} }))
             .catch((failure: unknown) => setToast({ text: messageOf(failure) }))
         }}
         onError={(text) => setToast({ text })}
         onToast={setToast}
-        collection={collection}
         canWrite={ROLE_PERMISSIONS[team.role].has("records:write")}
         layout="full"
         onToggleLayout={back}

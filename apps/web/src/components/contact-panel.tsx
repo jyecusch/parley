@@ -2,7 +2,7 @@ import type { Contact, TeamId } from "@parley/domain"
 import type { UserText } from "@parley/errors"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { call, messageOf } from "../lib/client.ts"
-import { type contactsCollection, displayNameOf } from "../lib/contacts.ts"
+import { type ContactDraft, saveContact, writeContact } from "../lib/contacts.ts"
 import { useFields } from "../lib/custom-fields.ts"
 import { AffiliationTags, ContactCompanies } from "./affiliations.tsx"
 import { EditableAddress } from "./company-panel.tsx"
@@ -31,8 +31,6 @@ export interface Toast {
   readonly undo?: () => void
 }
 
-type Draft = { -readonly [K in keyof Contact]: Contact[K] }
-
 export function ContactPanel(props: {
   readonly contact: Contact
   readonly teamId: TeamId
@@ -42,13 +40,12 @@ export function ContactPanel(props: {
   readonly onDelete: () => void
   readonly onError: (text: UserText) => void
   readonly onToast: (toast: Toast) => void
-  readonly collection: ReturnType<typeof contactsCollection>
   readonly canWrite: boolean
   /** A panel beside the list, or the full record view at its own URL (D55). */
   readonly layout?: "panel" | "full"
   readonly onToggleLayout?: () => void
 }) {
-  const { contact, collection } = props
+  const { contact } = props
   const queryClient = useQueryClient()
   const { fields } = useFields(props.teamId, "contact")
   const activity = useQuery({
@@ -56,13 +53,9 @@ export function ContactPanel(props: {
     queryFn: () => call("contacts.activity", { teamId: props.teamId, contactId: contact.id }),
   })
 
-  const save = (change: (draft: Draft) => void) => {
-    const transaction = collection.update(contact.id, (draft) => {
-      change(draft as Draft)
-      const primary = draft.emails.find((email) => email.isPrimary)?.address ?? draft.emails[0]?.address
-      draft.displayName = displayNameOf(draft.firstName, draft.lastName, primary)
-    })
-    transaction.isPersisted.promise
+  /** Shows the change at once, then saves it; a refused change rolls back (D53). */
+  const save = (change: (draft: ContactDraft) => void) => {
+    saveContact(queryClient, props.teamId, contact, change)
       .then(() => queryClient.invalidateQueries({ queryKey: ["contact-activity", props.teamId, contact.id] }))
       .catch((failure: unknown) => props.onError(messageOf(failure)))
   }
@@ -74,7 +67,7 @@ export function ContactPanel(props: {
         image === null
           ? await call("contacts.removeAvatar", { teamId: props.teamId, contactId: contact.id })
           : await call("contacts.setAvatar", { teamId: props.teamId, contactId: contact.id, image })
-      collection.utils.writeUpsert(updated)
+      writeContact(queryClient, props.teamId, updated)
       await queryClient.invalidateQueries({ queryKey: ["contact-activity", props.teamId, contact.id] })
     } catch (failure) {
       props.onError(messageOf(failure))

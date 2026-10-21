@@ -7,9 +7,12 @@ import {
   type FilterValue,
   OPERATOR_LABELS,
   OPERATORS_BY_KIND,
+  type TeamId,
   VALUELESS,
 } from "@parley/domain"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { companyApi } from "../lib/companies.ts"
+import { useRecordSearch, useRecordsById } from "../lib/records.ts"
 import { CloseIcon, PlusIcon } from "./icons.tsx"
 import { Button, Checkbox, cn, Hint, Input, Option, Popover, Select } from "./ui/index.ts"
 
@@ -24,16 +27,17 @@ export interface ValueOption {
  * there are several. Shared by saved views and v2 segments, which use the same filter model (D59).
  */
 export function FilterBar(props: {
+  /** The team whose companies a Company condition searches (D136). */
+  readonly teamId: TeamId
   readonly fields: ReadonlyArray<FilterFieldInfo>
   readonly filter: Filter
   readonly onChange: (filter: Filter) => void
-  /** The companies to choose from for a contact's Company condition. */
-  readonly companies?: ReadonlyArray<ValueOption>
   /** The people to choose from for a record owner condition (D123), "Me" first. */
   readonly people?: ReadonlyArray<ValueOption>
 }) {
   const [editing, setEditing] = useState<number | "new">()
   const { filter } = props
+  const chosenCompanies = useChosenCompanies(props.teamId, props.fields, filter.conditions)
   const update = (conditions: ReadonlyArray<FilterCondition>) => props.onChange({ ...filter, conditions })
 
   return (
@@ -57,7 +61,7 @@ export function FilterBar(props: {
               >
                 <b className="font-medium text-fg">{info?.label ?? "Unknown field"}</b>{" "}
                 {OPERATOR_LABELS[condition.operator]}{" "}
-                {describeValue(condition, info, info?.kind === "member" ? props.people : props.companies)}
+                {describeValue(condition, info, info?.kind === "member" ? props.people : chosenCompanies)}
               </button>
               <button
                 className="grid h-7 w-6 shrink-0 cursor-pointer place-items-center rounded-r-md text-subtle hover:bg-hover hover:text-fg"
@@ -72,7 +76,8 @@ export function FilterBar(props: {
               <ConditionEditor
                 fields={props.fields}
                 initial={condition}
-                companies={props.companies ?? []}
+                teamId={props.teamId}
+                chosenCompanies={chosenCompanies}
                 people={props.people ?? []}
                 onClose={() => setEditing(undefined)}
                 onSave={(next) => {
@@ -93,7 +98,8 @@ export function FilterBar(props: {
           <ConditionEditor
             fields={props.fields}
             initial={undefined}
-            companies={props.companies ?? []}
+            teamId={props.teamId}
+            chosenCompanies={chosenCompanies}
             people={props.people ?? []}
             onClose={() => setEditing(undefined)}
             onSave={(next) => {
@@ -115,6 +121,23 @@ export function FilterBar(props: {
       ) : null}
     </div>
   )
+}
+
+/** The companies a filter's Company conditions name, as options, fetched by id. */
+const useChosenCompanies = (
+  teamId: TeamId,
+  fields: ReadonlyArray<FilterFieldInfo>,
+  conditions: ReadonlyArray<FilterCondition>,
+): ReadonlyArray<ValueOption> => {
+  const ids = [
+    ...new Set(
+      conditions
+        .filter((condition) => fields.find((field) => field.field === condition.field)?.kind === "company")
+        .flatMap((condition) => (Array.isArray(condition.value) ? condition.value : [])),
+    ),
+  ]
+  const found = useRecordsById(companyApi, teamId, ids)
+  return ids.map((id) => ({ id, label: found.get(id)?.name ?? "…" }))
 }
 
 const describeValue = (
@@ -145,7 +168,9 @@ const defaultValue = (info: FilterFieldInfo, operator: FilterOperator): FilterVa
 function ConditionEditor(props: {
   readonly fields: ReadonlyArray<FilterFieldInfo>
   readonly initial: FilterCondition | undefined
-  readonly companies: ReadonlyArray<ValueOption>
+  readonly teamId: TeamId
+  /** Companies already in the filter, so they show with their names before any search. */
+  readonly chosenCompanies: ReadonlyArray<ValueOption>
   readonly people: ReadonlyArray<ValueOption>
   readonly onSave: (condition: FilterCondition) => void
   readonly onClose: () => void
@@ -172,8 +197,19 @@ function ConditionEditor(props: {
     ...(value !== undefined && !VALUELESS.has(operator) ? { value } : {}),
   }
   const problem = checkCondition(condition, props.fields)
+  // Companies are searched on the server as you type (D136); the ones already chosen stay listed.
+  const [companyQuery, setCompanyQuery] = useState("")
+  const found = useRecordSearch(companyApi, props.teamId, companyQuery, { enabled: info?.kind === "company" })
+  const companyOptions = useMemo(() => {
+    const chosen = Array.isArray(value) ? value : []
+    const matches = found.items.map((company) => ({ id: company.id as string, label: company.name }))
+    const kept = props.chosenCompanies.filter(
+      (option) => chosen.includes(option.id) && !matches.some((match) => match.id === option.id),
+    )
+    return [...kept, ...matches]
+  }, [found.items, props.chosenCompanies, value])
   const options: ReadonlyArray<ValueOption> =
-    info?.kind === "company" ? props.companies : info?.kind === "member" ? props.people : (info?.options ?? [])
+    info?.kind === "company" ? companyOptions : info?.kind === "member" ? props.people : (info?.options ?? [])
 
   return (
     <Popover
@@ -234,7 +270,22 @@ function ConditionEditor(props: {
           info.kind === "company" ||
           info.kind === "member" ? (
           <div className="max-h-60 overflow-auto">
-            {options.length === 0 ? <Hint>Nothing to choose from.</Hint> : null}
+            {info.kind === "company" ? (
+              <Input
+                className="mb-1.5 h-8"
+                type="text"
+                aria-label="Search companies"
+                placeholder="Search companies…"
+                autoFocus
+                value={companyQuery}
+                onChange={(event) => setCompanyQuery(event.target.value)}
+              />
+            ) : null}
+            {options.length === 0 ? (
+              <Hint>
+                {info.kind === "company" && companyQuery.trim() ? "No companies match." : "Nothing to choose from."}
+              </Hint>
+            ) : null}
             {options.map((option) => {
               const chosen = Array.isArray(value) && value.includes(option.id)
               return (

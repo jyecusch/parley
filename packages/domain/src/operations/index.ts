@@ -1,4 +1,10 @@
-import { createAffiliation, deleteAffiliation, listAffiliations, updateAffiliation } from "./affiliations.ts"
+import {
+  createAffiliation,
+  createManyAffiliations,
+  deleteAffiliation,
+  listAffiliations,
+  updateAffiliation,
+} from "./affiliations.ts"
 import { createApiKey, listApiKeys, revokeApiKey } from "./api-keys.ts"
 import {
   cancelCampaign,
@@ -23,20 +29,26 @@ import {
   companyActivity,
   createCompany,
   deleteCompany,
+  deleteManyCompanies,
   getCompany,
   listCompanies,
   restoreCompany,
+  restoreManyCompanies,
   updateCompany,
+  updateManyCompanies,
 } from "./companies.ts"
 import { createConnection, listConnections, revokeConnection } from "./connections.ts"
 import {
   contactActivity,
   createContact,
   deleteContact,
+  deleteManyContacts,
   getContact,
   listContacts,
   restoreContact,
+  restoreManyContacts,
   updateContact,
+  updateManyContacts,
 } from "./contacts.ts"
 import { exportCompanies, exportContacts, importCompanies, importContacts } from "./csv.ts"
 import { createField, deleteField, listFields, updateField } from "./custom-fields.ts"
@@ -139,6 +151,9 @@ export const operations = {
   "contacts.update": updateContact,
   "contacts.delete": deleteContact,
   "contacts.restore": restoreContact,
+  "contacts.updateMany": updateManyContacts,
+  "contacts.deleteMany": deleteManyContacts,
+  "contacts.restoreMany": restoreManyContacts,
   "contacts.activity": contactActivity,
   "contacts.export": exportContacts,
   "contacts.setAvatar": setContactAvatar,
@@ -152,6 +167,9 @@ export const operations = {
   "companies.update": updateCompany,
   "companies.delete": deleteCompany,
   "companies.restore": restoreCompany,
+  "companies.updateMany": updateManyCompanies,
+  "companies.deleteMany": deleteManyCompanies,
+  "companies.restoreMany": restoreManyCompanies,
   "companies.activity": companyActivity,
   "companies.export": exportCompanies,
   "companies.setLogo": setCompanyLogo,
@@ -163,6 +181,7 @@ export const operations = {
   "imports.cancel": cancelImport,
   "affiliations.list": listAffiliations,
   "affiliations.create": createAffiliation,
+  "affiliations.createMany": createManyAffiliations,
   "affiliations.update": updateAffiliation,
   "affiliations.delete": deleteAffiliation,
   "fields.list": listFields,

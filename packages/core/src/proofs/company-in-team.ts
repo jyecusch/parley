@@ -1,7 +1,15 @@
-import { type CompanyId, CompanyNotFound, type DatabaseUnavailable, type TeamId } from "@parley/domain"
+import {
+  type CompanyId,
+  CompanyNotFound,
+  type DatabaseUnavailable,
+  type InputRejected,
+  type Selection,
+  type TeamId,
+} from "@parley/domain"
 import type { DisplayName } from "@parley/errors"
 import { Effect } from "effect"
 import { Companies, type CompanyState } from "../services/companies.ts"
+import { SELECTION_CHUNK } from "../services/contacts.ts"
 import type { CanReadRecords } from "./permissions.ts"
 import { defineProof, type Named, type Proof } from "./proof.ts"
 
@@ -53,3 +61,35 @@ export const proveCompanyRestorable = <P, T, C>(
     ...CompanyRestorableProver.prove(company, team),
     ...located,
   }))
+
+const CompaniesInTeamProver = defineProof("CompaniesInTeam")
+
+/** Every company in a list exists in team T and isn't deleted, for changes to many at once. */
+export interface CompaniesInTeam<T> extends Proof<"CompaniesInTeam", [T]> {
+  readonly team: Named<T, TeamId>
+  readonly companyIds: ReadonlyArray<CompanyId>
+}
+
+/**
+ * Runs `each` over the live companies a selection covers (D137), at most 1,000 at a time, each
+ * chunk proven in team T as it's read. Returns the sum of what `each` returns.
+ */
+export const forEachSelectedCompany = <P, T, E, R>(
+  team: Named<T, TeamId>,
+  selection: Selection,
+  read: CanReadRecords<P, T>,
+  each: (chunk: CompaniesInTeam<T>) => Effect.Effect<number, E, R>,
+): Effect.Effect<number, E | InputRejected | DatabaseUnavailable, R | Companies> =>
+  Effect.gen(function* () {
+    const companies = yield* Companies
+    const selected = yield* companies.selection(team, selection, read)
+    let total = 0
+    let after: CompanyId | undefined
+    for (;;) {
+      const companyIds = yield* companies.selectChunk(selected, after)
+      after = companyIds[companyIds.length - 1]
+      if (after === undefined) return total
+      total += yield* each({ ...CompaniesInTeamProver.prove(team), team, companyIds })
+      if (companyIds.length < SELECTION_CHUNK) return total
+    }
+  })

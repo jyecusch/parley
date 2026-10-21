@@ -3,17 +3,16 @@ import {
   type Contact,
   type ContactId,
   type CustomField,
-  contactFieldReader,
   type FieldProblem,
   filterFields,
-  matchesFilter,
+  type Matching,
   ROLE_PERMISSIONS,
   type SegmentId,
+  type Selection,
   type TeamId,
   type UserId,
 } from "@parley/domain"
 import type { UserText } from "@parley/errors"
-import { useLiveQuery } from "@tanstack/react-db"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { createFileRoute, getRouteApi, useNavigate } from "@tanstack/react-router"
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react"
@@ -32,7 +31,8 @@ import {
   SetFieldDialog,
   ViewActions,
 } from "../components/index-view.tsx"
-import { LoadFailed, problemFor, problemsOf, toE164, toggle } from "../components/record.tsx"
+import { LoadFailed, problemFor, problemsOf, toE164 } from "../components/record.tsx"
+import { LoadingMoreRow, SelectionCount, SpacerRow, useSelection, useVirtualRows } from "../components/record-index.tsx"
 import { RecordOwnerCell, RecordOwnerField } from "../components/record-owner.tsx"
 import { AddToSegmentDialog } from "../components/segments.tsx"
 import { isTyping, useShell } from "../components/shell.tsx"
@@ -83,11 +83,12 @@ import {
   wideColumnClass,
 } from "../components/ui/record-list.tsx"
 import { call, isApiFailure, messageOf } from "../lib/client.ts"
-import { companiesCollection } from "../lib/companies.ts"
-import { contactsCollection } from "../lib/contacts.ts"
+import { refreshCompanies } from "../lib/companies.ts"
+import { contactApi, deleteContacts, refreshContacts, restoreContacts } from "../lib/contacts.ts"
 import { useFields } from "../lib/custom-fields.ts"
-import { compareBy, download, useIndexView } from "../lib/index-view.ts"
-import { sortReaderOf, usePeople, usePeopleOptions } from "../lib/people.ts"
+import { download, useIndexView } from "../lib/index-view.ts"
+import { usePeople, usePeopleOptions } from "../lib/people.ts"
+import { patchCached, useDebounced, useRecord, useRecordList } from "../lib/records.ts"
 import { absolute, relative } from "../lib/time.ts"
 
 const teamRoute = getRouteApi("/t/$teamId")
@@ -117,10 +118,7 @@ function ContactsScreen() {
   const search = Route.useSearch()
   const navigate = useNavigate({ from: Route.fullPath })
   const queryClient = useQueryClient()
-  const collection = contactsCollection(teamId, queryClient)
-  const live = useLiveQuery((q) => q.from({ contact: collection }), [collection])
   const [filter, setFilter] = useState("")
-  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
   const [cursor, setCursor] = useState<string>()
   const [toast, setToast] = useState<Toast>()
   const [dialog, setDialog] = useState<
@@ -137,33 +135,55 @@ function ContactsScreen() {
   )
   const canWrite = ROLE_PERMISSIONS[team.role].has("records:write")
   const canWriteEmail = ROLE_PERMISSIONS[team.role].has("email:write")
-  const companyCollection = companiesCollection(teamId, queryClient)
-  const companyLive = useLiveQuery((q) => q.from({ company: companyCollection }), [companyCollection])
-  const companyOptions = useMemo(
-    () =>
-      [...(companyLive.data ?? [])]
-        .sort((a, b) => a.name.localeCompare(b.name))
-        .map((company) => ({ id: company.id as string, label: company.name })),
-    [companyLive.data],
-  )
-
   const segments = useQuery({ queryKey: ["segments", teamId], queryFn: () => call("segments.list", { teamId }) })
 
+  // The server searches, filters and sorts, and sends a page at a time (D136).
+  const searchText = useDebounced(filter.trim())
+  const listParams = useMemo(
+    () => ({ search: searchText, filter: indexView.state.filter, sort: indexView.state.sort }),
+    [searchText, indexView.state.filter, indexView.state.sort],
+  )
+  const list = useRecordList(contactApi, teamId, listParams, { enabled: !search.deleted })
+  const contacts = list.items
+  const loadedIds = useMemo(() => contacts.map((contact) => contact.id as string), [contacts])
+  const matching: Matching = useMemo(
+    () => ({
+      ...(searchText ? { search: searchText } : {}),
+      ...(indexView.state.filter.conditions.length > 0 ? { filter: indexView.state.filter } : {}),
+    }),
+    [searchText, indexView.state.filter],
+  )
+  const selection = useSelection({ loadedIds, total: list.total, matching })
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const virtual = useVirtualRows({
+    count: contacts.length,
+    scrollRef,
+    onNearEnd: list.fetchNextPage,
+    resetKey: JSON.stringify(listParams),
+  })
+
+  // The open contact comes from the server, so a link to one past the loaded pages works.
+  const openRecord = useRecord(contactApi, teamId, search.contact)
+  const open = search.contact && openRecord.data && !openRecord.data.deletedAt ? openRecord.data : undefined
+  const openIndex = open ? contacts.findIndex((contact) => contact.id === open.id) : -1
+
   /**
-   * Exports as CSV (D62): the given contacts (what's showing, or a selection), or a segment's. More
-   * than the export takes by id falls back to the view's filter.
+   * Exports as CSV (D62): a selection, everything matching the view, or a segment's contacts.
    */
-  const exportCsv = async (what: { readonly ids: ReadonlyArray<string> } | { readonly segmentId: string }) => {
+  const exportCsv = async (
+    what: { readonly selection: Selection } | { readonly matching: Matching } | { readonly segmentId: string },
+  ) => {
     const segment = "segmentId" in what ? segments.data?.find((entry) => entry.id === what.segmentId) : undefined
+    const scope =
+      "segmentId" in what
+        ? { segmentId: what.segmentId as SegmentId }
+        : "matching" in what
+          ? what.matching
+          : "ids" in what.selection
+            ? { ids: [...what.selection.ids] }
+            : what.selection.matching
     try {
-      const result = await call("contacts.export", {
-        teamId,
-        ...("segmentId" in what
-          ? { segmentId: what.segmentId as SegmentId }
-          : what.ids.length <= 10_000
-            ? { ids: [...what.ids] }
-            : { filter: indexView.state.filter }),
-      })
+      const result = await call("contacts.export", { teamId, ...scope })
       const slug = segment
         ? `-${segment.name
             .toLowerCase()
@@ -171,31 +191,12 @@ function ContactsScreen() {
             .replace(/^-|-$/g, "")}`
         : ""
       download(`contacts${slug}-${new Date().toISOString().slice(0, 10)}.csv`, result.csv)
-      showToast({ text: `Exported ${result.count} ${result.count === 1 ? "contact" : "contacts"}.` })
+      showToast({ text: `Exported ${countOf(result.count)}.` })
     } catch (failure) {
       showToast({ text: messageOf(failure) })
     }
   }
   const filterRef = useRef<HTMLInputElement>(null)
-
-  const contacts = useMemo(() => {
-    const q = filter.trim().toLowerCase()
-    return [...(live.data ?? [])]
-      .filter(
-        (contact) =>
-          !q ||
-          contact.displayName.toLowerCase().includes(q) ||
-          contact.emails.some((email) => email.address.includes(q)),
-      )
-      .filter((record) => matchesFilter(indexView.state.filter, contactFieldReader(record)))
-      .sort(
-        indexView.state.sort
-          ? compareBy(sortReaderOf(contactFieldReader), indexView.state.sort)
-          : (a, b) => b.updatedAt.localeCompare(a.updatedAt) || b.id.localeCompare(a.id),
-      )
-  }, [live.data, filter, indexView.state])
-
-  const open = search.contact ? contacts.find((contact) => contact.id === search.contact) : undefined
 
   const setSearch = useCallback(
     (next: Search) => navigate({ search: { ...(search.view ? { view: search.view } : {}), ...next } }),
@@ -207,30 +208,64 @@ function ContactsScreen() {
     window.setTimeout(() => setToast((current) => (current === next ? undefined : current)), 8000)
   }, [])
 
+  /** Undoes a delete: restores what each deleteMany call deleted (D137). */
   const restore = useCallback(
-    async (ids: ReadonlyArray<string>) => {
+    async (deletedAts: ReadonlyArray<string>) => {
       try {
-        for (const id of ids) await call("contacts.restore", { teamId, contactId: id as ContactId })
+        for (const deletedAt of deletedAts) await restoreContacts(queryClient, teamId, deletedAt)
       } catch (failure) {
         showToast({ text: messageOf(failure) })
       }
-      await collection.utils.refetch()
-      await queryClient.invalidateQueries({ queryKey: ["contacts-deleted", teamId] })
     },
-    [collection, queryClient, showToast, teamId],
+    [queryClient, showToast, teamId],
   )
 
-  const remove = useCallback(
-    (ids: ReadonlyArray<string>) => {
-      if (ids.length === 0) return
-      const transaction = collection.delete(ids.map((id) => id as ContactId))
-      setSelected(new Set())
-      if (search.contact && ids.includes(search.contact)) void setSearch({})
-      const text = ids.length === 1 ? "1 contact deleted" : `${ids.length} contacts deleted`
-      showToast({ text, undo: () => void restore(ids) })
-      transaction.isPersisted.promise.catch((failure: unknown) => showToast({ text: messageOf(failure) }))
+  const restoreOne = useCallback(
+    async (id: string) => {
+      try {
+        await call("contacts.restore", { teamId, contactId: id as ContactId })
+      } catch (failure) {
+        showToast({ text: messageOf(failure) })
+      }
+      await refreshContacts(queryClient, teamId)
+      await queryClient.invalidateQueries({ queryKey: ["contacts-deleted", teamId] })
     },
-    [collection, restore, search.contact, setSearch, showToast],
+    [queryClient, showToast, teamId],
+  )
+
+  /** Deletes a selection: picked rows leave the list at once, and the toast can undo it (D137). */
+  const remove = useCallback(
+    async (selections: ReadonlyArray<Selection>) => {
+      if (selections.length === 0) return
+      selection.clear()
+      const picked = selections.flatMap((entry) => ("ids" in entry ? entry.ids : []))
+      if (search.contact && (picked.includes(search.contact) || selections.some((entry) => "matching" in entry))) {
+        void setSearch({})
+      }
+      try {
+        const results = []
+        for (const entry of selections) results.push(await deleteContacts(queryClient, teamId, entry))
+        const count = results.reduce((sum, result) => sum + result.count, 0)
+        const deletedAts = results.map((result) => result.deletedAt)
+        showToast({ text: `${countOf(count)} deleted`, undo: () => void restore(deletedAts) })
+      } catch (failure) {
+        showToast({ text: messageOf(failure) })
+      }
+    },
+    [queryClient, restore, search.contact, selection, setSearch, showToast, teamId],
+  )
+
+  /** Moves the keyboard cursor, or the open panel, through the list, loading more near its end. */
+  const moveTo = useCallback(
+    (index: number) => {
+      const next = contacts[index]
+      if (!next) return
+      if (index >= contacts.length - 10) list.fetchNextPage()
+      virtual.scrollTo(index)
+      if (search.contact) void setSearch({ contact: next.id })
+      else setCursor(next.id)
+    },
+    [contacts, list, search.contact, setSearch, virtual],
   )
 
   // Keyboard: j/k move, Enter opens, x selects, ⌫ deletes the selection, / filters, ⌘Z undoes.
@@ -243,44 +278,36 @@ function ContactsScreen() {
         return
       }
       if (isTyping(event) || event.metaKey || event.ctrlKey || event.altKey) return
-      const index = contacts.findIndex((contact) => contact.id === (open?.id ?? cursor))
-      const move = (delta: number) => {
-        const next = contacts[Math.min(Math.max(index + delta, 0), contacts.length - 1)]
-        if (!next) return
-        if (open) void setSearch({ contact: next.id })
-        else setCursor(next.id)
-      }
+      const index = contacts.findIndex((contact) => contact.id === (search.contact ?? cursor))
       if (event.key === "j" || event.key === "ArrowDown") {
         event.preventDefault()
-        move(index < 0 ? 0 : 1)
+        moveTo(index < 0 ? 0 : Math.min(index + 1, contacts.length - 1))
       } else if (event.key === "k" || event.key === "ArrowUp") {
         event.preventDefault()
-        move(index < 0 ? 0 : -1)
-      } else if (event.key === "Enter" && cursor && !open) {
+        moveTo(index < 0 ? 0 : Math.max(index - 1, 0))
+      } else if (event.key === "Enter" && cursor && !search.contact) {
         void setSearch({ contact: cursor })
       } else if (event.key === "x" && cursor) {
-        setSelected((current) => toggle(current, cursor))
-      } else if ((event.key === "Backspace" || event.key === "Delete") && selected.size > 0) {
+        selection.toggle(cursor)
+      } else if ((event.key === "Backspace" || event.key === "Delete") && selection.count > 0) {
         event.preventDefault()
-        remove([...selected])
+        void remove(selection.selections())
       } else if (event.key === "/") {
         event.preventDefault()
         filterRef.current?.focus()
       } else if (event.key === "Escape") {
         if (search.contact || search.new) void setSearch({})
-        else if (selected.size > 0) setSelected(new Set())
+        else if (selection.count > 0) selection.clear()
       }
     }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
-  }, [contacts, cursor, open, remove, search, selected, setSearch, toast])
+  }, [contacts, cursor, moveTo, remove, search, selection, setSearch, toast])
 
-  const allChecked = contacts.length > 0 && contacts.every((contact) => selected.has(contact.id))
-  const someChecked = !allChecked && contacts.some((contact) => selected.has(contact.id))
-
-  const isLoading = live.isLoading
-  const loadError = live.isError ? collection.utils.lastError : undefined
-  const isEmpty = !isLoading && !loadError && (live.data?.length ?? 0) === 0
+  const narrowed = searchText !== "" || indexView.state.filter.conditions.length > 0
+  const isLoading = list.isLoading
+  const loadError = list.isError ? list.error : undefined
+  const isEmpty = !isLoading && !loadError && !narrowed && list.total === 0
 
   return (
     <>
@@ -303,7 +330,9 @@ function ContactsScreen() {
               <span>{indexView.viewName ?? "Contacts"}</span>
             )}
           </Breadcrumb>
-          {!search.deleted && !isLoading && !isEmpty ? <Count>{contacts.length}</Count> : null}
+          {!search.deleted && !isLoading && !isEmpty && list.total !== null ? (
+            <Count>{list.total.toLocaleString()}</Count>
+          ) : null}
           <Spacer />
           {search.deleted ? null : (
             <ViewActions
@@ -358,10 +387,10 @@ function ContactsScreen() {
             )}
             {search.deleted ? null : (
               <FilterBar
+                teamId={teamId}
                 fields={filterInfo}
                 filter={indexView.state.filter}
                 onChange={indexView.setFilter}
-                companies={companyOptions}
                 people={peopleOptions}
               />
             )}
@@ -387,9 +416,9 @@ function ContactsScreen() {
             <ExportMenu
               singular="contact"
               plural="contacts"
-              showing={contacts.length}
-              filtered={filter.trim() !== "" || indexView.state.filter.conditions.length > 0}
-              onExportShowing={() => void exportCsv({ ids: contacts.map((contact) => contact.id) })}
+              showing={list.total ?? contacts.length}
+              filtered={narrowed}
+              onExportShowing={() => void exportCsv({ matching })}
               segments={segments.data ?? []}
               onExportSegment={(segmentId) => void exportCsv({ segmentId })}
             />
@@ -402,20 +431,20 @@ function ContactsScreen() {
             recordType="contact"
             plural="contacts"
             canWrite={canWrite}
-            onRecordsChanged={() => void collection.utils.refetch()}
+            onRecordsChanged={() => void refreshContacts(queryClient, teamId)}
           />
         )}
 
         <ViewBody>
           {search.deleted ? (
-            <DeletedContacts teamId={teamId} onRestore={restore} />
+            <DeletedContacts teamId={teamId} onRestore={restoreOne} />
           ) : isLoading ? (
             <LoadingRows />
           ) : loadError ? (
             <LoadFailed
               title="Contacts didn't load"
               message={messageOf(loadError)}
-              onRetry={() => void collection.utils.refetch()}
+              onRetry={() => void list.refetch()}
             />
           ) : isEmpty ? (
             <EmptyTeam
@@ -424,21 +453,23 @@ function ContactsScreen() {
             />
           ) : contacts.length === 0 ? (
             <Centered>
-              <EmptyState title={`No contacts match “${filter}”`}>Try part of a name or an email address.</EmptyState>
+              <EmptyState title={searchText ? `No contacts match “${searchText}”` : "No contacts match these filters"}>
+                {searchText ? "Try part of a name or an email address." : "Change or remove a filter to see more."}
+              </EmptyState>
             </Centered>
           ) : (
-            <TableScroll padForBar={selected.size > 0}>
+            <TableScroll ref={scrollRef} padForBar={selection.count > 0} className={cn(list.isStale && "opacity-60")}>
               <Table>
                 <caption className="sr-only">Contacts</caption>
                 <thead>
                   <tr>
                     <Th className={checkCellClass} scope="col">
                       <Checkbox
-                        reveal={selected.size === 0}
-                        mixed={someChecked}
+                        reveal={selection.count === 0}
+                        mixed={selection.someLoaded}
                         aria-label="Select all contacts"
-                        checked={allChecked}
-                        onChange={() => setSelected(allChecked ? new Set() : new Set(contacts.map((c) => c.id)))}
+                        checked={selection.allLoaded}
+                        onChange={selection.toggleAllLoaded}
                       />
                     </Th>
                     <Th className={NAME_COLUMN} scope="col">
@@ -469,31 +500,36 @@ function ContactsScreen() {
                   </tr>
                 </thead>
                 <tbody>
-                  {contacts.map((contact) => (
-                    <ContactRow
-                      key={contact.id}
-                      contact={contact}
-                      checked={selected.has(contact.id)}
-                      revealCheckbox={selected.size === 0}
-                      isOpen={open?.id === contact.id}
-                      isCursor={!open && cursor === contact.id}
-                      onToggle={() => setSelected((current) => toggle(current, contact.id))}
-                      onOpen={() => void setSearch({ contact: contact.id })}
-                      fields={shownFields}
-                      showOwner={showOwner}
-                    />
-                  ))}
+                  <SpacerRow height={virtual.before} />
+                  {virtual.rows.map((row) => {
+                    const contact = contacts[row.index]
+                    if (!contact) return null
+                    return (
+                      <ContactRow
+                        key={contact.id}
+                        contact={contact}
+                        checked={selection.isPicked(contact.id)}
+                        revealCheckbox={selection.count === 0}
+                        isOpen={open?.id === contact.id}
+                        isCursor={!open && cursor === contact.id}
+                        onToggle={() => selection.toggle(contact.id)}
+                        onOpen={() => void setSearch({ contact: contact.id })}
+                        fields={shownFields}
+                        showOwner={showOwner}
+                      />
+                    )
+                  })}
+                  <SpacerRow height={virtual.after} />
+                  {list.isFetchingNextPage ? <LoadingMoreRow /> : null}
                 </tbody>
               </Table>
             </TableScroll>
           )}
         </ViewBody>
 
-        {selected.size > 0 ? (
-          <FloatingBar role="toolbar" aria-label="Bulk actions">
-            <span className="mr-1.5 text-muted tabular-nums">
-              <b className="font-medium text-fg">{selected.size}</b> selected
-            </span>
+        {selection.count > 0 ? (
+          <FloatingBar role="toolbar" aria-label="Actions on the selection">
+            <SelectionCount selection={selection} total={list.total} plural="contacts" />
             <FloatingBarDivider />
             <Button variant="ghost" size="sm" onClick={() => setDialog("set-field")}>
               Set field
@@ -506,21 +542,26 @@ function ContactsScreen() {
                 Add to segment
               </Button>
             ) : null}
-            <Button variant="ghost" size="sm" onClick={() => void exportCsv({ ids: [...selected] })}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() =>
+                void exportCsv(
+                  selection.ids && selection.ids.length <= 10_000
+                    ? { selection: { ids: selection.ids } }
+                    : { matching },
+                )
+              }
+            >
               Export
             </Button>
             <Tooltip text="Delete  ⌫">
-              <Button variant="danger" size="sm" onClick={() => remove([...selected])}>
+              <Button variant="danger" size="sm" onClick={() => void remove(selection.selections())}>
                 Delete
               </Button>
             </Tooltip>
             <FloatingBarDivider />
-            <IconButton
-              label="Clear selection"
-              tip="Clear selection  Esc"
-              size="xs"
-              onClick={() => setSelected(new Set())}
-            >
+            <IconButton label="Clear selection" tip="Clear selection  Esc" size="xs" onClick={selection.clear}>
               <CloseIcon className="size-3.5" />
             </IconButton>
           </FloatingBar>
@@ -579,64 +620,79 @@ function ContactsScreen() {
         />
       ) : dialog === "set-field" ? (
         <SetFieldDialog
-          count={selected.size}
-          noun={selected.size === 1 ? "contact" : "contacts"}
+          count={selection.count}
+          noun={selection.count === 1 ? "contact" : "contacts"}
           fields={fields}
           onClose={() => setDialog(undefined)}
           onApply={async (field, value) => {
-            const ids = [...selected]
-            const transaction = collection.update(
-              ids.map((id) => id as ContactId),
-              (drafts) => {
-                for (const draft of drafts) {
-                  const next = { ...draft.custom }
-                  if (value === null) delete next[field.id]
-                  else next[field.id] = value as (typeof next)[string]
-                  draft.custom = next
-                }
-              },
-            )
+            const selections = selection.selections()
+            // Picked rows show the value at once; the server's answer then refreshes the list.
+            const undo = selection.ids
+              ? patchCached<Contact>(queryClient, "contacts", teamId, new Set(selection.ids), (contact) => {
+                  const custom = { ...contact.custom }
+                  if (value === null) delete custom[field.id]
+                  else custom[field.id] = value
+                  return { ...contact, custom }
+                })
+              : () => {}
             setDialog(undefined)
-            setSelected(new Set())
-            showToast({ text: `${field.name} is set on ${ids.length} ${ids.length === 1 ? "contact" : "contacts"}.` })
-            transaction.isPersisted.promise.catch((failure: unknown) => showToast({ text: messageOf(failure) }))
+            selection.clear()
+            try {
+              let count = 0
+              for (const entry of selections) {
+                const result = await call("contacts.updateMany", {
+                  teamId,
+                  selection: entry,
+                  custom: { [field.id]: value },
+                })
+                count += result.count
+              }
+              showToast({ text: `${field.name} is set on ${countOf(count)}.` })
+            } catch (failure) {
+              undo()
+              showToast({ text: messageOf(failure) })
+            }
+            await refreshContacts(queryClient, teamId)
           }}
         />
       ) : dialog === "segment" ? (
         <AddToSegmentDialog
           teamId={teamId}
-          contactIds={[...selected] as Array<ContactId>}
+          selections={selection.selections()}
+          count={selection.count}
           onClose={() => setDialog(undefined)}
           onDone={(text) => {
             setDialog(undefined)
-            setSelected(new Set())
+            selection.clear()
             showToast({ text })
           }}
         />
       ) : dialog === "affiliate" ? (
         <AffiliateDialog
-          count={selected.size}
-          companies={companyOptions}
+          teamId={teamId}
+          count={selection.count}
           onClose={() => setDialog(undefined)}
           onApply={async (companyId, title) => {
-            const ids = [...selected]
+            const selections = selection.selections()
             setDialog(undefined)
             try {
-              for (const contactId of ids) {
-                await call("affiliations.create", {
+              let count = 0
+              for (const entry of selections) {
+                const result = await call("affiliations.createMany", {
                   teamId,
-                  contactId: contactId as ContactId,
+                  contacts: entry,
                   companyId: companyId as CompanyId,
                   ...(title ? { title } : {}),
                 })
+                count += result.count
               }
-              setSelected(new Set())
-              showToast({ text: `${ids.length} ${ids.length === 1 ? "contact" : "contacts"} added.` })
+              selection.clear()
+              showToast({ text: `${countOf(count)} added.` })
             } catch (failure) {
               showToast({ text: messageOf(failure) })
             }
-            await collection.utils.refetch()
-            await companyCollection.utils.refetch()
+            await refreshContacts(queryClient, teamId)
+            await refreshCompanies(queryClient, teamId)
           }}
         />
       ) : null}
@@ -645,7 +701,7 @@ function ContactsScreen() {
           teamId={teamId}
           onClose={() => void setSearch({})}
           onCreated={async (contact) => {
-            await collection.utils.refetch()
+            await refreshContacts(queryClient, teamId)
             void setSearch({ contact: contact.id })
           }}
           onOpenExisting={(id) => void setSearch({ contact: id })}
@@ -655,16 +711,12 @@ function ContactsScreen() {
           key={open.id}
           contact={open}
           teamId={teamId}
-          position={{ index: contacts.indexOf(open), total: contacts.length }}
-          onMove={(delta) => {
-            const next = contacts[contacts.indexOf(open) + delta]
-            if (next) void setSearch({ contact: next.id })
-          }}
+          position={{ index: openIndex, total: list.total ?? contacts.length }}
+          onMove={(delta) => moveTo(openIndex + delta)}
           onClose={() => void setSearch({})}
-          onDelete={() => remove([open.id])}
+          onDelete={() => void remove([{ ids: [open.id] }])}
           onError={(text) => showToast({ text })}
           onToast={showToast}
-          collection={collection}
           canWrite={canWrite}
           layout="panel"
           onToggleLayout={() =>
@@ -675,6 +727,8 @@ function ContactsScreen() {
     </>
   )
 }
+
+const countOf = (count: number) => `${count.toLocaleString()} ${count === 1 ? "contact" : "contacts"}`
 
 /** Without the wide columns, the remaining text columns share the width. */
 const NAME_COLUMN = "w-[32%] @max-3xl/content:w-auto"
@@ -805,10 +859,7 @@ function EmptyTeam(props: { readonly onNew: () => void; readonly onImport: (() =
   )
 }
 
-function DeletedContacts(props: {
-  readonly teamId: TeamId
-  readonly onRestore: (ids: ReadonlyArray<string>) => Promise<void>
-}) {
+function DeletedContacts(props: { readonly teamId: TeamId; readonly onRestore: (id: string) => Promise<void> }) {
   const deleted = useQuery({
     queryKey: ["contacts-deleted", props.teamId],
     queryFn: () => call("contacts.list", { teamId: props.teamId, deleted: true, limit: 200 }),
@@ -870,7 +921,7 @@ function DeletedContacts(props: {
                 {contact.deletedAt ? relative(contact.deletedAt) : ""}
               </Td>
               <Td className="text-right">
-                <Button size="sm" onClick={() => void props.onRestore([contact.id])}>
+                <Button size="sm" onClick={() => void props.onRestore(contact.id)}>
                   <RestoreIcon className="size-3.5" />
                   Restore
                 </Button>

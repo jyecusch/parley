@@ -48,7 +48,7 @@ Parley is a **monorepo of Bun workspace packages**. Package boundaries, enforced
 | `@parley/api`    | The `HttpApi` contract: endpoints, payloads, and the tag→status map                                                                                  | `domain`, `errors`            |
 | `@parley/http`   | `HttpApi` handlers: thin, call operations                                                                                                            | `api`, `core`                 |
 | `@parley/mcp`    | MCP tools: thin, call operations                                                                                                                     | `core`, `domain`              |
-| `apps/web`       | TanStack Start: routes, UI, Tailwind, TanStack DB/Query. Mounts `/api/v1`, `/mcp`, `/api/auth`                                                       | `api` (client), `http`, `mcp` |
+| `apps/web`       | TanStack Start: routes, UI, Tailwind, TanStack Query.  Mounts `/api/v1`, `/mcp`, `/api/auth`                                                       | `api` (client), `http`, `mcp` |
 
 Two rules make this layout pay off:
 
@@ -64,7 +64,7 @@ Two rules make this layout pay off:
 | Backend effects, DI, errors, HTTP API | Effect v4 (`Context.Service`, `Layer`, `Schema.TaggedError`, `HttpApi`) |
 | Database                              | Postgres via Drizzle                                                    |
 | Auth                                  | Better-Auth with the organizations plugin                               |
-| Client data                           | TanStack DB + TanStack Query                                            |
+| Client data                           | TanStack Query, with index views loaded in pages (D136)                 |
 | Styling                               | Tailwind                                                                |
 | Lint and enforcement                  | Biome + GritQL rules, `@effect/language-service` diagnostics            |
 

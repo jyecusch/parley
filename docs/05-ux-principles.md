@@ -178,7 +178,7 @@ Which typeface we use is still open: the first design asset will show two or thr
 
 - **Every feature has to earn its place in the chrome.** A capability that agents can reach through the API doesn't automatically deserve a sidebar item.
 - **"Not yet" is a complete answer.** Deals, pipelines, tasks, custom objects and reporting dashboards are all things we're consciously *not* building, until the core is excellent.
-- **Speed is the feature users will notice first.** TanStack DB gives us a local, reactive copy of the data the user is looking at. Edits apply instantly and reconcile in the background, so **no spinners for local actions.** Renaming a contact doesn't show a loading state. It just happens. Spinners are for things that are really remote and really slow, such as an import or sending a campaign, and those get real progress, not a spinner.
+- **Speed is the feature users will notice first.** The web app keeps the records on screen in TanStack Query's cache, loaded a page at a time (D136). Edits apply instantly and reconcile in the background, so **no spinners for local actions.** Renaming a contact doesn't show a loading state. It just happens. Spinners are for things that are really remote and really slow, such as an import or sending a campaign, and those get real progress, not a spinner.
 - **Navigation is instant.** Moving between Contacts and Companies renders from local data first and refreshes quietly.
 
 ---

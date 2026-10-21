@@ -1,18 +1,21 @@
-import { type Company, ROLE_PERMISSIONS, type TeamId } from "@parley/domain"
-import { useLiveQuery } from "@tanstack/react-db"
+import { ROLE_PERMISSIONS, type TeamId } from "@parley/domain"
 import { useQueryClient } from "@tanstack/react-query"
 import { createFileRoute, getRouteApi, useNavigate } from "@tanstack/react-router"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 import type { ToastRequest as Toast } from "../components/affiliations.tsx"
 import { CompanyPanel } from "../components/company-panel.tsx"
 import { isTyping } from "../components/shell.tsx"
 import { Card, Centered, EmptyState, FloatingBar } from "../components/ui/index.ts"
 import { messageOf } from "../lib/client.ts"
-import { companiesCollection } from "../lib/companies.ts"
+import { companyApi, deleteCompanies } from "../lib/companies.ts"
+import { EMPTY_FILTER } from "../lib/index-view.ts"
+import { useRecord, useRecordList } from "../lib/records.ts"
 
 export const Route = createFileRoute("/t/$teamId/companies/$companyId")({ component: CompanyRecord })
 
 const teamRoute = getRouteApi("/t/$teamId")
+
+const DEFAULT_ORDER = { search: "", filter: EMPTY_FILTER, sort: null }
 
 /**
  * A company's full record view at its own URL (D55): the panel at full width. J and K move
@@ -24,18 +27,15 @@ function CompanyRecord() {
   const teamId = team.id as TeamId
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const collection = companiesCollection(teamId, queryClient)
-  const live = useLiveQuery((q) => q.from({ company: collection }), [collection])
-  const companies = useMemo(
-    () => ([...(live.data ?? [])] as Array<Company>).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
-    [live.data],
-  )
-  const contact = companies.find((entry) => entry.id === companyId)
+  const record = useRecord(companyApi, teamId, companyId)
+  const list = useRecordList(companyApi, teamId, DEFAULT_ORDER)
+  const company = record.data
   const [toast, setToast] = useState<Toast>()
-  const index = contact ? companies.indexOf(contact) : -1
+  const index = list.items.findIndex((entry) => entry.id === companyId)
   const back = () => void navigate({ to: "/t/$teamId/companies", params: { teamId }, search: { company: companyId } })
   const move = (delta: number) => {
-    const next = companies[index + delta]
+    const next = list.items[index + delta]
+    if (index + delta >= list.items.length - 5) list.fetchNextPage()
     if (next) void navigate({ to: "/t/$teamId/companies/$companyId", params: { teamId, companyId: next.id } })
   }
 
@@ -50,8 +50,8 @@ function CompanyRecord() {
     return () => window.removeEventListener("keydown", onKey)
   })
 
-  if (live.isLoading) return <Card as="main" className="flex-1" />
-  if (!contact) {
+  if (record.isLoading) return <Card as="main" className="flex-1" />
+  if (!company || company.deletedAt) {
     return (
       <Card as="main" className="flex-1">
         <Centered>
@@ -65,20 +65,18 @@ function CompanyRecord() {
   return (
     <>
       <CompanyPanel
-        key={contact.id}
-        company={contact}
+        key={company.id}
+        company={company}
         teamId={teamId}
-        position={{ index, total: companies.length }}
+        position={{ index, total: list.total ?? list.items.length }}
         onMove={move}
         onClose={() => void navigate({ to: "/t/$teamId/companies", params: { teamId }, search: {} })}
         onDelete={() => {
-          const transaction = collection.delete(contact.id)
-          transaction.isPersisted.promise
+          deleteCompanies(queryClient, teamId, { ids: [company.id] })
             .then(() => navigate({ to: "/t/$teamId/companies", params: { teamId }, search: {} }))
             .catch((failure: unknown) => setToast({ text: messageOf(failure) }))
         }}
         onToast={setToast}
-        collection={collection}
         canWrite={ROLE_PERMISSIONS[team.role].has("records:write")}
         layout="full"
         onToggleLayout={back}

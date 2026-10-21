@@ -6,6 +6,8 @@ import {
   type CompanyFields,
   type CompanyId,
   type CompanyPage,
+  type CustomValues,
+  type CustomValuesPatch,
   type DatabaseUnavailable,
   type FieldProblem,
   type Filter,
@@ -13,26 +15,28 @@ import {
   filterFields,
   InputRejected,
   isFreeEmailDomain,
+  type Matching,
   normalizeDomain,
   type PostalAddress,
+  type Selection,
   type Sort,
   type TeamId,
   type UserId,
 } from "@parley/domain"
 import { DisplayName, EchoedInput, userText } from "@parley/errors"
-import { and, asc, desc, eq, exists, ilike, inArray, isNotNull, isNull, ne, or, sql } from "drizzle-orm"
+import { and, asc, desc, eq, ilike, inArray, isNotNull, isNull, ne, or, type SQL, sql } from "drizzle-orm"
 import { Config, Context, Effect, Layer } from "effect"
 import type { SqlError } from "effect/sql"
 import { fetchFavicon } from "../files/favicon.ts"
 import type { Principal } from "../principal.ts"
-import type { CompanyInTeam, CompanyRestorable } from "../proofs/company-in-team.ts"
+import type { CompaniesInTeam, CompanyInTeam, CompanyRestorable } from "../proofs/company-in-team.ts"
 import type { CanDeleteRecords, CanReadRecords, CanWriteRecords } from "../proofs/permissions.ts"
 import type { Named } from "../proofs/proof.ts"
 import type { RecordOwnerChange } from "../proofs/record-owner.ts"
 import { activityRow, toActivityEntry } from "./activity.ts"
 import { addressColumns, addressOfRow, normalizeAddress } from "./addresses.ts"
 import { Affiliations } from "./affiliations.ts"
-import { RESTORE_WINDOW_DAYS } from "./contacts.ts"
+import { RESTORE_WINDOW_DAYS, SELECTION_CHUNK } from "./contacts.ts"
 import { CustomFields } from "./custom-fields.ts"
 import { FileStore, fileUrl } from "./file-store.ts"
 import { checkFilter, filterSql, sortSql } from "./filter-sql.ts"
@@ -48,6 +52,15 @@ export interface CompanyQuery {
   readonly deleted?: boolean | undefined
 }
 
+/**
+ * The live companies in team T a selection covers (D137), as a condition. Made by `selection`;
+ * read a chunk at a time with `selectChunk`.
+ */
+export interface CompanySelection<T> {
+  readonly team: Named<T, TeamId>
+  readonly where: SQL
+}
+
 /** Which companies a lookup may find: live ones, or deleted ones still inside the restore window. */
 export type CompanyState = "live" | "restorable"
 
@@ -58,6 +71,23 @@ export interface LocatedCompany {
 }
 
 const DOMAINS_KEY = "company_domains_team_id_domain_key"
+
+/** Companies whose name or any domain contains the search, case-insensitively. Undefined for no search. */
+const searchSql = (search: string | undefined): SQL | undefined => {
+  const trimmed = search?.trim()
+  if (!trimmed) return undefined
+  const pattern = `%${trimmed.replace(/[\\%_]/g, (c) => `\\${c}`)}%`
+  return or(
+    ilike(schema.companies.name, pattern),
+    sql`exists (select 1 from ${schema.companyDomains} where ${schema.companyDomains.companyId} = ${schema.companies.id} and ${schema.companyDomains.domain} ilike ${pattern})`,
+  )
+}
+
+/** Deleted companies that can still be restored. */
+const restorableSql = and(
+  isNotNull(schema.companies.deletedAt),
+  sql`${schema.companies.deletedAt} > now() - make_interval(days => ${RESTORE_WINDOW_DAYS})`,
+)
 
 const encodeCursor = (updatedAt: Date, id: string) => btoa(`${updatedAt.toISOString()}|${id}`)
 /** With a custom sort, pages are by position: "o:<offset>". */
@@ -173,6 +203,38 @@ export class Companies extends Context.Service<
       query: CompanyQuery,
       access: CanReadRecords<P, T>,
     ) => Effect.Effect<CompanyPage, InputRejected | DatabaseUnavailable>
+    /** The companies a selection covers (D137). Fails on a filter the list would refuse. */
+    readonly selection: <P, T>(
+      team: Named<T, TeamId>,
+      selection: Selection,
+      access: CanReadRecords<P, T>,
+    ) => Effect.Effect<CompanySelection<T>, InputRejected | DatabaseUnavailable>
+    /** Used only by the CompaniesInTeam prover: the next ids of a selection, in id order, after `after`. */
+    readonly selectChunk: <T>(
+      selection: CompanySelection<T>,
+      after: CompanyId | undefined,
+    ) => Effect.Effect<ReadonlyArray<CompanyId>, DatabaseUnavailable>
+    /**
+     * Sets custom field values (as a patch, like update) and the record owner on many companies.
+     * Returns how many live companies it looked at.
+     */
+    readonly updateMany: <P, T>(
+      companies: CompaniesInTeam<T>,
+      change: { readonly custom?: CustomValuesPatch | undefined; readonly owner?: RecordOwnerChange<T> },
+      access: CanWriteRecords<P, T>,
+    ) => Effect.Effect<number, InputRejected | DatabaseUnavailable>
+    /** Deletes many companies with one shared `deletedAt`, so restoreMany can bring back exactly those. */
+    readonly deleteMany: <P, T>(
+      companies: CompaniesInTeam<T>,
+      deletedAt: Date,
+      access: CanDeleteRecords<P, T>,
+    ) => Effect.Effect<number, DatabaseUnavailable>
+    /** Restores the companies deleted at `deletedAt` that can be; returns how many. */
+    readonly restoreMany: <P, T>(
+      team: Named<T, TeamId>,
+      deletedAt: Date,
+      access: CanDeleteRecords<P, T>,
+    ) => Effect.Effect<number, DatabaseUnavailable>
     /**
      * For imports: the live company each of these domains belongs to, and the one each of these
      * names (compared lower-case) belongs to, the oldest when several share a name.
@@ -453,56 +515,43 @@ export class Companies extends Context.Service<
           const fields = query.filter
             ? yield* checkFilter("company", query.filter, custom)
             : filterFields("company", custom)
-          const filtered = query.filter ? filterSql("company", query.filter, fields) : undefined
+          const matching = and(
+            eq(schema.companies.teamId, team.value),
+            query.filter ? filterSql("company", query.filter, fields) : undefined,
+            query.deleted ? restorableSql : isNull(schema.companies.deletedAt),
+            searchSql(query.search),
+          )
           // A custom sort pages by position; the default sort pages by (updated, id).
           const offset = query.sort ? decodeOffset(query.cursor) : 0
           const cursor = !query.sort && query.cursor ? decodeCursor(query.cursor) : undefined
-          const search = query.search?.trim()
-          const pattern = search ? `%${search.replace(/[\\%_]/g, (c) => `\\${c}`)}%` : undefined
-          const rows = yield* run(
-            db.query((d) =>
-              d
-                .select({ id: schema.companies.id, updatedAt: schema.companies.updatedAt })
-                .from(schema.companies)
-                .where(
-                  and(
-                    eq(schema.companies.teamId, team.value),
-                    filtered,
-                    query.deleted
-                      ? and(
-                          isNotNull(schema.companies.deletedAt),
-                          sql`${schema.companies.deletedAt} > now() - make_interval(days => ${RESTORE_WINDOW_DAYS})`,
-                        )
-                      : isNull(schema.companies.deletedAt),
-                    cursor
-                      ? sql`(${schema.companies.updatedAt}, ${schema.companies.id}) < (${cursor.updatedAt.toISOString()}::timestamptz, ${cursor.id}::uuid)`
-                      : undefined,
-                    pattern
-                      ? or(
-                          ilike(schema.companies.name, pattern),
-                          exists(
-                            d
-                              .select({ one: sql`1` })
-                              .from(schema.companyDomains)
-                              .where(
-                                and(
-                                  eq(schema.companyDomains.companyId, schema.companies.id),
-                                  ilike(schema.companyDomains.domain, pattern),
-                                ),
-                              ),
-                          ),
-                        )
-                      : undefined,
-                  ),
-                )
-                .orderBy(
-                  ...(query.sort
-                    ? [sortSql("company", query.sort, fields)]
-                    : [desc(schema.companies.updatedAt), desc(schema.companies.id)]),
-                )
-                .limit(limit + 1)
-                .offset(offset),
-            ),
+          const [rows, total] = yield* Effect.all(
+            [
+              run(
+                db.query((d) =>
+                  d
+                    .select({ id: schema.companies.id, updatedAt: schema.companies.updatedAt })
+                    .from(schema.companies)
+                    .where(
+                      and(
+                        matching,
+                        cursor
+                          ? sql`(${schema.companies.updatedAt}, ${schema.companies.id}) < (${cursor.updatedAt.toISOString()}::timestamptz, ${cursor.id}::uuid)`
+                          : undefined,
+                      ),
+                    )
+                    .orderBy(
+                      ...(query.sort
+                        ? [sortSql("company", query.sort, fields)]
+                        : [desc(schema.companies.updatedAt), desc(schema.companies.id)]),
+                    )
+                    .limit(limit + 1)
+                    .offset(offset),
+                ),
+              ),
+              // Only the first page counts (D136): later pages would count the same again.
+              query.cursor ? Effect.succeed(null) : count(matching),
+            ],
+            { concurrency: 2 },
           )
           const page = rows.slice(0, limit)
           const last = page[page.length - 1]
@@ -518,8 +567,299 @@ export class Companies extends Context.Service<
                 ? encodeOffset(offset + limit)
                 : encodeCursor(last.updatedAt, last.id)
               : null,
+            total,
           }
         })
+
+      const count = (where: SQL | undefined) =>
+        Effect.map(
+          run(db.query((d) => d.select({ count: sql<number>`count(*)::int` }).from(schema.companies).where(where))),
+          ([row]) => row?.count ?? 0,
+        )
+
+      /** Live companies matching a search and filter, as the list would find them (D137). */
+      const matchingWhere = (teamId: TeamId, matching: Matching) =>
+        Effect.gen(function* () {
+          const filter = matching.filter
+          const filtered = filter
+            ? filterSql(
+                "company",
+                filter,
+                yield* checkFilter("company", filter, yield* customFields.ofTeam(teamId, "company")),
+              )
+            : undefined
+          return (
+            and(
+              eq(schema.companies.teamId, teamId),
+              isNull(schema.companies.deletedAt),
+              filtered,
+              searchSql(matching.search),
+            ) ?? sql`false`
+          )
+        })
+
+      const selection = <P, T>(team: Named<T, TeamId>, selected: Selection, _access: CanReadRecords<P, T>) => {
+        if (!("ids" in selected)) {
+          return Effect.map(
+            matchingWhere(team.value, selected.matching),
+            (where): CompanySelection<T> => ({ team, where }),
+          )
+        }
+        // Ids that aren't uuids can't be companies; leaving them out keeps them away from the query.
+        const ids = selected.ids.filter((id) => UUID.test(id))
+        const where =
+          ids.length === 0
+            ? sql`false`
+            : (and(
+                eq(schema.companies.teamId, team.value),
+                isNull(schema.companies.deletedAt),
+                inArray(schema.companies.id, ids),
+              ) ?? sql`false`)
+        return Effect.succeed<CompanySelection<T>>({ team, where })
+      }
+
+      const selectChunk = <T>(selected: CompanySelection<T>, after: CompanyId | undefined) =>
+        Effect.map(
+          run(
+            db.query((d) =>
+              d
+                .select({ id: schema.companies.id })
+                .from(schema.companies)
+                .where(and(selected.where, after ? sql`${schema.companies.id} > ${after}::uuid` : undefined))
+                .orderBy(asc(schema.companies.id))
+                .limit(SELECTION_CHUNK),
+            ),
+          ),
+          (rows) => rows.map((row) => row.id as CompanyId),
+        )
+
+      const updateMany = <P, T>(
+        chunk: CompaniesInTeam<T>,
+        change: { readonly custom?: CustomValuesPatch | undefined; readonly owner?: RecordOwnerChange<T> },
+        access: CanWriteRecords<P, T>,
+      ) =>
+        Effect.gen(function* () {
+          const teamId = chunk.team.value
+          if (chunk.companyIds.length === 0) return 0
+          const patch = change.custom ?? {}
+          const patched = Object.keys(patch)
+          // Checks the values as companies.update would; `values` then holds the ones being set.
+          const applied = yield* customFields.apply(teamId, "company", {}, patch)
+          const cleared = patched.filter((fieldId) => !(fieldId in applied.values))
+          const nameOf = new Map(
+            patched.length > 0
+              ? (yield* customFields.ofTeam(teamId, "company")).map((field) => [field.id as string, field.name])
+              : [],
+          )
+          const ownerId = change.owner === undefined ? undefined : (change.owner?.userId ?? null)
+          const rows = yield* run(
+            db.query((d) =>
+              d
+                .select({ id: schema.companies.id, custom: schema.companies.custom, ownerId: schema.companies.ownerId })
+                .from(schema.companies)
+                .where(
+                  and(
+                    eq(schema.companies.teamId, teamId),
+                    inArray(schema.companies.id, [...chunk.companyIds]),
+                    isNull(schema.companies.deletedAt),
+                  ),
+                ),
+            ),
+          )
+          const changes = rows.flatMap((row) => {
+            const current = row.custom as CustomValues
+            const changed = [
+              ...patched
+                .filter((fieldId) =>
+                  fieldId in applied.values
+                    ? JSON.stringify(current[fieldId]) !== JSON.stringify(applied.values[fieldId])
+                    : fieldId in current,
+                )
+                .map((fieldId) => nameOf.get(fieldId) ?? fieldId),
+              ...(ownerId !== undefined && ownerId !== row.ownerId ? ["ownerId"] : []),
+            ]
+            return changed.length > 0 ? [{ id: row.id, changed }] : []
+          })
+          if (changes.length === 0) return rows.length
+          const principal = access.member.principal.value
+          const kept =
+            cleared.length > 0
+              ? sql`(${schema.companies.custom} - array[${sql.join(
+                  cleared.map((fieldId) => sql`${fieldId}`),
+                  sql`, `,
+                )}]::text[])`
+              : sql`${schema.companies.custom}`
+          yield* run(
+            db.transaction(
+              Effect.gen(function* () {
+                yield* db.query((d) =>
+                  d
+                    .update(schema.companies)
+                    .set({
+                      ...(patched.length > 0
+                        ? { custom: sql`${kept} || ${JSON.stringify(applied.values)}::jsonb` }
+                        : {}),
+                      ...(ownerId !== undefined ? { ownerId } : {}),
+                      updatedAt: sql`now()`,
+                    })
+                    .where(
+                      and(
+                        eq(schema.companies.teamId, teamId),
+                        inArray(
+                          schema.companies.id,
+                          changes.map((entry) => entry.id),
+                        ),
+                      ),
+                    ),
+                )
+                yield* db.query((d) =>
+                  d.insert(schema.activity).values(
+                    changes.map((entry) =>
+                      activityRow(principal, {
+                        teamId,
+                        recordType: "company",
+                        recordId: entry.id,
+                        kind: "updated",
+                        changedFields: entry.changed,
+                      }),
+                    ),
+                  ),
+                )
+              }),
+            ),
+          )
+          return rows.length
+        }).pipe(Effect.withSpan("Companies.updateMany"))
+
+      const deleteMany = <P, T>(chunk: CompaniesInTeam<T>, deletedAt: Date, access: CanDeleteRecords<P, T>) =>
+        Effect.gen(function* () {
+          const teamId = chunk.team.value
+          if (chunk.companyIds.length === 0) return 0
+          const principal = access.member.principal.value
+          return yield* run(
+            db.transaction(
+              Effect.gen(function* () {
+                const deleted = yield* db.query((d) =>
+                  d
+                    .update(schema.companies)
+                    .set({ deletedAt, updatedAt: sql`now()` })
+                    .where(
+                      and(
+                        eq(schema.companies.teamId, teamId),
+                        inArray(schema.companies.id, [...chunk.companyIds]),
+                        isNull(schema.companies.deletedAt),
+                      ),
+                    )
+                    .returning({ id: schema.companies.id }),
+                )
+                if (deleted.length === 0) return 0
+                const ids = deleted.map((row) => row.id)
+                yield* db.query((d) =>
+                  d
+                    .update(schema.companyDomains)
+                    .set({ active: false })
+                    .where(inArray(schema.companyDomains.companyId, ids)),
+                )
+                yield* db.query((d) =>
+                  d.insert(schema.activity).values(
+                    ids.map((id) =>
+                      activityRow(principal, {
+                        teamId,
+                        recordType: "company",
+                        recordId: id,
+                        kind: "deleted",
+                        changedFields: [],
+                      }),
+                    ),
+                  ),
+                )
+                return deleted.length
+              }),
+            ),
+          )
+        }).pipe(Effect.withSpan("Companies.deleteMany"))
+
+      const restoreMany = <P, T>(team: Named<T, TeamId>, deletedAt: Date, access: CanDeleteRecords<P, T>) =>
+        Effect.gen(function* () {
+          const teamId = team.value
+          const principal = access.member.principal.value
+          let restored = 0
+          let after: string | undefined
+          for (;;) {
+            const chunk = yield* run(
+              db.query((d) =>
+                d
+                  .select({ id: schema.companies.id })
+                  .from(schema.companies)
+                  .where(
+                    and(
+                      eq(schema.companies.teamId, teamId),
+                      eq(schema.companies.deletedAt, deletedAt),
+                      restorableSql,
+                      after ? sql`${schema.companies.id} > ${after}::uuid` : undefined,
+                    ),
+                  )
+                  .orderBy(asc(schema.companies.id))
+                  .limit(SELECTION_CHUNK),
+              ),
+            )
+            const last = chunk[chunk.length - 1]
+            if (!last) return restored
+            after = last.id
+            const ids = chunk.map((row) => row.id)
+            // A company whose domain another company has taken since stays deleted, as companies.restore refuses it.
+            const blocked = yield* run(
+              db.query((d) =>
+                d
+                  .selectDistinct({ companyId: schema.companyDomains.companyId })
+                  .from(schema.companyDomains)
+                  .where(
+                    and(
+                      inArray(schema.companyDomains.companyId, ids),
+                      sql`exists (select 1 from ${schema.companyDomains} taken where taken.team_id = ${teamId} and taken.active and taken.domain = ${schema.companyDomains.domain})`,
+                    ),
+                  ),
+              ),
+            )
+            const skip = new Set(blocked.map((row) => row.companyId))
+            const restorable = ids.filter((id) => !skip.has(id))
+            if (restorable.length > 0) {
+              yield* run(
+                db.transaction(
+                  Effect.gen(function* () {
+                    yield* db.query((d) =>
+                      d
+                        .update(schema.companies)
+                        .set({ deletedAt: null, updatedAt: sql`now()` })
+                        .where(and(eq(schema.companies.teamId, teamId), inArray(schema.companies.id, restorable))),
+                    )
+                    yield* db.query((d) =>
+                      d
+                        .update(schema.companyDomains)
+                        .set({ active: true })
+                        .where(inArray(schema.companyDomains.companyId, restorable)),
+                    )
+                    yield* db.query((d) =>
+                      d.insert(schema.activity).values(
+                        restorable.map((id) =>
+                          activityRow(principal, {
+                            teamId,
+                            recordType: "company",
+                            recordId: id,
+                            kind: "restored",
+                            changedFields: [],
+                          }),
+                        ),
+                      ),
+                    )
+                  }),
+                ),
+              )
+            }
+            restored += restorable.length
+            if (chunk.length < SELECTION_CHUNK) return restored
+          }
+        }).pipe(Effect.withSpan("Companies.restoreMany"))
 
       const locate = <P, T>(
         team: Named<T, TeamId>,
@@ -817,7 +1157,23 @@ export class Companies extends Context.Service<
           }
         })
 
-      return { list, matchKeys, locate, get, create, update, delete: remove, restore, activity, setLogo }
+      return {
+        list,
+        selection,
+        selectChunk,
+        updateMany,
+        deleteMany,
+        restoreMany,
+        matchKeys,
+        locate,
+        get,
+        create,
+        update,
+        delete: remove,
+        restore,
+        activity,
+        setLogo,
+      }
     }),
   )
 }

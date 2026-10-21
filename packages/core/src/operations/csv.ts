@@ -146,21 +146,6 @@ export const exportContactsCsv = (principal: Principal, input: OperationInput<ty
       const canRead = yield* proveCanReadRecords(member)
       const scope = yield* segmentScope(member, input.segmentId)
       const fields = yield* customFields.list(team, "contact", canRead)
-      const items: Array<Contact> = []
-      let cursor: string | undefined
-      for (let page = 0; page < 200; page++) {
-        const result = yield* contacts.list(
-          team,
-          { limit: 200, ...(input.filter ? { filter: input.filter } : {}), ...(cursor ? { cursor } : {}) },
-          canRead,
-          scope,
-        )
-        items.push(...result.items)
-        if (!result.nextCursor) break
-        cursor = result.nextCursor
-      }
-      const only = input.ids ? new Set(input.ids) : undefined
-      const rows = items.filter((contact) => !only || only.has(contact.id))
       const header = [
         "First name",
         "Last name",
@@ -181,40 +166,60 @@ export const exportContactsCsv = (principal: Principal, input: OperationInput<ty
         "Updated",
         ...fields.map((field) => field.name),
       ]
-      const csv = toCsv([
-        header,
-        ...rows.map((contact) => {
-          const primary = contact.emails.find((email) => email.isPrimary) ?? contact.emails[0]
-          return [
-            contact.firstName ?? "",
-            contact.lastName ?? "",
-            primary?.address ?? "",
-            contact.emails
-              .filter((email) => email !== primary)
-              .map((email) => email.address)
-              .join("; "),
-            contact.phones.map((phone) => phone.number).join("; "),
-            contact.affiliations
-              .map((affiliation) =>
-                affiliation.title ? `${affiliation.companyName} (${affiliation.title})` : affiliation.companyName,
-              )
-              .join("; "),
-            contact.address?.line1 ?? "",
-            contact.address?.line2 ?? "",
-            contact.address?.city ?? "",
-            contact.address?.region ?? "",
-            contact.address?.postcode ?? "",
-            contact.address?.country ?? "",
-            contact.socialProfiles.join("; "),
-            SUBSCRIPTION_STATUS_LABELS[contact.subscriptionStatus],
-            contact.ownerName ?? "",
-            isoDay(contact.createdAt),
-            isoDay(contact.updatedAt),
-            ...fields.map((field) => cellOfCustom(field, contact.custom[field.id])),
-          ]
-        }),
-      ])
-      return { csv, count: rows.length }
+      const rowOf = (contact: Contact) => {
+        const primary = contact.emails.find((email) => email.isPrimary) ?? contact.emails[0]
+        return [
+          contact.firstName ?? "",
+          contact.lastName ?? "",
+          primary?.address ?? "",
+          contact.emails
+            .filter((email) => email !== primary)
+            .map((email) => email.address)
+            .join("; "),
+          contact.phones.map((phone) => phone.number).join("; "),
+          contact.affiliations
+            .map((affiliation) =>
+              affiliation.title ? `${affiliation.companyName} (${affiliation.title})` : affiliation.companyName,
+            )
+            .join("; "),
+          contact.address?.line1 ?? "",
+          contact.address?.line2 ?? "",
+          contact.address?.city ?? "",
+          contact.address?.region ?? "",
+          contact.address?.postcode ?? "",
+          contact.address?.country ?? "",
+          contact.socialProfiles.join("; "),
+          SUBSCRIPTION_STATUS_LABELS[contact.subscriptionStatus],
+          contact.ownerName ?? "",
+          isoDay(contact.createdAt),
+          isoDay(contact.updatedAt),
+          ...fields.map((field) => cellOfCustom(field, contact.custom[field.id])),
+        ]
+      }
+      // Written a page at a time, so only the CSV text is held, not every record.
+      const only = input.ids ? new Set(input.ids) : undefined
+      const parts = [toCsv([header])]
+      let count = 0
+      let cursor: string | undefined
+      for (let page = 0; page < 1000; page++) {
+        const result = yield* contacts.list(
+          team,
+          {
+            limit: 200,
+            ...(input.search ? { search: input.search } : {}),
+            ...(input.filter ? { filter: input.filter } : {}),
+            ...(cursor ? { cursor } : {}),
+          },
+          canRead,
+          scope,
+        )
+        const rows = result.items.filter((contact) => !only || only.has(contact.id))
+        count += rows.length
+        if (rows.length > 0) parts.push(toCsv(rows.map(rowOf)))
+        if (!result.nextCursor) break
+        cursor = result.nextCursor
+      }
+      return { csv: parts.join(""), count }
     }),
   )
 
@@ -226,20 +231,6 @@ export const exportCompaniesCsv = (principal: Principal, input: OperationInput<t
       const member = yield* proveMemberOf(principal, team)
       const canRead = yield* proveCanReadRecords(member)
       const fields = yield* customFields.list(team, "company", canRead)
-      const items: Array<Company> = []
-      let cursor: string | undefined
-      for (let page = 0; page < 200; page++) {
-        const result = yield* companies.list(
-          team,
-          { limit: 200, ...(input.filter ? { filter: input.filter } : {}), ...(cursor ? { cursor } : {}) },
-          canRead,
-        )
-        items.push(...result.items)
-        if (!result.nextCursor) break
-        cursor = result.nextCursor
-      }
-      const only = input.ids ? new Set(input.ids) : undefined
-      const rows = items.filter((company) => !only || only.has(company.id))
       const header = [
         "Name",
         "Domains",
@@ -263,33 +254,52 @@ export const exportCompaniesCsv = (principal: Principal, input: OperationInput<t
         "Updated",
         ...fields.map((field) => field.name),
       ]
-      const csv = toCsv([
-        header,
-        ...rows.map((company) => [
-          company.name,
-          company.domains.map((entry) => entry.domain).join("; "),
-          company.website ?? "",
-          company.phone ?? "",
-          company.address?.line1 ?? "",
-          company.address?.line2 ?? "",
-          company.address?.city ?? "",
-          company.address?.region ?? "",
-          company.address?.postcode ?? "",
-          company.address?.country ?? "",
-          company.description ?? "",
-          company.employees === null ? "" : String(company.employees),
-          company.industry ?? "",
-          company.yearFounded === null ? "" : String(company.yearFounded),
-          company.annualRevenue === null ? "" : String(company.annualRevenue),
-          company.socialProfiles.join("; "),
-          String(company.contactCount),
-          company.ownerName ?? "",
-          isoDay(company.createdAt),
-          isoDay(company.updatedAt),
-          ...fields.map((field) => cellOfCustom(field, company.custom[field.id])),
-        ]),
-      ])
-      return { csv, count: rows.length }
+      const rowOf = (company: Company) => [
+        company.name,
+        company.domains.map((entry) => entry.domain).join("; "),
+        company.website ?? "",
+        company.phone ?? "",
+        company.address?.line1 ?? "",
+        company.address?.line2 ?? "",
+        company.address?.city ?? "",
+        company.address?.region ?? "",
+        company.address?.postcode ?? "",
+        company.address?.country ?? "",
+        company.description ?? "",
+        company.employees === null ? "" : String(company.employees),
+        company.industry ?? "",
+        company.yearFounded === null ? "" : String(company.yearFounded),
+        company.annualRevenue === null ? "" : String(company.annualRevenue),
+        company.socialProfiles.join("; "),
+        String(company.contactCount),
+        company.ownerName ?? "",
+        isoDay(company.createdAt),
+        isoDay(company.updatedAt),
+        ...fields.map((field) => cellOfCustom(field, company.custom[field.id])),
+      ]
+      // Written a page at a time, so only the CSV text is held, not every record.
+      const only = input.ids ? new Set(input.ids) : undefined
+      const parts = [toCsv([header])]
+      let count = 0
+      let cursor: string | undefined
+      for (let page = 0; page < 1000; page++) {
+        const result = yield* companies.list(
+          team,
+          {
+            limit: 200,
+            ...(input.search ? { search: input.search } : {}),
+            ...(input.filter ? { filter: input.filter } : {}),
+            ...(cursor ? { cursor } : {}),
+          },
+          canRead,
+        )
+        const rows = result.items.filter((company) => !only || only.has(company.id))
+        count += rows.length
+        if (rows.length > 0) parts.push(toCsv(rows.map(rowOf)))
+        if (!result.nextCursor) break
+        cursor = result.nextCursor
+      }
+      return { csv: parts.join(""), count }
     }),
   )
 

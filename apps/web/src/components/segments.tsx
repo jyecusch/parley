@@ -1,4 +1,4 @@
-import type { ContactId, SegmentId, TeamId } from "@parley/domain"
+import type { ContactId, SegmentId, Selection, TeamId } from "@parley/domain"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useState } from "react"
 import { call, messageOf } from "../lib/client.ts"
@@ -9,7 +9,9 @@ import { Box, Button, Dialog, ErrorText, Field, Input, PopoverItem } from "./ui/
 /** Adds selected contacts to a fixed segment, or to a new one (D23). */
 export function AddToSegmentDialog(props: {
   readonly teamId: TeamId
-  readonly contactIds: ReadonlyArray<ContactId>
+  /** The selection (D137), as calls of up to 1,000 ids or one "all matching". */
+  readonly selections: ReadonlyArray<Selection>
+  readonly count: number
   readonly onDone: (text: string) => void
   readonly onClose: () => void
 }) {
@@ -23,7 +25,7 @@ export function AddToSegmentDialog(props: {
   const [name, setName] = useState("")
   const [error, setError] = useState<string>()
   const [busy, setBusy] = useState(false)
-  const count = props.contactIds.length
+  const count = props.count
   const ready = choice === "new" ? name.trim() !== "" : choice !== undefined
 
   const apply = async () => {
@@ -34,16 +36,17 @@ export function AddToSegmentDialog(props: {
           ? await call("segments.create", { teamId: props.teamId, name: name.trim(), kind: "fixed" })
           : fixed.find((entry) => entry.id === choice)
       if (!segment) return
-      // The operation takes up to 1,000 at a time.
-      for (let start = 0; start < props.contactIds.length; start += 1000) {
+      for (const selection of props.selections) {
         await call("segments.addContacts", {
           teamId: props.teamId,
           segmentId: segment.id,
-          contactIds: props.contactIds.slice(start, start + 1000),
+          ...("ids" in selection
+            ? { contactIds: selection.ids.map((id) => id as ContactId) }
+            : { matching: selection.matching }),
         })
       }
       await queryClient.invalidateQueries({ queryKey: ["segments", props.teamId] })
-      props.onDone(`${count} ${count === 1 ? "contact" : "contacts"} added to ${segment.name}.`)
+      props.onDone(`${count.toLocaleString()} ${count === 1 ? "contact" : "contacts"} added to ${segment.name}.`)
     } catch (failure) {
       setError(messageOf(failure))
       setBusy(false)
@@ -52,7 +55,7 @@ export function AddToSegmentDialog(props: {
 
   return (
     <Dialog
-      title={`Add ${count} ${count === 1 ? "contact" : "contacts"} to a segment`}
+      title={`Add ${count.toLocaleString()} ${count === 1 ? "contact" : "contacts"} to a segment`}
       onClose={props.onClose}
       footer={
         <>

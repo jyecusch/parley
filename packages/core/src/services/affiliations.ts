@@ -16,7 +16,7 @@ import type { SqlError } from "effect/sql"
 import type { Principal } from "../principal.ts"
 import type { AffiliationInTeam } from "../proofs/affiliation-in-team.ts"
 import type { CompanyInTeam } from "../proofs/company-in-team.ts"
-import type { ContactInTeam } from "../proofs/contact-in-team.ts"
+import type { ContactInTeam, ContactsInTeam } from "../proofs/contact-in-team.ts"
 import type { CanReadRecords, CanWriteRecords } from "../proofs/permissions.ts"
 import type { Named } from "../proofs/proof.ts"
 import { activityRow } from "./activity.ts"
@@ -65,6 +65,16 @@ export class Affiliations extends Context.Service<
       title: string | null | undefined,
       access: CanWriteRecords<P, T>,
     ) => Effect.Effect<Affiliation, DatabaseUnavailable>
+    /**
+     * Affiliates many contacts with one company (D137), as create does for each: already affiliated
+     * ones keep their affiliation, with `title` replacing theirs if given. Returns how many contacts.
+     */
+    readonly createMany: <P, T, K>(
+      contacts: ContactsInTeam<T>,
+      company: CompanyInTeam<K, T>,
+      title: string | null | undefined,
+      access: CanWriteRecords<P, T>,
+    ) => Effect.Effect<number, DatabaseUnavailable>
     readonly update: <P, T, A>(
       target: AffiliationInTeam<A, T>,
       title: string | null,
@@ -277,6 +287,105 @@ export class Affiliations extends Context.Service<
           return yield* byId(teamId, id)
         }).pipe(Effect.withSpan("Affiliations.create"))
 
+      const createMany = <P, T, K>(
+        contacts: ContactsInTeam<T>,
+        company: CompanyInTeam<K, T>,
+        title: string | null | undefined,
+        access: CanWriteRecords<P, T>,
+      ) =>
+        Effect.gen(function* () {
+          const teamId = contacts.team.value
+          const companyId = company.company.value
+          const contactIds = [...contacts.contactIds]
+          if (contactIds.length === 0) return 0
+          const principal = access.member.principal.value
+          yield* run(
+            db.transaction(
+              Effect.gen(function* () {
+                const inserted = yield* db.query((d) =>
+                  d
+                    .insert(schema.affiliations)
+                    .values(
+                      contactIds.map((contactId) => ({
+                        id: crypto.randomUUID(),
+                        teamId,
+                        contactId,
+                        companyId,
+                        title: title ?? null,
+                      })),
+                    )
+                    .onConflictDoNothing({ target: [schema.affiliations.contactId, schema.affiliations.companyId] })
+                    .returning({ contactId: schema.affiliations.contactId }),
+                )
+                const added = new Set(inserted.map((row) => row.contactId))
+                // Already affiliated: a given title replaces the old one (D43).
+                const retitled =
+                  title === undefined
+                    ? []
+                    : yield* db.query((d) =>
+                        d
+                          .update(schema.affiliations)
+                          .set({ title })
+                          .where(
+                            and(
+                              eq(schema.affiliations.companyId, companyId),
+                              inArray(
+                                schema.affiliations.contactId,
+                                contactIds.filter((id) => !added.has(id)),
+                              ),
+                              sql`${schema.affiliations.title} is distinct from ${title}`,
+                            ),
+                          )
+                          .returning({ contactId: schema.affiliations.contactId }),
+                      )
+                const changed = [...added, ...retitled.map((row) => row.contactId)]
+                if (changed.length === 0) return
+                const [names, [companyRow]] = yield* Effect.all([
+                  db.query((d) =>
+                    d
+                      .select({ id: schema.contacts.id, name: contactNameSql })
+                      .from(schema.contacts)
+                      .where(inArray(schema.contacts.id, changed)),
+                  ),
+                  db.query((d) =>
+                    d
+                      .select({ name: schema.companies.name })
+                      .from(schema.companies)
+                      .where(eq(schema.companies.id, companyId)),
+                  ),
+                ])
+                const companyRef = { id: companyId, name: companyRow?.name ?? "" }
+                yield* db.query((d) =>
+                  d.insert(schema.activity).values(
+                    names.flatMap((contact) => {
+                      const entry = added.has(contact.id)
+                        ? { kind: "affiliated" as const, ...(title ? { changedFields: ["title"] } : {}) }
+                        : { kind: "updated" as const, changedFields: ["title"] }
+                      return [
+                        activityRow(principal, {
+                          teamId,
+                          recordType: "contact",
+                          recordId: contact.id,
+                          ...entry,
+                          related: { recordType: "company", ...companyRef },
+                        }),
+                        activityRow(principal, {
+                          teamId,
+                          recordType: "company",
+                          recordId: companyId,
+                          ...entry,
+                          related: { recordType: "contact", id: contact.id, name: contact.name },
+                        }),
+                      ]
+                    }),
+                  ),
+                )
+              }),
+            ),
+          )
+          return contactIds.length
+        }).pipe(Effect.withSpan("Affiliations.createMany"))
+
       const update = <P, T, A>(target: AffiliationInTeam<A, T>, title: string | null, access: CanWriteRecords<P, T>) =>
         Effect.gen(function* () {
           const teamId = target.team.value
@@ -426,7 +535,17 @@ export class Affiliations extends Context.Service<
           )
         })
 
-      return { forContacts, listForCompany, locate, create, update, delete: remove, matchContact, matchCompany }
+      return {
+        forContacts,
+        listForCompany,
+        locate,
+        create,
+        createMany,
+        update,
+        delete: remove,
+        matchContact,
+        matchCompany,
+      }
     }),
   )
 }
