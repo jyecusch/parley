@@ -387,9 +387,17 @@ function CompaniesScreen() {
                 icon={<CompaniesIcon />}
                 title="No companies yet"
                 actions={
-                  <Button variant="primary" onClick={() => void setSearch({ new: true })}>
-                    New company <Kbd onPrimary>C</Kbd>
-                  </Button>
+                  <>
+                    <Button variant="primary" onClick={() => void setSearch({ new: true })}>
+                      New company <Kbd onPrimary>C</Kbd>
+                    </Button>
+                    {canWrite ? (
+                      <Button onClick={() => setDialog("import")}>
+                        <UploadIcon className="size-4" />
+                        Import a CSV
+                      </Button>
+                    ) : null}
+                  </>
                 }
               >
                 Companies are the organizations your contacts work for. Give a company its domains, and contacts with an

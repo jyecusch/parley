@@ -111,7 +111,7 @@ export const Route = createFileRoute("/t/$teamId/contacts/")({
 })
 
 function ContactsScreen() {
-  const { team, openCommand } = useShell()
+  const { team } = useShell()
   const teamId = team.id as TeamId
   const search = Route.useSearch()
   const navigate = useNavigate({ from: Route.fullPath })
@@ -405,7 +405,10 @@ function ContactsScreen() {
               onRetry={() => void collection.utils.refetch()}
             />
           ) : isEmpty ? (
-            <EmptyTeam onNew={() => void setSearch({ new: true })} onCommand={openCommand} />
+            <EmptyTeam
+              onNew={() => void setSearch({ new: true })}
+              onImport={canWrite ? () => setDialog("import") : undefined}
+            />
           ) : contacts.length === 0 ? (
             <Centered>
               <EmptyState title={`No contacts match “${filter}”`}>Try part of a name or an email address.</EmptyState>
@@ -754,7 +757,8 @@ function LoadingRows() {
   )
 }
 
-function EmptyTeam(props: { readonly onNew: () => void; readonly onCommand: () => void }) {
+/** No contacts yet: add one, or bring them in from a CSV (such as another CRM's export). */
+function EmptyTeam(props: { readonly onNew: () => void; readonly onImport: (() => void) | undefined }) {
   return (
     <Centered>
       <EmptyState
@@ -765,14 +769,17 @@ function EmptyTeam(props: { readonly onNew: () => void; readonly onCommand: () =
             <Button variant="primary" onClick={props.onNew}>
               New contact <Kbd onPrimary>C</Kbd>
             </Button>
-            <Button onClick={props.onCommand}>
-              Search <Kbd>⌘K</Kbd>
-            </Button>
+            {props.onImport ? (
+              <Button onClick={props.onImport}>
+                <UploadIcon className="size-4" />
+                Import a CSV
+              </Button>
+            ) : null}
           </>
         }
       >
-        Contacts are the people your team works with. Connect an agent over MCP and let it do the typing, or add them
-        yourself.
+        Contacts are the people your team works with. Import them from a CSV, such as another CRM's export, connect an
+        agent over MCP and let it do the typing, or add them yourself.
       </EmptyState>
     </Centered>
   )
