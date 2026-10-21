@@ -13,7 +13,7 @@ import {
   type UserId,
 } from "@parley/domain"
 import { type UserText, userText } from "@parley/errors"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { call, messageOf } from "../lib/client.ts"
 import { type Person, personLabel, usePeople } from "../lib/people.ts"
@@ -433,8 +433,14 @@ export function ImportDialog(props: {
   const [replaceMulti, setReplaceMulti] = useState(false)
   /** Who each unrecognised owner cell means (D127): a person, or no one. */
   const [owners, setOwners] = useState<Record<string, UserId | null>>({})
-  /** Opt-out columns whose topic doesn't exist yet, by header, and whether to create it. */
-  const [newTopics, setNewTopics] = useState<Record<string, { readonly name: string; readonly create: boolean }>>({})
+  /**
+   * Opt-out columns (D127) whose topic is still to be made, by header: the name to give it, and
+   * whether Parley chose it (so a topic of that name loading later takes over). Those mapped to an
+   * existing topic are in `mapping`; those skipped are in neither.
+   */
+  const [newTopics, setNewTopics] = useState<Record<string, { readonly name: string; readonly guessed: boolean }>>({})
+  /** Every opt-out column in the file, by header, with the topic name it gives. */
+  const [optOuts, setOptOuts] = useState<ReadonlyArray<readonly [string, string]>>([])
   const [showSkipped, setShowSkipped] = useState(false)
   const multiFields = props.customFields.filter((field) => field.type === "multi-select")
   const touchesMulti = multiFields.some(
@@ -443,6 +449,7 @@ export function ImportDialog(props: {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<UserText>()
   const people = usePeople(props.teamId).data ?? []
+  const queryClient = useQueryClient()
   const topics = useQuery({
     queryKey: ["topics", props.teamId],
     enabled: props.recordType === "contact",
@@ -469,19 +476,22 @@ export function ImportDialog(props: {
   const load = (text: string) => {
     const [fileHeaders = []] = parseCsv(text)
     const guessed = guessMapping(fileHeaders, props.recordType, props.customFields)
-    const pending: Record<string, { name: string; create: boolean }> = {}
+    const pending: Record<string, { name: string; guessed: boolean }> = {}
+    const found: Array<readonly [string, string]> = []
     if (props.recordType === "contact") {
       for (const header of fileHeaders) {
         const name = OPT_OUT.exec(header.trim())?.[1]?.trim()
         if (!name || guessed[header]) continue
+        found.push([header, name])
         const topic = topics.data?.find((entry) => entry.name.toLowerCase() === name.toLowerCase())
         if (topic) guessed[header] = `topic:${topic.id}`
-        else pending[header] = { name, create: props.canCreateTopics }
+        else if (props.canCreateTopics) pending[header] = { name: name.slice(0, 60), guessed: true }
       }
     }
     setCsv(text)
     setError(undefined)
     setOwners({})
+    setOptOuts(found)
     setNewTopics(pending)
     setMapping(guessed)
   }
@@ -490,6 +500,7 @@ export function ImportDialog(props: {
   useEffect(() => {
     const known = topics.data ?? []
     const matched = Object.entries(newTopics).flatMap(([header, pending]) => {
+      if (!pending.guessed) return []
       const topic = known.find((entry) => entry.name.toLowerCase() === pending.name.toLowerCase())
       return topic ? [[header, topic.id] as const] : []
     })
@@ -516,18 +527,23 @@ export function ImportDialog(props: {
     const finalMapping = { ...mapping }
     try {
       for (const [header, pending] of Object.entries(newTopics)) {
-        if (!pending.create || !props.canCreateTopics) continue
+        // A column mapped to something else in the column list since isn't made a topic.
+        if (!props.canCreateTopics || finalMapping[header]) continue
         const existing = (await call("topics.list", { teamId: props.teamId })).find(
-          (topic) => topic.name.toLowerCase() === pending.name.toLowerCase(),
+          (topic) => topic.name.toLowerCase() === pending.name.trim().toLowerCase(),
         )
-        const topic = existing ?? (await call("topics.create", { teamId: props.teamId, name: pending.name as never }))
+        const topic =
+          existing ?? (await call("topics.create", { teamId: props.teamId, name: pending.name.trim() as never }))
         finalMapping[header] = `topic:${topic.id}`
       }
     } catch (failure) {
+      await queryClient.invalidateQueries({ queryKey: ["topics", props.teamId] })
       setError(messageOf(failure))
       setBusy(false)
       return
     }
+    // Topics made here show in the next import's menus, and in email settings.
+    if (Object.keys(newTopics).length > 0) void queryClient.invalidateQueries({ queryKey: ["topics", props.teamId] })
     const filled = Object.fromEntries(Object.entries(set).filter(([, value]) => value.trim() !== ""))
     const options: ImportOptions = {
       set: filled,
@@ -592,7 +608,21 @@ export function ImportDialog(props: {
       </Select>
     </div>
   )
-  const pendingTopics = Object.entries(newTopics)
+  /** Opt-out columns still headed for a topic, or skipped: not mapped to some other field since. */
+  const topicColumns = optOuts.filter(([header]) => !mapping[header] || mapping[header]?.startsWith("topic:"))
+  const topicNameProblem = Object.entries(newTopics).some(
+    ([header, pending]) => !mapping[header] && (pending.name.trim() === "" || pending.name.trim().length > 60),
+  )
+  /** Points an opt-out column at a new topic, an existing one ("topic:<id>"), or nothing. */
+  const chooseTopic = (header: string, fileName: string, choice: string) => {
+    const { [header]: _, ...rest } = newTopics
+    if (choice === "new") setNewTopics({ ...rest, [header]: { name: fileName.slice(0, 60), guessed: false } })
+    else setNewTopics(rest)
+    setMapping((current) => {
+      const { [header]: __, ...others } = current
+      return choice.startsWith("topic:") ? { ...others, [header]: choice } : others
+    })
+  }
 
   return (
     <Dialog
@@ -609,7 +639,7 @@ export function ImportDialog(props: {
           </Button>
           <Button
             variant="primary"
-            disabled={busy || !csv || Object.keys(mapping).length === 0 || tooMany}
+            disabled={busy || !csv || Object.keys(mapping).length === 0 || tooMany || topicNameProblem}
             onClick={() => void run()}
           >
             {busy ? "Starting…" : `Import ${rows.toLocaleString()} ${rows === 1 ? "row" : "rows"}`}
@@ -706,34 +736,58 @@ export function ImportDialog(props: {
           ))}
         </Fieldset>
       ) : null}
-      {headers.length > 0 && pendingTopics.length > 0 ? (
+      {headers.length > 0 && topicColumns.length > 0 ? (
         <Fieldset legend="Topics">
-          {props.canCreateTopics ? (
-            <Hint>
-              These columns say who left a kind of email. Parley can make a topic for each, so they stay unsubscribed
-              from just that.
-            </Hint>
-          ) : (
-            <Notice tone="warn">
-              Some columns say who left a kind of email, but there's no topic for them, and making topics takes
-              permission to manage email. Those columns are skipped; ask an admin to add the topics first.
-            </Notice>
-          )}
-          {props.canCreateTopics
-            ? pendingTopics.map(([header, pending]) => (
-                <Option key={header}>
-                  <Checkbox
-                    checked={pending.create}
-                    onChange={(event) =>
-                      setNewTopics({ ...newTopics, [header]: { ...pending, create: event.target.checked } })
-                    }
-                  />
-                  <span>
-                    Create topic <b className="font-medium">{pending.name}</b>
-                  </span>
-                </Option>
-              ))
-            : null}
+          <Hint>
+            These columns say who left a kind of email. Choose the topic each one means, so those contacts stay
+            unsubscribed from just that.
+            {props.canCreateTopics
+              ? ""
+              : " Making a topic takes permission to manage email; ask an admin to add any that are missing."}
+          </Hint>
+          {topicColumns.map(([header, fileName]) => {
+            const pending = newTopics[header]
+            const choice = mapping[header] ?? (pending ? "new" : "skip")
+            return (
+              <div key={header} className="flex flex-col gap-1.5">
+                <span className="truncate text-sm text-subtle">{header}</span>
+                <div className="flex flex-wrap gap-2">
+                  <Select
+                    aria-label={`Topic for ${header}`}
+                    className="min-w-0 flex-1"
+                    value={choice}
+                    onChange={(event) => chooseTopic(header, fileName, event.target.value)}
+                  >
+                    {props.canCreateTopics ? <option value="new">New topic</option> : null}
+                    <option value="skip">Skip this column</option>
+                    {(topics.data ?? []).length > 0 ? (
+                      <optgroup label="Your topics">
+                        {(topics.data ?? []).map((topic) => (
+                          <option key={topic.id} value={`topic:${topic.id}`}>
+                            {topic.name}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ) : null}
+                  </Select>
+                  {pending && !mapping[header] ? (
+                    <Input
+                      aria-label={`Name of the new topic for ${header}`}
+                      className="min-w-0 flex-1"
+                      value={pending.name}
+                      maxLength={60}
+                      onChange={(event) =>
+                        setNewTopics({ ...newTopics, [header]: { name: event.target.value, guessed: false } })
+                      }
+                    />
+                  ) : null}
+                </div>
+                {pending && !mapping[header] && pending.name.trim() === "" ? (
+                  <ErrorText>Give the new topic a name, or choose another option.</ErrorText>
+                ) : null}
+              </div>
+            )
+          })}
         </Fieldset>
       ) : null}
       {headers.length > 0 && props.recordType === "contact" ? (
