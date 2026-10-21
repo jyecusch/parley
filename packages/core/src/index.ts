@@ -14,6 +14,8 @@ import { DeliveryEvents } from "./services/delivery-events.ts"
 import { EmailImages } from "./services/email-images.ts"
 import { EmailStyles } from "./services/email-styles.ts"
 import { FileStore } from "./services/file-store.ts"
+import { ImportRunner } from "./services/import-runner.ts"
+import { Imports } from "./services/imports.ts"
 import { Invitations } from "./services/invitations.ts"
 import { Members } from "./services/members.ts"
 import { Notes } from "./services/notes.ts"
@@ -79,10 +81,13 @@ const Services = Layer.mergeAll(
   Campaigns.layer,
   CampaignSender.layer,
   DeliveryEvents.layer,
+  Imports.layer,
 ).pipe(Layer.provideMerge(Layer.mergeAll(UnsubscribeLinks.layer, RateLimiter.layer)))
 
 /** Everything operations and authentication need, built once per process. */
 export const CoreLive = Authenticator.layer.pipe(
+  // The runner imports rows as any operation would, so it is built on every service.
+  Layer.provideMerge(ImportRunner.layer),
   Layer.provideMerge(Services),
   Layer.provideMerge(BetterAuth.layer),
   Layer.provideMerge(Mailer.layer),
@@ -90,7 +95,12 @@ export const CoreLive = Authenticator.layer.pipe(
 )
 
 export { CampaignSender } from "./services/campaign-sender.ts"
+export { ImportRunner } from "./services/import-runner.ts"
 export { Purge } from "./services/purge.ts"
 
 /** Work the server does on its own schedule, such as purging records deleted 30 days ago (D30). */
-export const BackgroundLive = Layer.mergeAll(Purge.schedule.pipe(Layer.provide(Purge.layer)), CampaignSender.schedule)
+export const BackgroundLive = Layer.mergeAll(
+  Purge.schedule.pipe(Layer.provide(Purge.layer)),
+  CampaignSender.schedule,
+  ImportRunner.schedule,
+)

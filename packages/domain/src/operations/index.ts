@@ -66,6 +66,7 @@ import {
   uploadEmailImage,
 } from "./email-styles.ts"
 import { removeCompanyLogo, removeContactAvatar, setCompanyLogo, setContactAvatar } from "./images.ts"
+import { cancelImport, getImport, listImports, startImport } from "./imports.ts"
 import {
   acceptInvitation,
   createInvitation,
@@ -109,6 +110,7 @@ export * from "./custom-fields.ts"
 export * from "./email-setup.ts"
 export * from "./email-styles.ts"
 export * from "./images.ts"
+export * from "./imports.ts"
 export * from "./members.ts"
 export * from "./notes.ts"
 export * from "./saved-views.ts"
@@ -155,6 +157,10 @@ export const operations = {
   "companies.setLogo": setCompanyLogo,
   "companies.removeLogo": removeCompanyLogo,
   "companies.import": importCompanies,
+  "imports.start": startImport,
+  "imports.get": getImport,
+  "imports.list": listImports,
+  "imports.cancel": cancelImport,
   "affiliations.list": listAffiliations,
   "affiliations.create": createAffiliation,
   "affiliations.update": updateAffiliation,

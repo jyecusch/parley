@@ -173,6 +173,18 @@ export class Companies extends Context.Service<
       query: CompanyQuery,
       access: CanReadRecords<P, T>,
     ) => Effect.Effect<CompanyPage, InputRejected | DatabaseUnavailable>
+    /**
+     * For imports: the live company each of these domains belongs to, and the one each of these
+     * names (compared lower-case) belongs to, the oldest when several share a name.
+     */
+    readonly matchKeys: <P, T>(
+      team: Named<T, TeamId>,
+      keys: { readonly domains: ReadonlyArray<string>; readonly names: ReadonlyArray<string> },
+      access: CanReadRecords<P, T>,
+    ) => Effect.Effect<
+      { readonly byDomain: ReadonlyMap<string, CompanyId>; readonly byName: ReadonlyMap<string, CompanyId> },
+      DatabaseUnavailable
+    >
     /** Used only by the CompanyInTeam and CompanyRestorable provers. */
     readonly locate: <P, T>(
       team: Named<T, TeamId>,
@@ -756,7 +768,56 @@ export class Companies extends Context.Service<
           return company
         }).pipe(Effect.withSpan("Companies.setLogo"))
 
-      return { list, locate, get, create, update, delete: remove, restore, activity, setLogo }
+      const matchKeys = <P, T>(
+        team: Named<T, TeamId>,
+        keys: { readonly domains: ReadonlyArray<string>; readonly names: ReadonlyArray<string> },
+        _access: CanReadRecords<P, T>,
+      ) =>
+        Effect.gen(function* () {
+          const domains =
+            keys.domains.length === 0
+              ? []
+              : yield* run(
+                  db.query((d) =>
+                    d
+                      .select({ domain: schema.companyDomains.domain, companyId: schema.companyDomains.companyId })
+                      .from(schema.companyDomains)
+                      .where(
+                        and(
+                          eq(schema.companyDomains.teamId, team.value),
+                          inArray(schema.companyDomains.domain, [...keys.domains]),
+                          eq(schema.companyDomains.active, true),
+                        ),
+                      ),
+                  ),
+                )
+          const lowered = [...new Set(keys.names.map((name) => name.toLowerCase()))]
+          const names =
+            lowered.length === 0
+              ? []
+              : yield* run(
+                  db.query((d) =>
+                    d
+                      .select({ name: sql<string>`lower(${schema.companies.name})`, id: schema.companies.id })
+                      .from(schema.companies)
+                      .where(
+                        and(
+                          eq(schema.companies.teamId, team.value),
+                          inArray(sql`lower(${schema.companies.name})`, lowered),
+                          isNull(schema.companies.deletedAt),
+                        ),
+                      )
+                      .orderBy(desc(schema.companies.createdAt)),
+                  ),
+                )
+          return {
+            byDomain: new Map(domains.map((row) => [row.domain, row.companyId as CompanyId])),
+            // Oldest last, so it wins.
+            byName: new Map(names.map((row) => [row.name, row.id as CompanyId])),
+          }
+        })
+
+      return { list, matchKeys, locate, get, create, update, delete: remove, restore, activity, setLogo }
     }),
   )
 }

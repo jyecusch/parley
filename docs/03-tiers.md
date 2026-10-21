@@ -267,11 +267,12 @@ There's a second layer we could add underneath: **Postgres row-level security**.
 | `Activity` | process | Each entry carries its own team and principal |
 | `Mailer`: a pluggable interface; the default implementation wraps the Resend client (D50) | process | One client, one Resend credential for our Resend account. Per-team things (verified sending domain, footer legal name and address) are team **data**, looked up per call, never held here |
 | `CampaignSender` (batching, Resend rate limit) | process | Resend's rate limit applies to our account, not per team |
+| `Imports`, `ImportRunner` (D135) | process | Each import row carries its own team and the principal who started it; the runner rebuilds that principal for every part and checks their membership and permissions again, so nothing is held between parts |
 | `TeamSendingSettings` | process | A lookup by named team, not a holder of one team's settings |
 | `Templates`, `Drafts`, and the v2 contact-set services (names not yet defined) | process | Team passed per call |
 | `Subscriptions` (unsubscribe state) | process | Keyed by team + recipient |
 | `TeamSendRateLimiter` (only if we need per-team in-memory limits) | **team** | Holds one team's counters. The single justified team-tier service so far, and maybe not even that: a Postgres- or Redis-backed limiter keyed by `TeamId` would be process tier. |
-| `Principal`, proofs | **request** | Values, never services, never stored |
+| `Principal`, proofs | **request** | Values, never services, never stored. One exception: an import stores who started it (D135), and its runner checks again that they may still write before each part |
 
 Notice how short the team-tier section is. That's on purpose.
 

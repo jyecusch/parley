@@ -23,6 +23,7 @@ import { CustomCell } from "../components/custom-fields.tsx"
 import { FilterBar } from "../components/filters.tsx"
 import { CloseIcon, ContactsIcon, RestoreIcon, TrashIcon, UploadIcon } from "../components/icons.tsx"
 import { ContactAvatar } from "../components/images.tsx"
+import { ImportBanners, importsKey, PastImportsDialog } from "../components/imports.tsx"
 import {
   DisplayMenu,
   ExportMenu,
@@ -122,7 +123,9 @@ function ContactsScreen() {
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
   const [cursor, setCursor] = useState<string>()
   const [toast, setToast] = useState<Toast>()
-  const [dialog, setDialog] = useState<"save-view" | "import" | "set-field" | "affiliate" | "segment">()
+  const [dialog, setDialog] = useState<
+    "save-view" | "import" | "set-field" | "affiliate" | "segment" | "past-imports"
+  >()
   const { fields } = useFields(teamId, "contact")
   const { userId } = teamRoute.useRouteContext()
   const peopleOptions = usePeopleOptions(teamId, userId)
@@ -393,6 +396,16 @@ function ContactsScreen() {
           </Toolbar>
         )}
 
+        {search.deleted ? null : (
+          <ImportBanners
+            teamId={teamId}
+            recordType="contact"
+            plural="contacts"
+            canWrite={canWrite}
+            onRecordsChanged={() => void collection.utils.refetch()}
+          />
+        )}
+
         <ViewBody>
           {search.deleted ? (
             <DeletedContacts teamId={teamId} onRestore={restore} />
@@ -551,11 +564,18 @@ function ContactsScreen() {
           plural="contacts"
           customFields={fields}
           onClose={() => setDialog(undefined)}
-          onImport={async (csv, mapping, options) => {
-            const result = await call("contacts.import", { teamId, csv, mapping, ...options })
-            await collection.utils.refetch()
-            return result
+          onShowPast={() => setDialog("past-imports")}
+          onStarted={() => {
+            setDialog(undefined)
+            void queryClient.invalidateQueries({ queryKey: importsKey(teamId, "contact") })
           }}
+        />
+      ) : dialog === "past-imports" ? (
+        <PastImportsDialog
+          teamId={teamId}
+          recordType="contact"
+          plural="contacts"
+          onClose={() => setDialog(undefined)}
         />
       ) : dialog === "set-field" ? (
         <SetFieldDialog

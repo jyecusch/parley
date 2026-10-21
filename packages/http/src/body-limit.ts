@@ -2,6 +2,9 @@
 const DEFAULT_LIMIT = 1024 * 1024
 const LARGE_LIMIT = 16 * 1024 * 1024
 const LARGE = /\/(avatar|logo|import)$/
+/** imports.start takes a file of up to 100,000 rows (D135). */
+const IMPORT_LIMIT = 32 * 1024 * 1024
+const IMPORTS = /\/teams\/[^/]+\/imports$/
 
 const tooLarge = (limit: number) =>
   new Response(
@@ -23,7 +26,8 @@ const tooLarge = (limit: number) =>
  */
 export const limitBody = (request: Request): Request | Response => {
   if (!request.body) return request
-  const limit = LARGE.test(new URL(request.url).pathname) ? LARGE_LIMIT : DEFAULT_LIMIT
+  const path = new URL(request.url).pathname
+  const limit = IMPORTS.test(path) ? IMPORT_LIMIT : LARGE.test(path) ? LARGE_LIMIT : DEFAULT_LIMIT
   const declared = Number(request.headers.get("content-length"))
   if (Number.isFinite(declared) && declared > limit) return tooLarge(limit)
   let seen = 0

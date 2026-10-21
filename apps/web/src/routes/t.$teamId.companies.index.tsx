@@ -29,6 +29,7 @@ import { CustomCell } from "../components/custom-fields.tsx"
 import { FilterBar } from "../components/filters.tsx"
 import { CloseIcon, CompaniesIcon, PlusIcon, RestoreIcon, TrashIcon, UploadIcon } from "../components/icons.tsx"
 import { CompanyLogo } from "../components/images.tsx"
+import { ImportBanners, importsKey, PastImportsDialog } from "../components/imports.tsx"
 import {
   DisplayMenu,
   ExportMenu,
@@ -157,7 +158,7 @@ function CompaniesScreen() {
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
   const [cursor, setCursor] = useState<string>()
   const [toast, setToast] = useState<ToastRequest>()
-  const [dialog, setDialog] = useState<"save-view" | "import" | "set-field" | "affiliate">()
+  const [dialog, setDialog] = useState<"save-view" | "import" | "set-field" | "affiliate" | "past-imports">()
   const { fields } = useFields(teamId, "company")
   const indexView = useIndexView(teamId, "company", search.view)
   const filterInfo = useMemo(() => filterFields("company", fields), [fields])
@@ -399,6 +400,16 @@ function CompaniesScreen() {
           </Toolbar>
         )}
 
+        {search.deleted ? null : (
+          <ImportBanners
+            teamId={teamId}
+            recordType="company"
+            plural="companies"
+            canWrite={canWrite}
+            onRecordsChanged={() => void collection.utils.refetch()}
+          />
+        )}
+
         <ViewBody>
           {search.deleted ? (
             <DeletedCompanies teamId={teamId} onRestore={restore} />
@@ -627,11 +638,18 @@ function CompaniesScreen() {
           plural="companies"
           customFields={fields}
           onClose={() => setDialog(undefined)}
-          onImport={async (csv, mapping, options) => {
-            const result = await call("companies.import", { teamId, csv, mapping, ...options })
-            await collection.utils.refetch()
-            return result
+          onShowPast={() => setDialog("past-imports")}
+          onStarted={() => {
+            setDialog(undefined)
+            void queryClient.invalidateQueries({ queryKey: importsKey(teamId, "company") })
           }}
+        />
+      ) : dialog === "past-imports" ? (
+        <PastImportsDialog
+          teamId={teamId}
+          recordType="company"
+          plural="companies"
+          onClose={() => setDialog(undefined)}
         />
       ) : dialog === "set-field" ? (
         <SetFieldDialog

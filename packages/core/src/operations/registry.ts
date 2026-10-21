@@ -11,6 +11,7 @@ import type { Contacts } from "../services/contacts.ts"
 import type { CustomFields } from "../services/custom-fields.ts"
 import type { EmailImages } from "../services/email-images.ts"
 import type { EmailStyles } from "../services/email-styles.ts"
+import type { Imports } from "../services/imports.ts"
 import type { Invitations } from "../services/invitations.ts"
 import type { Members } from "../services/members.ts"
 import type { Notes } from "../services/notes.ts"
@@ -37,6 +38,7 @@ import * as emailImages from "./email-images.ts"
 import * as emailSetup from "./email-setup.ts"
 import * as emailStyles from "./email-styles.ts"
 import * as images from "./images.ts"
+import * as imports from "./imports.ts"
 import * as members from "./members.ts"
 import * as notes from "./notes.ts"
 import * as savedViews from "./saved-views.ts"
@@ -70,6 +72,7 @@ export type OperationServices =
   | RateLimiter
   | EmailImages
   | EmailStyles
+  | Imports
 
 export type Implementation<Name extends OperationName> = (
   principal: Principal,
@@ -118,6 +121,10 @@ export const implementations: { readonly [Name in OperationName]: Implementation
   "companies.import": csv.importCompaniesCsv,
   "companies.setLogo": images.setLogo,
   "companies.removeLogo": images.removeLogo,
+  "imports.start": imports.start,
+  "imports.get": imports.get,
+  "imports.list": imports.list,
+  "imports.cancel": imports.cancel,
   "affiliations.list": affiliations.list,
   "affiliations.create": affiliations.create,
   "affiliations.update": affiliations.update,

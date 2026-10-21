@@ -33,12 +33,8 @@ const exportInput = Schema.Struct({
   ),
 })
 
-const importInput = Schema.Struct({
-  ...InTeam,
-  csv: Schema.String.check(Schema.isMaxLength(5_000_000)).annotate({
-    title: "CSV",
-    description: "The file's text, with a header row. Up to 5,000 rows.",
-  }),
+/** How a file's columns become fields, shared by contacts.import, companies.import and imports.start. */
+export const ImportOptions = {
   mapping: Schema.optional(
     Schema.Record(Schema.String, Schema.String).annotate({
       title: "Column mapping",
@@ -67,6 +63,15 @@ const importInput = Schema.Struct({
         "When a row updates an existing record: add (the default) keeps its values and adds the row's; replace uses only the row's.",
     }),
   ),
+}
+
+const importInput = Schema.Struct({
+  ...InTeam,
+  csv: Schema.String.check(Schema.isMaxLength(5_000_000)).annotate({
+    title: "CSV",
+    description: "The file's text, with a header row. Up to 5,000 rows. For a bigger file, use imports.start.",
+  }),
+  ...ImportOptions,
 })
 
 export const exportContacts = defineTeamOperation({

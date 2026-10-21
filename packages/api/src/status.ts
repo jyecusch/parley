@@ -34,6 +34,7 @@ export const ERROR_STATUS: { readonly [Tag in ErrorTag]: Status } = {
   ContactNotFound: 404,
   ContactEmailTaken: 409,
   CompanyNotFound: 404,
+  ImportNotFound: 404,
   CompanyDomainTaken: 409,
   FreeEmailDomain: 422,
   AffiliationNotFound: 404,

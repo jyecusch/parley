@@ -601,3 +601,79 @@ export const campaignRecipients = pgTable(
     index("campaign_recipients_provider_idx").on(t.providerId),
   ],
 )
+
+/**
+ * An import of contacts or companies, run in the background (D135). Its file is split into
+ * import_parts when it starts; the runner imports one part at a time and deletes it once imported,
+ * so a restart picks up at the next part. `failed` and `warnings` keep the first 1,000 rows of each.
+ */
+export const imports = pgTable(
+  "imports",
+  {
+    id: uuid("id").primaryKey(),
+    teamId: teamId(),
+    recordType: text("record_type", { enum: ["contact", "company"] }).notNull(),
+    status: text("status", { enum: ["queued", "running", "fetching-logos", "finished", "cancelled", "failed"] })
+      .notNull()
+      .default("queued"),
+    fileName: text("file_name"),
+    /** mapping, set, owners and multiSelect, as given to imports.start. */
+    options: jsonb("options").$type<unknown>().notNull(),
+    totalRows: integer("total_rows").notNull(),
+    processedRows: integer("processed_rows").notNull().default(0),
+    created: integer("created").notNull().default(0),
+    updated: integer("updated").notNull().default(0),
+    failedCount: integer("failed_count").notNull().default(0),
+    warningCount: integer("warning_count").notNull().default(0),
+    failed: jsonb("failed").$type<unknown[]>().notNull().default([]),
+    warnings: jsonb("warnings").$type<unknown[]>().notNull().default([]),
+    /** Null for contacts, and for companies before their logos are counted. */
+    logosTotal: integer("logos_total"),
+    logosDone: integer("logos_done").notNull().default(0),
+    startedByUserId: text("started_by_user_id").references(() => user.id, { onDelete: "set null" }),
+    startedByName: text("started_by_name"),
+    /** Who started it, as authenticated: each part is imported as them, with their access checked again. */
+    principal: jsonb("principal").$type<unknown>().notNull(),
+    /** Why it stopped, when its status is "failed": a message for the person, in our words. */
+    error: text("error"),
+    /** When a runner last claimed it; a claim older than a few minutes is taken over (a restart). */
+    claimedAt: timestamp("claimed_at", { withTimezone: true }),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (t) => [index("imports_team_idx").on(t.teamId, t.createdAt), index("imports_status_idx").on(t.status)],
+)
+
+/** A slice of an import's file, with the header row, imported in one go (D135). Deleted once imported. */
+export const importParts = pgTable(
+  "import_parts",
+  {
+    id: uuid("id").primaryKey(),
+    importId: uuid("import_id")
+      .notNull()
+      .references(() => imports.id, { onDelete: "cascade" }),
+    position: integer("position").notNull(),
+    /** The file line of the part's first row (the header is line 1). */
+    firstLine: integer("first_line").notNull(),
+    csv: text("csv").notNull(),
+  },
+  (t) => [uniqueIndex("import_parts_position_idx").on(t.importId, t.position)],
+)
+
+/** A company logo to fetch after an import's rows are in, one at a time (D135). Deleted once fetched. */
+export const importLogos = pgTable(
+  "import_logos",
+  {
+    id: uuid("id").primaryKey(),
+    importId: uuid("import_id")
+      .notNull()
+      .references(() => imports.id, { onDelete: "cascade" }),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    /** The file line it came from, for a warning if it can't be fetched. */
+    line: integer("line").notNull(),
+    url: text("url").notNull(),
+  },
+  (t) => [index("import_logos_import_idx").on(t.importId, t.line)],
+)

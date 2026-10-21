@@ -177,6 +177,12 @@ export class Contacts extends Context.Service<
       contactIds: ReadonlyArray<ContactId>,
       access: CanReadRecords<P, T>,
     ) => Effect.Effect<ReadonlySet<string>, DatabaseUnavailable>
+    /** For imports: the live contact each of these addresses (lower-case) belongs to, if any. */
+    readonly matchEmails: <P, T>(
+      team: Named<T, TeamId>,
+      addresses: ReadonlyArray<string>,
+      access: CanReadRecords<P, T>,
+    ) => Effect.Effect<ReadonlyMap<string, ContactId>, DatabaseUnavailable>
     /** Used only by the ContactInTeam and ContactRestorable provers. */
     readonly locate: <P, T>(
       team: Named<T, TeamId>,
@@ -820,7 +826,41 @@ export class Contacts extends Context.Service<
               ),
             ).pipe(Effect.map((rows) => new Set(rows.map((row) => row.id))))
 
-      return { list, locateMany, locate, get, create, update, delete: remove, restore, activity, setAvatar }
+      const matchEmails = <P, T>(
+        team: Named<T, TeamId>,
+        addresses: ReadonlyArray<string>,
+        _access: CanReadRecords<P, T>,
+      ) =>
+        addresses.length === 0
+          ? Effect.succeed(new Map<string, ContactId>())
+          : run(
+              db.query((d) =>
+                d
+                  .select({ address: schema.contactEmails.address, contactId: schema.contactEmails.contactId })
+                  .from(schema.contactEmails)
+                  .where(
+                    and(
+                      eq(schema.contactEmails.teamId, team.value),
+                      inArray(schema.contactEmails.address, [...addresses]),
+                      eq(schema.contactEmails.active, true),
+                    ),
+                  ),
+              ),
+            ).pipe(Effect.map((rows) => new Map(rows.map((row) => [row.address, row.contactId as ContactId]))))
+
+      return {
+        list,
+        locateMany,
+        matchEmails,
+        locate,
+        get,
+        create,
+        update,
+        delete: remove,
+        restore,
+        activity,
+        setAvatar,
+      }
     }),
   )
 }

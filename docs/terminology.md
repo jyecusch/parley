@@ -34,6 +34,7 @@ How to pick a name: choose the most common name for the concept. Reject anything
 | **Avatar** | A contact's image: uploaded, else Gravatar (if the team enables it), else initials. | photo, profile picture, picture |
 | **Logo** | A company's image: uploaded, else the favicon from its primary domain, else initials. | icon, favicon (except the fetched source), brand image |
 | **Social profile** | A link to a contact's or company's page on a social network, such as LinkedIn or X (D133). | social link, social URL, handle (for the link), socials |
+| **Import** | Bringing contacts or companies in from a CSV file; also one such run, which Parley carries out in the background with its progress and results (D135). | upload, ingest, import job (in UI copy), sync |
 | **Activity** | The history of changes to a record, as shown in the UI, including who made each change (for example "Jane via Claude"). | audit log, history, timeline, events |
 
 ## Identity and access
@@ -142,6 +143,7 @@ How to pick a name: choose the most common name for the concept. Reject anything
 | 2026-10-20 | Added **email style** (D116). |
 | 2026-10-21 | Added **record owner** (D123). |
 | 2026-10-21 | Added **social profile** (D133). |
+| 2026-10-21 | Added **import** (D135). |
 | 2026-10-20 | Added **domain**, **free email domain** and **domain matching** (D105, D106). |
 | 2026-10-20 | Added the v2 email terms: campaign, draft, template, merge tag, test send, recipient, topic, subscription status, unsubscribe, unsubscribe link, footer, sender and sending domain. Claude's picks, open to veto (see `docs/review.md`). Later: **preview text**. |
 | 2026-10-20 | Added **access token**, and removed it from API key's banned synonyms (P5, D97). |

@@ -31,6 +31,7 @@ import {
   type SocialNetworkId,
   SUBSCRIPTION_STATUS_LABELS,
   socialProfileFrom,
+  type TeamId,
   type TopicId,
   toCsv,
   type UserId,
@@ -44,7 +45,12 @@ import type { Principal } from "../principal.ts"
 import { proveCompanyInTeam } from "../proofs/company-in-team.ts"
 import { proveContactInTeam } from "../proofs/contact-in-team.ts"
 import { type MemberOf, proveMemberOf } from "../proofs/member-of.ts"
-import { type CanReadRecords, proveCanReadRecords, proveCanWriteRecords } from "../proofs/permissions.ts"
+import {
+  type CanReadRecords,
+  type CanWriteRecords,
+  proveCanReadRecords,
+  proveCanWriteRecords,
+} from "../proofs/permissions.ts"
 import { type Named, named } from "../proofs/proof.ts"
 import { proveRecordOwner, type RecordOwner } from "../proofs/record-owner.ts"
 import { proveSegmentInTeam } from "../proofs/segment-in-team.ts"
@@ -118,35 +124,6 @@ const customFromCell = (field: CustomField, cell: string): { value: CustomValue 
       return { value: text }
   }
 }
-
-/** Every live record of a type, page by page, for export and for matching rows on import. */
-const allContacts = <P, T>(team: Named<T, Parameters<typeof proveMemberOf>[1]["value"]>, read: CanReadRecords<P, T>) =>
-  Effect.gen(function* () {
-    const contacts = yield* Contacts
-    const items: Array<Contact> = []
-    let cursor: string | undefined
-    for (let page = 0; page < 200; page++) {
-      const result = yield* contacts.list(team, { limit: 200, ...(cursor ? { cursor } : {}) }, read)
-      items.push(...result.items)
-      if (!result.nextCursor) break
-      cursor = result.nextCursor
-    }
-    return items
-  })
-
-const allCompanies = <P, T>(team: Named<T, Parameters<typeof proveMemberOf>[1]["value"]>, read: CanReadRecords<P, T>) =>
-  Effect.gen(function* () {
-    const companies = yield* Companies
-    const items: Array<Company> = []
-    let cursor: string | undefined
-    for (let page = 0; page < 200; page++) {
-      const result = yield* companies.list(team, { limit: 200, ...(cursor ? { cursor } : {}) }, read)
-      items.push(...result.items)
-      if (!result.nextCursor) break
-      cursor = result.nextCursor
-    }
-    return items
-  })
 
 /** A segment's contacts, as the scope contacts.list narrows to; none when no segment is asked for. */
 const segmentScope = <P, T>(member: MemberOf<P, T>, segmentId: SegmentId | undefined) =>
@@ -327,6 +304,7 @@ const parse = (
   mapping: Readonly<Record<string, string>> | undefined,
   recordType: RecordType,
   fields: ReadonlyArray<CustomField>,
+  maxRows: number,
 ) =>
   Effect.gen(function* () {
     const [headers = [], ...rows] = parseCsv(csv)
@@ -341,13 +319,13 @@ const parse = (
         ],
       })
     }
-    if (rows.length > MAX_ROWS) {
+    if (rows.length > maxRows) {
       return yield* new InputRejected({
         problems: [
           {
             field: "csv",
             problem: "too-long",
-            userMessage: userText`Import up to ${MAX_ROWS} rows at a time. Split the file and import each part.`,
+            userMessage: userText`Import up to ${maxRows} rows at a time. Split the file and import each part.`,
           },
         ],
       })
@@ -658,7 +636,7 @@ const logoUrlOf = (cell: string | undefined): string | "invalid" | undefined => 
   return /^https:\/\/[^\s/]+\.[^\s]+$/i.test(url) ? url : "invalid"
 }
 
-const logoProblem = (): FieldProblem => ({
+export const logoProblem = (): FieldProblem => ({
   field: "logoUrl",
   problem: "invalid-format",
   userMessage: userText`The logo couldn't be fetched from its address, so the company keeps the logo it had.`,
@@ -786,8 +764,28 @@ type Outcome = {
   warnings: Array<ImportResult["warnings"][number]>
 }
 
-export const importContactsCsv = (principal: Principal, input: OperationInput<typeof importContacts>) =>
-  named(principal, input.teamId, (principal, team) =>
+/** How an import reads a file's columns: from contacts.import, companies.import or imports.start. */
+export type ImportSettings = Pick<OperationInput<typeof importContacts>, "mapping" | "set" | "owners" | "multiSelect">
+
+/**
+ * Where a slice of a file sits in it: its header row, then rows from `firstLine` on (the header is
+ * line 1), and the most rows it may have.
+ */
+export interface FileSlice {
+  readonly csv: string
+  readonly firstLine: number
+  readonly maxRows: number
+}
+
+const lowerEmailsOf = (cells: Record<string, string>) =>
+  [...split(cells.email), ...split(cells.emails)].map((email) => email.toLowerCase())
+
+/**
+ * Imports a file, or a slice of one, of contacts as `principal`, with the same checks as any
+ * request. Rows are matched to existing contacts by email and companies by name.
+ */
+export const importContactRows = (principal: Principal, teamId: TeamId, slice: FileSlice, input: ImportSettings) =>
+  named(principal, teamId, (principal, team) =>
     Effect.gen(function* () {
       const contacts = yield* Contacts
       const companies = yield* Companies
@@ -798,30 +796,29 @@ export const importContactsCsv = (principal: Principal, input: OperationInput<ty
       const canRead = yield* proveCanReadRecords(member)
       const canWrite = yield* proveCanWriteRecords(member)
       const fields = yield* customFields.list(team, "contact", canRead)
-      const parsed = yield* parse(input.csv, input.mapping, "contact", fields)
+      const parsed = yield* parse(slice.csv, input.mapping, "contact", fields, slice.maxRows)
       yield* checkSet(input.set, "contact", fields)
       const owners = yield* ownerResolver(member, input.owners)
       const topics = yield* topicColumns(member, parsed.mapping)
 
-      // Rows match existing contacts by email, and companies by name.
-      const byEmail = new Map<string, ContactId>()
-      for (const contact of yield* allContacts(team, canRead)) {
-        for (const email of contact.emails) byEmail.set(email.address, contact.id)
-      }
-      const companyByName = new Map<string, CompanyId>()
-      for (const company of yield* allCompanies(team, canRead))
-        companyByName.set(company.name.toLowerCase(), company.id)
+      // Rows match existing contacts by email, and companies by name, looked up for these rows only.
+      const rowCells = parsed.rows.map((row) => withSet(cellsOf(parsed, row), input.set, fields))
+      const byEmail = new Map(yield* contacts.matchEmails(team, [...new Set(rowCells.flatMap(lowerEmailsOf))], canRead))
+      const companyNames = rowCells.flatMap((cells) => cells.company?.split(";")[0]?.trim() || [])
+      const companyByName = new Map(
+        (yield* companies.matchKeys(team, { domains: [], names: companyNames }, canRead)).byName,
+      )
 
       const result: Outcome = { created: 0, updated: 0, failed: [], warnings: [] }
       for (const [index, row] of parsed.rows.entries()) {
-        const line = index + 2
-        const cells = withSet(cellsOf(parsed, row), input.set, fields)
+        const line = slice.firstLine + index
+        const cells = rowCells[index] ?? {}
         const problems: Array<FieldProblem> = []
         // Values that can't be used are left out and the row is still imported (D126).
         const warnings: Array<FieldProblem> = []
         const custom = customOf(cells, fields, warnings)
         const [first, ...rest] = (cells.name ?? "").split(/\s+/).filter(Boolean)
-        const emails = [...new Set([...split(cells.email), ...split(cells.emails)].map((email) => email.toLowerCase()))]
+        const emails = [...new Set(lowerEmailsOf(cells))]
         const allPhones = split(cells.phone).map((phone) => phone.replace(/[\s().-]/g, ""))
         const phones = [...new Set(allPhones.filter((phone) => Schema.is(PhoneNumber)(phone)))]
         // Rows skip the request's schema, so each cell is checked here as an operation's input would be.
@@ -993,8 +990,40 @@ export const importContactsCsv = (principal: Principal, input: OperationInput<ty
     }),
   )
 
-export const importCompaniesCsv = (principal: Principal, input: OperationInput<typeof importCompanies>) =>
-  named(principal, input.teamId, (principal, team) =>
+export const importContactsCsv = (principal: Principal, input: OperationInput<typeof importContacts>) =>
+  importContactRows(principal, input.teamId, { csv: input.csv, firstLine: 2, maxRows: MAX_ROWS }, input)
+
+/** A domains cell as domains: a website or an email address keeps just its domain. */
+const domainsOfCell = (cell: string | undefined) => {
+  const all = split(cell).map((value) =>
+    normalizeDomain(
+      value.includes("@") ? domainOfEmail(value) : (value.replace(/^https?:\/\//i, "").split("/")[0] ?? ""),
+    ),
+  )
+  const domains = [...new Set(all.filter((domain) => Schema.is(Domain)(domain)))]
+  return { domains, leftOut: domains.length < all.length }
+}
+
+/** A company logo from an import's logo column, to fetch once the rows are in (D134). */
+export interface LogoToFetch {
+  readonly line: number
+  readonly companyId: CompanyId
+  readonly url: string
+}
+
+/**
+ * Imports a file, or a slice of one, of companies as `principal`. Rows are matched to existing
+ * companies by domain, then by exact name. Logos are fetched here, a few at a time, or with
+ * "return" handed back to fetch later (D135).
+ */
+export const importCompanyRows = (
+  principal: Principal,
+  teamId: TeamId,
+  slice: FileSlice,
+  input: ImportSettings,
+  logoMode: "fetch" | "return",
+) =>
+  named(principal, teamId, (principal, team) =>
     Effect.gen(function* () {
       const companies = yield* Companies
       const customFields = yield* CustomFields
@@ -1002,35 +1031,34 @@ export const importCompaniesCsv = (principal: Principal, input: OperationInput<t
       const canRead = yield* proveCanReadRecords(member)
       const canWrite = yield* proveCanWriteRecords(member)
       const fields = yield* customFields.list(team, "company", canRead)
-      const parsed = yield* parse(input.csv, input.mapping, "company", fields)
+      const parsed = yield* parse(slice.csv, input.mapping, "company", fields, slice.maxRows)
       yield* checkSet(input.set, "company", fields)
       const owners = yield* ownerResolver(member, input.owners)
 
-      // Rows match existing companies by domain, then by exact name.
-      const byDomain = new Map<string, CompanyId>()
-      const byName = new Map<string, CompanyId>()
-      for (const company of yield* allCompanies(team, canRead)) {
-        for (const entry of company.domains) byDomain.set(entry.domain, company.id)
-        byName.set(company.name.toLowerCase(), company.id)
-      }
+      // Rows match existing companies by domain, then by exact name, looked up for these rows only.
+      const rowCells = parsed.rows.map((row) => withSet(cellsOf(parsed, row), input.set, fields))
+      const matched = yield* companies.matchKeys(
+        team,
+        {
+          domains: [...new Set(rowCells.flatMap((cells) => domainsOfCell(cells.domains).domains))],
+          names: rowCells.flatMap((cells) => cells.name?.trim().slice(0, 200) || []),
+        },
+        canRead,
+      )
+      const byDomain = new Map(matched.byDomain)
+      const byName = new Map(matched.byName)
 
       const result: Outcome = { created: 0, updated: 0, failed: [], warnings: [] }
       // Logos are fetched once the rows are in, a few at a time (D134).
-      const logos: Array<{ line: number; companyId: CompanyId; url: string }> = []
-      for (const [index, row] of parsed.rows.entries()) {
-        const line = index + 2
-        const cells = withSet(cellsOf(parsed, row), input.set, fields)
+      const logos: Array<LogoToFetch> = []
+      for (const index of parsed.rows.keys()) {
+        const line = slice.firstLine + index
+        const cells = rowCells[index] ?? {}
         // Values that can't be used are left out and the row is still imported (D126).
         const warnings: Array<FieldProblem> = []
         const custom = customOf(cells, fields, warnings)
-        // A "domain" may come as a website or an email address; keep just the domain.
-        const allDomains = split(cells.domains).map((value) =>
-          normalizeDomain(
-            value.includes("@") ? domainOfEmail(value) : (value.replace(/^https?:\/\//i, "").split("/")[0] ?? ""),
-          ),
-        )
-        const domains = [...new Set(allDomains.filter((domain) => Schema.is(Domain)(domain)))]
-        if (domains.length < allDomains.length) {
+        const { domains, leftOut } = domainsOfCell(cells.domains)
+        if (leftOut) {
           warnings.push({
             field: "domains",
             problem: "invalid-format",
@@ -1156,27 +1184,89 @@ export const importCompaniesCsv = (principal: Principal, input: OperationInput<t
           },
         )
       }
+      if (logoMode === "return") return { ...result, logos }
       yield* Effect.forEach(
         logos,
         (logo) =>
-          fetchLogo(logo.url).pipe(
-            Effect.flatMap((image) =>
-              named(logo.companyId, (company) =>
-                Effect.gen(function* () {
-                  const proof = yield* proveCompanyInTeam(team, company, canRead)
-                  yield* companies.setLogo(proof, image, canWrite)
-                }),
-              ),
-            ),
-            Effect.catch((error) =>
-              typeof error === "object" && error._tag === "DatabaseUnavailable"
-                ? Effect.fail(error)
-                : Effect.sync(() => addWarnings(result, logo.line, [logoProblem()])),
+          setLogoFrom(team, logo, canRead, canWrite).pipe(
+            Effect.flatMap((fetched) =>
+              fetched ? Effect.void : Effect.sync(() => addWarnings(result, logo.line, [logoProblem()])),
             ),
           ),
         { concurrency: LOGO_CONCURRENCY, discard: true },
       )
       result.warnings.sort((a, b) => a.line - b.line)
-      return result
+      return { ...result, logos: [] as ReadonlyArray<LogoToFetch> }
+    }),
+  )
+
+export const importCompaniesCsv = (principal: Principal, input: OperationInput<typeof importCompanies>) =>
+  importCompanyRows(principal, input.teamId, { csv: input.csv, firstLine: 2, maxRows: MAX_ROWS }, input, "fetch").pipe(
+    Effect.map(({ logos: _, ...result }) => result),
+  )
+
+/**
+ * Fetches a company's logo from its address and stores it as its logo. False when it couldn't be
+ * fetched or the company is gone, so the company keeps the logo it had.
+ */
+const setLogoFrom = <P, T>(
+  team: Named<T, TeamId>,
+  logo: LogoToFetch,
+  canRead: CanReadRecords<P, T>,
+  canWrite: CanWriteRecords<P, T>,
+) =>
+  Effect.gen(function* () {
+    const companies = yield* Companies
+    return yield* fetchLogo(logo.url).pipe(
+      Effect.flatMap((image) =>
+        named(logo.companyId, (company) =>
+          Effect.gen(function* () {
+            const proof = yield* proveCompanyInTeam(team, company, canRead)
+            yield* companies.setLogo(proof, image, canWrite)
+            return true
+          }),
+        ),
+      ),
+      Effect.catch((error) =>
+        typeof error === "object" && error._tag === "DatabaseUnavailable" ? Effect.fail(error) : Effect.succeed(false),
+      ),
+    )
+  })
+
+/** Fetches one logo an import handed back (D135), as `principal`. False when it couldn't be used. */
+export const fetchImportedLogo = (principal: Principal, teamId: TeamId, logo: LogoToFetch) =>
+  named(principal, teamId, (principal, team) =>
+    Effect.gen(function* () {
+      const member = yield* proveMemberOf(principal, team)
+      const canRead = yield* proveCanReadRecords(member)
+      const canWrite = yield* proveCanWriteRecords(member)
+      return yield* setLogoFrom(team, logo, canRead, canWrite)
+    }),
+  )
+
+/**
+ * Checks how an import reads its file before any row is imported (D135): the values to set, the
+ * owners chosen and the topic columns. The mapping, guessed from the headers when not given, is
+ * returned to keep with the import.
+ */
+export const checkImportSettings = (
+  principal: Principal,
+  teamId: TeamId,
+  recordType: RecordType,
+  headers: ReadonlyArray<string>,
+  input: ImportSettings,
+) =>
+  named(principal, teamId, (principal, team) =>
+    Effect.gen(function* () {
+      const customFields = yield* CustomFields
+      const member = yield* proveMemberOf(principal, team)
+      const canRead = yield* proveCanReadRecords(member)
+      yield* proveCanWriteRecords(member)
+      const fields = yield* customFields.list(team, recordType, canRead)
+      const mapping = input.mapping ?? guessMapping(headers, recordType, fields)
+      yield* checkSet(input.set, recordType, fields)
+      yield* ownerResolver(member, input.owners)
+      if (recordType === "contact") yield* topicColumns(member, mapping)
+      return mapping
     }),
   )
