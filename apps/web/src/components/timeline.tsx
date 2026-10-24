@@ -1,9 +1,10 @@
-import type { ActivityEntry, Note, NoteId, RecordType, TeamId } from "@parley/domain"
+import type { ActivityEntry, ContactId, Note, NoteId, RecordType, TeamId } from "@parley/domain"
 import type { UserText } from "@parley/errors"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { getRouteApi } from "@tanstack/react-router"
 import { useState } from "react"
 import { call, messageOf } from "../lib/client.ts"
+import { refreshRecords } from "../lib/records.ts"
 import { MoreIcon } from "./icons.tsx"
 import { ActivityRow, TimelineRow } from "./record.tsx"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./ui/dropdown-menu.tsx"
@@ -36,6 +37,29 @@ export function Timeline(props: {
   })
   const isAdmin = current.role !== "member"
   const refresh = () => queryClient.invalidateQueries({ queryKey: key })
+
+  /** Writes a value a form submission kept (D145) to the contact, then reloads it and its activity. */
+  const applyKept = async (kept: ActivityEntry["kept"][number]) => {
+    const contactId = props.recordId as ContactId
+    try {
+      if (kept.field.startsWith("custom:")) {
+        await call("contacts.update", {
+          teamId: props.teamId,
+          contactId,
+          custom: { [kept.field.slice("custom:".length)]: kept.value as never },
+        })
+      } else {
+        await call("contacts.update", { teamId: props.teamId, contactId, [kept.field]: kept.value } as never)
+      }
+    } catch (failure) {
+      props.onError(messageOf(failure))
+      throw failure
+    }
+    await Promise.all([
+      refreshRecords(queryClient, "contacts", props.teamId),
+      queryClient.invalidateQueries({ queryKey: ["contact-activity", props.teamId] }),
+    ])
+  }
 
   const entries: ReadonlyArray<Entry> = [
     ...(props.activity ?? []).map((activity) => ({ at: activity.at, activity })),
@@ -79,6 +103,7 @@ export function Timeline(props: {
             entry={entry.activity}
             recordType={props.recordType}
             first={index === 0}
+            onApplyKept={props.recordType === "contact" ? applyKept : undefined}
           />
         ),
       )}

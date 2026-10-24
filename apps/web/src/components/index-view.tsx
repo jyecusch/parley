@@ -649,7 +649,7 @@ export function ImportDialog(props: {
     <Dialog
       title={`Import ${props.plural}`}
       onClose={props.onClose}
-      className="w-[min(46rem,calc(100%-2rem))]"
+      className="max-w-184"
       footer={
         <>
           <TextButton className="mr-auto self-center text-sm" onClick={props.onShowPast}>
@@ -948,10 +948,10 @@ function SetOnEveryRow(props: {
           .map((label) => label.trim())
           .filter(Boolean)
         return (
-          <div key={target} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_auto] items-start gap-2.5">
-            <span className="truncate pt-2 text-sm">{field.name}</span>
+          <div key={target} className="flex items-start gap-2.5">
+            <span className="min-w-0 flex-5 truncate pt-2 text-sm">{field.name}</span>
             {field.type === "multi-select" ? (
-              <div className="flex flex-wrap gap-x-3 gap-y-1 pt-1.5">
+              <div className="flex min-w-0 flex-7 flex-wrap gap-x-3 gap-y-1 pt-1.5">
                 {field.options.map((option) => (
                   <Option key={option.id} className="min-h-6 text-sm">
                     <Checkbox
@@ -971,22 +971,24 @@ function SetOnEveryRow(props: {
                 ))}
               </div>
             ) : field.type === "single-select" ? (
-              <Select
-                className="h-9"
-                aria-label={`Value for ${field.name}`}
-                value={text}
-                onChange={(event) => setOne(target, event.target.value)}
-              >
-                <option value="">Choose…</option>
-                {field.options.map((option) => (
-                  <option key={option.id} value={option.label}>
-                    {option.label}
-                  </option>
-                ))}
-              </Select>
+              <div className="min-w-0 flex-7">
+                <Select
+                  className="h-9"
+                  aria-label={`Value for ${field.name}`}
+                  value={text}
+                  onChange={(event) => setOne(target, event.target.value)}
+                >
+                  <option value="">Choose…</option>
+                  {field.options.map((option) => (
+                    <option key={option.id} value={option.label}>
+                      {option.label}
+                    </option>
+                  ))}
+                </Select>
+              </div>
             ) : (
               <Input
-                className="h-9"
+                className="h-9 min-w-0 flex-7"
                 aria-label={`Value for ${field.name}`}
                 value={text}
                 onChange={(event) => setOne(target, event.target.value)}

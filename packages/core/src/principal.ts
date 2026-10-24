@@ -62,8 +62,23 @@ export interface ServiceAccountConnection {
 /** Who is making the request. The output of authentication, before any team is known. */
 export type Principal = UserSession | UserApiKey | ServiceAccountApiKey | UserConnection | ServiceAccountConnection
 
+/**
+ * Parley acting on its own, for a change nobody signed in asked for: a confirmed form submission,
+ * say (D145). Shown as its name, such as "Form: Waitlist".
+ */
+export interface SystemActor {
+  readonly _tag: "SystemActor"
+  readonly name: string
+}
+
+/** Who a change is attributed to: a principal, or Parley itself. */
+export type Actor = Principal | SystemActor
+
 /** How a change is attributed in activity: "Jane Doe via Claude on my laptop" (D78, D96). */
-export const attribution = (principal: Principal) => {
+export const attribution = (principal: Actor) => {
+  if (principal._tag === "SystemActor") {
+    return { actorUserId: null, actorName: principal.name, viaApiKeyId: null, viaConnectionId: null, viaName: null }
+  }
   const actor = { actorUserId: principal.userId, actorName: principal.name }
   switch (principal._tag) {
     case "UserSession":

@@ -17,10 +17,12 @@ import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as SignUpRouteImport } from './routes/sign-up'
 import { Route as DotwellKnownSplatRouteImport } from './routes/[.]well-known.$'
 import { Route as ApiSplatRouteImport } from './routes/api/$'
+import { Route as FFormIdRouteImport } from './routes/f.$formId'
 import { Route as IImageIdRouteImport } from './routes/i.$imageId'
 import { Route as InviteInvitationIdRouteImport } from './routes/invite.$invitationId'
 import { Route as TTeamIdRouteImport } from './routes/t.$teamId'
 import { Route as UnsubscribeTokenRouteImport } from './routes/unsubscribe.$token'
+import { Route as FConfirmTokenRouteImport } from './routes/f.confirm.$token'
 import { Route as TTeamIdSettingsRouteImport } from './routes/t.$teamId.settings'
 import { Route as TTeamIdBroadcastsIndexRouteImport } from './routes/t.$teamId.broadcasts.index'
 import { Route as TTeamIdBroadcastsBroadcastIdRouteImport } from './routes/t.$teamId.broadcasts.$broadcastId'
@@ -30,6 +32,7 @@ import { Route as TTeamIdCompaniesIndexRouteImport } from './routes/t.$teamId.co
 import { Route as TTeamIdCompaniesCompanyIdRouteImport } from './routes/t.$teamId.companies.$companyId'
 import { Route as TTeamIdContactsIndexRouteImport } from './routes/t.$teamId.contacts.index'
 import { Route as TTeamIdContactsContactIdRouteImport } from './routes/t.$teamId.contacts.$contactId'
+import { Route as TTeamIdFormsIndexRouteImport } from './routes/t.$teamId.forms.index'
 import { Route as TTeamIdSegmentsIndexRouteImport } from './routes/t.$teamId.segments.index'
 import { Route as TTeamIdSegmentsSegmentIdRouteImport } from './routes/t.$teamId.segments.$segmentId'
 import { Route as TTeamIdSettingsIndexRouteImport } from './routes/t.$teamId.settings.index'
@@ -37,11 +40,14 @@ import { Route as TTeamIdSettingsApiKeysRouteImport } from './routes/t.$teamId.s
 import { Route as TTeamIdSettingsConnectionsRouteImport } from './routes/t.$teamId.settings.connections'
 import { Route as TTeamIdSettingsEmailRouteImport } from './routes/t.$teamId.settings.email'
 import { Route as TTeamIdSettingsFieldsRouteImport } from './routes/t.$teamId.settings.fields'
+import { Route as TTeamIdSettingsFormsRouteImport } from './routes/t.$teamId.settings.forms'
 import { Route as TTeamIdSettingsGeneralRouteImport } from './routes/t.$teamId.settings.general'
 import { Route as TTeamIdSettingsMembersRouteImport } from './routes/t.$teamId.settings.members'
 import { Route as TTeamIdSettingsServiceAccountsRouteImport } from './routes/t.$teamId.settings.service-accounts'
 import { Route as TTeamIdTemplatesIndexRouteImport } from './routes/t.$teamId.templates.index'
 import { Route as TTeamIdTemplatesTemplateIdRouteImport } from './routes/t.$teamId.templates.$templateId'
+import { Route as TTeamIdFormsFormIdIndexRouteImport } from './routes/t.$teamId.forms.$formId.index'
+import { Route as TTeamIdFormsFormIdSubmissionsRouteImport } from './routes/t.$teamId.forms.$formId.submissions'
 import { Route as TTeamIdSettingsEmailStylesIndexRouteImport } from './routes/t.$teamId.settings.email-styles.index'
 import { Route as TTeamIdSettingsEmailStylesStyleIdRouteImport } from './routes/t.$teamId.settings.email-styles.$styleId'
 
@@ -85,6 +91,11 @@ const ApiSplatRoute = ApiSplatRouteImport.update({
   path: '/api/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FFormIdRoute = FFormIdRouteImport.update({
+  id: '/f/$formId',
+  path: '/f/$formId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IImageIdRoute = IImageIdRouteImport.update({
   id: '/i/$imageId',
   path: '/i/$imageId',
@@ -103,6 +114,11 @@ const TTeamIdRoute = TTeamIdRouteImport.update({
 const UnsubscribeTokenRoute = UnsubscribeTokenRouteImport.update({
   id: '/unsubscribe/$token',
   path: '/unsubscribe/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FConfirmTokenRoute = FConfirmTokenRouteImport.update({
+  id: '/f/confirm/$token',
+  path: '/f/confirm/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TTeamIdSettingsRoute = TTeamIdSettingsRouteImport.update({
@@ -154,6 +170,11 @@ const TTeamIdContactsContactIdRoute =
     path: '/contacts/$contactId',
     getParentRoute: () => TTeamIdRoute,
   } as any)
+const TTeamIdFormsIndexRoute = TTeamIdFormsIndexRouteImport.update({
+  id: '/forms/',
+  path: '/forms/',
+  getParentRoute: () => TTeamIdRoute,
+} as any)
 const TTeamIdSegmentsIndexRoute = TTeamIdSegmentsIndexRouteImport.update({
   id: '/segments/',
   path: '/segments/',
@@ -191,6 +212,11 @@ const TTeamIdSettingsFieldsRoute = TTeamIdSettingsFieldsRouteImport.update({
   path: '/fields',
   getParentRoute: () => TTeamIdSettingsRoute,
 } as any)
+const TTeamIdSettingsFormsRoute = TTeamIdSettingsFormsRouteImport.update({
+  id: '/forms',
+  path: '/forms',
+  getParentRoute: () => TTeamIdSettingsRoute,
+} as any)
 const TTeamIdSettingsGeneralRoute = TTeamIdSettingsGeneralRouteImport.update({
   id: '/general',
   path: '/general',
@@ -218,6 +244,17 @@ const TTeamIdTemplatesTemplateIdRoute =
     path: '/templates/$templateId',
     getParentRoute: () => TTeamIdRoute,
   } as any)
+const TTeamIdFormsFormIdIndexRoute = TTeamIdFormsFormIdIndexRouteImport.update({
+  id: '/forms/$formId/',
+  path: '/forms/$formId/',
+  getParentRoute: () => TTeamIdRoute,
+} as any)
+const TTeamIdFormsFormIdSubmissionsRoute =
+  TTeamIdFormsFormIdSubmissionsRouteImport.update({
+    id: '/forms/$formId/submissions',
+    path: '/forms/$formId/submissions',
+    getParentRoute: () => TTeamIdRoute,
+  } as any)
 const TTeamIdSettingsEmailStylesIndexRoute =
   TTeamIdSettingsEmailStylesIndexRouteImport.update({
     id: '/email-styles/',
@@ -240,10 +277,12 @@ export interface FileRoutesByFullPath {
   '/sign-up': typeof SignUpRoute
   '/.well-known/$': typeof DotwellKnownSplatRoute
   '/api/$': typeof ApiSplatRoute
+  '/f/$formId': typeof FFormIdRoute
   '/i/$imageId': typeof IImageIdRoute
   '/invite/$invitationId': typeof InviteInvitationIdRoute
   '/t/$teamId': typeof TTeamIdRouteWithChildren
   '/unsubscribe/$token': typeof UnsubscribeTokenRoute
+  '/f/confirm/$token': typeof FConfirmTokenRoute
   '/t/$teamId/settings': typeof TTeamIdSettingsRouteWithChildren
   '/t/$teamId/broadcasts/$broadcastId': typeof TTeamIdBroadcastsBroadcastIdRoute
   '/t/$teamId/campaigns/$campaignId': typeof TTeamIdCampaignsCampaignIdRoute
@@ -254,6 +293,7 @@ export interface FileRoutesByFullPath {
   '/t/$teamId/settings/connections': typeof TTeamIdSettingsConnectionsRoute
   '/t/$teamId/settings/email': typeof TTeamIdSettingsEmailRoute
   '/t/$teamId/settings/fields': typeof TTeamIdSettingsFieldsRoute
+  '/t/$teamId/settings/forms': typeof TTeamIdSettingsFormsRoute
   '/t/$teamId/settings/general': typeof TTeamIdSettingsGeneralRoute
   '/t/$teamId/settings/members': typeof TTeamIdSettingsMembersRoute
   '/t/$teamId/settings/service-accounts': typeof TTeamIdSettingsServiceAccountsRoute
@@ -262,10 +302,13 @@ export interface FileRoutesByFullPath {
   '/t/$teamId/campaigns/': typeof TTeamIdCampaignsIndexRoute
   '/t/$teamId/companies/': typeof TTeamIdCompaniesIndexRoute
   '/t/$teamId/contacts/': typeof TTeamIdContactsIndexRoute
+  '/t/$teamId/forms/': typeof TTeamIdFormsIndexRoute
   '/t/$teamId/segments/': typeof TTeamIdSegmentsIndexRoute
   '/t/$teamId/settings/': typeof TTeamIdSettingsIndexRoute
   '/t/$teamId/templates/': typeof TTeamIdTemplatesIndexRoute
+  '/t/$teamId/forms/$formId/submissions': typeof TTeamIdFormsFormIdSubmissionsRoute
   '/t/$teamId/settings/email-styles/$styleId': typeof TTeamIdSettingsEmailStylesStyleIdRoute
+  '/t/$teamId/forms/$formId/': typeof TTeamIdFormsFormIdIndexRoute
   '/t/$teamId/settings/email-styles/': typeof TTeamIdSettingsEmailStylesIndexRoute
 }
 export interface FileRoutesByTo {
@@ -277,10 +320,12 @@ export interface FileRoutesByTo {
   '/sign-up': typeof SignUpRoute
   '/.well-known/$': typeof DotwellKnownSplatRoute
   '/api/$': typeof ApiSplatRoute
+  '/f/$formId': typeof FFormIdRoute
   '/i/$imageId': typeof IImageIdRoute
   '/invite/$invitationId': typeof InviteInvitationIdRoute
   '/t/$teamId': typeof TTeamIdRouteWithChildren
   '/unsubscribe/$token': typeof UnsubscribeTokenRoute
+  '/f/confirm/$token': typeof FConfirmTokenRoute
   '/t/$teamId/broadcasts/$broadcastId': typeof TTeamIdBroadcastsBroadcastIdRoute
   '/t/$teamId/campaigns/$campaignId': typeof TTeamIdCampaignsCampaignIdRoute
   '/t/$teamId/companies/$companyId': typeof TTeamIdCompaniesCompanyIdRoute
@@ -290,6 +335,7 @@ export interface FileRoutesByTo {
   '/t/$teamId/settings/connections': typeof TTeamIdSettingsConnectionsRoute
   '/t/$teamId/settings/email': typeof TTeamIdSettingsEmailRoute
   '/t/$teamId/settings/fields': typeof TTeamIdSettingsFieldsRoute
+  '/t/$teamId/settings/forms': typeof TTeamIdSettingsFormsRoute
   '/t/$teamId/settings/general': typeof TTeamIdSettingsGeneralRoute
   '/t/$teamId/settings/members': typeof TTeamIdSettingsMembersRoute
   '/t/$teamId/settings/service-accounts': typeof TTeamIdSettingsServiceAccountsRoute
@@ -298,10 +344,13 @@ export interface FileRoutesByTo {
   '/t/$teamId/campaigns': typeof TTeamIdCampaignsIndexRoute
   '/t/$teamId/companies': typeof TTeamIdCompaniesIndexRoute
   '/t/$teamId/contacts': typeof TTeamIdContactsIndexRoute
+  '/t/$teamId/forms': typeof TTeamIdFormsIndexRoute
   '/t/$teamId/segments': typeof TTeamIdSegmentsIndexRoute
   '/t/$teamId/settings': typeof TTeamIdSettingsIndexRoute
   '/t/$teamId/templates': typeof TTeamIdTemplatesIndexRoute
+  '/t/$teamId/forms/$formId/submissions': typeof TTeamIdFormsFormIdSubmissionsRoute
   '/t/$teamId/settings/email-styles/$styleId': typeof TTeamIdSettingsEmailStylesStyleIdRoute
+  '/t/$teamId/forms/$formId': typeof TTeamIdFormsFormIdIndexRoute
   '/t/$teamId/settings/email-styles': typeof TTeamIdSettingsEmailStylesIndexRoute
 }
 export interface FileRoutesById {
@@ -314,10 +363,12 @@ export interface FileRoutesById {
   '/sign-up': typeof SignUpRoute
   '/.well-known/$': typeof DotwellKnownSplatRoute
   '/api/$': typeof ApiSplatRoute
+  '/f/$formId': typeof FFormIdRoute
   '/i/$imageId': typeof IImageIdRoute
   '/invite/$invitationId': typeof InviteInvitationIdRoute
   '/t/$teamId': typeof TTeamIdRouteWithChildren
   '/unsubscribe/$token': typeof UnsubscribeTokenRoute
+  '/f/confirm/$token': typeof FConfirmTokenRoute
   '/t/$teamId/settings': typeof TTeamIdSettingsRouteWithChildren
   '/t/$teamId/broadcasts/$broadcastId': typeof TTeamIdBroadcastsBroadcastIdRoute
   '/t/$teamId/campaigns/$campaignId': typeof TTeamIdCampaignsCampaignIdRoute
@@ -328,6 +379,7 @@ export interface FileRoutesById {
   '/t/$teamId/settings/connections': typeof TTeamIdSettingsConnectionsRoute
   '/t/$teamId/settings/email': typeof TTeamIdSettingsEmailRoute
   '/t/$teamId/settings/fields': typeof TTeamIdSettingsFieldsRoute
+  '/t/$teamId/settings/forms': typeof TTeamIdSettingsFormsRoute
   '/t/$teamId/settings/general': typeof TTeamIdSettingsGeneralRoute
   '/t/$teamId/settings/members': typeof TTeamIdSettingsMembersRoute
   '/t/$teamId/settings/service-accounts': typeof TTeamIdSettingsServiceAccountsRoute
@@ -336,10 +388,13 @@ export interface FileRoutesById {
   '/t/$teamId/campaigns/': typeof TTeamIdCampaignsIndexRoute
   '/t/$teamId/companies/': typeof TTeamIdCompaniesIndexRoute
   '/t/$teamId/contacts/': typeof TTeamIdContactsIndexRoute
+  '/t/$teamId/forms/': typeof TTeamIdFormsIndexRoute
   '/t/$teamId/segments/': typeof TTeamIdSegmentsIndexRoute
   '/t/$teamId/settings/': typeof TTeamIdSettingsIndexRoute
   '/t/$teamId/templates/': typeof TTeamIdTemplatesIndexRoute
+  '/t/$teamId/forms/$formId/submissions': typeof TTeamIdFormsFormIdSubmissionsRoute
   '/t/$teamId/settings/email-styles/$styleId': typeof TTeamIdSettingsEmailStylesStyleIdRoute
+  '/t/$teamId/forms/$formId/': typeof TTeamIdFormsFormIdIndexRoute
   '/t/$teamId/settings/email-styles/': typeof TTeamIdSettingsEmailStylesIndexRoute
 }
 export interface FileRouteTypes {
@@ -353,10 +408,12 @@ export interface FileRouteTypes {
     | '/sign-up'
     | '/.well-known/$'
     | '/api/$'
+    | '/f/$formId'
     | '/i/$imageId'
     | '/invite/$invitationId'
     | '/t/$teamId'
     | '/unsubscribe/$token'
+    | '/f/confirm/$token'
     | '/t/$teamId/settings'
     | '/t/$teamId/broadcasts/$broadcastId'
     | '/t/$teamId/campaigns/$campaignId'
@@ -367,6 +424,7 @@ export interface FileRouteTypes {
     | '/t/$teamId/settings/connections'
     | '/t/$teamId/settings/email'
     | '/t/$teamId/settings/fields'
+    | '/t/$teamId/settings/forms'
     | '/t/$teamId/settings/general'
     | '/t/$teamId/settings/members'
     | '/t/$teamId/settings/service-accounts'
@@ -375,10 +433,13 @@ export interface FileRouteTypes {
     | '/t/$teamId/campaigns/'
     | '/t/$teamId/companies/'
     | '/t/$teamId/contacts/'
+    | '/t/$teamId/forms/'
     | '/t/$teamId/segments/'
     | '/t/$teamId/settings/'
     | '/t/$teamId/templates/'
+    | '/t/$teamId/forms/$formId/submissions'
     | '/t/$teamId/settings/email-styles/$styleId'
+    | '/t/$teamId/forms/$formId/'
     | '/t/$teamId/settings/email-styles/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -390,10 +451,12 @@ export interface FileRouteTypes {
     | '/sign-up'
     | '/.well-known/$'
     | '/api/$'
+    | '/f/$formId'
     | '/i/$imageId'
     | '/invite/$invitationId'
     | '/t/$teamId'
     | '/unsubscribe/$token'
+    | '/f/confirm/$token'
     | '/t/$teamId/broadcasts/$broadcastId'
     | '/t/$teamId/campaigns/$campaignId'
     | '/t/$teamId/companies/$companyId'
@@ -403,6 +466,7 @@ export interface FileRouteTypes {
     | '/t/$teamId/settings/connections'
     | '/t/$teamId/settings/email'
     | '/t/$teamId/settings/fields'
+    | '/t/$teamId/settings/forms'
     | '/t/$teamId/settings/general'
     | '/t/$teamId/settings/members'
     | '/t/$teamId/settings/service-accounts'
@@ -411,10 +475,13 @@ export interface FileRouteTypes {
     | '/t/$teamId/campaigns'
     | '/t/$teamId/companies'
     | '/t/$teamId/contacts'
+    | '/t/$teamId/forms'
     | '/t/$teamId/segments'
     | '/t/$teamId/settings'
     | '/t/$teamId/templates'
+    | '/t/$teamId/forms/$formId/submissions'
     | '/t/$teamId/settings/email-styles/$styleId'
+    | '/t/$teamId/forms/$formId'
     | '/t/$teamId/settings/email-styles'
   id:
     | '__root__'
@@ -426,10 +493,12 @@ export interface FileRouteTypes {
     | '/sign-up'
     | '/.well-known/$'
     | '/api/$'
+    | '/f/$formId'
     | '/i/$imageId'
     | '/invite/$invitationId'
     | '/t/$teamId'
     | '/unsubscribe/$token'
+    | '/f/confirm/$token'
     | '/t/$teamId/settings'
     | '/t/$teamId/broadcasts/$broadcastId'
     | '/t/$teamId/campaigns/$campaignId'
@@ -440,6 +509,7 @@ export interface FileRouteTypes {
     | '/t/$teamId/settings/connections'
     | '/t/$teamId/settings/email'
     | '/t/$teamId/settings/fields'
+    | '/t/$teamId/settings/forms'
     | '/t/$teamId/settings/general'
     | '/t/$teamId/settings/members'
     | '/t/$teamId/settings/service-accounts'
@@ -448,10 +518,13 @@ export interface FileRouteTypes {
     | '/t/$teamId/campaigns/'
     | '/t/$teamId/companies/'
     | '/t/$teamId/contacts/'
+    | '/t/$teamId/forms/'
     | '/t/$teamId/segments/'
     | '/t/$teamId/settings/'
     | '/t/$teamId/templates/'
+    | '/t/$teamId/forms/$formId/submissions'
     | '/t/$teamId/settings/email-styles/$styleId'
+    | '/t/$teamId/forms/$formId/'
     | '/t/$teamId/settings/email-styles/'
   fileRoutesById: FileRoutesById
 }
@@ -464,10 +537,12 @@ export interface RootRouteChildren {
   SignUpRoute: typeof SignUpRoute
   DotwellKnownSplatRoute: typeof DotwellKnownSplatRoute
   ApiSplatRoute: typeof ApiSplatRoute
+  FFormIdRoute: typeof FFormIdRoute
   IImageIdRoute: typeof IImageIdRoute
   InviteInvitationIdRoute: typeof InviteInvitationIdRoute
   TTeamIdRoute: typeof TTeamIdRouteWithChildren
   UnsubscribeTokenRoute: typeof UnsubscribeTokenRoute
+  FConfirmTokenRoute: typeof FConfirmTokenRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -528,6 +603,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/f/$formId': {
+      id: '/f/$formId'
+      path: '/f/$formId'
+      fullPath: '/f/$formId'
+      preLoaderRoute: typeof FFormIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/i/$imageId': {
       id: '/i/$imageId'
       path: '/i/$imageId'
@@ -554,6 +636,13 @@ declare module '@tanstack/react-router' {
       path: '/unsubscribe/$token'
       fullPath: '/unsubscribe/$token'
       preLoaderRoute: typeof UnsubscribeTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/f/confirm/$token': {
+      id: '/f/confirm/$token'
+      path: '/f/confirm/$token'
+      fullPath: '/f/confirm/$token'
+      preLoaderRoute: typeof FConfirmTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/t/$teamId/settings': {
@@ -619,6 +708,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TTeamIdContactsContactIdRouteImport
       parentRoute: typeof TTeamIdRoute
     }
+    '/t/$teamId/forms/': {
+      id: '/t/$teamId/forms/'
+      path: '/forms'
+      fullPath: '/t/$teamId/forms/'
+      preLoaderRoute: typeof TTeamIdFormsIndexRouteImport
+      parentRoute: typeof TTeamIdRoute
+    }
     '/t/$teamId/segments/': {
       id: '/t/$teamId/segments/'
       path: '/segments'
@@ -668,6 +764,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TTeamIdSettingsFieldsRouteImport
       parentRoute: typeof TTeamIdSettingsRoute
     }
+    '/t/$teamId/settings/forms': {
+      id: '/t/$teamId/settings/forms'
+      path: '/forms'
+      fullPath: '/t/$teamId/settings/forms'
+      preLoaderRoute: typeof TTeamIdSettingsFormsRouteImport
+      parentRoute: typeof TTeamIdSettingsRoute
+    }
     '/t/$teamId/settings/general': {
       id: '/t/$teamId/settings/general'
       path: '/general'
@@ -703,6 +806,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TTeamIdTemplatesTemplateIdRouteImport
       parentRoute: typeof TTeamIdRoute
     }
+    '/t/$teamId/forms/$formId/': {
+      id: '/t/$teamId/forms/$formId/'
+      path: '/forms/$formId'
+      fullPath: '/t/$teamId/forms/$formId/'
+      preLoaderRoute: typeof TTeamIdFormsFormIdIndexRouteImport
+      parentRoute: typeof TTeamIdRoute
+    }
+    '/t/$teamId/forms/$formId/submissions': {
+      id: '/t/$teamId/forms/$formId/submissions'
+      path: '/forms/$formId/submissions'
+      fullPath: '/t/$teamId/forms/$formId/submissions'
+      preLoaderRoute: typeof TTeamIdFormsFormIdSubmissionsRouteImport
+      parentRoute: typeof TTeamIdRoute
+    }
     '/t/$teamId/settings/email-styles/': {
       id: '/t/$teamId/settings/email-styles/'
       path: '/email-styles'
@@ -725,6 +842,7 @@ interface TTeamIdSettingsRouteChildren {
   TTeamIdSettingsConnectionsRoute: typeof TTeamIdSettingsConnectionsRoute
   TTeamIdSettingsEmailRoute: typeof TTeamIdSettingsEmailRoute
   TTeamIdSettingsFieldsRoute: typeof TTeamIdSettingsFieldsRoute
+  TTeamIdSettingsFormsRoute: typeof TTeamIdSettingsFormsRoute
   TTeamIdSettingsGeneralRoute: typeof TTeamIdSettingsGeneralRoute
   TTeamIdSettingsMembersRoute: typeof TTeamIdSettingsMembersRoute
   TTeamIdSettingsServiceAccountsRoute: typeof TTeamIdSettingsServiceAccountsRoute
@@ -738,6 +856,7 @@ const TTeamIdSettingsRouteChildren: TTeamIdSettingsRouteChildren = {
   TTeamIdSettingsConnectionsRoute: TTeamIdSettingsConnectionsRoute,
   TTeamIdSettingsEmailRoute: TTeamIdSettingsEmailRoute,
   TTeamIdSettingsFieldsRoute: TTeamIdSettingsFieldsRoute,
+  TTeamIdSettingsFormsRoute: TTeamIdSettingsFormsRoute,
   TTeamIdSettingsGeneralRoute: TTeamIdSettingsGeneralRoute,
   TTeamIdSettingsMembersRoute: TTeamIdSettingsMembersRoute,
   TTeamIdSettingsServiceAccountsRoute: TTeamIdSettingsServiceAccountsRoute,
@@ -763,8 +882,11 @@ interface TTeamIdRouteChildren {
   TTeamIdCampaignsIndexRoute: typeof TTeamIdCampaignsIndexRoute
   TTeamIdCompaniesIndexRoute: typeof TTeamIdCompaniesIndexRoute
   TTeamIdContactsIndexRoute: typeof TTeamIdContactsIndexRoute
+  TTeamIdFormsIndexRoute: typeof TTeamIdFormsIndexRoute
   TTeamIdSegmentsIndexRoute: typeof TTeamIdSegmentsIndexRoute
   TTeamIdTemplatesIndexRoute: typeof TTeamIdTemplatesIndexRoute
+  TTeamIdFormsFormIdSubmissionsRoute: typeof TTeamIdFormsFormIdSubmissionsRoute
+  TTeamIdFormsFormIdIndexRoute: typeof TTeamIdFormsFormIdIndexRoute
 }
 
 const TTeamIdRouteChildren: TTeamIdRouteChildren = {
@@ -779,8 +901,11 @@ const TTeamIdRouteChildren: TTeamIdRouteChildren = {
   TTeamIdCampaignsIndexRoute: TTeamIdCampaignsIndexRoute,
   TTeamIdCompaniesIndexRoute: TTeamIdCompaniesIndexRoute,
   TTeamIdContactsIndexRoute: TTeamIdContactsIndexRoute,
+  TTeamIdFormsIndexRoute: TTeamIdFormsIndexRoute,
   TTeamIdSegmentsIndexRoute: TTeamIdSegmentsIndexRoute,
   TTeamIdTemplatesIndexRoute: TTeamIdTemplatesIndexRoute,
+  TTeamIdFormsFormIdSubmissionsRoute: TTeamIdFormsFormIdSubmissionsRoute,
+  TTeamIdFormsFormIdIndexRoute: TTeamIdFormsFormIdIndexRoute,
 }
 
 const TTeamIdRouteWithChildren =
@@ -795,10 +920,12 @@ const rootRouteChildren: RootRouteChildren = {
   SignUpRoute: SignUpRoute,
   DotwellKnownSplatRoute: DotwellKnownSplatRoute,
   ApiSplatRoute: ApiSplatRoute,
+  FFormIdRoute: FFormIdRoute,
   IImageIdRoute: IImageIdRoute,
   InviteInvitationIdRoute: InviteInvitationIdRoute,
   TTeamIdRoute: TTeamIdRouteWithChildren,
   UnsubscribeTokenRoute: UnsubscribeTokenRoute,
+  FConfirmTokenRoute: FConfirmTokenRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

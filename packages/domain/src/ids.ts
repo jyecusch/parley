@@ -59,3 +59,9 @@ export type EmailImageId = typeof EmailImageId.Type
 
 export const ImportId = Schema.String.pipe(Schema.brand("ImportId"))
 export type ImportId = typeof ImportId.Type
+
+export const FormId = Schema.String.pipe(Schema.brand("FormId"))
+export type FormId = typeof FormId.Type
+
+export const SubmissionId = Schema.String.pipe(Schema.brand("SubmissionId"))
+export type SubmissionId = typeof SubmissionId.Type

@@ -5,6 +5,9 @@ const LARGE = /\/(avatar|logo|import)$/
 /** imports.start takes a file of up to 100,000 rows (D135). */
 const IMPORT_LIMIT = 32 * 1024 * 1024
 const IMPORTS = /\/teams\/[^/]+\/imports$/
+/** A form's answers and confirmation clicks are small (D144). */
+const FORM_LIMIT = 64 * 1024
+const FORMS = /^\/api\/forms\//
 
 const tooLarge = (limit: number) =>
   new Response(
@@ -27,7 +30,13 @@ const tooLarge = (limit: number) =>
 export const limitBody = (request: Request): Request | Response => {
   if (!request.body) return request
   const path = new URL(request.url).pathname
-  const limit = IMPORTS.test(path) ? IMPORT_LIMIT : LARGE.test(path) ? LARGE_LIMIT : DEFAULT_LIMIT
+  const limit = FORMS.test(path)
+    ? FORM_LIMIT
+    : IMPORTS.test(path)
+      ? IMPORT_LIMIT
+      : LARGE.test(path)
+        ? LARGE_LIMIT
+        : DEFAULT_LIMIT
   const declared = Number(request.headers.get("content-length"))
   if (Number.isFinite(declared) && declared > limit) return tooLarge(limit)
   let seen = 0

@@ -347,8 +347,15 @@ export class Broadcasts extends Context.Service<
                   )
                   .pipe(Effect.map((result) => rowsOf<{ status: string }>(result)))
                 if (locked?.status !== "draft") return 0
+                // Who isn't on the topic: opt-out topics, those who left it; opt-in topics, everyone
+                // who hasn't joined it (D149).
                 const topicJoin = topicId
-                  ? sql`left join "topic_unsubscribes" tu on tu.contact_id = "contacts"."id" and tu.topic_id = ${topicId}`
+                  ? sql`left join lateral (select "contacts"."id" as contact_id where case
+                      when (select t.mode from "topics" t where t.id = ${topicId}) = 'opt-in'
+                        then not exists (select 1 from "topic_members" m
+                          where m.contact_id = "contacts"."id" and m.topic_id = ${topicId})
+                      else exists (select 1 from "topic_unsubscribes" u
+                          where u.contact_id = "contacts"."id" and u.topic_id = ${topicId}) end) tu on true`
                   : sql`left join (select null::uuid as contact_id) tu on false`
                 yield* db.query((d) =>
                   d.execute(sql`

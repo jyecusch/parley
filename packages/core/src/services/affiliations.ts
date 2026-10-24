@@ -13,7 +13,7 @@ import {
 import { and, asc, eq, inArray, isNull, type SQL, sql } from "drizzle-orm"
 import { Context, Effect, Layer } from "effect"
 import type { SqlError } from "effect/sql"
-import type { Principal } from "../principal.ts"
+import type { Actor, Principal } from "../principal.ts"
 import type { AffiliationInTeam } from "../proofs/affiliation-in-team.ts"
 import type { CompanyInTeam } from "../proofs/company-in-team.ts"
 import type { ContactInTeam, ContactsInTeam } from "../proofs/contact-in-team.ts"
@@ -94,7 +94,7 @@ export class Affiliations extends Context.Service<
      * which already holds the proof that the principal may write records in this team.
      */
     readonly matchContact: (
-      principal: Principal,
+      principal: Actor,
       teamId: TeamId,
       contact: RecordRef,
       addedAddresses: ReadonlyArray<string>,
@@ -170,7 +170,7 @@ export class Affiliations extends Context.Service<
 
       /** Activity on both records: the contact names the company, and the company names the contact. */
       const recordBoth = (
-        principal: Principal,
+        principal: Actor,
         teamId: TeamId,
         contact: RecordRef,
         company: RecordRef,
@@ -448,7 +448,7 @@ export class Affiliations extends Context.Service<
 
       /** Affiliates each pair that isn't already, and records it as domain matching. */
       const affiliateMatches = (
-        principal: Principal,
+        principal: Actor,
         teamId: TeamId,
         pairs: ReadonlyArray<{ readonly contact: RecordRef; readonly company: RecordRef; readonly domain: string }>,
       ) =>
@@ -478,7 +478,7 @@ export class Affiliations extends Context.Service<
         [...new Set(domains)].filter((domain) => !isFreeEmailDomain(domain))
 
       const matchContact = (
-        principal: Principal,
+        principal: Actor,
         teamId: TeamId,
         contact: RecordRef,
         addedAddresses: ReadonlyArray<string>,
