@@ -55,7 +55,7 @@ function TemplatesScreen() {
   ) : null
 
   return (
-    <Card as="main" className="flex-[999_1_35rem]">
+    <Card as="main" className="grow-999 basis-140">
       <PageHeader>
         <Breadcrumb>
           <BreadcrumbList>

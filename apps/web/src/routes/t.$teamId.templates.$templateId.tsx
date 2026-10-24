@@ -29,10 +29,10 @@ function TemplateScreen() {
     queryKey: ["template", teamId, templateId],
     queryFn: () => call("templates.get", { teamId, templateId: templateId as TemplateId }),
   })
-  if (template.isPending) return <Card as="main" className="flex-[999_1_35rem]" />
+  if (template.isPending) return <Card as="main" className="grow-999 basis-140" />
   if (template.isError) {
     return (
-      <Card as="main" className="flex-[999_1_35rem]">
+      <Card as="main" className="grow-999 basis-140">
         <ViewBody>
           <LoadFailed
             title="This template didn't load"
@@ -107,7 +107,7 @@ function TemplateEditor(props: { readonly teamId: TeamId; readonly template: Tem
   }
 
   return (
-    <Card as="main" className="flex-[999_1_35rem]">
+    <Card as="main" className="grow-999 basis-140">
       <PageHeader>
         <Breadcrumb>
           <BreadcrumbList>

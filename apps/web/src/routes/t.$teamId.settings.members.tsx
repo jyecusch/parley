@@ -123,7 +123,7 @@ function Members() {
           <Table kind="settings">
             <thead>
               <tr>
-                <Th scope="col" className="w-[40%]">
+                <Th scope="col" className="w-2/5">
                   Name
                 </Th>
                 <Th scope="col" className="w-44">
@@ -211,7 +211,7 @@ function Members() {
               <tbody>
                 {invitations.data?.map((invitation) => (
                   <Tr key={invitation.id}>
-                    <Td className="w-[40%]">
+                    <Td className="w-2/5">
                       <RowIdentity
                         mark={<Avatar size="md">{invitation.email[0]?.toUpperCase()}</Avatar>}
                         name={invitation.email}

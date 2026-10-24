@@ -159,18 +159,19 @@
 
   --shadow-card: var(--ink-shadow-card);
   --shadow-pop: var(--ink-shadow-pop);
+  /* The bar on a table row's left edge: the open record, or the keyboard cursor. */
+  --inset-shadow-marker: inset 0.125rem 0 0 var(--color-mark);
+  --inset-shadow-marker-subtle: inset 0.125rem 0 0 var(--color-subtle);
+  /* Inside a rounded box with a 1px edge, such as a settings table's last row. */
+  --radius-inner: calc(var(--radius-lg) - 1px);
 
-  --animate-shimmer: shimmer 1.6s linear infinite;
   --animate-breathe: breathe 1.6s ease-in-out infinite;
 }
 
-@keyframes shimmer {
-  from {
-    background-position: 150% 0;
-  }
-  to {
-    background-position: -50% 0;
-  }
+/* A dotted grid behind the form designer's preview. */
+@utility bg-dots {
+  background-image: radial-gradient(var(--color-line) 1px, transparent 1px);
+  background-size: 1rem 1rem;
 }
 
 @keyframes breathe {

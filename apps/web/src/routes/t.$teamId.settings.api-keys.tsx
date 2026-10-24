@@ -98,13 +98,13 @@ function ApiKeys() {
           <Table kind="settings">
             <thead>
               <tr>
-                <Th scope="col" className="w-[26%]">
+                <Th scope="col" className="w-13/50">
                   Name
                 </Th>
-                <Th scope="col" className="w-[18%]">
+                <Th scope="col" className="w-9/50">
                   Key
                 </Th>
-                <Th scope="col" className="w-[20%]">
+                <Th scope="col" className="w-1/5">
                   Scopes
                 </Th>
                 <Th scope="col" className="w-28">
@@ -245,10 +245,7 @@ function NewApiKey(props: {
             return (
               <Option
                 key={scope}
-                className={cn(
-                  "grid min-h-8 grid-cols-[1rem_8.5rem_minmax(0,1fr)] items-center gap-2.5 py-0.5",
-                  allowed ? "cursor-pointer" : "cursor-default [&>span]:opacity-50",
-                )}
+                className={cn("min-h-8 py-0.5", allowed ? "cursor-pointer" : "cursor-default [&>span]:opacity-50")}
               >
                 <Checkbox
                   className={cn(locked && "disabled:opacity-55")}
@@ -256,7 +253,7 @@ function NewApiKey(props: {
                   disabled={locked || !allowed}
                   onChange={() => toggle(scope)}
                 />
-                <span className="font-mono text-sm">{scope}</span>
+                <span className="w-34 shrink-0 font-mono text-sm">{scope}</span>
                 <span className="text-muted">
                   {SCOPE_LABELS[scope]}
                   {locked ? <span className="text-sm text-subtle"> · Always on</span> : null}

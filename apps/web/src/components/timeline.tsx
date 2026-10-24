@@ -69,7 +69,7 @@ export function Timeline(props: {
   return (
     <Section>
       <SectionHeader>Activity</SectionHeader>
-      {props.activityLoading || notes.isLoading ? <Skeleton className="my-2 w-[60%]" /> : null}
+      {props.activityLoading || notes.isLoading ? <Skeleton className="my-2 w-3/5" /> : null}
       {props.activityError ? <ErrorText className="my-1">{props.activityError}</ErrorText> : null}
       {notes.isError ? <ErrorText className="my-1">{messageOf(notes.error)}</ErrorText> : null}
       {entries.map((entry, index) =>

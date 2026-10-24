@@ -290,7 +290,7 @@ export function ImportResultsDialog(props: {
     <Dialog
       title="Import results"
       onClose={props.onClose}
-      className="w-[min(46rem,calc(100%-2rem))]"
+      className="max-w-184"
       footer={
         <Button variant="primary" onClick={props.onClose}>
           Done
@@ -324,7 +324,7 @@ export function PastImportsDialog(props: {
     <Dialog
       title={open ? "Import results" : `Past imports of ${props.plural}`}
       onClose={props.onClose}
-      className="w-[min(46rem,calc(100%-2rem))]"
+      className="max-w-184"
       footer={
         <>
           {open ? (
@@ -349,12 +349,12 @@ export function PastImportsDialog(props: {
       ) : (
         <ul className="m-0 flex list-none flex-col p-0">
           {imports.data.map((entry) => (
-            <li key={entry.id} className="border-b border-line last:border-b-0">
+            <li key={entry.id} className="flex flex-col border-b border-line last:border-b-0">
               <PlainButton
                 variant={null}
                 size={null}
                 type="button"
-                className="-mx-2 flex w-[calc(100%+1rem)] cursor-pointer items-center gap-3 rounded-md px-2 py-2.5 text-left hover:bg-hover"
+                className="-mx-2 flex cursor-pointer items-center gap-3 rounded-md px-2 py-2.5 text-left hover:bg-hover"
                 onClick={() => setOpen(entry.id)}
               >
                 <span className="flex min-w-0 flex-1 flex-col">

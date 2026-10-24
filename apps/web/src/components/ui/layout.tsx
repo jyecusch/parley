@@ -87,7 +87,7 @@ export function RecordPanel({
       className={cn(
         full
           ? "w-auto flex-auto"
-          : "w-md shrink-0 @max-[69rem]/content:absolute @max-[69rem]/content:inset-y-1.5 @max-[69rem]/content:right-1.5 @max-[69rem]/content:z-5 @max-[69rem]/content:w-[min(28rem,calc(100%-0.75rem))] @max-[69rem]/content:shadow-pop",
+          : "w-md shrink-0 @max-[69rem]/content:absolute @max-[69rem]/content:inset-y-1.5 @max-[69rem]/content:right-1.5 @max-[69rem]/content:z-5 @max-[69rem]/content:left-1.5 @max-[69rem]/content:ml-auto @max-[69rem]/content:w-auto @max-[69rem]/content:max-w-md @max-[69rem]/content:shadow-pop",
         className,
       )}
       {...props}
@@ -134,15 +134,15 @@ export function SectionHeader({ className, ...props }: HTMLAttributes<HTMLHeadin
 /** One labeled property of a record: label on the left, value on the right. */
 export function PropertyRow({ label, children, htmlFor }: { label: ReactNode; children: ReactNode; htmlFor?: string }) {
   return (
-    <div className="grid grid-cols-[7rem_minmax(0,1fr)] items-start gap-2.5">
+    <div className="flex items-start gap-2.5">
       {htmlFor ? (
-        <label htmlFor={htmlFor} className="pt-1.5 text-sm text-subtle">
+        <label htmlFor={htmlFor} className="w-28 shrink-0 pt-1.5 text-sm text-subtle">
           {label}
         </label>
       ) : (
-        <span className="pt-1.5 text-sm text-subtle">{label}</span>
+        <span className="w-28 shrink-0 pt-1.5 text-sm text-subtle">{label}</span>
       )}
-      {children}
+      <div className="min-w-0 flex-1">{children}</div>
     </div>
   )
 }

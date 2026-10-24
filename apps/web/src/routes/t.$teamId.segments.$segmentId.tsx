@@ -80,10 +80,10 @@ function SegmentScreen() {
     await refreshContacts(queryClient, teamId)
   }
 
-  if (segment.isPending) return <Card as="main" className="flex-[999_1_35rem]" />
+  if (segment.isPending) return <Card as="main" className="grow-999 basis-140" />
   if (segment.isError) {
     return (
-      <Card as="main" className="flex-[999_1_35rem]">
+      <Card as="main" className="grow-999 basis-140">
         <ViewBody>
           <LoadFailed
             title="This segment didn't load"
@@ -191,7 +191,7 @@ function SegmentView(props: {
   }))
 
   return (
-    <Card as="main" className="flex-[999_1_35rem]">
+    <Card as="main" className="grow-999 basis-140">
       <PageHeader>
         <Breadcrumb>
           <BreadcrumbList>
@@ -365,10 +365,10 @@ function SegmentView(props: {
               <caption className="sr-only">Contacts in {segment.name}</caption>
               <thead>
                 <tr>
-                  <Th className="w-[32%] pl-4 @max-[40rem]/content:w-auto" scope="col">
+                  <Th className="w-8/25 pl-4 @max-[40rem]/content:w-auto" scope="col">
                     Name
                   </Th>
-                  <Th className={`w-[36%] ${wideColumnClass}`} scope="col">
+                  <Th className={`w-9/25 ${wideColumnClass}`} scope="col">
                     Primary email
                   </Th>
                   <Th scope="col">Subscription</Th>

@@ -1,6 +1,18 @@
 import { type SocialNetworkId, socialNetworkOf } from "@parley/domain"
-import { type ReactNode, useState } from "react"
-import { CloseIcon, PlusIcon } from "./icons.tsx"
+import { useState } from "react"
+import type { IconType } from "react-icons"
+import {
+  FaBluesky,
+  FaFacebook,
+  FaGithub,
+  FaInstagram,
+  FaLinkedin,
+  FaThreads,
+  FaTiktok,
+  FaXTwitter,
+  FaYoutube,
+} from "react-icons/fa6"
+import { CloseIcon, LinkIcon, PlusIcon } from "./icons.tsx"
 import { EmptyValue } from "./record.tsx"
 import { Button as PlainButton } from "./ui/button.tsx"
 import { cn, IconButton, InlineInput, PropertyRow, propertyValueClass, Textarea, TextButton } from "./ui/index.ts"
@@ -242,73 +254,21 @@ export function SocialProfilesField(props: {
   )
 }
 
-/** Simple monochrome marks for the networks Parley recognises; a link otherwise. */
+/** The networks' own marks (react-icons, Font Awesome brands); a link otherwise. */
+const NETWORK_ICONS: Readonly<Record<SocialNetworkId, IconType>> = {
+  linkedin: FaLinkedin,
+  x: FaXTwitter,
+  facebook: FaFacebook,
+  instagram: FaInstagram,
+  youtube: FaYoutube,
+  github: FaGithub,
+  bluesky: FaBluesky,
+  threads: FaThreads,
+  tiktok: FaTiktok,
+}
+
 export function SocialIcon(props: { readonly network: SocialNetworkId | undefined }) {
-  const glyph: ReactNode = (() => {
-    switch (props.network) {
-      case "linkedin":
-        return (
-          <>
-            <rect x="3" y="3" width="18" height="18" rx="3" />
-            <path d="M8 10v7M8 7v.01M12 17v-4a2 2 0 0 1 4 0v4M12 10v7" />
-          </>
-        )
-      case "x":
-        return <path d="M4 4l16 16M20 4L4 20" />
-      case "facebook":
-        return (
-          <>
-            <circle cx="12" cy="12" r="9" />
-            <path d="M15 8h-1.5A2.5 2.5 0 0 0 11 10.5V21M8.5 13H15" />
-          </>
-        )
-      case "instagram":
-        return (
-          <>
-            <rect x="3.5" y="3.5" width="17" height="17" rx="5" />
-            <circle cx="12" cy="12" r="4" />
-            <path d="M17 7v.01" />
-          </>
-        )
-      case "youtube":
-        return (
-          <>
-            <rect x="2.5" y="5.5" width="19" height="13" rx="4" />
-            <path d="M10 9.5v5l4.5-2.5z" />
-          </>
-        )
-      case "github":
-        return (
-          <path d="M9 19c-4 1.5-4-2-6-2.5M15 21v-3.5a3 3 0 0 0-.8-2.2c2.8-.3 5.8-1.4 5.8-6.3a4.9 4.9 0 0 0-1.3-3.4 4.6 4.6 0 0 0-.1-3.4s-1-.3-3.5 1.3a12 12 0 0 0-6.2 0C6.3 2 5.3 2.3 5.3 2.3a4.6 4.6 0 0 0-.1 3.4A4.9 4.9 0 0 0 3.9 9c0 4.9 3 6 5.8 6.3a3 3 0 0 0-.8 2.2V21" />
-        )
-      case "bluesky":
-        return (
-          <path d="M12 11c-1.5-3-5-6.5-7-6.5-1.5 0-1.5 2-1 4 .7 2.6 3.5 3 6 2.7-3 .5-5.5 1.8-3 4.8 2.7 3.2 4.3-.5 5-3 .7 2.5 2.3 6.2 5 3 2.5-3 0-4.3-3-4.8 2.5.3 5.3-.1 6-2.7.5-2 .5-4-1-4-2 0-5.5 3.5-7 6.5Z" />
-        )
-      case "threads":
-        return (
-          <path d="M16.5 11.5c-.8-3-3-4-5-3.8-2.3.2-3.7 2-3.5 3.8.2 1.9 2 3 4 2.8 2.4-.3 3.6-2.4 3.2-5.6M12 21c-5 0-8.5-3.5-8.5-9S7 3 12 3s7.5 2.5 8.5 6" />
-        )
-      case "tiktok":
-        return <path d="M14 3v11.5a3.5 3.5 0 1 1-3.5-3.5M14 3c.5 2.5 2.5 4.5 5 4.5" />
-      default:
-        return (
-          <path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1" />
-        )
-    }
-  })()
-  return (
-    <svg
-      className="size-4 shrink-0 text-subtle"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.6}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      {glyph}
-    </svg>
-  )
+  if (!props.network) return <LinkIcon className="size-4 text-subtle" />
+  const Mark = NETWORK_ICONS[props.network]
+  return <Mark aria-hidden="true" className="size-4 shrink-0 text-subtle" />
 }

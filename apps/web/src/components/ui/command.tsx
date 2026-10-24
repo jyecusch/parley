@@ -32,10 +32,7 @@ function CommandDialog({
 }) {
   return (
     <Dialog {...props}>
-      <DialogContent
-        className={cn("top-[14%] w-[min(42rem,calc(100%-2rem))] overflow-hidden", className)}
-        showCloseButton={false}
-      >
+      <DialogContent className={cn("top-1/7 max-w-2xl overflow-hidden", className)} showCloseButton={false}>
         <DialogTitle className="sr-only">{title}</DialogTitle>
         <DialogDescription className="sr-only">{description}</DialogDescription>
         {children}

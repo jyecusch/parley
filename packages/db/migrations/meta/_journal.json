@@ -155,6 +155,13 @@
       "when": 1792833638446,
       "tag": "0021_tracking",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1792839259190,
+      "tag": "0022_rate_limits",
+      "breakpoints": true
     }
   ]
 }

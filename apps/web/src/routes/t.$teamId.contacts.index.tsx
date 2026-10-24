@@ -320,7 +320,7 @@ function ContactsScreen() {
 
   return (
     <>
-      <Card as="main" className="flex-[999_1_39rem]">
+      <Card as="main" className="grow-999 basis-156">
         <PageHeader>
           <Breadcrumb>
             <BreadcrumbList>
@@ -496,7 +496,7 @@ function ContactsScreen() {
                     <Th className={cn(EMAIL_COLUMN, wideColumnClass)} scope="col">
                       Primary email
                     </Th>
-                    <Th className="w-[30%]" scope="col">
+                    <Th className="w-3/10" scope="col">
                       Companies
                     </Th>
                     {showOwner ? (
@@ -753,8 +753,8 @@ function ContactsScreen() {
 const countOf = (count: number) => `${count.toLocaleString()} ${count === 1 ? "contact" : "contacts"}`
 
 /** Without the wide columns, the remaining text columns share the width. */
-const NAME_COLUMN = "w-[32%] @max-3xl/content:w-auto"
-const EMAIL_COLUMN = "w-[36%] @max-3xl/content:w-auto"
+const NAME_COLUMN = "w-8/25 @max-3xl/content:w-auto"
+const EMAIL_COLUMN = "w-9/25 @max-3xl/content:w-auto"
 
 function ContactRow(props: {
   readonly contact: Contact
@@ -834,7 +834,7 @@ function LoadingRows() {
                   <Skeleton />
                 </div>
               </Td>
-              <Td className="w-[30%]">
+              <Td className="w-3/10">
                 <div style={{ width: `${width * 0.5}%` }}>
                   <Skeleton />
                 </div>

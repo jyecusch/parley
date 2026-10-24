@@ -13,7 +13,7 @@ function Progress({
       <ProgressPrimitive.Track data-slot="progress-track" className="h-1.5 overflow-hidden rounded-full bg-fill">
         <ProgressPrimitive.Indicator
           data-slot="progress-indicator"
-          className="h-full rounded-full bg-primary transition-[width] duration-500"
+          className="h-full rounded-full bg-primary transition-all duration-500"
         />
       </ProgressPrimitive.Track>
     </ProgressPrimitive.Root>

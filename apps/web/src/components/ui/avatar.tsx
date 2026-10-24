@@ -10,7 +10,7 @@ function Avatar({
     <AvatarPrimitive.Root
       data-slot="avatar"
       className={cn(
-        "relative inline-grid shrink-0 place-items-center leading-none font-semibold tracking-normal",
+        "relative inline-grid shrink-0 place-items-center overflow-hidden leading-none font-semibold tracking-normal",
         className,
       )}
       {...props}
@@ -24,11 +24,7 @@ function AvatarImage({
   ...props
 }: Omit<AvatarPrimitive.Image.Props, "className"> & { className?: string | undefined }) {
   return (
-    <AvatarPrimitive.Image
-      data-slot="avatar-image"
-      className={cn("size-full rounded-[inherit] object-cover", className)}
-      {...props}
-    />
+    <AvatarPrimitive.Image data-slot="avatar-image" className={cn("size-full object-cover", className)} {...props} />
   )
 }
 

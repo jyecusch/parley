@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm"
 import {
+  bigint,
   boolean,
   doublePrecision,
   foreignKey,
@@ -12,6 +13,7 @@ import {
   unique,
   uniqueIndex,
   uuid,
+  varchar,
 } from "drizzle-orm/pg-core"
 import { organization, user } from "./auth.ts"
 
@@ -710,3 +712,124 @@ export const importLogos = pgTable(
   },
   (t) => [index("import_logos_import_idx").on(t.importId, t.line)],
 )
+
+/**
+ * A sign-up form (D144). `draft` is what the designer edits, `published` what visitors see; both
+ * are FormContent. Each publish also lands in form_versions, which consent records point at (D150).
+ */
+export const forms = pgTable(
+  "forms",
+  {
+    id: uuid("id").primaryKey(),
+    teamId: teamId(),
+    name: text("name").notNull(),
+    draft: jsonb("draft").$type<unknown>().notNull(),
+    published: jsonb("published").$type<unknown>(),
+    version: integer("version").notNull().default(0),
+    /** Hostnames that may frame it, or null for any site. */
+    allowedSites: jsonb("allowed_sites").$type<ReadonlyArray<string> | null>(),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (t) => [index("forms_team_idx").on(t.teamId)],
+)
+
+/** Every published version of a form, as visitors saw it. */
+export const formVersions = pgTable(
+  "form_versions",
+  {
+    formId: uuid("form_id")
+      .notNull()
+      .references(() => forms.id, { onDelete: "cascade" }),
+    version: integer("version").notNull(),
+    content: jsonb("content").$type<unknown>().notNull(),
+    publishedAt: timestamp("published_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [unique("form_versions_key").on(t.formId, t.version)],
+)
+
+/** Views of a form by day and page (D144 analytics). */
+export const formViews = pgTable(
+  "form_views",
+  {
+    formId: uuid("form_id")
+      .notNull()
+      .references(() => forms.id, { onDelete: "cascade" }),
+    day: text("day").notNull(),
+    /** Host and path of the page it was on, or "" for the hosted page. */
+    page: text("page").notNull(),
+    views: integer("views").notNull().default(0),
+  },
+  (t) => [unique("form_views_key").on(t.formId, t.day, t.page)],
+)
+
+/**
+ * One visitor's answers (D146), with its consent record (D150). Waiting submissions touch no
+ * contact until confirmed; spam is kept 30 days with its reason.
+ */
+export const formSubmissions = pgTable(
+  "form_submissions",
+  {
+    id: uuid("id").primaryKey(),
+    teamId: teamId(),
+    formId: uuid("form_id")
+      .notNull()
+      .references(() => forms.id, { onDelete: "cascade" }),
+    version: integer("version").notNull(),
+    email: text("email").notNull(),
+    values: jsonb("values").$type<Record<string, unknown>>().notNull(),
+    status: text("status", { enum: ["waiting", "confirmed", "spam", "expired"] }).notNull(),
+    spamReason: text("spam_reason"),
+    contactId: uuid("contact_id").references(() => contacts.id, { onDelete: "set null" }),
+    outcome: text("outcome", { enum: ["created", "updated"] }),
+    page: text("page"),
+    utm: jsonb("utm").$type<Record<string, string>>().notNull().default({}),
+    /** Ad click IDs, when the embedding site passes them (D154). */
+    clickIds: jsonb("click_ids").$type<Record<string, string>>().notNull().default({}),
+    /** The consent record: the exact wording shown, and who, when and where (D150). */
+    consent: jsonb("consent").$type<unknown>().notNull(),
+    ip: text("ip"),
+    userAgent: text("user_agent"),
+    confirmIp: text("confirm_ip"),
+    confirmUserAgent: text("confirm_user_agent"),
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("form_submissions_form_idx").on(t.formId, t.createdAt),
+    index("form_submissions_email_idx").on(t.teamId, t.email),
+  ],
+)
+
+/** A team's settings for its forms (D147). The Turnstile secret is encrypted at rest. */
+export const formSettings = pgTable("form_settings", {
+  teamId: text("team_id")
+    .primaryKey()
+    .references(() => organization.id, { onDelete: "cascade" }),
+  captchaProvider: text("captcha_provider", { enum: ["builtin", "turnstile"] })
+    .notNull()
+    .default("builtin"),
+  turnstileSiteKey: text("turnstile_site_key"),
+  turnstileMode: text("turnstile_mode", { enum: ["invisible", "managed"] }),
+  turnstileSecret: text("turnstile_secret"),
+  blockDisposableEmails: boolean("block_disposable_emails").notNull().default(false),
+  privacyPolicyUrl: text("privacy_policy_url"),
+  ...timestamps,
+})
+
+/**
+ * Rate limit counts (D157), shared by every server. The shape rate-limiter-flexible's Postgres store
+ * reads and writes: points used in the current window, and when it ends (ms since the epoch).
+ */
+export const rateLimits = pgTable("rate_limits", {
+  key: varchar("key", { length: 255 }).primaryKey(),
+  points: integer("points").notNull().default(0),
+  expire: bigint("expire", { mode: "number" }),
+})
+
+/** One-time tokens and proof-of-work challenges already used (D147), until they expire. */
+export const formTokenUses = pgTable("form_token_uses", {
+  nonce: text("nonce").primaryKey(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+})

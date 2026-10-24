@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Duration, Effect } from "effect"
+import type { RequestsTooFrequent } from "@parley/domain"
+import { Duration, Effect, Layer } from "effect"
 import { RateLimiter } from "../src/index.ts"
 
 describe("rate limiter", () => {
@@ -14,5 +15,22 @@ describe("rate limiter", () => {
       // Other keys have their own allowance.
       yield* limiter.take(`${key}:other`, 3, Duration.minutes(1))
     }).pipe(Effect.provide(RateLimiter.layer)),
+  )
+
+  it.effect("shares counts between servers, since they live in Postgres (D157)", () =>
+    Effect.gen(function* () {
+      const key = `test:${crypto.randomUUID()}`
+      // Two separately built limiters stand in for two servers.
+      const take = Effect.gen(function* () {
+        const limiter = yield* RateLimiter
+        yield* limiter.take(key, 2, Duration.minutes(1))
+      })
+      const server = (effect: Effect.Effect<void, RequestsTooFrequent, RateLimiter>) =>
+        effect.pipe(Effect.provide(Layer.fresh(RateLimiter.layer)))
+      yield* server(take)
+      yield* server(take)
+      const refused = yield* server(take).pipe(Effect.flip)
+      expect(refused._tag).toBe("RequestsTooFrequent")
+    }),
   )
 })
