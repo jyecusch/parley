@@ -23,8 +23,14 @@ interface Payload {
 const encode = (text: string) => Buffer.from(text).toString("base64url")
 
 /**
- * Signs and reads unsubscribe links (R39). Process tier: holds only the secret. Links never expire,
+ * Signs and reads unsubscribe links (R39). Process tier: holds only the secrets. Links never expire,
  * because anti-spam law needs them to keep working after the email is sent.
+ *
+ * The secret is UNSUBSCRIBE_SECRET. To rotate it (D152), move the old one to
+ * UNSUBSCRIBE_SECRETS_PREVIOUS (comma-separated) and set a new one: new links are signed with the
+ * new secret, and links signed with a previous one still work. Sent links can't be re-signed, so
+ * keep a previous secret as long as its emails' links should work: well past the 30 days
+ * anti-spam law asks for.
  */
 export class UnsubscribeLinks extends Context.Service<
   UnsubscribeLinks,
@@ -41,19 +47,37 @@ export class UnsubscribeLinks extends Context.Service<
     UnsubscribeLinks,
     Effect.gen(function* () {
       const own = yield* Config.option(Config.Redacted("UNSUBSCRIBE_SECRET")).pipe(Effect.orDie)
+      const previous = yield* Config.option(Config.Redacted("UNSUBSCRIBE_SECRETS_PREVIOUS")).pipe(Effect.orDie)
       const auth = yield* Config.Redacted("BETTER_AUTH_SECRET").pipe(Effect.orDie)
       const sendsForReal = yield* Config.option(Config.String("RESEND_API_KEY")).pipe(Effect.orDie)
       // Links already sent must keep working (R39), so once email really goes out the secret can't
-      // be the sign-in secret, which might one day be rotated.
+      // be the sign-in secret: rotating that would break them, since nothing would keep the old one.
       if (Option.isNone(own) && Option.isSome(sendsForReal) && sendsForReal.value.trim() !== "") {
         return yield* Effect.die(
-          new Error("UNSUBSCRIBE_SECRET is required when RESEND_API_KEY is set. Set it once and never change it."),
+          new Error(
+            "UNSUBSCRIBE_SECRET is required when RESEND_API_KEY is set. To change it later, keep the old one in UNSUBSCRIBE_SECRETS_PREVIOUS.",
+          ),
         )
       }
       const base = yield* PublicUrl.pipe(Effect.orDie)
       const secret = Redacted.value(Option.getOrElse(own, () => auth))
-      const mac = (body: string) =>
-        createHmac("sha256", secret).update(`parley-unsubscribe:${body}`).digest().subarray(0, 16)
+      const retired = Option.match(previous, {
+        onSome: (value) =>
+          Redacted.value(value)
+            .split(",")
+            .map((entry) => entry.trim())
+            .filter((entry) => entry !== ""),
+        onNone: () => [],
+      })
+      const macWith = (key: string, body: string) =>
+        createHmac("sha256", key).update(`parley-unsubscribe:${body}`).digest().subarray(0, 16)
+      const mac = (body: string) => macWith(secret, body)
+      /** Whether any secret, current or previous, signed `body` as `given`. */
+      const signed = (body: string, given: Buffer) =>
+        [secret, ...retired].some((key) => {
+          const expected = macWith(key, body)
+          return given.length === expected.length && timingSafeEqual(given, expected)
+        })
 
       return {
         sign: (facts) => {
@@ -74,9 +98,7 @@ export class UnsubscribeLinks extends Context.Service<
         read: (token) => {
           const [body, signature, extra] = token.split(".")
           if (!body || !signature || extra !== undefined) return undefined
-          const expected = mac(body)
-          const given = Buffer.from(signature, "base64url")
-          if (given.length !== expected.length || !timingSafeEqual(given, expected)) return undefined
+          if (!signed(body, Buffer.from(signature, "base64url"))) return undefined
           try {
             const payload = JSON.parse(Buffer.from(body, "base64url").toString()) as Payload
             if (typeof payload.t !== "string") return undefined
