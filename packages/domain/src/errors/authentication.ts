@@ -37,7 +37,7 @@ export class ApiKeyUnrecognized
     return "API key did not verify"
   }
   get userMessage() {
-    return userText`Parley doesn't recognise this API key. Check that it was copied in full, or create a new one in Settings → API keys.`
+    return userText`Parley doesn't recognize this API key. Check that it was copied in full, or create a new one in Settings → API keys.`
   }
 }
 
@@ -76,7 +76,7 @@ export class AccessTokenUnrecognized
     return "access token did not verify"
   }
   get userMessage() {
-    return userText`Parley doesn't recognise this agent's sign-in. Connect the agent to Parley again.`
+    return userText`Parley doesn't recognize this agent's sign-in. Connect the agent to Parley again.`
   }
 }
 

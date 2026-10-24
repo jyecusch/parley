@@ -46,7 +46,7 @@ const ZERO: BroadcastCounts = {
   failed: 0,
   bounced: 0,
   markedAsSpam: 0,
-  cancelled: 0,
+  canceled: 0,
   unsubscribed: 0,
 }
 
@@ -73,7 +73,7 @@ const COUNT_KEY: Readonly<Record<RecipientStatus, keyof BroadcastCounts>> = {
   failed: "failed",
   bounced: "bounced",
   "marked-as-spam": "markedAsSpam",
-  cancelled: "cancelled",
+  canceled: "canceled",
 }
 
 /** What changes on a draft. Undefined leaves a field; null clears the segment or topic. */
@@ -440,7 +440,7 @@ export class Broadcasts extends Context.Service<
                 const updated = yield* db.query((d) =>
                   d
                     .update(schema.broadcasts)
-                    .set({ status: "cancelled", finishedAt: sql`now()`, updatedAt: sql`now()` })
+                    .set({ status: "canceled", finishedAt: sql`now()`, updatedAt: sql`now()` })
                     .where(
                       and(
                         eq(schema.broadcasts.teamId, teamId),
@@ -454,7 +454,7 @@ export class Broadcasts extends Context.Service<
                 yield* db.query((d) =>
                   d
                     .update(schema.broadcastRecipients)
-                    .set({ status: "cancelled", updatedAt: sql`now()` })
+                    .set({ status: "canceled", updatedAt: sql`now()` })
                     .where(
                       and(
                         eq(schema.broadcastRecipients.broadcastId, broadcastId),

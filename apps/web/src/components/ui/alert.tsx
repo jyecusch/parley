@@ -17,7 +17,7 @@ const alertVariants = cva("flex items-start gap-3 rounded-lg px-3.5 py-3 leading
   },
 })
 
-/** The icon's colour, by tone. */
+/** The icon's color, by tone. */
 const alertIconVariants = cva("mt-0.5 shrink-0", {
   variants: {
     tone: { info: "text-subtle", warn: "text-warn", danger: "text-danger", ok: "text-ok" },

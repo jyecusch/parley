@@ -1,7 +1,7 @@
 import type { ComponentProps } from "react"
 import { cn } from "./cn.ts"
 
-/** A keyboard key or shortcut, in Parley's look (D80). Its colours come from where it sits. */
+/** A keyboard key or shortcut, in Parley's look (D80). Its colors come from where it sits. */
 function Kbd({ className, ...props }: ComponentProps<"kbd">) {
   return (
     <kbd

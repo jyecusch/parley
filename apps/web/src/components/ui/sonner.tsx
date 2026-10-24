@@ -13,7 +13,7 @@ const Toaster = ({ ...props }: ToasterProps) => (
     position="bottom-center"
     offset={20}
     visibleToasts={1}
-    // Sonner's toast is as wide as its stack; Parley's pill sits centred in it.
+    // Sonner's toast is as wide as its stack; Parley's pill sits centered in it.
     toastOptions={{ unstyled: true, classNames: { toast: "flex w-full justify-center" } }}
     {...props}
   />

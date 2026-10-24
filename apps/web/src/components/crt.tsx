@@ -100,7 +100,7 @@ const shaderSupported = () =>
 /** The barrel factor for a curvature setting: 0.5 bows the screen edges in by about 1.5% of the width. */
 const barrelFactor = (curvature: number) => curvature * 0.24
 
-/** A theme colour as the browser computes it, with the CRT variables and any calc() worked out. */
+/** A theme color as the browser computes it, with the CRT variables and any calc() worked out. */
 const computedColor = (token: string) => {
   const probe = document.createElement("span")
   probe.style.color = `var(${token})`
@@ -112,7 +112,7 @@ const computedColor = (token: string) => {
 }
 
 /**
- * A theme colour as 0–1 RGB for the shader, so it matches the UI exactly.
+ * A theme color as 0–1 RGB for the shader, so it matches the UI exactly.
  */
 const resolveColor = (token: string): readonly [number, number, number] => {
   const color = computedColor(token)
@@ -148,7 +148,7 @@ const cursorShapeAt = (target: EventTarget | null): CursorShape => {
   return "arrow"
 }
 
-/** Draws a cursor shape, tip at the top-left, in the theme's colours. */
+/** Draws a cursor shape, tip at the top-left, in the theme's colors. */
 const paintCursor = (context: CanvasRenderingContext2D, shape: CursorShape, scale: number) => {
   const fill = computedColor("--ink-fg")
   const outline = computedColor("--ink-canvas")
@@ -244,7 +244,7 @@ function mountShader(screen: HTMLElement, options: { readonly still: boolean; re
   /** The cursor in app coordinates (where the shader samples the app under the pointer), or null when hidden. */
   let cursor: { x: number; y: number; shape: CursorShape } | null = null
   let cursorShape: CursorShape | null = null
-  /** The phosphor colour, and the hue and saturation it was resolved for (the cursor is painted in it too). */
+  /** The phosphor color, and the hue and saturation it was resolved for (the cursor is painted in it too). */
   let phosphor: { key: string; rgb: readonly [number, number, number] } | null = null
   const uploadCursor = (shape: CursorShape) => {
     if (!cursorContext || shape === cursorShape) return
@@ -275,7 +275,7 @@ function mountShader(screen: HTMLElement, options: { readonly still: boolean; re
     const key = `${settings.hue} ${settings.saturation}`
     if (phosphor?.key !== key) {
       phosphor = { key, rgb: resolveColor("--ink-fg") }
-      // Repaint the cursor in the new colour.
+      // Repaint the cursor in the new color.
       const shape = cursorShape
       cursorShape = null
       if (shape) uploadCursor(shape)
@@ -441,7 +441,7 @@ void main() {
 }`
 
 /*
- * The CRT shader, in the phosphor colour of the CRT settings. Mask, scanlines, flicker, vignette and edge light mirror the CSS layer in
+ * The CRT shader, in the phosphor color of the CRT settings. Mask, scanlines, flicker, vignette and edge light mirror the CSS layer in
  * app.css. The shader adds what CSS can't: the convex glass (barrel curvature, a curved bezel and a soft
  * reflection), chromatic aberration towards the edges, and bloom. There is no rolling band (D81).
  */
@@ -452,8 +452,8 @@ uniform vec2 u_size;    // canvas size in CSS pixels
 uniform vec2 u_extent;  // app size over canvas size; above 1 when the app overflows the viewport
 uniform float u_flicker;
 uniform float u_curvature;   // barrel factor; 0 is flat
-uniform float u_aberration;  // colour fringing at the edges, in CSS pixels
-uniform vec3 u_phosphor;     // the phosphor colour (the theme's foreground)
+uniform float u_aberration;  // color fringing at the edges, in CSS pixels
+uniform vec3 u_phosphor;     // the phosphor color (the theme's foreground)
 uniform float u_scanlines;   // how dark the gaps between scanlines are
 uniform float u_bloom;
 uniform float u_vignette;

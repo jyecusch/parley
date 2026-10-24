@@ -88,10 +88,10 @@ const FONT_STACKS: Readonly<Record<RenderStyle["font"], string | null>> = {
   default: null,
 }
 
-/** A colour from a style, re-checked so nothing but a hex colour ever reaches a style attribute. */
+/** A color from a style, re-checked so nothing but a hex color ever reaches a style attribute. */
 const colorOf = (value: string, fallback: string) => (/^#[0-9a-fA-F]{6}$/.test(value) ? value : fallback)
 
-const FOOTER_GREY = "#767676"
+const FOOTER_GRAY = "#767676"
 
 /**
  * A button written on its own line (D118): `[[button: See what's new | https://example.com]]`.
@@ -100,7 +100,7 @@ const FOOTER_GREY = "#767676"
 const BUTTON = /^[ \t]*\[\[button:[ \t]*([^|\]\n]{1,120}?)[ \t]*\|[ \t]*(\S+?)[ \t]*\]\][ \t]*$/gm
 
 /**
- * Markdown as email HTML, in a style's colours. HTML typed into the Markdown is shown as text, not
+ * Markdown as email HTML, in a style's colors. HTML typed into the Markdown is shown as text, not
  * rendered (R41); links must be web or mail addresses, and images https.
  */
 const markdownFor = (link: string) =>
@@ -150,7 +150,7 @@ const headerHtml = (style: RenderStyle, divider: boolean) => {
       ? `<img src="${escapeHtml(style.logoUrl)}" alt="" height="40" style="display:inline-block;height:40px;max-height:48px;width:auto;border:0;vertical-align:middle">`
       : ""
   const line = style.headerText?.trim()
-    ? `<span style="display:inline-block;vertical-align:middle;font-size:14px;color:${FOOTER_GREY};${logo ? "margin-left:12px" : ""}">${escapeHtml(style.headerText.trim())}</span>`
+    ? `<span style="display:inline-block;vertical-align:middle;font-size:14px;color:${FOOTER_GRAY};${logo ? "margin-left:12px" : ""}">${escapeHtml(style.headerText.trim())}</span>`
     : ""
   if (!logo && !line) return ""
   const align = style.logoAlign === "center" ? "center" : "left"
@@ -187,7 +187,7 @@ interface Parts {
   readonly footer: string
 }
 
-/** Text colour and font for a cell, as a style attribute's contents. */
+/** Text color and font for a cell, as a style attribute's contents. */
 const typeOf = (style: RenderStyle) => {
   const stack = FONT_STACKS[style.font]
   return `${stack ? `font-family:${stack};` : ""}color:${colorOf(style.colors.text, PLAIN_COLORS.text)}`
@@ -197,17 +197,17 @@ const FOOTER_ALIGNS = new Set(["left", "center", "right"])
 
 /**
  * The footer as it sits under the content, inside the same column or card (D121): a thin rule, then
- * small grey lines, aligned as the style says. The font follows the style, or inherits for custom HTML.
+ * small gray lines, aligned as the style says. The font follows the style, or inherits for custom HTML.
  */
 const footerBlock = (footer: string, style: RenderStyle, font: "style" | "inherit") => {
   const align = FOOTER_ALIGNS.has(style.footerAlign) ? style.footerAlign : "left"
   const stack = font === "style" ? FONT_STACKS[style.font] : undefined
-  return `<div style="border-top:1px solid #e5e5e5;margin-top:16px;padding-top:12px;${stack ? `font-family:${stack};` : ""}font-size:12px;line-height:1.6;color:${FOOTER_GREY};text-align:${align}">
+  return `<div style="border-top:1px solid #e5e5e5;margin-top:16px;padding-top:12px;${stack ? `font-family:${stack};` : ""}font-size:12px;line-height:1.6;color:${FOOTER_GRAY};text-align:${align}">
 ${footer}
 </div>`
 }
 
-/** Plain (D115): like a personal email. Left-aligned, no card; a thin rule, then the footer in small grey text. */
+/** Plain (D115): like a personal email. Left-aligned, no card; a thin rule, then the footer in small gray text. */
 const plainLayout = (parts: Parts, style: RenderStyle) =>
   documentHtml({
     subject: parts.subject,
@@ -225,7 +225,7 @@ ${parts.body}
 </table>`,
   })
 
-/** Card: the content on a white card, full width up to 600px, over the background colour; the footer inside the card, under the content. */
+/** Card: the content on a white card, full width up to 600px, over the background color; the footer inside the card, under the content. */
 const cardLayout = (parts: Parts, style: RenderStyle) => {
   const background = colorOf(style.colors.background, "#F4F4F4")
   return documentHtml({
@@ -425,7 +425,7 @@ export const renderEmail = (
   const footerHtml = [
     `<p style="margin:0 0 6px">${escapeHtml(footer.reason)}</p>`,
     `<p style="margin:0 0 6px">${escapeHtml(footer.legalName)} · ${escapeHtml(footer.postalAddress)}</p>`,
-    `<p style="margin:0"><a href="${escapeHtml(unsubscribe ?? "#")}" style="color:${FOOTER_GREY};text-decoration:underline">Unsubscribe</a> or choose which email you get.</p>`,
+    `<p style="margin:0"><a href="${escapeHtml(unsubscribe ?? "#")}" style="color:${FOOTER_GRAY};text-decoration:underline">Unsubscribe</a> or choose which email you get.</p>`,
   ].join("\n")
   const footerText = [
     "—",

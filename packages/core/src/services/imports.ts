@@ -10,7 +10,7 @@ import type { CanReadRecords, CanWriteRecords } from "../proofs/permissions.ts"
 import type { Named } from "../proofs/proof.ts"
 import { classifySqlError } from "./sql-errors.ts"
 
-/** Imports still to finish: the runner works on these, and they can be cancelled (D135). */
+/** Imports still to finish: the runner works on these, and they can be canceled (D135). */
 export const UNFINISHED = ["queued", "running", "fetching-logos"] as const
 
 /** How many imports imports.list returns. */
@@ -66,7 +66,7 @@ export interface NewImport {
   readonly parts: ReadonlyArray<{ readonly csv: string; readonly firstLine: number }>
 }
 
-/** Imports run in the background (D135): starting, finding and cancelling them. The runner is ImportRunner. */
+/** Imports run in the background (D135): starting, finding and canceling them. The runner is ImportRunner. */
 export class Imports extends Context.Service<
   Imports,
   {
@@ -176,7 +176,7 @@ export class Imports extends Context.Service<
                 const stopped = yield* db.query((d) =>
                   d
                     .update(schema.imports)
-                    .set({ status: "cancelled", finishedAt: new Date(), claimedAt: null, updatedAt: new Date() })
+                    .set({ status: "canceled", finishedAt: new Date(), claimedAt: null, updatedAt: new Date() })
                     .where(
                       and(
                         eq(schema.imports.teamId, target.team.value),

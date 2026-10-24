@@ -7,7 +7,7 @@ import { RecordType } from "./record-type.ts"
 const Timestamp = Schema.String.annotate({ description: "ISO 8601 timestamp" })
 
 /** Where an import is (D135). Logos are fetched after the rows, while "fetching-logos". */
-export const ImportStatus = Schema.Literals(["queued", "running", "fetching-logos", "finished", "cancelled", "failed"])
+export const ImportStatus = Schema.Literals(["queued", "running", "fetching-logos", "finished", "canceled", "failed"])
 export type ImportStatus = typeof ImportStatus.Type
 
 /** A row with problems, by its line in the file (the header is line 1). */

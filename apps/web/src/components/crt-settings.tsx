@@ -3,7 +3,7 @@ import { CRT_DEFAULTS, type CrtSettings, crtSettings, saveCrtSettings } from "..
 import { Button, Checkbox, Dialog, Fieldset, Hint, Option, Slider } from "./ui/index.ts"
 
 /**
- * CRT settings (D114): the phosphor colour and how strong each part of the effect is. Every change shows at
+ * CRT settings (D114): the phosphor color and how strong each part of the effect is. Every change shows at
  * once, behind the dialog, and is kept in this browser.
  */
 export function CrtSettingsDialog(props: { readonly crtOn: boolean; readonly onClose: () => void }) {

@@ -6,6 +6,8 @@ Every concept in Parley has exactly one name. It is used in code, docs, UI copy,
 
 How to pick a name: choose the most common name for the concept. Reject anything vague, or anything that overlaps with another term here, with a concept our users already have (a CRM user thinks "organization" means a customer), or with a term from our stack (Effect, TanStack, Better-Auth, MCP).
 
+**American spelling** (D151): color, behavior, canceled, gray, recognize.
+
 **Third-party names stay third-party.** Better-Auth's `organization`, Effect's `Scope`, a library's `collection` and MCP's `tool` are used *only* when talking about that library's API, never as Parley concepts.
 
 ---
@@ -47,8 +49,8 @@ How to pick a name: choose the most common name for the concept. Reject anything
 | **Session** | A user's sign-in to the web app (a Better-Auth session cookie). | login, auth cookie |
 | **API key** | A secret credential used by an agent or script. It belongs to either a user (it acts as that user, is limited by its scopes, and is bound to one team) or a service account. | token, PAT, secret, credential (as a noun for this) |
 | **CRT mode** | The optional old-monitor look (D81, D102), drawn by a WebGL shader where the browser can, otherwise by the CSS layer. Amber by default. | retro mode, terminal theme, CRT filter |
-| **CRT settings** | How CRT mode looks, kept per browser (D114): the **phosphor** colour (hue and saturation), text glow, **curvature**, **chromatic aberration**, scanlines, bloom, vignette and flicker. | CRT config, CRT options, CRT preferences |
-| **Phosphor** | The colour CRT mode draws in, named after a monitor's phosphor coating, set by hue and saturation (saturation 0 is white). | tint, accent colour (for this) |
+| **CRT settings** | How CRT mode looks, kept per browser (D114): the **phosphor** color (hue and saturation), text glow, **curvature**, **chromatic aberration**, scanlines, bloom, vignette and flicker. | CRT config, CRT options, CRT preferences |
+| **Phosphor** | The color CRT mode draws in, named after a monitor's phosphor coating, set by hue and saturation (saturation 0 is white). | tint, accent color (for this) |
 | **Invitation** | An emailed link to join a team with a role, good for 7 days. | invite (as a noun), join link, team invite |
 | **Access token** | The short-lived OAuth token an agent gets for a connection and sends to `/mcp`. It names the connection and nothing else. In UI copy, say "the agent's sign-in". | token (alone), bearer, JWT (outside code about its format) |
 | **Connection** | An agent someone authorized over OAuth (MCP sign-in), bound to one team, acting as that person or as a service account, limited to its scopes. Listed and revoked in Settings. | grant, authorization, integration, connected app, OAuth app |
@@ -78,7 +80,7 @@ How to pick a name: choose the most common name for the concept. Reject anything
 
 | Term | Meaning | Banned synonyms |
 | --- | --- | --- |
-| **Error** | An expected way an operation can go wrong, modelled as one `Schema.TaggedError` class that implements `DomainError`. | failure, exception, problem |
+| **Error** | An expected way an operation can go wrong, modeled as one `Schema.TaggedError` class that implements `DomainError`. | failure, exception, problem |
 | **Error union** | The set of error classes one operation can produce, such as `UpdateContactError`. | failure union, error type (for the union) |
 | **Defect** | A bug or an unexpected condition. It is never a `DomainError`, never shown in detail, and is logged in full. Its public tag is `InternalDefect`. | crash, panic, internal error, unknown error |
 | **User message** | `userMessage`: the words people and agents read, written in our own words. | error text, display message, copy |
@@ -119,7 +121,7 @@ How to pick a name: choose the most common name for the concept. Reject anything
 | **Broadcast** | One marketing email sent to a segment at once: its subject, content, segment and topic, and, once sent, its recipients and results (D140). | campaign (reserved: in marketing it means something broader), blast, newsletter (as a noun for the thing sent), mailing, send |
 | **Draft** | A broadcast that hasn't been sent. A status of a broadcast, not a separate thing. | unsent broadcast, pending broadcast |
 | **Template** | Reusable content (subject and body) that a new broadcast starts from. The broadcast takes a copy; editing the template later doesn't change it. | layout, design (for email content), theme |
-| **Email style** | A reusable look for emails: logo and header, colours, font, footer alignment, plain or card, or custom HTML (D116, D121). A team has a default; templates and broadcasts can use another. Not a template, which is content. | layout, brand, theme, letterhead, email design |
+| **Email style** | A reusable look for emails: logo and header, colors, font, footer alignment, plain or card, or custom HTML (D116, D121). A team has a default; templates and broadcasts can use another. Not a template, which is content. | layout, brand, theme, letterhead, email design |
 | **Preview text** | The line inbox apps show after a broadcast's subject. | preheader, snippet, teaser |
 | **Merge tag** | A placeholder in a subject or body, like `{{first_name}}`, filled in per recipient. | variable, placeholder, token, personalization tag |
 | **Test send** | Sending a draft to members of the team (not contacts) to check it. | preview email, proof, test email |
@@ -157,5 +159,6 @@ How to pick a name: choose the most common name for the concept. Reject anything
 | 2026-10-21 | Added **selection** (D137). |
 | 2026-10-21 | **Broadcast** replaces **campaign** for one marketing email (D140); "campaign" is now banned for it. |
 | 2026-10-24 | Added **form**, **submission** and **appearance** (D144, D148). |
+| 2026-10-24 | American spelling throughout (D151). |
 | 2026-10-24 | Added **tracking parameters** and **click ID** (D153, D154). |
 | 2026-10-24 | Added **info tip** (D155). |

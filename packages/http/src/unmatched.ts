@@ -51,7 +51,7 @@ export const explainUnsupportedBody = (request: Request): Response =>
     _tag: "UnsupportedMediaType",
     error: {
       _tag: "UnsupportedMediaType",
-      userMessage: `This endpoint reads JSON, not ${request.headers.get("content-type") ?? "an unlabelled body"}. Send the body as JSON with the header content-type: application/json.`,
+      userMessage: `This endpoint reads JSON, not ${request.headers.get("content-type") ?? "an unlabeled body"}. Send the body as JSON with the header content-type: application/json.`,
       isRetryable: false,
     },
   })

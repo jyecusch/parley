@@ -4,7 +4,7 @@ import { cn } from "./ui/cn.ts"
 
 /**
  * Where an email shows: white, whatever the app's theme, as an inbox shows it. The email paints any
- * background of its own (a card style's colour); a plain one stays white (D115).
+ * background of its own (a card style's color); a plain one stays white (D115).
  */
 export const EMAIL_FRAME_CLASS = "mx-3.5 mb-3.5 min-h-96 flex-1 rounded-md bg-white"
 

@@ -15,7 +15,7 @@ export const IMPORT_MAX_ROWS = 100_000
 export const startImport = defineTeamOperation({
   name: "imports.start",
   description:
-    "Start importing contacts or companies from a CSV file of up to 100,000 rows. Parley imports it in the background (D135); follow it with imports.get. Rows are matched and imported as contacts.import and companies.import do. Rows already imported stay if the import is cancelled.",
+    "Start importing contacts or companies from a CSV file of up to 100,000 rows. Parley imports it in the background (D135); follow it with imports.get. Rows are matched and imported as contacts.import and companies.import do. Rows already imported stay if the import is canceled.",
   input: Schema.Struct({
     ...InTeam,
     recordType: RecordType.annotate({ title: "Import into", description: "contact or company." }),

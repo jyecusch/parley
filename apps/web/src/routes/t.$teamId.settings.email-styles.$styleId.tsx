@@ -327,7 +327,7 @@ function StyleEditor(props: {
                   onChange={(event) => set("headerText", event.target.value)}
                 />
               </Field>
-              <Fieldset legend="Colours">
+              <Fieldset legend="Colors">
                 <div className="flex max-w-sm flex-col gap-2.5">
                   {COLOR_FIELDS.map((field) => (
                     <ColorField
@@ -364,7 +364,7 @@ function StyleEditor(props: {
               label="Footer alignment"
               options={[
                 { value: "left", label: "Left" },
-                { value: "center", label: "Centred" },
+                { value: "center", label: "Centered" },
                 { value: "right", label: "Right" },
               ]}
               value={draft.footerAlign}
@@ -449,7 +449,7 @@ function LayoutSketch(props: { readonly layout: EmailStyleLayout }) {
   )
 }
 
-/** The logo: upload, replace or remove, and whether it sits left or centred. */
+/** The logo: upload, replace or remove, and whether it sits left or centered. */
 function LogoField(props: {
   readonly teamId: TeamId
   readonly disabled: boolean
@@ -517,7 +517,7 @@ function LogoField(props: {
           label="Logo position"
           options={[
             { value: "left", label: "Left" },
-            { value: "center", label: "Centred" },
+            { value: "center", label: "Centered" },
           ]}
           value={props.align}
           onChange={props.onAlign}
@@ -530,7 +530,7 @@ function LogoField(props: {
   )
 }
 
-/** A colour: the system picker and the hex code side by side, kept in step. */
+/** A color: the system picker and the hex code side by side, kept in step. */
 function ColorField(props: {
   readonly label: string
   readonly value: string
@@ -545,7 +545,7 @@ function ColorField(props: {
     <div className="flex items-center gap-2.5">
       <input
         type="color"
-        aria-label={`${props.label} colour`}
+        aria-label={`${props.label} color`}
         disabled={props.disabled}
         className="size-8 shrink-0 cursor-pointer rounded-md border-0 bg-transparent p-0"
         value={props.value}

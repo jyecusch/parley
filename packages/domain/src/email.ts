@@ -184,7 +184,7 @@ export const Template = Schema.Struct({
 })
 export type Template = typeof Template.Type
 
-export const BroadcastStatus = Schema.Literals(["draft", "sending", "sent", "cancelled"])
+export const BroadcastStatus = Schema.Literals(["draft", "sending", "sent", "canceled"])
 export type BroadcastStatus = typeof BroadcastStatus.Type
 
 /** How a broadcast's sending went, by recipient. */
@@ -197,7 +197,7 @@ export const BroadcastCounts = Schema.Struct({
   failed: Schema.Number,
   bounced: Schema.Number,
   markedAsSpam: Schema.Number,
-  cancelled: Schema.Number,
+  canceled: Schema.Number,
   /** Recipients who unsubscribed through this broadcast's link, from everything or from its topic (D119). */
   unsubscribed: Schema.Number,
 })
@@ -237,7 +237,7 @@ export const RecipientStatus = Schema.Literals([
   "failed",
   "bounced",
   "marked-as-spam",
-  "cancelled",
+  "canceled",
 ])
 export type RecipientStatus = typeof RecipientStatus.Type
 
@@ -317,13 +317,13 @@ export type UnsubscribeChange = typeof UnsubscribeChange.Type
 
 export const EmailStyleName = Schema.String.check(Schema.isTrimmed(), Schema.isMinLength(1), Schema.isMaxLength(80))
 export const HexColor = Schema.String.check(Schema.isPattern(/^#[0-9a-fA-F]{6}$/)).annotate({
-  title: "Colour",
-  description: "A hex colour like #1F2430.",
+  title: "Color",
+  description: "A hex color like #1F2430.",
 })
 export const EmailStyleLayout = Schema.Literals(["plain", "card", "custom"]).annotate({
   title: "Layout",
   description:
-    "plain: like a personal email. card: the content on a white card over the background colour. custom: your own HTML (customHtml) around the content.",
+    "plain: like a personal email. card: the content on a white card over the background color. custom: your own HTML (customHtml) around the content.",
 })
 export type EmailStyleLayout = typeof EmailStyleLayout.Type
 export const EmailFont = Schema.Literals(["sans", "serif", "default"]).annotate({
@@ -346,7 +346,7 @@ export const CustomHtml = Schema.String.check(Schema.isMaxLength(100_000)).annot
     "Your own HTML around the content, for layout custom. It must contain {{content}} where the email's body goes. Scripts, forms and iframes are removed, and Parley's footer is always added after it.",
 })
 
-/** A reusable look for emails (D116): logo and header, colours, font, plain or card, or custom HTML. */
+/** A reusable look for emails (D116): logo and header, colors, font, plain or card, or custom HTML. */
 export const EmailStyle = Schema.Struct({
   id: EmailStyleId,
   name: Schema.String,
@@ -369,7 +369,7 @@ export const EmailStyle = Schema.Struct({
 })
 export type EmailStyle = typeof EmailStyle.Type
 
-/** The plain look's colours (D115): what a new style starts with. */
+/** The plain look's colors (D115): what a new style starts with. */
 export const PLAIN_COLORS: EmailStyleColors = {
   text: "#1A1A1A",
   background: "#FFFFFF",

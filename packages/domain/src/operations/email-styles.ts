@@ -48,7 +48,7 @@ const StyleFields = {
 
 export const listEmailStyles = defineTeamOperation({
   name: "emailStyles.list",
-  description: "List the team's email styles: how emails look (logo, colours, font, layout). One is the default.",
+  description: "List the team's email styles: how emails look (logo, colors, font, layout). One is the default.",
   input: Schema.Struct(InTeam),
   output: Schema.Array(EmailStyle),
   errors: [],

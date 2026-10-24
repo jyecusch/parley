@@ -10,7 +10,7 @@ You'll get there. But first come a loading skeleton, then a sidebar with fourtee
 
 That's the problem Parley exists to solve. And it's a problem no single screen can fix, because it isn't *in* any single screen.
 
-In March 2024 Linear published a two-part series on redesigning their app: [A design reset (part I)](https://linear.app/now/a-design-reset) by Karri Saarinen, and [How we redesigned the Linear UI (part II)](https://linear.app/now/how-we-redesigned-the-linear-ui) by Karri, Yann-Edern Gillet, Andreas Eldh and Romain Cascino. On the surface it's about a sidebar, some tabs and a new colour system. Underneath, it's a manual for how a small team keeps a product feeling *good* as it grows.
+In March 2024 Linear published a two-part series on redesigning their app: [A design reset (part I)](https://linear.app/now/a-design-reset) by Karri Saarinen, and [How we redesigned the Linear UI (part II)](https://linear.app/now/how-we-redesigned-the-linear-ui) by Karri, Yann-Edern Gillet, Andreas Eldh and Romain Cascino. On the surface it's about a sidebar, some tabs and a new color system. Underneath, it's a manual for how a small team keeps a product feeling *good* as it grows.
 
 We aren't going to copy Linear's sidebar. We're going to steal their reasons.
 
@@ -130,7 +130,7 @@ That's the deepest idea in the whole series. Quality accumulates below conscious
 **What it means for Parley.**
 
 - **One spacing scale, used without exception.** Tailwind's default 4px scale, with a short list of the steps we actually use. If a design needs `13px`, the design is wrong, not the scale.
-- **Icons and text share an optical centre.** Sidebar items, table cells, buttons and menu items all get one row height per density and one icon size per row height.
+- **Icons and text share an optical center.** Sidebar items, table cells, buttons and menu items all get one row height per density and one icon size per row height.
 - **Columns align across views.** The "Name" column in Contacts and the "Name" column in Companies start at the same x position. Switching between them shouldn't make your eye jump.
 - **Density suited to users who work in it all day.** CRMs are scanned, not read. A contacts table should show 25 to 30 rows on a laptop without feeling cramped. Generous whitespace is for marketing websites. There is one dense default and no compact/comfortable toggle (D52), so there's one row height and one icon size to get perfectly aligned.
 - **Motion is quick and purposeful.** Panels slide in fast enough to feel instant. Nothing bounces. No animation ever stands between someone and their data.
@@ -141,19 +141,19 @@ Each of these is a rule we can put in a component and a lint check, so getting i
 
 ## 6. Appearance is a system, not a palette
 
-**What Linear saw.** This is the most technical part of part II, and the most transferable. Andreas explains that Linear rebuilt theme generation in **LCH**, a colour space that is *perceptually uniform*. Two colours with the same lightness value actually *look* equally light, which isn't true in HSL. The payoff is big: instead of hand-tuning 98 variables per theme, they define **three inputs (base colour, accent colour, and contrast)** and generate everything else.
+**What Linear saw.** This is the most technical part of part II, and the most transferable. Andreas explains that Linear rebuilt theme generation in **LCH**, a color space that is *perceptually uniform*. Two colors with the same lightness value actually *look* equally light, which isn't true in HSL. The payoff is big: instead of hand-tuning 98 variables per theme, they define **three inputs (base color, accent color, and contrast)** and generate everything else.
 
 Two details are worth underlining:
 
 - **Contrast is an input.** Turn it up and you get a high-contrast theme for users who need one, for free. Accessibility isn't a separate theme someone has to maintain. It's a setting on the same system.
-- **They pulled colour *out* of the chrome.** Limiting how much of the accent goes into surfaces gave a more neutral, timeless look, and made text and icons darker in light mode and lighter in dark mode. The frame recedes, and the content leads.
+- **They pulled color *out* of the chrome.** Limiting how much of the accent goes into surfaces gave a more neutral, timeless look, and made text and icons darker in light mode and lighter in dark mode. The frame recedes, and the content leads.
 
 **What it means for Parley.** Tailwind v4 already defines its palette in **OKLCH**, a modern refinement of the same perceptually uniform idea. So we don't fight our tools. We lean in:
 
 - **Semantic theme variables only.** Components use `bg-surface`, `bg-surface-raised`, `text-primary`, `text-muted`, `border-subtle`, `accent`. They never use `bg-gray-100` or `text-blue-600`. Raw palette classes get a lint rule.
 - **Light and dark ship in v1** (D51), following the OS with a manual override. There's no theme picker in v1; custom and high-contrast themes come almost free later because of the next point.
 - **Theme variables are generated from a few inputs** (base, accent, contrast) in OKLCH, the way Linear generates theirs. Surfaces are lightness steps away from the base, so elevation (background → panel → menu → dialog) is consistent by construction.
-- **Neutral chrome.** The sidebar and header are near-greyscale. Colour is reserved for meaning: the primary action, a selection, a status (unsubscribed, bounced), and an error. If everything is blue, nothing is.
+- **Neutral chrome.** The sidebar and header are near-grayscale. Color is reserved for meaning: the primary action, a selection, a status (unsubscribed, bounced), and an error. If everything is blue, nothing is.
 - **Contrast is tested, not hoped for.** Every theme-variable pair used for text meets WCAG AA at default contrast, and a future high-contrast theme must meet AAA.
 
 ---
@@ -192,18 +192,18 @@ In Parley, a `UserApiKey` or `ServiceAccountApiKey` (see [00](./00-architecture.
 - **Attribution everywhere.** Activity reads "Jane changed email *via Claude (Inbox triage API key)*" or "*Support Bot* created this contact". Never a vague "System".
 - **Service accounts and API keys are visible.** A team's service accounts appear in Settings → Members with their role and when they were last active. Every API key shows its scopes and last use. An admin can revoke one in two clicks.
 - **Parity, in both directions.** Anything the UI can do, an agent can do through an operation. Anything an agent did, the UI can show and undo with the same operations.
-- **Recognisable at a glance.** A small, consistent marker on agent-made changes, in activity and the "last edited by" cell. It isn't a warning, just a fact.
+- **Recognizable at a glance.** A small, consistent marker on agent-made changes, in activity and the "last edited by" cell. It isn't a warning, just a fact.
 
 ---
 
 ## How we'll actually work: the per-screen loop
 
-Linear's process went through five milestones: stress tests, behaviour definitions, chrome refresh behind a feature flag, private beta, and general availability. They dogfooded everything internally, with a toolbar toggle to flip between old and new. We're a much smaller team, but the shape transfers:
+Linear's process went through five milestones: stress tests, behavior definitions, chrome refresh behind a feature flag, private beta, and general availability. They dogfooded everything internally, with a toolbar toggle to flip between old and new. We're a much smaller team, but the shape transfers:
 
 1. **Discuss.** What is this screen for? Which operations does it expose? Which view type is it?
 2. **Design asset.** Shown in the real frame, with its error, empty and loading states (D57). Bold is fine here. It's for agreeing direction, not a promise of every pixel.
 3. **Stress test.** Run the checklist from principle 3. Fix the design, not the checklist.
-4. **Behaviour definitions.** For core components (sidebar, index view header, table, record view, panel, command menu), write down how they *behave* before building them: keyboard, focus, URL state, what happens on narrow widths, what happens on error. Linear treated this as its own milestone, and so will we. These components are built once and used everywhere.
+4. **Behavior definitions.** For core components (sidebar, index view header, table, record view, panel, command menu), write down how they *behave* before building them: keyboard, focus, URL state, what happens on narrow widths, what happens on error. Linear treated this as its own milestone, and so will we. These components are built once and used everywhere.
 5. **Build behind a flag.** The new screen ships off by default.
 6. **Dogfood.** We run our own customer list in Parley. Anything that annoys us gets fixed before anyone else sees it.
 7. **Ship.**

@@ -35,8 +35,8 @@ describe("email rendering", () => {
   })
 
   it("shows unknown tags as typed, escaped", () => {
-    const rendered = render("{{favourite}} <b>x</b>")
-    expect(rendered.unknownMergeTags).toEqual(["favourite"])
+    const rendered = render("{{favorite}} <b>x</b>")
+    expect(rendered.unknownMergeTags).toEqual(["favorite"])
     expect(rendered.html).not.toContain("<b>")
   })
 })
@@ -51,11 +51,11 @@ describe("email styles", () => {
     expect(html).not.toMatch(/class="content" style="font-family/)
     expect(html).toContain("border-top:1px solid #e5e5e5")
     expect(html).toContain("Acme Pty Ltd · 1 Market St")
-    // The unsubscribe link is the footer's grey.
+    // The unsubscribe link is the footer's gray.
     expect(html).toContain('style="color:#767676;text-decoration:underline">Unsubscribe</a>')
   })
 
-  it("renders a card at full width, up to 600px, on the background colour", () => {
+  it("renders a card at full width, up to 600px, on the background color", () => {
     const html = styled("Hello", { layout: "card", colors: { ...PLAIN_STYLE.colors, background: "#EEF1F6" } }).html
     expect(html).toContain(
       'width="600" cellpadding="0" cellspacing="0" style="width:100%;max-width:600px;background:#ffffff',
@@ -63,7 +63,7 @@ describe("email styles", () => {
     expect(html).toContain("background:#EEF1F6")
   })
 
-  it("puts the logo and header line at the top, and uses the style's colours and font", () => {
+  it("puts the logo and header line at the top, and uses the style's colors and font", () => {
     const html = styled("See [this](https://acme.com)", {
       logoUrl: "https://parley.example/i/abc",
       logoAlign: "center",
@@ -78,7 +78,7 @@ describe("email styles", () => {
     expect(html).toContain('style="color:#2F5BEA;text-decoration:underline"')
   })
 
-  it("never lets a colour or logo address break out of its attribute", () => {
+  it("never lets a color or logo address break out of its attribute", () => {
     const html = styled("Hi", {
       logoUrl: "javascript:alert(1)",
       colors: { ...PLAIN_STYLE.colors, text: '#000;"><script>alert(1)</script>' },

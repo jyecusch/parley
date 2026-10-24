@@ -5,7 +5,7 @@
 
 /*
  * Ink, the approved design (D80), as Tailwind tokens. Components use only utilities built from
- * these, so sizes come from Tailwind's rem scale and colours from the theme: nothing is styled in
+ * these, so sizes come from Tailwind's rem scale and colors from the theme: nothing is styled in
  * pixels. Light and dark follow the OS unless the person picks one (D51); CRT is an opt-in
  * appearance mode (D81).
  */
@@ -216,7 +216,7 @@
   ::placeholder {
     color: var(--color-subtle);
   }
-  /* Thin scrollbars in the theme's colours, CRT's phosphor included, instead of the browser's. */
+  /* Thin scrollbars in the theme's colors, CRT's phosphor included, instead of the browser's. */
   * {
     scrollbar-width: thin;
     scrollbar-color: var(--color-scrollbar) transparent;
