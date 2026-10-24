@@ -1,8 +1,10 @@
 import handler, { createServerEntry } from "@tanstack/react-start/server-entry"
+import { handle } from "./server/app.ts"
 
 /**
  * Headers every response gets. No page may be framed by another site, so a page like the agent
- * consent screen can't be overlaid and clicked through (clickjacking).
+ * consent screen can't be overlaid and clicked through (clickjacking). The one exception is a
+ * form's page (/f/<form id>), which exists to be framed: by the sites its team allows (D144).
  */
 const SECURITY_HEADERS: Readonly<Record<string, string>> = {
   "content-security-policy": "frame-ancestors 'none'",
@@ -11,11 +13,36 @@ const SECURITY_HEADERS: Readonly<Record<string, string>> = {
   "referrer-policy": "strict-origin-when-cross-origin",
 }
 
+const FORM_PAGE = /^\/f\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/?$/i
+
+/**
+ * The frame-ancestors for a form's page: any site when the team hasn't limited it, else the
+ * sites it allows ("nitric.io", "*.nitric.io") over https, and Parley itself (for previews).
+ * If the lookup fails, only Parley may frame it.
+ */
+const formFrameAncestors = async (request: Request, formId: string): Promise<string> => {
+  try {
+    const response = await handle(new Request(new URL(`/api/forms/${formId}/sites`, request.url)))
+    if (!response.ok) return "'self'"
+    const { allowedSites } = (await response.json()) as { allowedSites: ReadonlyArray<string> | null }
+    if (allowedSites === null) return "*"
+    return ["'self'", ...allowedSites.map((site) => `https://${site}`)].join(" ")
+  } catch {
+    return "'self'"
+  }
+}
+
 export default createServerEntry({
   async fetch(request, options) {
     const response = await handler.fetch(request, options)
     const headers = new Headers(response.headers)
-    for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
+    const form = FORM_PAGE.exec(new URL(request.url).pathname)
+    const security: Record<string, string> = { ...SECURITY_HEADERS }
+    if (form?.[1] && request.method === "GET") {
+      security["content-security-policy"] = `frame-ancestors ${await formFrameAncestors(request, form[1])}`
+      delete security["x-frame-options"]
+    }
+    for (const [name, value] of Object.entries(security)) {
       // A route's own policy (the file route sets one) is kept; frame-ancestors is added to it.
       if (name === "content-security-policy" && headers.has(name)) {
         headers.set(name, `${headers.get(name)}; ${value}`)

@@ -1,6 +1,7 @@
 import { Schema } from "effect"
 import { PostalAddress } from "./address.ts"
 import { CustomValues, CustomValuesPatch } from "./custom-field.ts"
+import { Tracking } from "./forms.ts"
 import { AffiliationId, CompanyId, ContactId, TeamId, UserId } from "./ids.ts"
 import { RecordType } from "./record-type.ts"
 import { SocialProfiles } from "./social.ts"
@@ -142,12 +143,20 @@ export const ActivityEntry = Schema.Struct({
     "resubscribed",
     "bounced",
     "marked-as-spam",
+    "submitted-form",
   ]),
   changedFields: Schema.Array(Schema.String),
+  /**
+   * For "submitted-form": values the submission didn't write because the contact already had one
+   * (D145), for a person to apply. `field` is a contacts.update key or "custom:<field id>".
+   */
+  kept: Schema.Array(Schema.Struct({ field: Schema.String, label: Schema.String, value: Schema.Unknown })),
+  /** For "submitted-form": where the sign-up came from, when the form records it (D153). */
+  tracking: Schema.NullOr(Tracking),
   /** The other record an affiliation change was about, by its name at the time. */
   related: Schema.NullOr(
     Schema.Struct({
-      recordType: Schema.Union([RecordType, Schema.Literal("broadcast")]),
+      recordType: Schema.Union([RecordType, Schema.Literals(["broadcast", "form"])]),
       id: Schema.String,
       name: Schema.String,
     }),

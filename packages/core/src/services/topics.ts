@@ -10,6 +10,7 @@ import { classifySqlError } from "./sql-errors.ts"
 export interface TopicInput {
   readonly name?: string | undefined
   readonly description?: string | null | undefined
+  readonly mode?: "opt-out" | "opt-in" | undefined
 }
 
 /** Topics (R38): kinds of marketing email a contact can unsubscribe from on its own. */
@@ -51,6 +52,9 @@ export class Topics extends Context.Service<
                 unsubscribed: sql<number>`(select count(*)::int from "topic_unsubscribes" u
                   join "contacts" c on c.id = u.contact_id
                   where u.topic_id = "topics"."id" and c.deleted_at is null)`,
+                members: sql<number>`(select count(*)::int from "topic_members" m
+                  join "contacts" c on c.id = m.contact_id
+                  where m.topic_id = "topics"."id" and c.deleted_at is null)`,
               })
               .from(schema.topics)
               .where(and(eq(schema.topics.teamId, teamId), topicId ? eq(schema.topics.id, topicId) : undefined))
@@ -59,11 +63,13 @@ export class Topics extends Context.Service<
         ).pipe(
           Effect.map((rows) =>
             rows.map(
-              ({ row, unsubscribed }): Topic => ({
+              ({ row, unsubscribed, members }): Topic => ({
                 id: row.id as TopicId,
                 name: row.name,
                 description: row.description,
+                mode: row.mode,
                 unsubscribedCount: Number(unsubscribed),
+                memberCount: Number(members),
                 createdAt: row.createdAt.toISOString(),
                 updatedAt: row.updatedAt.toISOString(),
               }),
@@ -85,9 +91,13 @@ export class Topics extends Context.Service<
             const teamId = access.member.team.value
             yield* run(
               db.query((d) =>
-                d
-                  .insert(schema.topics)
-                  .values({ id, teamId, name: input.name, description: input.description ?? null }),
+                d.insert(schema.topics).values({
+                  id,
+                  teamId,
+                  name: input.name,
+                  description: input.description ?? null,
+                  mode: input.mode ?? "opt-out",
+                }),
               ),
             )
             return yield* one(teamId, id)
@@ -102,6 +112,9 @@ export class Topics extends Context.Service<
                   .set({
                     ...(input.name !== undefined ? { name: input.name } : {}),
                     ...(input.description !== undefined ? { description: input.description } : {}),
+                    // A topic's mode can change; members and unsubscribes are both kept, so changing
+                    // back restores who gets it (D149).
+                    ...(input.mode !== undefined ? { mode: input.mode } : {}),
                     updatedAt: sql`now()`,
                   })
                   .where(and(eq(schema.topics.teamId, teamId), eq(schema.topics.id, target.topic.value))),

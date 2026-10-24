@@ -35,6 +35,11 @@ export const SUBSCRIPTION_STATUS_LABELS: Readonly<Record<SubscriptionStatus, str
 
 export const TopicName = Schema.String.check(Schema.isTrimmed(), Schema.isMinLength(1), Schema.isMaxLength(60))
 export const TopicDescription = Schema.String.check(Schema.isTrimmed(), Schema.isMaxLength(200))
+export const TopicMode = Schema.Literals(["opt-out", "opt-in"]).annotate({
+  title: "Mode",
+  description:
+    "opt-out: sent to everyone subscribed who hasn't left the topic. opt-in: sent only to contacts who joined it (D149).",
+})
 
 /** A kind of marketing email a contact can unsubscribe from on its own (R38). */
 export const Topic = Schema.Struct({
@@ -42,8 +47,15 @@ export const Topic = Schema.Struct({
   name: Schema.String,
   /** Shown on the unsubscribe page. */
   description: Schema.NullOr(Schema.String),
-  /** Contacts unsubscribed from this topic alone. */
+  /**
+   * opt-out: sent to everyone subscribed who hasn't left it. opt-in: sent only to contacts who
+   * joined it, through a form, an import or by hand (D149).
+   */
+  mode: Schema.Literals(["opt-out", "opt-in"]),
+  /** Contacts unsubscribed from this topic alone (opt-out topics). */
   unsubscribedCount: Schema.Number,
+  /** Contacts who joined it (opt-in topics). */
+  memberCount: Schema.Number,
   createdAt: Timestamp,
   updatedAt: Timestamp,
 })

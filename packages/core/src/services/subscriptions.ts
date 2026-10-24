@@ -75,12 +75,20 @@ export class Subscriptions extends Context.Service<
                 id: schema.topics.id,
                 name: schema.topics.name,
                 description: schema.topics.description,
+                mode: schema.topics.mode,
                 left: sql<boolean>`exists (select 1 from "topic_unsubscribes" u
                   where u.topic_id = "topics"."id" and u.contact_id = ${contactId})`,
+                member: sql<boolean>`exists (select 1 from "topic_members" m
+                  where m.topic_id = "topics"."id" and m.contact_id = ${contactId})`,
               })
               .from(schema.topics)
               .where(eq(schema.topics.teamId, teamId))
               .orderBy(asc(schema.topics.name)),
+          ),
+        ).pipe(
+          // Opt-out topics: in unless they left. Opt-in topics: in only if they joined (D149).
+          Effect.map((rows) =>
+            rows.map((row) => ({ ...row, subscribed: row.mode === "opt-in" ? row.member : !row.left })),
           ),
         )
 
@@ -113,37 +121,62 @@ export class Subscriptions extends Context.Service<
             topics: topics.map((topic) => ({
               topicId: topic.id as TopicId,
               name: topic.name,
-              subscribed: !topic.left,
+              subscribed: topic.subscribed,
             })),
           }
           return result
         })
 
-      /** Leaves or rejoins one topic. Returns whether anything changed. */
-      const setTopic = (teamId: TeamId, contactId: string, topicId: string, subscribed: boolean) =>
-        subscribed
-          ? db
-              .query((d) =>
-                d
-                  .delete(schema.topicUnsubscribes)
-                  .where(
-                    and(
-                      eq(schema.topicUnsubscribes.contactId, contactId),
-                      eq(schema.topicUnsubscribes.topicId, topicId),
-                    ),
-                  )
-                  .returning({ topicId: schema.topicUnsubscribes.topicId }),
-              )
-              .pipe(Effect.map((rows) => rows.length > 0))
-          : db
-              .query((d) =>
-                d
-                  .insert(schema.topicUnsubscribes)
-                  .values({ teamId, contactId, topicId })
-                  .onConflictDoNothing()
-                  .returning({ topicId: schema.topicUnsubscribes.topicId }),
-              )
-              .pipe(Effect.map((rows) => rows.length > 0))
+      /** Leaves or rejoins one topic, or joins and leaves an opt-in one (D149). Returns whether anything changed. */
+      const setTopic = (
+        teamId: TeamId,
+        contactId: string,
+        topicId: string,
+        subscribed: boolean,
+        mode: "opt-out" | "opt-in" = "opt-out",
+      ) =>
+        mode === "opt-in"
+          ? subscribed
+            ? db
+                .query((d) =>
+                  d
+                    .insert(schema.topicMembers)
+                    .values({ teamId, contactId, topicId })
+                    .onConflictDoNothing()
+                    .returning({ topicId: schema.topicMembers.topicId }),
+                )
+                .pipe(Effect.map((rows) => rows.length > 0))
+            : db
+                .query((d) =>
+                  d
+                    .delete(schema.topicMembers)
+                    .where(and(eq(schema.topicMembers.contactId, contactId), eq(schema.topicMembers.topicId, topicId)))
+                    .returning({ topicId: schema.topicMembers.topicId }),
+                )
+                .pipe(Effect.map((rows) => rows.length > 0))
+          : subscribed
+            ? db
+                .query((d) =>
+                  d
+                    .delete(schema.topicUnsubscribes)
+                    .where(
+                      and(
+                        eq(schema.topicUnsubscribes.contactId, contactId),
+                        eq(schema.topicUnsubscribes.topicId, topicId),
+                      ),
+                    )
+                    .returning({ topicId: schema.topicUnsubscribes.topicId }),
+                )
+                .pipe(Effect.map((rows) => rows.length > 0))
+            : db
+                .query((d) =>
+                  d
+                    .insert(schema.topicUnsubscribes)
+                    .values({ teamId, contactId, topicId })
+                    .onConflictDoNothing()
+                    .returning({ topicId: schema.topicUnsubscribes.topicId }),
+                )
+                .pipe(Effect.map((rows) => rows.length > 0))
 
       const updateTopics = <P, T, C>(
         target: ContactInTeam<C, T>,
@@ -161,6 +194,10 @@ export class Subscriptions extends Context.Service<
                 Effect.gen(function* () {
                   const subscribed = wanted.get(topic.id)
                   if (subscribed === undefined) return
+                  // Joining an opt-in topic by hand is consent too, so it needs the same right as rejoining.
+                  if (subscribed && !resubscribe && topic.mode === "opt-in") {
+                    return yield* Effect.die(new Error("joining an opt-in topic needs email:manage"))
+                  }
                   if (subscribed && !resubscribe) {
                     const [left] = yield* db.query((d) =>
                       d
@@ -175,7 +212,7 @@ export class Subscriptions extends Context.Service<
                     )
                     if (left) return yield* Effect.die(new Error("rejoining a topic needs email:manage"))
                   }
-                  const changed = yield* setTopic(teamId, contactId, topic.id, subscribed)
+                  const changed = yield* setTopic(teamId, contactId, topic.id, subscribed, topic.mode)
                   if (!changed) return
                   yield* db.query((d) =>
                     d.insert(schema.activity).values(
@@ -219,7 +256,7 @@ export class Subscriptions extends Context.Service<
               id: topic.id as TopicId,
               name: topic.name,
               description: topic.description,
-              subscribed: !topic.left,
+              subscribed: topic.subscribed,
             })),
             test,
           }
@@ -265,12 +302,14 @@ export class Subscriptions extends Context.Service<
             Effect.gen(function* () {
               const [topic] = yield* db.query((d) =>
                 d
-                  .select({ name: schema.topics.name })
+                  .select({ name: schema.topics.name, mode: schema.topics.mode })
                   .from(schema.topics)
                   .where(and(eq(schema.topics.teamId, teamId), eq(schema.topics.id, id))),
               )
               if (!topic) return
-              const changed = yield* setTopic(teamId, contactId, id, subscribed)
+              // From the page, an opt-in topic can only be left: joining one needs a form (D149).
+              if (subscribed && topic.mode === "opt-in") return
+              const changed = yield* setTopic(teamId, contactId, id, subscribed, topic.mode)
               if (changed) yield* recordActivity(subscribed ? "resubscribed" : "unsubscribed", topic.name)
             })
 

@@ -10,9 +10,12 @@ import {
   Button,
   ErrorText,
   Field,
+  Fieldset,
   Hint,
   Input,
   Notice,
+  RadioCard,
+  RadioCards,
   Select,
   Table,
   Td,
@@ -555,8 +558,11 @@ function Topics(props: {
                   Name
                 </Th>
                 <Th scope="col">Description</Th>
-                <Th scope="col" className="w-[16%]">
-                  Unsubscribed
+                <Th scope="col" className="w-3/25">
+                  Mode
+                </Th>
+                <Th scope="col" className="w-4/25" title="Opt-in: who joined. Opt-out: who left.">
+                  People
                 </Th>
                 <Th scope="col" className="w-44">
                   <span className="sr-only">Actions</span>
@@ -568,7 +574,10 @@ function Topics(props: {
                 <Tr key={topic.id}>
                   <Td className="font-medium">{topic.name}</Td>
                   <Td className="text-subtle">{topic.description ?? "—"}</Td>
-                  <Td className="text-subtle tabular-nums">{topic.unsubscribedCount}</Td>
+                  <Td className="text-subtle">{topic.mode === "opt-in" ? "Opt-in" : "Opt-out"}</Td>
+                  <Td className="text-subtle tabular-nums">
+                    {topic.mode === "opt-in" ? `${topic.memberCount} joined` : `${topic.unsubscribedCount} left`}
+                  </Td>
                   <Td className="text-right">
                     {!props.canManage ? null : confirming === topic.id ? (
                       <RowActions>
@@ -635,6 +644,7 @@ function TopicDialog(props: {
 }) {
   const [name, setName] = useState(props.topic?.name ?? "")
   const [description, setDescription] = useState(props.topic?.description ?? "")
+  const [mode, setMode] = useState<"opt-out" | "opt-in">(props.topic?.mode ?? "opt-out")
   const [error, setError] = useState<string>()
   const [busy, setBusy] = useState(false)
   const save = async () => {
@@ -645,7 +655,7 @@ function TopicDialog(props: {
         await call("topics.update", { teamId: props.teamId, topicId: props.topic.id, ...input })
         await props.onSaved(`${input.name} is saved.`)
       } else {
-        await call("topics.create", { teamId: props.teamId, ...input })
+        await call("topics.create", { teamId: props.teamId, ...input, mode })
         await props.onSaved(`${input.name} is added.`)
       }
     } catch (failure) {
@@ -695,6 +705,29 @@ function TopicDialog(props: {
           onChange={(event) => setDescription(event.target.value)}
         />
       </Field>
+      {props.topic ? (
+        <Hint>
+          {props.topic.mode === "opt-in"
+            ? "Opt-in: sent only to contacts who joined it."
+            : "Opt-out: sent to everyone subscribed who hasn't left it."}{" "}
+          A topic's mode is set when it's made.
+        </Hint>
+      ) : (
+        <Fieldset legend="Who gets it">
+          <RadioCards name="topic-mode" value={mode} onChange={setMode}>
+            <RadioCard
+              value="opt-out"
+              label="Everyone, unless they leave"
+              description="Opt-out. For email every subscribed contact should get, like product updates to customers."
+            />
+            <RadioCard
+              value="opt-in"
+              label="Only people who join"
+              description="Opt-in. For lists people sign up to through a form, like a newsletter or a waitlist."
+            />
+          </RadioCards>
+        </Fieldset>
+      )}
       {error ? <ErrorText>{error}</ErrorText> : null}
     </Dialog>
   )

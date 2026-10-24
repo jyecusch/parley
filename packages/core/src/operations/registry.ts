@@ -11,6 +11,7 @@ import type { Contacts } from "../services/contacts.ts"
 import type { CustomFields } from "../services/custom-fields.ts"
 import type { EmailImages } from "../services/email-images.ts"
 import type { EmailStyles } from "../services/email-styles.ts"
+import type { Forms } from "../services/forms.ts"
 import type { Imports } from "../services/imports.ts"
 import type { Invitations } from "../services/invitations.ts"
 import type { Members } from "../services/members.ts"
@@ -37,6 +38,7 @@ import * as customFields from "./custom-fields.ts"
 import * as emailImages from "./email-images.ts"
 import * as emailSetup from "./email-setup.ts"
 import * as emailStyles from "./email-styles.ts"
+import * as forms from "./forms.ts"
 import * as images from "./images.ts"
 import * as imports from "./imports.ts"
 import * as members from "./members.ts"
@@ -73,6 +75,7 @@ export type OperationServices =
   | EmailImages
   | EmailStyles
   | Imports
+  | Forms
 
 export type Implementation<Name extends OperationName> = (
   principal: Principal,
@@ -127,6 +130,17 @@ export const implementations: { readonly [Name in OperationName]: Implementation
   "companies.import": csv.importCompaniesCsv,
   "companies.setLogo": images.setLogo,
   "companies.removeLogo": images.removeLogo,
+  "forms.list": forms.list,
+  "forms.get": forms.get,
+  "forms.create": forms.create,
+  "forms.update": forms.update,
+  "forms.publish": forms.publish,
+  "forms.delete": forms.remove,
+  "forms.analytics": forms.analytics,
+  "forms.submissions": forms.submissions,
+  "forms.releaseSubmission": forms.release,
+  "formSettings.get": forms.settings,
+  "formSettings.update": forms.updateSettings,
   "imports.start": imports.start,
   "imports.get": imports.get,
   "imports.list": imports.list,

@@ -20,6 +20,7 @@ import {
   FieldSet,
   FieldLabel as FieldTitle,
 } from "./field.tsx"
+import { InfoTip } from "./info-tip.tsx"
 import { Input as InputBase } from "./input.tsx"
 import { Label } from "./label.tsx"
 import { NativeSelect } from "./native-select.tsx"
@@ -205,6 +206,7 @@ export function Field({
   label,
   htmlFor,
   hint,
+  info,
   error,
   children,
   className,
@@ -212,13 +214,23 @@ export function Field({
   label?: ReactNode | undefined
   htmlFor?: string | undefined
   hint?: ReactNode | undefined
+  /** An explanation behind an info tip beside the label (D155), in place of a hint under it. */
+  info?: ReactNode | undefined
   error?: ReactNode | undefined
   children: ReactNode
   className?: string | undefined
 }) {
+  const title = label ? <FieldTitle htmlFor={htmlFor}>{label}</FieldTitle> : null
   return (
     <FieldRoot className={className}>
-      {label ? <FieldTitle htmlFor={htmlFor}>{label}</FieldTitle> : null}
+      {title && info ? (
+        <span className="flex items-center gap-1">
+          {title}
+          <InfoTip label={typeof label === "string" ? label.toLowerCase() : "this"}>{info}</InfoTip>
+        </span>
+      ) : (
+        title
+      )}
       {children}
       {error ? <FieldError>{error}</FieldError> : hint ? <Hint>{hint}</Hint> : null}
     </FieldRoot>
@@ -228,16 +240,25 @@ export function Field({
 /** A group of related controls with a heading, such as a set of checkboxes. */
 export function Fieldset({
   legend,
+  info,
+  section,
   children,
   className,
 }: {
   legend: ReactNode
+  /** An explanation behind an info tip beside the heading (D155). */
+  info?: ReactNode | undefined
+  /** A heading over labeled fields: quieter than their labels, so the two don't read as a double header. */
+  section?: boolean | undefined
   children: ReactNode
   className?: string
 }) {
   return (
     <FieldSet className={className}>
-      <FieldLegend>{legend}</FieldLegend>
+      <FieldLegend className={cn(info && "flex items-center gap-1", section && "text-sm font-normal text-muted")}>
+        {legend}
+        {info ? <InfoTip label={typeof legend === "string" ? legend.toLowerCase() : "this"}>{info}</InfoTip> : null}
+      </FieldLegend>
       {children}
     </FieldSet>
   )
@@ -266,6 +287,7 @@ export function Slider({
   format = (n) => `${Math.round(n * 100)}%`,
   onChange,
   className,
+  labelClassName,
 }: {
   label: ReactNode
   value: number
@@ -275,14 +297,17 @@ export function Slider({
   format?: ((value: number) => string) | undefined
   onChange: (value: number) => void
   className?: string | undefined
+  /** The label's width; a wide one by default, so a stack of sliders lines up. */
+  labelClassName?: string | undefined
 }) {
   const id = useId()
   return (
-    <div className={cn("grid grid-cols-[12rem_minmax(0,1fr)_3.5rem] items-center gap-3", className)}>
-      <span id={id} className="text-muted">
+    <div className={cn("flex items-center gap-3", className)}>
+      <span id={id} className={cn("w-48 shrink-0 text-muted", labelClassName)}>
         {label}
       </span>
       <SliderBase
+        className="min-w-0 flex-1"
         aria-labelledby={id}
         min={min}
         max={max}
@@ -290,7 +315,7 @@ export function Slider({
         value={value}
         onValueChange={(next) => onChange(next)}
       />
-      <output className="text-right text-sm text-subtle tabular-nums">{format(value)}</output>
+      <output className="w-14 shrink-0 text-right text-sm text-subtle tabular-nums">{format(value)}</output>
     </div>
   )
 }

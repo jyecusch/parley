@@ -2,6 +2,7 @@ import type { ActivityEntry, FieldProblem, RecordType } from "@parley/domain"
 import type { UserText } from "@parley/errors"
 import { type ReactNode, useState } from "react"
 import { isApiFailure } from "../lib/client.ts"
+import { cameFrom } from "../lib/forms.ts"
 import { absolute, relative } from "../lib/time.ts"
 import {
   AgentIcon,
@@ -27,6 +28,7 @@ import {
   propertyValueClass,
   RecordTitle,
   Spacer,
+  TextButton,
 } from "./ui/index.ts"
 
 /** Pieces shared by the contact and company screens: inline editing, activity and load states. */
@@ -159,7 +161,64 @@ const describe = (entry: ActivityEntry, recordType: RecordType): ReactNode => {
       )
     case "marked-as-spam":
       return entry.related ? <>marked {other} as spam</> : "marked a broadcast as spam"
+    case "submitted-form": {
+      // The form filled empty fields only (D145); what it filled is in changedFields.
+      const filled = entry.changedFields.map((field) => FIELD_NAMES[field] ?? field)
+      // The actor is the form ("Form: Waitlist"), so the line doesn't name it again.
+      return (
+        <>
+          signed {self} up
+          {filled.length > 0 ? <span className="text-subtle">, filling in {filled.join(", ")}</span> : null}
+        </>
+      )
+    }
   }
+}
+
+/** A kept value as text: what the visitor typed, or a list of choices. */
+const keptText = (value: unknown) =>
+  typeof value === "string" ? value : Array.isArray(value) ? value.join(", ") : JSON.stringify(value)
+
+/**
+ * Values a form submission didn't write because the contact already had one (D145), each with
+ * Apply for a person who decides the new one is right.
+ */
+function KeptValues(props: {
+  readonly kept: ActivityEntry["kept"]
+  readonly onApply: ((kept: ActivityEntry["kept"][number]) => Promise<void>) | undefined
+}) {
+  const [applied, setApplied] = useState<ReadonlySet<string>>(new Set())
+  const [busy, setBusy] = useState<string>()
+  return (
+    <ul className="m-0 mt-1 flex list-none flex-col gap-1 p-0 text-sm">
+      {props.kept.map((entry) => (
+        <li key={entry.field} className="flex flex-wrap items-center gap-x-2 text-muted">
+          <span>
+            Submitted {entry.label.toLowerCase()}: <b>{keptText(entry.value)}</b>
+          </span>
+          {applied.has(entry.field) ? (
+            <span className="text-subtle">Applied</span>
+          ) : props.onApply ? (
+            <TextButton
+              className="text-sm"
+              disabled={busy !== undefined}
+              onClick={async () => {
+                setBusy(entry.field)
+                try {
+                  await props.onApply?.(entry)
+                  setApplied((current) => new Set([...current, entry.field]))
+                } finally {
+                  setBusy(undefined)
+                }
+              }}
+            >
+              {busy === entry.field ? "Applying…" : "Apply"}
+            </TextButton>
+          ) : null}
+        </li>
+      ))}
+    </ul>
+  )
 }
 
 /**
@@ -178,13 +237,12 @@ export function TimelineRow(props: {
   return (
     <div
       className={cn(
-        "relative grid grid-cols-[auto_minmax(0,1fr)_auto] gap-2.5 py-1.5",
-        !props.first &&
-          "before:absolute before:-top-1.5 before:left-2.75 before:h-3 before:w-px before:bg-line-strong before:content-['']",
+        "relative flex gap-2.5 py-1.5",
+        !props.first && "before:absolute before:-top-1.5 before:left-2.75 before:h-3 before:w-px before:bg-line-strong",
       )}
     >
       <Avatar badge={props.via ? <AgentIcon /> : undefined}>{initialsOfName(props.actorName)}</Avatar>
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         <div className="text-pretty text-muted [&_b]:font-medium [&_b]:text-fg">
           <b>{props.actorName}</b>
           {props.via ? <span className="text-subtle"> via {props.via}</span> : null} {props.children}
@@ -203,10 +261,34 @@ export function ActivityRow(props: {
   readonly entry: ActivityEntry
   readonly recordType: RecordType
   readonly first: boolean
+  /** Writes a kept value from a form submission to the record (D145). */
+  readonly onApplyKept?: ((kept: ActivityEntry["kept"][number]) => Promise<void>) | undefined
 }) {
   const { entry } = props
+  const came = entry.tracking ? cameFrom(entry.tracking) : undefined
+  const tracked =
+    entry.tracking && (came || entry.tracking.page) ? (
+      <p className="m-0 mt-1 text-sm text-subtle">
+        {[entry.tracking.page ? `On ${entry.tracking.page}` : null, came?.main, ...(came?.more ?? [])]
+          .filter(Boolean)
+          .join(" · ")}
+      </p>
+    ) : null
   return (
-    <TimelineRow actorName={entry.actorName} via={entry.via} first={props.first} at={entry.at}>
+    <TimelineRow
+      actorName={entry.actorName}
+      via={entry.via}
+      first={props.first}
+      at={entry.at}
+      body={
+        entry.kept.length > 0 || tracked ? (
+          <>
+            {tracked}
+            {entry.kept.length > 0 ? <KeptValues kept={entry.kept} onApply={props.onApplyKept} /> : null}
+          </>
+        ) : undefined
+      }
+    >
       {describe(entry, props.recordType)}
     </TimelineRow>
   )

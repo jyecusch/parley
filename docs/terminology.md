@@ -102,6 +102,7 @@ How to pick a name: choose the most common name for the concept. Reject anything
 | **Import** / **Export** | Moving records into or out of Parley as CSV. | upload, download, sync, migrate |
 | **Selection** | The records an action on an index view applies to: the rows picked, or every record matching its search and filter (D137). | bulk selection, batch, checked rows |
 | **Toast** | A brief, non-blocking message (e.g. "Contact deleted · Undo"). | snackbar, notification, flash |
+| **Info tip** | A small (i) button beside a label that shows a short explanation on hover, focus or click (D155). | tooltip (that's a one-line label on hover), help icon, hint (that's text shown under a field) |
 | **Design asset** | The artifact we agree on before building a screen. | mockup, wireframe, concept, comp |
 
 ## Marketing email (v2)
@@ -110,6 +111,11 @@ How to pick a name: choose the most common name for the concept. Reject anything
 | --- | --- | --- |
 | **Segment** | A group of contacts that a broadcast is sent to. It comes in two kinds: a **dynamic segment** is defined by filters and its contacts change as records change; a **fixed segment** is a hand-picked set of contacts. It matches Resend's current term (Resend replaced "Audiences" with "Segments" in Nov 2025). | audience, list, group, cohort, contact set |
 
+| **Form** | A sign-up form a team designs in Parley and embeds on its websites, such as a newsletter sign-up or a waitlist (D144). | widget, embed (as a noun), sign-up widget, landing form |
+| **Submission** | One visitor's answers to a form, with its consent record. It becomes a contact once confirmed (D146). | entry, response, lead (as a noun for the record) |
+| **Appearance** | How a form looks: its colors (fixed, or light and dark), design tokens and allowed style rules (D148). | theme (alone), skin, custom CSS |
+| **Tracking parameters** | What a submission records about where a visitor came from: its UTM parameters and, when the embedding site opts in, click IDs (D153, D154). Shown to people as "Came from". | attribution (that means who made a change), source (alone), referral data |
+| **Click ID** | An ad network's identifier for one ad click, passed in the page's address (`gclid`, `fbclid`, `msclkid`…). | click identifier, ad ID |
 | **Broadcast** | One marketing email sent to a segment at once: its subject, content, segment and topic, and, once sent, its recipients and results (D140). | campaign (reserved: in marketing it means something broader), blast, newsletter (as a noun for the thing sent), mailing, send |
 | **Draft** | A broadcast that hasn't been sent. A status of a broadcast, not a separate thing. | unsent broadcast, pending broadcast |
 | **Template** | Reusable content (subject and body) that a new broadcast starts from. The broadcast takes a copy; editing the template later doesn't change it. | layout, design (for email content), theme |
@@ -150,3 +156,6 @@ How to pick a name: choose the most common name for the concept. Reject anything
 | 2026-10-20 | Added **access token**, and removed it from API key's banned synonyms (P5, D97). |
 | 2026-10-21 | Added **selection** (D137). |
 | 2026-10-21 | **Broadcast** replaces **campaign** for one marketing email (D140); "campaign" is now banned for it. |
+| 2026-10-24 | Added **form**, **submission** and **appearance** (D144, D148). |
+| 2026-10-24 | Added **tracking parameters** and **click ID** (D153, D154). |
+| 2026-10-24 | Added **info tip** (D155). |

@@ -1,6 +1,7 @@
 import { DatabaseLive } from "@parley/db"
 import { Layer } from "effect"
 import { Authenticator, BetterAuth } from "./auth/authenticator.ts"
+import { EmailChecks, FormTokens, Turnstile } from "./forms/protection.ts"
 import { Mailer } from "./mail/mailer.ts"
 import { Affiliations } from "./services/affiliations.ts"
 import { ApiKeys } from "./services/api-keys.ts"
@@ -13,7 +14,11 @@ import { CustomFields } from "./services/custom-fields.ts"
 import { DeliveryEvents } from "./services/delivery-events.ts"
 import { EmailImages } from "./services/email-images.ts"
 import { EmailStyles } from "./services/email-styles.ts"
+import { Encryption } from "./services/encryption.ts"
 import { FileStore } from "./services/file-store.ts"
+import { FormRuntimeLive } from "./services/form-runtime-live.ts"
+import { FormSubmissions } from "./services/form-submissions.ts"
+import { Forms } from "./services/forms.ts"
 import { ImportRunner } from "./services/import-runner.ts"
 import { Imports } from "./services/imports.ts"
 import { Invitations } from "./services/invitations.ts"
@@ -38,13 +43,17 @@ export { PublicUrl } from "./config/public-url.ts"
 export { unsubscribeApply, unsubscribePage } from "./email/unsubscribe.ts"
 export { receiveDeliveryEvent } from "./email/webhook.ts"
 export { readFile } from "./files/serve.ts"
+export { EmailChecks, FormTokens, Turnstile } from "./forms/protection.ts"
 export { classifyDecodeError } from "./input/classify.ts"
 export { Mailer, type OutgoingEmail } from "./mail/mailer.ts"
 export { type Implementation, implementations, type OperationServices } from "./operations/registry.ts"
 export type { Principal } from "./principal.ts"
 export type { DeliveryEvents } from "./services/delivery-events.ts"
 export { EmailImages } from "./services/email-images.ts"
+export { Encryption } from "./services/encryption.ts"
 export { FileStore } from "./services/file-store.ts"
+export * from "./services/form-runtime.ts"
+export { Forms } from "./services/forms.ts"
 export type { Members } from "./services/members.ts"
 export { RateLimiter } from "./services/rate-limiter.ts"
 export type { Subscriptions } from "./services/subscriptions.ts"
@@ -84,15 +93,29 @@ const Services = Layer.mergeAll(
   Imports.layer,
 ).pipe(Layer.provideMerge(Layer.mergeAll(UnsubscribeLinks.layer, RateLimiter.layer)))
 
-/** Everything operations and authentication need, built once per process. */
-export const CoreLive = Authenticator.layer.pipe(
-  // The runner imports rows as any operation would, so it is built on every service.
-  Layer.provideMerge(ImportRunner.layer),
-  Layer.provideMerge(Services),
-  Layer.provideMerge(BetterAuth.layer),
-  Layer.provideMerge(Mailer.layer),
-  Layer.provideMerge(DatabaseLive),
-)
+/** Forms (D144–D150), built on the services: their submissions write contacts as any change does. */
+const formsLive = (outside: Layer.Layer<Turnstile | EmailChecks>) =>
+  Layer.mergeAll(Forms.layer, FormRuntimeLive).pipe(
+    Layer.provideMerge(FormSubmissions.layer),
+    Layer.provideMerge(Layer.mergeAll(Encryption.layer, FormTokens.layer, outside)),
+  )
+
+/**
+ * Everything operations and authentication need, built once per process. `outside` stands in for
+ * the network calls forms make (Cloudflare Turnstile, DNS), which tests replace.
+ */
+export const coreLiveWith = (outside: Layer.Layer<Turnstile | EmailChecks>) =>
+  Authenticator.layer.pipe(
+    // The runner imports rows as any operation would, so it is built on every service.
+    Layer.provideMerge(ImportRunner.layer),
+    Layer.provideMerge(formsLive(outside)),
+    Layer.provideMerge(Services),
+    Layer.provideMerge(BetterAuth.layer),
+    Layer.provideMerge(Mailer.layer),
+    Layer.provideMerge(DatabaseLive),
+  )
+
+export const CoreLive = coreLiveWith(Layer.mergeAll(Turnstile.layer, EmailChecks.layer))
 
 export { BroadcastSender } from "./services/broadcast-sender.ts"
 export { ImportRunner } from "./services/import-runner.ts"
@@ -100,6 +123,7 @@ export { Purge } from "./services/purge.ts"
 
 /** Work the server does on its own schedule, such as purging records deleted 30 days ago (D30). */
 export const BackgroundLive = Layer.mergeAll(
+  Encryption.reencrypt,
   Purge.schedule.pipe(Layer.provide(Purge.layer)),
   BroadcastSender.schedule,
   ImportRunner.schedule,

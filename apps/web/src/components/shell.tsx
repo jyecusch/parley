@@ -22,6 +22,7 @@ import {
   CloseIcon,
   CompaniesIcon,
   ContactsIcon,
+  FormIcon,
   PlusIcon,
   RestoreIcon,
   SearchIcon,
@@ -342,6 +343,7 @@ export function AppShell(props: {
                         ["/t/$teamId/broadcasts", "Broadcasts", <SendIcon key="icon" />],
                         ["/t/$teamId/templates", "Templates", <TemplateIcon key="icon" />],
                         ["/t/$teamId/segments", "Segments", <SegmentIcon key="icon" />],
+                        ["/t/$teamId/forms", "Forms", <FormIcon key="icon" />],
                       ] as const
                     ).map(([to, label, icon]) => (
                       <SidebarMenuItem key={to}>
@@ -588,6 +590,20 @@ function CommandMenu(props: { readonly onClose: () => void }) {
         icon: <SegmentIcon />,
         run: go(() => navigate({ to: "/t/$teamId/segments", params: { teamId: team.id } })),
       },
+      {
+        id: "go:forms",
+        group: "Go to" as const,
+        label: "Forms",
+        icon: <FormIcon />,
+        run: go(() => navigate({ to: "/t/$teamId/forms", params: { teamId: team.id } })),
+      },
+      {
+        id: "op:new-form",
+        group: "Operations" as const,
+        label: "New form",
+        icon: <PlusIcon />,
+        run: go(() => navigate({ to: "/t/$teamId/forms", params: { teamId: team.id }, search: { new: true } })),
+      },
       ...(
         [
           ["general", "General"],
@@ -673,7 +689,7 @@ function CommandMenu(props: { readonly onClose: () => void }) {
             </IconButton>
           }
         />
-        <CommandList className="max-h-[30rem] px-1.5 pt-1 pb-1.5">
+        <CommandList className="max-h-120 px-1.5 pt-1 pb-1.5">
           <CommandEmpty>Nothing matches “{query}”.</CommandEmpty>
           {groups.map((group) => {
             const inGroup = items.filter((item) => item.group === group)

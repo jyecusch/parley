@@ -11,6 +11,7 @@ import {
   SendingDomain,
   Topic,
   TopicDescription,
+  TopicMode,
   TopicName,
 } from "../email.ts"
 import {
@@ -131,11 +132,13 @@ export const listTopics = defineTeamOperation({
 
 export const createTopic = defineTeamOperation({
   name: "topics.create",
-  description: "Add a topic. Its name and description are shown on the unsubscribe page.",
+  description:
+    "Add a topic. Its name and description are shown on the unsubscribe page. Opt-out topics (the default) reach everyone subscribed who hasn't left; opt-in topics reach only contacts who joined them.",
   input: Schema.Struct({
     ...InTeam,
     name: TopicName.annotate({ title: "Name" }),
     description: Schema.optional(Schema.NullOr(TopicDescription.annotate({ title: "Description" }))),
+    mode: Schema.optional(TopicMode),
   }),
   output: Topic,
   errors: [],
@@ -146,11 +149,12 @@ export const createTopic = defineTeamOperation({
 
 export const updateTopic = defineTeamOperation({
   name: "topics.update",
-  description: "Rename a topic or change its description.",
+  description: "Rename a topic, change its description, or switch it between opt-out and opt-in.",
   input: Schema.Struct({
     ...OneTopic,
     name: Schema.optional(TopicName.annotate({ title: "Name" })),
     description: Schema.optional(Schema.NullOr(TopicDescription.annotate({ title: "Description" }))),
+    mode: Schema.optional(TopicMode),
   }),
   output: Topic,
   errors: [TopicNotFound],

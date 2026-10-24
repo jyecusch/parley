@@ -7,6 +7,9 @@ import { RESTORE_WINDOW_DAYS } from "./contacts.ts"
 export interface Purged {
   readonly contacts: number
   readonly companies: number
+  /** Form submissions: spam past 30 days, deleted (D147); confirmation links past 7, expired (D146). */
+  readonly spam: number
+  readonly expired: number
 }
 
 /**
@@ -41,11 +44,29 @@ export class Purge extends Context.Service<Purge, { readonly run: Effect.Effect<
             }),
           )
           .pipe(Effect.orDie)
+      const count = (result: unknown) =>
+        (result as { readonly rows?: ReadonlyArray<unknown> }).rows?.length ??
+        (Array.isArray(result) ? result.length : 0)
+      const purgeForms = Effect.gen(function* () {
+        const spam = yield* db.query((d) =>
+          d.execute(sql`delete from "form_submissions"
+            where status = 'spam' and created_at < now() - make_interval(days => 30) returning id`),
+        )
+        // Unconfirmed after the link's 7 days: never a contact, so their answers go too (D146).
+        const expired = yield* db.query((d) =>
+          d.execute(sql`update "form_submissions" set status = 'expired', values = '{}'::jsonb
+            where status = 'waiting' and created_at < now() - make_interval(days => 7) returning id`),
+        )
+        yield* db.query((d) => d.execute(sql`delete from "form_token_uses" where expires_at < now()`))
+        return { spam: count(spam), expired: count(expired) }
+      }).pipe(Effect.orDie)
       const run = Effect.gen(function* () {
         const contacts = yield* purgeTable("contacts", "contact")
         const companies = yield* purgeTable("companies", "company")
+        const { spam, expired } = yield* purgeForms
         if (contacts + companies > 0) yield* Effect.logInfo(`purged ${contacts} contacts and ${companies} companies`)
-        return { contacts, companies }
+        if (spam + expired > 0) yield* Effect.logInfo(`purged ${spam} spam submissions; ${expired} expired`)
+        return { contacts, companies, spam, expired }
       }).pipe(Effect.withSpan("Purge.run"))
       return { run }
     }),

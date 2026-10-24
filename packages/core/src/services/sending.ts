@@ -62,6 +62,11 @@ export class Sending extends Context.Service<
     ) => Effect.Effect<EmailSettings, SenderAddressNotOnSendingDomain | DatabaseUnavailable>
     /** The sender for a send, or what's missing. */
     readonly sender: <P, T>(member: MemberOf<P, T>) => Effect.Effect<Sender, SenderNotReady | DatabaseUnavailable>
+    /**
+     * A team's sender for its forms' confirmation emails (D146), or undefined when it isn't set up.
+     * Process tier, for the public form runtime, which has no member: it only reads what's sent.
+     */
+    readonly senderForTeam: (teamId: TeamId) => Effect.Effect<Sender | undefined, DatabaseUnavailable>
     readonly domains: <P, T>(member: MemberOf<P, T>) => Effect.Effect<ReadonlyArray<SendingDomain>, DatabaseUnavailable>
     /** Used only by the SendingDomainInTeam prover. */
     readonly locateDomain: (
@@ -171,6 +176,24 @@ export class Sending extends Context.Service<
           )
           return yield* settingsOf(teamId)
         }).pipe(Effect.withSpan("Sending.updateSettings"))
+
+      const senderOfTeam = (teamId: TeamId) =>
+        Effect.map(settingsOf(teamId), (settings): Sender | undefined =>
+          settings.missing.length > 0 ||
+          !settings.senderName ||
+          !settings.senderAddress ||
+          !settings.legalName ||
+          !settings.postalAddress ||
+          !settings.footerReason
+            ? undefined
+            : {
+                from: fromHeader(settings.senderName, settings.senderAddress),
+                replyTo: settings.replyTo,
+                legalName: settings.legalName,
+                postalAddress: settings.postalAddress,
+                footerReason: settings.footerReason,
+              },
+        )
 
       const sender = <P, T>(member: MemberOf<P, T>) =>
         Effect.gen(function* () {
@@ -337,6 +360,7 @@ export class Sending extends Context.Service<
         settings: (member) => settingsOf(member.team.value),
         updateSettings,
         sender,
+        senderForTeam: senderOfTeam,
         domains: (member) => domainsOf(member.team.value),
         locateDomain: (teamId, id) =>
           run(

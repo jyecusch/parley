@@ -494,29 +494,35 @@ function SendDialog(props: {
         </>
       }
     >
-      <dl className="m-0 grid grid-cols-[6rem_minmax(0,1fr)] gap-x-3 gap-y-2 [&>dd]:m-0 [&>dt]:text-subtle">
-        <dt>To</dt>
-        <dd>
-          {segment.data ? (
-            <>
-              {segment.data.name}: {count} of {segment.data.contactCount} contacts are subscribed and have an email.
-            </>
-          ) : (
-            "No segment chosen yet."
-          )}
-        </dd>
+      <dl className="m-0 flex flex-col gap-2 [&_dd]:m-0 [&_dd]:min-w-0 [&_dt]:w-24 [&_dt]:shrink-0 [&_dt]:text-subtle [&>div]:flex [&>div]:gap-3">
+        <div>
+          <dt>To</dt>
+          <dd>
+            {segment.data ? (
+              <>
+                {segment.data.name}: {count} of {segment.data.contactCount} contacts are subscribed and have an email.
+              </>
+            ) : (
+              "No segment chosen yet."
+            )}
+          </dd>
+        </div>
         {props.broadcast.topicName ? (
-          <>
+          <div>
             <dt>Topic</dt>
             <dd>{props.broadcast.topicName}. Anyone who left it is skipped.</dd>
-          </>
+          </div>
         ) : null}
-        <dt>From</dt>
-        <dd>
-          {settings.data?.senderName ?? "—"} &lt;{settings.data?.senderAddress ?? "—"}&gt;
-        </dd>
-        <dt>Subject</dt>
-        <dd>{props.broadcast.subject || "—"}</dd>
+        <div>
+          <dt>From</dt>
+          <dd>
+            {settings.data?.senderName ?? "—"} &lt;{settings.data?.senderAddress ?? "—"}&gt;
+          </dd>
+        </div>
+        <div>
+          <dt>Subject</dt>
+          <dd>{props.broadcast.subject || "—"}</dd>
+        </div>
       </dl>
       {missing.length > 0 ? (
         <Notice tone="warn">
@@ -613,9 +619,7 @@ function Report(props: { readonly teamId: TeamId; readonly broadcast: Broadcast;
         ...(counts.failed > 0 ? [{ label: "Failed", value: counts.failed, status: "failed" as const }] : []),
         { label: "Bounced", value: counts.bounced, status: "bounced" as const },
         { label: "Marked as spam", value: counts.markedAsSpam, status: "marked-as-spam" as const },
-        ...(counts.cancelled > 0
-          ? [{ label: "Cancelled", value: counts.cancelled, status: "cancelled" as const }]
-          : []),
+        ...(counts.canceled > 0 ? [{ label: "Canceled", value: counts.canceled, status: "canceled" as const }] : []),
       ]
     : []
 
@@ -669,8 +673,8 @@ function Report(props: { readonly teamId: TeamId; readonly broadcast: Broadcast;
         </Button>
       </PageHeader>
       {error ? <ErrorText className="px-4 pt-2.5">{error}</ErrorText> : null}
-      <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] overflow-auto border-t border-line @max-4xl/content:grid-cols-1">
-        <div className="flex flex-col gap-3.5 overflow-auto border-r border-line p-4 @max-4xl/content:border-r-0">
+      <div className="flex min-h-0 flex-1 overflow-auto border-t border-line @max-4xl/content:flex-col">
+        <div className="flex min-w-0 flex-6 flex-col gap-3.5 overflow-auto border-r border-line p-4 @max-4xl/content:border-r-0">
           <p className="m-0 text-sm text-subtle">
             {broadcast.sentByName ?? "Someone"} sent this to <b>{broadcast.segmentName ?? "a segment"}</b>
             {broadcast.topicName ? ` (topic: ${broadcast.topicName})` : ""}
@@ -679,9 +683,10 @@ function Report(props: { readonly teamId: TeamId; readonly broadcast: Broadcast;
             ) : null}
             {broadcast.status === "sending" ? " · sending now" : ""}
           </p>
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-2.5">
+          <div className="flex flex-wrap gap-2.5">
             {tiles.map((tile) => (
               <StatTile
+                className="min-w-34 flex-1"
                 key={tile.label}
                 value={tile.value}
                 label={tile.label}
@@ -746,7 +751,7 @@ function Report(props: { readonly teamId: TeamId; readonly broadcast: Broadcast;
             ) : null}
           </Box>
         </div>
-        <div className="flex min-h-0 flex-col bg-canvas">
+        <div className="flex min-h-0 min-w-0 flex-5 flex-col bg-canvas">
           <div className="flex h-11 shrink-0 items-center gap-2 px-3.5">
             <span className="text-sm text-subtle">The email, with sample values</span>
           </div>

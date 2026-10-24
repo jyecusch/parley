@@ -77,6 +77,19 @@ import {
   updateEmailStyle,
   uploadEmailImage,
 } from "./email-styles.ts"
+import {
+  createForm,
+  deleteForm,
+  formAnalytics,
+  getForm,
+  getFormSettings,
+  listForms,
+  listSubmissions,
+  publishForm,
+  releaseSubmission,
+  updateForm,
+  updateFormSettings,
+} from "./forms.ts"
 import { removeCompanyLogo, removeContactAvatar, setCompanyLogo, setContactAvatar } from "./images.ts"
 import { cancelImport, getImport, listImports, startImport } from "./imports.ts"
 import {
@@ -121,6 +134,7 @@ export * from "./csv.ts"
 export * from "./custom-fields.ts"
 export * from "./email-setup.ts"
 export * from "./email-styles.ts"
+export * from "./forms.ts"
 export * from "./images.ts"
 export * from "./imports.ts"
 export * from "./members.ts"
@@ -221,6 +235,17 @@ export const operations = {
   "sendingDomains.create": createSendingDomain,
   "sendingDomains.verify": verifySendingDomain,
   "sendingDomains.delete": deleteSendingDomain,
+  "forms.list": listForms,
+  "forms.get": getForm,
+  "forms.create": createForm,
+  "forms.update": updateForm,
+  "forms.publish": publishForm,
+  "forms.delete": deleteForm,
+  "forms.analytics": formAnalytics,
+  "forms.submissions": listSubmissions,
+  "forms.releaseSubmission": releaseSubmission,
+  "formSettings.get": getFormSettings,
+  "formSettings.update": updateFormSettings,
   "topics.list": listTopics,
   "topics.create": createTopic,
   "topics.update": updateTopic,

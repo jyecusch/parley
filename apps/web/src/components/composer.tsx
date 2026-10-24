@@ -25,14 +25,30 @@ const MERGE_TAGS: ReadonlyArray<{ readonly tag: string; readonly label: string }
 ]
 
 /** Calls `save` once edits have paused, and reports whether everything is saved. */
-export const useAutosave = <T,>(value: T, saved: T, save: (value: T) => Promise<void>, delay = 700) => {
-  const [state, setState] = useState<"saved" | "saving" | "unsaved" | "failed">("saved")
+/**
+ * Saves `value` a moment after it stops changing. `isComplete` holds a save back while something
+ * is still being filled in (a half-typed address), which is "waiting", not a failure.
+ */
+export const useAutosave = <T,>(
+  value: T,
+  saved: T,
+  save: (value: T) => Promise<void>,
+  options: { readonly delay?: number; readonly isComplete?: (value: T) => boolean } = {},
+) => {
+  const delay = options.delay ?? 700
+  const isComplete = options.isComplete
+  const [state, setState] = useState<SaveStatus>("saved")
   const latest = useRef(save)
   latest.current = save
   const dirty = JSON.stringify(value) !== JSON.stringify(saved)
   useEffect(() => {
+    // Back to what's saved (an edit undone, or a failed change reverted): nothing is unsaved.
     if (!dirty) {
-      setState((current) => (current === "failed" ? current : "saved"))
+      setState("saved")
+      return
+    }
+    if (isComplete && !isComplete(value)) {
+      setState("waiting")
       return
     }
     setState("unsaved")
@@ -44,19 +60,23 @@ export const useAutosave = <T,>(value: T, saved: T, save: (value: T) => Promise<
       )
     }, delay)
     return () => window.clearTimeout(timer)
-  }, [value, dirty, delay])
+  }, [value, dirty, delay, isComplete])
   return state
 }
 
-export function SaveState(props: { readonly state: "saved" | "saving" | "unsaved" | "failed" }) {
+export type SaveStatus = "saved" | "saving" | "unsaved" | "waiting" | "failed"
+
+export function SaveState(props: { readonly state: SaveStatus }) {
   const text =
     props.state === "saving"
       ? "Saving…"
       : props.state === "unsaved"
         ? "Unsaved"
-        : props.state === "failed"
-          ? "Not saved"
-          : "Saved"
+        : props.state === "waiting"
+          ? "Not saved yet"
+          : props.state === "failed"
+            ? "Not saved"
+            : "Saved"
   return <span className={cn("ml-2.5 text-sm", props.state === "failed" ? "text-danger" : "text-subtle")}>{text}</span>
 }
 

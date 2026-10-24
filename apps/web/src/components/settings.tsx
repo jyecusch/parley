@@ -11,10 +11,11 @@ import {
   ConnectionIcon,
   CopyIcon,
   DisplayIcon,
+  EmailStyleIcon,
+  FormIcon,
   KeyIcon,
   MailIcon,
   MembersIcon,
-  PaletteIcon,
   ServiceAccountIcon,
   SettingsIcon,
 } from "./icons.tsx"
@@ -92,7 +93,8 @@ const SETTINGS_PAGES = [
   { group: "team", to: "/t/$teamId/settings/members", label: "Members", icon: <MembersIcon /> },
   { group: "team", to: "/t/$teamId/settings/fields", label: "Fields", icon: <DisplayIcon className="size-5" /> },
   { group: "team", to: "/t/$teamId/settings/email", label: "Email", icon: <MailIcon /> },
-  { group: "team", to: "/t/$teamId/settings/email-styles", label: "Email styles", icon: <PaletteIcon /> },
+  { group: "team", to: "/t/$teamId/settings/email-styles", label: "Email styles", icon: <EmailStyleIcon /> },
+  { group: "team", to: "/t/$teamId/settings/forms", label: "Forms", icon: <FormIcon /> },
   {
     group: "team",
     to: "/t/$teamId/settings/service-accounts",
@@ -212,7 +214,7 @@ export function CopyField(props: { readonly value: string; readonly label: strin
         className={cn(
           "min-w-0 flex-1 font-mono text-sm",
           props.code
-            ? "overflow-auto py-2.5 pr-1 pl-3 leading-6 whitespace-pre select-text"
+            ? "py-2.5 pr-1 pl-3 leading-6 whitespace-pre-wrap wrap-anywhere select-text"
             : "truncate pr-1 pl-3 select-all",
         )}
         aria-label={props.label}

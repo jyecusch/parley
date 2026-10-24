@@ -137,11 +137,20 @@ export const activity = pgTable(
         "resubscribed",
         "bounced",
         "marked-as-spam",
+        "submitted-form",
       ],
     }).notNull(),
     changedFields: text("changed_fields").array().notNull().default(sql`'{}'::text[]`),
+    /** For "submitted-form": values not written because the contact had one (D145), for a person to apply. */
+    kept: jsonb("kept").$type<ReadonlyArray<{ field: string; label: string; value: unknown }>>().notNull().default([]),
+    /** For "submitted-form": the page and tracking parameters the submission recorded (D153). */
+    tracking: jsonb("tracking").$type<{
+      page: string | null
+      utm: Record<string, string>
+      clickIds: Record<string, string>
+    }>(),
     /** The other record an affiliation change was about, and its name at the time. */
-    relatedRecordType: text("related_record_type", { enum: ["contact", "company", "broadcast"] }),
+    relatedRecordType: text("related_record_type", { enum: ["contact", "company", "broadcast", "form"] }),
     relatedRecordId: uuid("related_record_id"),
     relatedName: text("related_name"),
     /** Set when Parley made the change itself (D105). */
@@ -412,9 +421,31 @@ export const topics = pgTable(
     teamId: teamId(),
     name: text("name").notNull(),
     description: text("description"),
+    /** opt-out: everyone subscribed who hasn't left. opt-in: only its members (D149). */
+    mode: text("mode", { enum: ["opt-out", "opt-in"] })
+      .notNull()
+      .default("opt-out"),
     ...timestamps,
   },
   (t) => [index("topics_team_idx").on(t.teamId)],
+)
+
+/** A contact who joined an opt-in topic (D149), and how. */
+export const topicMembers = pgTable(
+  "topic_members",
+  {
+    teamId: teamId(),
+    contactId: uuid("contact_id")
+      .notNull()
+      .references(() => contacts.id, { onDelete: "cascade" }),
+    topicId: uuid("topic_id")
+      .notNull()
+      .references(() => topics.id, { onDelete: "cascade" }),
+    /** The confirmed submission that joined them, or null when added by hand or import. */
+    submissionId: uuid("submission_id"),
+    at: timestamp("at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [unique("topic_members_key").on(t.contactId, t.topicId), index("topic_members_topic_idx").on(t.topicId)],
 )
 
 /** A contact unsubscribed from one topic. */
