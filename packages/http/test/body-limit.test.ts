@@ -7,7 +7,7 @@ const post = (path: string, body: BodyInit, headers: Record<string, string> = {}
 describe("request body limits", () => {
   it("refuses a declared length over the limit before reading anything", () => {
     const body = "x".repeat(2 * 1024 * 1024)
-    const result = limitBody(post("/api/v1/teams/t/contacts/list", body, { "content-length": String(body.length) }))
+    const result = limitBody(post("/api/v1/teams/t/contacts", body, { "content-length": String(body.length) }))
     expect(result).toBeInstanceOf(Response)
     expect((result as Response).status).toBe(413)
   })

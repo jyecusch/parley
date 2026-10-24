@@ -36,7 +36,7 @@ export const listCompanies = defineTeamOperation({
   }),
   output: CompanyPage,
   errors: [],
-  http: { method: "POST", path: "/teams/:teamId/companies/list" },
+  http: { method: "GET", path: "/teams/:teamId/companies" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: ["records:read"],
 })

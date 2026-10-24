@@ -290,7 +290,7 @@ function ApiKeyCreated(props: {
   readonly onClose: () => void
 }) {
   const { apiKey, secret } = props.created
-  const curl = `curl ${window.location.origin}/api/v1/teams/${props.teamId}/contacts \\\n  -H "x-api-key: ${secret}"`
+  const curl = `curl "${window.location.origin}/api/v1/teams/${props.teamId}/contacts?limit=10" \\\n  -H "x-api-key: ${secret}"`
   return (
     <Dialog
       title="API key created"

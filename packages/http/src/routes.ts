@@ -64,7 +64,7 @@ const handlerFor =
         input: unknown,
       ) => Effect.Effect<unknown, AnyOperationError, OperationServices>
       return yield* run(principal, input)
-    }).pipe(Effect.mapError((error: AnyOperationError) => errorBody(error)))
+    }).pipe(Effect.mapError((error: AnyOperationError) => errorBody(error, name)))
 
 /**
  * Every operation, served under /api/v1, derived from the registry (D16). The builder can't see

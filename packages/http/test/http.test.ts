@@ -95,6 +95,35 @@ describe("HTTP entrypoint", () => {
     })
   })
 
+  it("asks for a JSON object when the body is missing or isn't one", async () => {
+    for (const body of [undefined, "hi"]) {
+      const response = await call("POST", `/api/v1/teams/${teamId}/contacts`, body === undefined ? {} : { body })
+      expect(response.status).toBe(422)
+      expect(response.body.error.userMessage).toBe(
+        'The input should be a JSON object of its fields, such as {"firstName": "Ada"}.',
+      )
+    }
+  })
+
+  it("says what the operation takes with every rejected input (D143)", async () => {
+    const malformed = await call("POST", `/api/v1/teams/${teamId}/contacts`)
+    expect(malformed.body.error.details.expected).toMatchObject({
+      operation: "contacts.create",
+      method: "POST",
+      path: "/api/v1/teams/{teamId}/contacts",
+      pathParameters: ["teamId"],
+    })
+    expect(malformed.body.error.details.expected.body.properties.firstName.anyOf[0].title).toBe("First name")
+    // A rejection from the operation itself, not the decoder, says the same.
+    const badFilter = await call(
+      "GET",
+      `/api/v1/teams/${teamId}/contacts?filter=${encodeURIComponent(JSON.stringify({ match: "all", conditions: [{ field: "nope", operator: "is", value: "x" }] }))}`,
+    )
+    expect(badFilter.status).toBe(422)
+    expect(badFilter.body.error.details.expected.operation).toBe("contacts.list")
+    expect(badFilter.body.error.details.expected.query.properties.filter).toBeDefined()
+  })
+
   it("answers invalid input with 422 InputRejected, field by field", async () => {
     const response = await call("POST", `/api/v1/teams/${teamId}/contacts`, {
       body: { firstName: "Sam", emails: [{ address: "nope" }] },
@@ -107,7 +136,7 @@ describe("HTTP entrypoint", () => {
   })
 
   it("answers an unknown team with 404 NotATeamMember, and no session with 401", async () => {
-    const other = await call("POST", "/api/v1/teams/not-a-team/contacts/list", { body: {} })
+    const other = await call("GET", "/api/v1/teams/not-a-team/contacts")
     expect(other.status).toBe(404)
     expect(other.body.error._tag).toBe("NotATeamMember")
     const saved = cookie
@@ -121,10 +150,7 @@ describe("HTTP entrypoint", () => {
   it("lets an API key read but not write, as its scopes say", async () => {
     const saved = cookie
     cookie = ""
-    const read = await call("POST", `/api/v1/teams/${teamId}/contacts/list`, {
-      headers: { "x-api-key": readOnlyKey },
-      body: {},
-    })
+    const read = await call("GET", `/api/v1/teams/${teamId}/contacts`, { headers: { "x-api-key": readOnlyKey } })
     const write = await call("POST", `/api/v1/teams/${teamId}/contacts`, {
       headers: { authorization: `Bearer ${readOnlyKey}` },
       body: { firstName: "Agent" },
@@ -161,7 +187,7 @@ describe("API keys", () => {
     cookie = ""
     const asKey = (method: string, path: string, body?: unknown) =>
       call(method, path, { headers: { "x-api-key": secret }, ...(body !== undefined ? { body } : {}) })
-    expect((await asKey("POST", `/api/v1/teams/${teamId}/contacts/list`, {})).status).toBe(200)
+    expect((await asKey("GET", `/api/v1/teams/${teamId}/contacts`)).status).toBe(200)
     const mint = await asKey("POST", `/api/v1/teams/${teamId}/api-keys`, { name: "Sneaky" })
     expect(mint.status).toBe(403)
     expect(mint.body.error._tag).toBe("SignInRequired")
@@ -170,7 +196,7 @@ describe("API keys", () => {
     const revoked = await call("POST", `/api/v1/teams/${teamId}/api-keys/${created.body.apiKey.id}/revoke`)
     expect(revoked.body.revoked).toBe(true)
     cookie = ""
-    const after = await asKey("POST", `/api/v1/teams/${teamId}/contacts/list`, {})
+    const after = await asKey("GET", `/api/v1/teams/${teamId}/contacts`)
     cookie = saved
     expect(after.status).toBe(401)
     expect(after.body.error._tag).toBe("ApiKeyRevoked")
@@ -255,5 +281,31 @@ describe("malformed requests", () => {
       )
       expect(response.status, body).toBe(422)
     }
+  })
+})
+
+describe("listing over GET (D142)", () => {
+  it("takes search, limit, sort and a JSON filter in the query", async () => {
+    for (const firstName of ["Gia", "Gus", "Hal"]) {
+      await call("POST", `/api/v1/teams/${teamId}/contacts`, {
+        body: {
+          firstName,
+          lastName: suffix,
+          emails: [{ address: `${firstName.toLowerCase()}-${suffix}@example.com` }],
+        },
+      })
+    }
+    const filter = JSON.stringify({ match: "all", conditions: [{ field: "name", operator: "contains", value: "G" }] })
+    const sort = JSON.stringify({ field: "name", direction: "desc" })
+    const query = new URLSearchParams({ search: suffix, limit: "1", filter, sort })
+    const page = await call("GET", `/api/v1/teams/${teamId}/contacts?${query}`)
+    expect(page.status, JSON.stringify(page.body)).toBe(200)
+    expect(page.body.total).toBe(2)
+    expect(page.body.items.map((contact: { firstName: string }) => contact.firstName)).toEqual(["Gus"])
+    const plain = await call("GET", `/api/v1/teams/${teamId}/contacts?search=${suffix}&deleted=false`)
+    expect(plain.status, JSON.stringify(plain.body)).toBe(200)
+    expect(plain.body.total).toBe(3)
+    const bad = await call("GET", `/api/v1/teams/${teamId}/contacts?filter=nope`)
+    expect(bad.status).toBe(422)
   })
 })

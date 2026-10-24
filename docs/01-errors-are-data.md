@@ -383,10 +383,13 @@ export const ErrorDetails = {
   CompanyDomainTaken:  Schema.Struct({ existing: CompanyId }),
   RoleLacksPermission: Schema.Struct({ needed: Permission }),
   ApiKeyScopeExcludes: Schema.Struct({ needed: Permission }),
-  InputRejected:       Schema.Struct({ problems: Schema.Array(FieldProblem) }),
+  // Over HTTP, `expected` is the operation's input, generated from its schema (D143).
+  InputRejected:       Schema.Struct({ problems: Schema.Array(FieldProblem), expected: Schema.optional(ExpectedInput) }),
   InternalDefect:      Schema.Struct({ referenceId: ReferenceId }),
 } satisfies Partial<Record<PublicTag, Schema.Top>>
 ```
+
+Rejected input over HTTP says exactly what the operation takes, so a caller can get the next request right without looking anything up (D143). `expected` holds the operation's name, description, method, path (with `{name}` for path parameters), and a JSON Schema of its query or body. It's generated from the same input schema as the OpenAPI document, never written by hand. A 405 carries the same for each method the path takes. MCP doesn't need it: a tool's input schema is already in `tools/list`.
 
 ### MCP
 

@@ -2,6 +2,8 @@ import { BackgroundLive, CoreLive } from "@parley/core"
 import {
   ApiRoutesLive,
   AuthRoutesLive,
+  explainUnmatched,
+  explainUnsupportedBody,
   FailureResponsesLive,
   FileRoutesLive,
   limitBody,
@@ -45,5 +47,15 @@ export const handle = (request: Request): Promise<Response> => {
   holder[KEY] ??= makeApp()
   const app = holder[KEY]
   const limited = limitBody(request)
-  return limited instanceof Response ? Promise.resolve(limited) : app.handler(limited)
+  if (limited instanceof Response) return Promise.resolve(limited)
+  return app.handler(limited).then((response) => {
+    // The router's own plain answers, in the API's JSON errors: no route took it (a bare 404, not
+    // a record's JSON one), or a body that isn't JSON.
+    if (response.headers.get("content-type")?.includes("json")) return response
+    if (response.status === 404) return explainUnmatched(request) ?? response
+    if (response.status === 415 && new URL(request.url).pathname.startsWith("/api/v1/")) {
+      return explainUnsupportedBody(request)
+    }
+    return response
+  })
 }

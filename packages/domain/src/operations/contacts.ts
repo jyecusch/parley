@@ -35,7 +35,7 @@ export const listContacts = defineTeamOperation({
   }),
   output: ContactPage,
   errors: [],
-  http: { method: "POST", path: "/teams/:teamId/contacts/list" },
+  http: { method: "GET", path: "/teams/:teamId/contacts" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: ["records:read"],
 })

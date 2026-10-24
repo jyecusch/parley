@@ -52,7 +52,10 @@ export const call = async <Name extends OperationName>(
   const hasBody = op.http.method === "POST" || op.http.method === "PATCH"
   const query = new URLSearchParams()
   if (!hasBody) {
-    for (const [key, value] of Object.entries(values)) if (value !== undefined) query.set(key, String(value))
+    for (const [key, value] of Object.entries(values)) {
+      // Objects and lists, such as a filter, go as JSON (D142).
+      if (value !== undefined) query.set(key, typeof value === "string" ? value : JSON.stringify(value))
+    }
   }
   let response: Response
   try {

@@ -73,7 +73,12 @@ export const classifyDecodeError = (error: Schema.SchemaError): InputRejected =>
   const push = (kind: FieldProblemKind, path: ReadonlyArray<PropertyKey>, title: string | undefined) => {
     const field = path.map(String).join(".") || "input"
     if (problems.some((problem) => problem.field === field)) return
-    problems.push({ field, problem: kind, userMessage: messageFor(kind, labelFor(title, path)) })
+    // The input as a whole isn't an object: no body, or JSON that isn't one.
+    const userMessage =
+      path.length === 0 && kind === "wrong-type"
+        ? userText`The input should be a JSON object of its fields, such as {"firstName": "Ada"}.`
+        : messageFor(kind, labelFor(title, path))
+    problems.push({ field, problem: kind, userMessage })
   }
   const walk = (issue: SchemaIssue.Issue, path: ReadonlyArray<PropertyKey>, title: string | undefined): void => {
     switch (issue._tag) {

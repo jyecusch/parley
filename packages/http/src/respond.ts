@@ -1,18 +1,30 @@
-import { type AnyOperationError, BODY_TAG, detailsOf, ERROR_STATUS } from "@parley/api"
+import { type AnyOperationError, BODY_TAG, detailsOf, ERROR_STATUS, expectedInputOf, operationFor } from "@parley/api"
 import { classifyDecodeError } from "@parley/core"
+import type { OperationName } from "@parley/domain"
 import { defectPublicError, ReferenceId, toPublicError } from "@parley/errors"
 import { Cause, Effect } from "effect"
-import { HttpRouter, HttpServerResponse } from "effect/http"
+import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http"
 import { HttpApiError } from "effect/http-api"
 
-/** The error body for a domain error, by its exhaustively mapped status. */
-export const errorBody = (error: AnyOperationError) => {
+/**
+ * The error body for a domain error, by its exhaustively mapped status. Rejected input also says
+ * what the operation takes (D143), when the operation is known.
+ */
+export const errorBody = (error: AnyOperationError, operation?: OperationName) => {
   const status = ERROR_STATUS[error._tag]
-  return { _tag: BODY_TAG[status], error: toPublicError(error, detailsOf(error)) }
+  const details = detailsOf(error)
+  const expected = error._tag === "InputRejected" && operation ? { expected: expectedInputOf(operation) } : {}
+  return {
+    _tag: BODY_TAG[status],
+    error: toPublicError(
+      error,
+      details === undefined && !expected.expected ? undefined : { ...(details as object), ...expected },
+    ),
+  }
 }
 
-const errorResponse = (error: AnyOperationError) =>
-  HttpServerResponse.jsonUnsafe(errorBody(error), { status: ERROR_STATUS[error._tag] })
+const errorResponse = (error: AnyOperationError, operation?: OperationName) =>
+  HttpServerResponse.jsonUnsafe(errorBody(error, operation), { status: ERROR_STATUS[error._tag] })
 
 /**
  * Wraps the whole HTTP app. Decode failures become InputRejected (422) in our own words;
@@ -30,7 +42,13 @@ export const respondToFailures = <E, R>(
         )
         .find((value) => HttpApiError.HttpApiSchemaError.is(value))
       if (decodeFailure && decodeFailure.kind !== "Body" && decodeFailure.kind !== "ResponseHeaders") {
-        return Effect.succeed(errorResponse(classifyDecodeError(decodeFailure.cause)))
+        return Effect.map(Effect.serviceOption(HttpServerRequest.HttpServerRequest), (request) => {
+          const operation =
+            request._tag === "Some"
+              ? operationFor(request.value.method, new URL(request.value.url, "http://parley").pathname)
+              : undefined
+          return errorResponse(classifyDecodeError(decodeFailure.cause), operation)
+        })
       }
       if (Cause.hasDies(cause)) {
         const referenceId = ReferenceId.make()
