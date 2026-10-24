@@ -19,7 +19,7 @@ import type { UnsubscribeLinkValid } from "../proofs/unsubscribe-link.ts"
 import { activityRow } from "./activity.ts"
 import { classifySqlError } from "./sql-errors.ts"
 
-/** "sam@acme.com" → "s**@acme.com": enough to recognise, not enough to harvest. */
+/** "sam@acme.com" → "s**@acme.com": enough to recognize, not enough to harvest. */
 const mask = (address: string) => {
   const [local = "", domain = ""] = address.split("@")
   return `${local.slice(0, 1)}${"*".repeat(Math.max(2, Math.min(local.length - 1, 6)))}@${domain}`

@@ -584,7 +584,7 @@ export const broadcasts = pgTable(
     styleId: uuid("style_id").references(() => emailStyles.id, { onDelete: "set null" }),
     segmentId: uuid("segment_id").references(() => segments.id, { onDelete: "set null" }),
     topicId: uuid("topic_id").references(() => topics.id, { onDelete: "set null" }),
-    status: text("status", { enum: ["draft", "sending", "sent", "cancelled"] })
+    status: text("status", { enum: ["draft", "sending", "sent", "canceled"] })
       .notNull()
       .default("draft"),
     /** Copied when sending starts, so later settings changes don't alter a broadcast in flight. */
@@ -616,7 +616,7 @@ export const broadcastRecipients = pgTable(
     /** Merge tag values, taken when the broadcast was queued. */
     merge: jsonb("merge").$type<Record<string, string>>().notNull().default({}),
     status: text("status", {
-      enum: ["queued", "sent", "delivered", "skipped", "failed", "bounced", "marked-as-spam", "cancelled"],
+      enum: ["queued", "sent", "delivered", "skipped", "failed", "bounced", "marked-as-spam", "canceled"],
     }).notNull(),
     skipReason: text("skip_reason", {
       enum: ["no-email", "unsubscribed", "unsubscribed-from-topic", "bounced", "marked-as-spam"],
@@ -646,7 +646,7 @@ export const imports = pgTable(
     id: uuid("id").primaryKey(),
     teamId: teamId(),
     recordType: text("record_type", { enum: ["contact", "company"] }).notNull(),
-    status: text("status", { enum: ["queued", "running", "fetching-logos", "finished", "cancelled", "failed"] })
+    status: text("status", { enum: ["queued", "running", "fetching-logos", "finished", "canceled", "failed"] })
       .notNull()
       .default("queued"),
     fileName: text("file_name"),

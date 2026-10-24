@@ -108,11 +108,11 @@ describe("Imports (D135)", () => {
       const { csv, tag } = contactsFile(600)
       const started = yield* run["imports.start"](f.jane, { teamId: f.acme, recordType: "contact", csv })
       expect(yield* runner.step).toBe(true)
-      const cancelled = yield* run["imports.cancel"](f.jane, { teamId: f.acme, importId: started.id })
-      expect(cancelled).toMatchObject({ status: "cancelled", processedRows: 250, created: 250 })
+      const canceled = yield* run["imports.cancel"](f.jane, { teamId: f.acme, importId: started.id })
+      expect(canceled).toMatchObject({ status: "canceled", processedRows: 250, created: 250 })
       yield* runner.drain
       expect(yield* run["imports.get"](f.jane, { teamId: f.acme, importId: started.id })).toMatchObject({
-        status: "cancelled",
+        status: "canceled",
         processedRows: 250,
       })
       const imported = yield* run["contacts.list"](f.jane, { teamId: f.acme, search: tag, limit: 200 })
@@ -122,8 +122,8 @@ describe("Imports (D135)", () => {
       const notImported = yield* run["contacts.list"](f.jane, { teamId: f.acme, search: `p252-${tag}`, limit: 5 })
       expect(notImported.items.length).toBe(0)
 
-      // Cancelling again changes nothing.
-      expect((yield* run["imports.cancel"](f.jane, { teamId: f.acme, importId: started.id })).status).toBe("cancelled")
+      // Canceling again changes nothing.
+      expect((yield* run["imports.cancel"](f.jane, { teamId: f.acme, importId: started.id })).status).toBe("canceled")
     }).pipe(Effect.provide(CoreLive)),
   )
 

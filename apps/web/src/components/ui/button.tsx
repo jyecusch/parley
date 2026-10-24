@@ -2,22 +2,22 @@ import { Button as ButtonPrimitive } from "@base-ui/react/button"
 import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "./cn.ts"
 
-/** What every bordered, labelled button shares. */
-const LABELLED =
+/** What every bordered, labeled button shares. */
+const LABELED =
   "inline-flex shrink-0 cursor-pointer items-center justify-center rounded-md border font-medium whitespace-nowrap no-underline transition-colors disabled:cursor-default disabled:opacity-50 motion-reduce:transition-none"
 
 /**
- * Parley's button looks (D80), as shadcn's button variants. The labelled variants take a `size` of
+ * Parley's button looks (D80), as shadcn's button variants. The labeled variants take a `size` of
  * sm, md or lg; `icon` takes an icon size; `text`, `link` and `tile` take none.
  */
 const buttonVariants = cva("", {
   variants: {
     variant: {
-      secondary: `${LABELLED} border-line-strong text-fg hover:bg-hover active:bg-active`,
-      primary: `${LABELLED} border-primary bg-primary text-on-primary hover:border-primary-hover hover:bg-primary-hover`,
-      ghost: `${LABELLED} border-transparent text-muted hover:bg-hover hover:text-fg active:bg-active`,
-      danger: `${LABELLED} border-transparent text-danger hover:bg-danger-soft`,
-      "danger-solid": `${LABELLED} border-danger bg-danger text-white hover:brightness-90`,
+      secondary: `${LABELED} border-line-strong text-fg hover:bg-hover active:bg-active`,
+      primary: `${LABELED} border-primary bg-primary text-on-primary hover:border-primary-hover hover:bg-primary-hover`,
+      ghost: `${LABELED} border-transparent text-muted hover:bg-hover hover:text-fg active:bg-active`,
+      danger: `${LABELED} border-transparent text-danger hover:bg-danger-soft`,
+      "danger-solid": `${LABELED} border-danger bg-danger text-white hover:brightness-90`,
       /** A square button holding one icon. */
       icon: "grid shrink-0 cursor-pointer place-items-center p-0 text-muted transition-colors hover:bg-hover hover:text-fg active:bg-active disabled:cursor-default disabled:opacity-50 motion-reduce:transition-none",
       /** Text that acts like a link, such as "Add email". */

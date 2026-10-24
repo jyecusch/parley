@@ -88,7 +88,7 @@ export class BroadcastNotFound
 export class BroadcastNotDraft
   extends Schema.TaggedError<BroadcastNotDraft>()("BroadcastNotDraft", {
     broadcast: DisplayName.schema,
-    status: Schema.Literals(["sending", "sent", "cancelled"]),
+    status: Schema.Literals(["sending", "sent", "canceled"]),
   })
   implements DomainError
 {
@@ -102,11 +102,11 @@ export class BroadcastNotDraft
       ? userText`${this.broadcast} is being sent, so it can't be changed. You can cancel the rest of the sending.`
       : this.status === "sent"
         ? userText`${this.broadcast} has been sent, so it can't be changed. Duplicate it to send something similar.`
-        : userText`${this.broadcast} was cancelled, so it can't be changed. Duplicate it to try again.`
+        : userText`${this.broadcast} was canceled, so it can't be changed. Duplicate it to try again.`
   }
 }
 
-/** Only a broadcast that's sending can be cancelled. */
+/** Only a broadcast that's sending can be canceled. */
 export class BroadcastNotSending
   extends Schema.TaggedError<BroadcastNotSending>()("BroadcastNotSending", { broadcast: DisplayName.schema })
   implements DomainError

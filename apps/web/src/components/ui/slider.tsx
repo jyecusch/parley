@@ -3,7 +3,7 @@ import { cn } from "./cn.ts"
 
 /**
  * A single-value slider, drawn as the browser drew our native range input (accent-primary): an
- * 8px outlined track, filled to the thumb in the primary colour, and a 16px thumb.
+ * 8px outlined track, filled to the thumb in the primary color, and a 16px thumb.
  */
 function Slider({ className, ...props }: SliderPrimitive.Root.Props<number>) {
   return (

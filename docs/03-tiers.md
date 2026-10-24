@@ -146,17 +146,17 @@ type CanUse<T extends Tier> =
   T extends "team"    ? "process" | "team" :
   Tier
 
-type TierOf<S> = S extends { readonly [TierMarker]: infer T } ? T : "unlabelled"
+type TierOf<S> = S extends { readonly [TierMarker]: infer T } ? T : "unlabeled"
 ```
 
-Services from Effect or other libraries (`HttpClient`, for example) have no marker. They come out as `"unlabelled"`, which is allowed anywhere and treated as process tier (D41). Third-party code that never opted in doesn't need labelling. Every service *we* write gets a marker, and a lint rule (below) enforces that.
+Services from Effect or other libraries (`HttpClient`, for example) have no marker. They come out as `"unlabeled"`, which is allowed anywhere and treated as process tier (D41). Third-party code that never opted in doesn't need labeling. Every service *we* write gets a marker, and a lint rule (below) enforces that.
 
 ### Step 3: find the offenders
 
 ```ts
 type WrongTier<R, T extends Tier> =
   R extends unknown                       // look at each type in the R union separately
-    ? TierOf<R> extends CanUse<T> | "unlabelled" ? never : R
+    ? TierOf<R> extends CanUse<T> | "unlabeled" ? never : R
     : never
 ```
 

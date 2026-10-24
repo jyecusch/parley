@@ -8,6 +8,7 @@ Every concept has exactly one name, defined in [`docs/terminology.md`](docs/term
 
 - Use the term from `docs/terminology.md`. Never use a listed banned synonym.
 - Need a concept that has no term yet? Add it to `docs/terminology.md` first, in the same change. Pick the most common name, and avoid vague names or names that overlap with an existing term, with a CRM user's vocabulary, or with our stack (Effect, TanStack, Better-Auth, MCP).
+- Spelling is American (D151): color, behavior, canceled.
 - Third-party names (Better-Auth `organization`, Effect `Scope`, TanStack DB `collection`, MCP `tool`) are used only when talking about that library's API.
 - If two words seem to mean the same thing, stop and fix it. Don't pick one locally.
 

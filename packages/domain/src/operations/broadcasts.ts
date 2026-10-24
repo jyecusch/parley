@@ -232,7 +232,7 @@ export const previewBroadcast = defineTeamOperation({
 export const testSendBroadcast = defineTeamOperation({
   name: "broadcasts.testSend",
   description:
-    'Send a draft to members of the team to check it, labelled "[Test]". Defaults to you. Its unsubscribe link changes nothing.',
+    'Send a draft to members of the team to check it, labeled "[Test]". Defaults to you. Its unsubscribe link changes nothing.',
   input: Schema.Struct({
     ...OneBroadcast,
     userIds: Schema.optional(TestRecipients.annotate({ title: "Members", description: "Up to 5 members' user ids." })),
@@ -255,7 +255,7 @@ export const testSendBroadcast = defineTeamOperation({
 export const sendBroadcast = defineTeamOperation({
   name: "broadcasts.send",
   description:
-    "Send a draft to its segment now. Recipients are fixed at this moment: subscribed contacts with an email address (and still subscribed to its topic). This can't be undone, though the rest of the sending can be cancelled. Only send to people who agreed to get it.",
+    "Send a draft to its segment now. Recipients are fixed at this moment: subscribed contacts with an email address (and still subscribed to its topic). This can't be undone, though the rest of the sending can be canceled. Only send to people who agreed to get it.",
   input: Schema.Struct(OneBroadcast),
   output: Broadcast,
   errors: [
@@ -273,7 +273,7 @@ export const sendBroadcast = defineTeamOperation({
 
 export const cancelBroadcast = defineTeamOperation({
   name: "broadcasts.cancel",
-  description: "Stop sending a broadcast. Emails already sent stay sent; the rest are recorded as cancelled.",
+  description: "Stop sending a broadcast. Emails already sent stay sent; the rest are recorded as canceled.",
   input: Schema.Struct(OneBroadcast),
   output: Broadcast,
   errors: [BroadcastNotFound, BroadcastNotSending],

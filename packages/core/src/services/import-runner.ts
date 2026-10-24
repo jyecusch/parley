@@ -160,7 +160,7 @@ export class ImportRunner extends Context.Service<
           )
         })
 
-      /** Adds a part's outcome and drops the part. Counts are added even if it was cancelled meanwhile. */
+      /** Adds a part's outcome and drops the part. Counts are added even if it was canceled meanwhile. */
       const record = (claimed: Claimed, partId: string, outcome: PartOutcome) =>
         run(
           db.transaction(

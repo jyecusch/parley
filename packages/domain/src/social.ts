@@ -12,7 +12,7 @@ export const SocialProfile = Schema.String.check(
 export const SocialProfiles = Schema.Array(SocialProfile).check(Schema.isMaxLength(20))
 
 /**
- * The networks Parley recognises, by the hosts their profiles live on (D133). `handle` turns a
+ * The networks Parley recognizes, by the hosts their profiles live on (D133). `handle` turns a
  * bare handle (as some exports give, like "acme" or "@acme") into the profile's address; LinkedIn's
  * differs for people and companies.
  */
@@ -55,7 +55,7 @@ export const SOCIAL_NETWORKS = [
 ] as const
 export type SocialNetworkId = (typeof SOCIAL_NETWORKS)[number]["id"]
 
-/** Which network a profile link is on, or undefined for a link Parley doesn't recognise. */
+/** Which network a profile link is on, or undefined for a link Parley doesn't recognize. */
 export const socialNetworkOf = (url: string) => {
   let host: string
   try {

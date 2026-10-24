@@ -553,7 +553,7 @@ const RECIPIENT_LABELS: Readonly<Record<RecipientStatus, string>> = {
   failed: "Failed",
   bounced: "Bounced",
   "marked-as-spam": "Marked as spam",
-  cancelled: "Cancelled",
+  canceled: "Canceled",
 }
 
 const SKIP_LABELS: Readonly<Record<string, string>> = {
@@ -589,7 +589,7 @@ function Report(props: { readonly teamId: TeamId; readonly broadcast: Broadcast;
     queryFn: () => call("broadcasts.preview", { teamId, broadcastId: broadcast.id }),
   })
   const reached = counts ? counts.delivered || counts.sent + counts.delivered : 0
-  /** Tiles for what happened. Queued, skipped, failed and cancelled show only when there are some. */
+  /** Tiles for what happened. Queued, skipped, failed and canceled show only when there are some. */
   const tiles: ReadonlyArray<{
     readonly label: string
     readonly value: ReactNode

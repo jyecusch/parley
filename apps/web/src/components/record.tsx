@@ -40,7 +40,7 @@ export const toggle = (set: ReadonlySet<string>, id: string): ReadonlySet<string
   return next
 }
 
-/** Normalises what people type ("+61 400 812 337") to E.164 (D34). */
+/** Normalizes what people type ("+61 400 812 337") to E.164 (D34). */
 export const toE164 = (value: string) => value.replace(/[\s().-]/g, "")
 
 export const problemFor = (problems: ReadonlyArray<FieldProblem> | undefined, field: string) =>

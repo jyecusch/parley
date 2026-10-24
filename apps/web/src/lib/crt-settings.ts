@@ -1,12 +1,12 @@
 /**
  * CRT settings (D81, D102, D114): how CRT mode looks, tuned per browser and kept in localStorage. The
- * phosphor colour drives the CSS palette through `--h` (hue) and `--crt-saturation` on <html>; the rest are
+ * phosphor color drives the CSS palette through `--h` (hue) and `--crt-saturation` on <html>; the rest are
  * read by the shader on every draw, and the scanlines, vignette, flicker and glow also by the CSS layer.
  */
 export interface CrtSettings {
   /** The phosphor's hue, 0–360 (OKLCH). */
   readonly hue: number
-  /** How coloured the phosphor is, 0 (white) to 1. */
+  /** How colored the phosphor is, 0 (white) to 1. */
   readonly saturation: number
   /** How round the glass is, 0 (flat) to 1. */
   readonly curvature: number
@@ -105,7 +105,7 @@ export const crtSettings = (): CrtSettings => {
   return cached.settings
 }
 
-/** Puts the phosphor colour and glow on <html>, where the CRT palette in app.css reads them. */
+/** Puts the phosphor color and glow on <html>, where the CRT palette in app.css reads them. */
 export const applyCrtSettings = (settings: CrtSettings = crtSettings()) => {
   const style = document.documentElement.style
   style.setProperty("--h", String(settings.hue))
@@ -127,7 +127,7 @@ export const saveCrtSettings = (settings: CrtSettings) => {
 }
 
 /**
- * The same as applyCrtSettings, as a script for the page head so the colour is right on first paint. Kept in
+ * The same as applyCrtSettings, as a script for the page head so the color is right on first paint. Kept in
  * step with parse and applyCrtSettings by hand; it trusts the stored values less (only numbers pass).
  */
 export const CRT_SETTINGS_SCRIPT = `try{var s=JSON.parse(localStorage.getItem("${KEY}")||"{}"),r=document.documentElement.style;if(typeof s.hue==="number")r.setProperty("--h",s.hue);if(typeof s.saturation==="number")r.setProperty("--crt-saturation",s.saturation);if(typeof s.glow==="number")r.setProperty("--crt-glow",s.glow);if(typeof s.scanlines==="number")r.setProperty("--crt-scanlines",s.scanlines/${CRT_DEFAULTS.scanlines});if(typeof s.vignette==="number")r.setProperty("--crt-vignette",s.vignette/${CRT_DEFAULTS.vignette});if(s.flicker===false)r.setProperty("--crt-flicker","0")}catch(e){}`

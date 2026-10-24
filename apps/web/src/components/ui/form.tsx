@@ -30,7 +30,7 @@ import { Textarea as TextareaBase } from "./textarea.tsx"
 
 /*
  * Parley's form controls (D80), built on shadcn's (D139): the same props and look as before, with
- * Base UI's behaviour and accessibility underneath.
+ * Base UI's behavior and accessibility underneath.
  */
 
 type InputProps = InputHTMLAttributes<HTMLInputElement> & { ref?: Ref<HTMLInputElement> | undefined }
@@ -201,7 +201,7 @@ export function Option({ className, ...props }: LabelHTMLAttributes<HTMLLabelEle
   return <Label className={cn("flex min-h-8 cursor-pointer items-center gap-2.5", className)} {...props} />
 }
 
-/** A labelled form field: label, control, then a hint or an error. */
+/** A labeled form field: label, control, then a hint or an error. */
 export function Field({
   label,
   htmlFor,

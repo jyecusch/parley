@@ -8,7 +8,7 @@ const Timestamp = Schema.String.annotate({ description: "ISO 8601 timestamp" })
 export const ApiKey = Schema.Struct({
   id: ApiKeyId,
   name: Schema.String,
-  /** The first characters of the key, so its owner can recognise it ("parley_a1b2"). */
+  /** The first characters of the key, so its owner can recognize it ("parley_a1b2"). */
   start: Schema.NullOr(Schema.String),
   scopes: Schema.Array(Permission),
   createdAt: Timestamp,

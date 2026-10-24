@@ -67,7 +67,7 @@ export function ViewBody({ className, ...props }: HTMLAttributes<HTMLDivElement>
   return <div className={cn("flex min-h-0 flex-1 flex-col", className)} {...props} />
 }
 
-/** Centres its content in the space available, for empty and error states. */
+/** Centers its content in the space available, for empty and error states. */
 export function Centered({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return <div className={cn("grid flex-1 place-items-center p-10", className)} {...props} />
 }
@@ -131,7 +131,7 @@ export function SectionHeader({ className, ...props }: HTMLAttributes<HTMLHeadin
   )
 }
 
-/** One labelled property of a record: label on the left, value on the right. */
+/** One labeled property of a record: label on the left, value on the right. */
 export function PropertyRow({ label, children, htmlFor }: { label: ReactNode; children: ReactNode; htmlFor?: string }) {
   return (
     <div className="grid grid-cols-[7rem_minmax(0,1fr)] items-start gap-2.5">

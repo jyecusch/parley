@@ -47,7 +47,7 @@ describe("templates and broadcasts", () => {
         teamId: f.acme,
         name: "Monthly update",
         subject: "Hi {{first_name|there}}",
-        body: "# News\n\nHello **{{name}}** from {{company|your team}}. {{favourite_colour}}\n\n<script>alert(1)</script>",
+        body: "# News\n\nHello **{{name}}** from {{company|your team}}. {{favorite_color}}\n\n<script>alert(1)</script>",
       })
       const contact = yield* run["contacts.create"](f.jane, {
         teamId: f.acme,
@@ -72,7 +72,7 @@ describe("templates and broadcasts", () => {
       expect(preview.html).toContain("<strong>Ada &lt;Lovelace&gt;</strong> from your team")
       expect(preview.html).toContain("&lt;script&gt;")
       expect(preview.html).not.toContain("<script>")
-      expect(preview.unknownMergeTags).toEqual(["favourite_colour"])
+      expect(preview.unknownMergeTags).toEqual(["favorite_color"])
       // Without a sender set up, the footer has placeholders.
       expect(preview.text).toContain("Your legal name")
 
@@ -217,9 +217,9 @@ describe("templates and broadcasts", () => {
       })
       yield* run["segments.addContacts"](f.jane, { teamId: f.acme, segmentId: empty.id, contactIds: [contact.id] })
       yield* run["broadcasts.send"](f.jane, { teamId: f.acme, broadcastId: broadcast.id })
-      const cancelled = yield* run["broadcasts.cancel"](f.jane, { teamId: f.acme, broadcastId: broadcast.id })
-      expect(cancelled.status).toBe("cancelled")
-      expect(cancelled.counts).toMatchObject({ cancelled: 1, sent: 0 })
+      const canceled = yield* run["broadcasts.cancel"](f.jane, { teamId: f.acme, broadcastId: broadcast.id })
+      expect(canceled.status).toBe("canceled")
+      expect(canceled.counts).toMatchObject({ canceled: 1, sent: 0 })
       const twice = yield* run["broadcasts.cancel"](f.jane, { teamId: f.acme, broadcastId: broadcast.id }).pipe(
         Effect.flip,
       )

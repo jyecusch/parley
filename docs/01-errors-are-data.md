@@ -237,7 +237,7 @@ How a decode error becomes this, in one classifier (`core/src/input/classify.ts`
 
 1. Walk the leaf issues of the Schema decode error.
 2. Map each leaf to the small `problem` vocabulary.
-3. Build `userMessage` from a **`label` annotation we write on every input field** (`label: "Email"`) plus fixed words per `problem`. Unlabelled fields fall back to a generic "This field".
+3. Build `userMessage` from a **`label` annotation we write on every input field** (`label: "Email"`) plus fixed words per `problem`. Unlabeled fields fall back to a generic "This field".
 4. **Never** include the offending input value, and **never** include Schema's own message.
 
 The `field` path *is* ours: it's a key in our schema, not foreign text. So it's safe and very useful to agents ("fix `addresses.0.postcode`").

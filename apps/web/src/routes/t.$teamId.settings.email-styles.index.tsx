@@ -40,7 +40,7 @@ const usedBy = (style: EmailStyle) => {
 
 const DESCRIPTIONS: Readonly<Record<EmailStyle["layout"], string>> = {
   plain: "Plain, like a personal email",
-  card: "A card on a coloured background",
+  card: "A card on a colored background",
   custom: "Your own HTML around the content",
 }
 
@@ -66,7 +66,7 @@ function EmailStyles() {
   return (
     <SettingsPage
       title="Email styles"
-      intro="How your emails look: logo, colours, font and layout. Templates and broadcasts use the default unless they choose another."
+      intro="How your emails look: logo, colors, font and layout. Templates and broadcasts use the default unless they choose another."
       action={
         canManage ? (
           <Link
@@ -227,7 +227,7 @@ function StyleActions(props: {
 }
 
 /**
- * A small sketch of a style, in its own colours: lines of text, a button, and the footer rule. Colours
+ * A small sketch of a style, in its own colors: lines of text, a button, and the footer rule. Colors
  * are the team's data, so they're set inline.
  */
 export function StyleThumbnail(props: { readonly style: Pick<EmailStyle, "layout" | "colors" | "logoUrl"> }) {

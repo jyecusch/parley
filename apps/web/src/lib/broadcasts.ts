@@ -4,5 +4,5 @@ export const BROADCAST_STATUS_LABELS: Readonly<Record<Broadcast["status"], strin
   draft: "Draft",
   sending: "Sending",
   sent: "Sent",
-  cancelled: "Cancelled",
+  canceled: "Canceled",
 }

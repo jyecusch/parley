@@ -195,7 +195,7 @@ function ImportProgress(props: { readonly teamId: TeamId; readonly entry: Import
             Keep importing
           </Button>
           <Button size="sm" variant="danger" disabled={busy} onClick={() => void cancel()}>
-            {busy ? "Cancelling…" : "Cancel import"}
+            {busy ? "Canceling…" : "Cancel import"}
           </Button>
         </div>
       ) : (
@@ -215,8 +215,8 @@ function ImportFinished(props: {
   const text =
     entry.status === "finished"
       ? `Imported ${fileOf(entry)}: ${outcome(entry)}.`
-      : entry.status === "cancelled"
-        ? `Cancelled the import of ${fileOf(entry)}: ${outcome(entry)}.`
+      : entry.status === "canceled"
+        ? `Canceled the import of ${fileOf(entry)}: ${outcome(entry)}.`
         : `The import of ${fileOf(entry)} stopped before it finished: ${outcome(entry)}. ${entry.error ?? ""} Import the file again to finish; rows already imported are only updated.`
   return (
     <div
@@ -269,7 +269,7 @@ function ImportResults(props: { readonly teamId: TeamId; readonly importId: Impo
         {isActive(entry)
           ? `${count(entry.processedRows)} of ${count(entry.totalRows)} rows so far: ${outcome(entry)}.`
           : `${count(entry.totalRows)} rows: ${outcome(entry)}.`}
-        {entry.status === "cancelled" ? " The import was cancelled." : ""}
+        {entry.status === "canceled" ? " The import was canceled." : ""}
         {entry.status === "failed" ? ` The import stopped before it finished. ${entry.error ?? ""}` : ""}
       </p>
       <LineProblems title="Not imported" lines={entry.failed} />
@@ -307,7 +307,7 @@ const STATUS_LABEL: Record<Import["status"], string> = {
   running: "Importing",
   "fetching-logos": "Fetching logos",
   finished: "Finished",
-  cancelled: "Cancelled",
+  canceled: "Canceled",
   failed: "Stopped",
 }
 

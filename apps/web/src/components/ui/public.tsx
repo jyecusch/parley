@@ -4,7 +4,7 @@ import { cn } from "./cn.ts"
 
 /**
  * The frame for pages outside the app: sign-in, sign-up, a new team, an invitation and the
- * unsubscribe page. One narrow column, centred in the window.
+ * unsubscribe page. One narrow column, centered in the window.
  */
 export function AuthPage({ className, children, ...props }: HTMLAttributes<HTMLDivElement>) {
   return (

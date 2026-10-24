@@ -452,7 +452,7 @@ export function ImportDialog(props: {
   /** Values for every row, by custom field: what a cell would say (option labels, joined by "; "). */
   const [set, setSet] = useState<Record<string, string>>({})
   const [replaceMulti, setReplaceMulti] = useState(false)
-  /** Who each unrecognised owner cell means (D127): a person, or no one. */
+  /** Who each unrecognized owner cell means (D127): a person, or no one. */
   const [owners, setOwners] = useState<Record<string, UserId | null>>({})
   /**
    * Opt-out columns (D127) whose topic is still to be made, by header: the name to give it, and
