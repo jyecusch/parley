@@ -340,7 +340,7 @@ function CompaniesScreen() {
 
   return (
     <>
-      <Card as="main" className="flex-[999_1_39rem]">
+      <Card as="main" className="grow-999 basis-156">
         <PageHeader>
           <Breadcrumb>
             <BreadcrumbList>
@@ -804,7 +804,7 @@ const TALL = "h-12"
 const TALL_HEIGHT = 48
 
 const countOf = (count: number) => `${count.toLocaleString()} ${count === 1 ? "company" : "companies"}`
-const NAME_COLUMN = "w-[34%]"
+const NAME_COLUMN = "w-17/50"
 const COUNT_COLUMN = "w-32"
 
 function LoadingRows() {

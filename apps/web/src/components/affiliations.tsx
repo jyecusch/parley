@@ -7,7 +7,7 @@ import { companyApi, primaryDomainOf, refreshCompanies } from "../lib/companies.
 import { contactApi, refreshContacts } from "../lib/contacts.ts"
 import { useRecordSearch } from "../lib/records.ts"
 import { ChoiceItem, ChoiceList } from "./choice-list.tsx"
-import { CloseIcon, PlusIcon } from "./icons.tsx"
+import { CloseIcon, PencilIcon, PlusIcon } from "./icons.tsx"
 import { CompanyLogo, ContactAvatar } from "./images.tsx"
 import { PopoverAnchor } from "./popover-anchor.tsx"
 import { initialsOfName } from "./record.tsx"
@@ -458,7 +458,7 @@ export function CompanyContacts(props: {
           Add contact
         </PlainButton>
       </SectionHeader>
-      {affiliations.isLoading ? <Skeleton className="my-2 w-[60%]" /> : null}
+      {affiliations.isLoading ? <Skeleton className="my-2 w-3/5" /> : null}
       {affiliations.isError ? <ErrorText className="my-1">{messageOf(affiliations.error)}</ErrorText> : null}
       {affiliations.isSuccess && rows.length === 0 ? (
         <SectionEmpty>No contacts yet. Contacts with an email at its domains join on their own.</SectionEmpty>
@@ -580,21 +580,6 @@ function TitleEditor(props: {
     </AffiliationRow>
   )
 }
-
-const PencilIcon = () => (
-  <svg
-    className="size-3.5"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.75"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-  >
-    <path d="M4 20h4L19 9l-4-4L4 16z" />
-  </svg>
-)
 
 /** Bulk "affiliate with a company" for selected contacts (D71). */
 export function AffiliateDialog(props: {

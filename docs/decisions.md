@@ -160,6 +160,8 @@ What we decided, who decided it, and what's still open. Nothing becomes "decided
 | D153 | Tracking parameters on sign-ups | A form records every utm_* parameter (GA4's longer ones included) with the page. People see them as "Came from" on each submission and on the contact's sign-up activity, and analytics break sign-ups down by source, medium and campaign | Owner | 2026-10-24 |
 | D154 | Tracking options belong to the embedding site | Remembering UTM parameters across a visit or for days (browser storage on the site) and passing ad click IDs are off by default, turned on by attributes on the embed script (data-remember-utm, data-click-ids). The site that turns them on answers for its visitors' consent. The form's own setting can still refuse to record them | Owner | 2026-10-24 |
 | D155 | Embed tab layout | Design asset A of three (canvas: https://claude.ai/artifact/Q41RTtrRnXGuBrd4WCvpvS): the embed snippet and hosted link first, then folded options (Tracking, Where it can appear, Match the page) that each show their setting in one line. Explanations sit in info tips. The snippet is one line that wraps to fit, never scrolls. "Seen on" moves to a tab on the Submissions screen, with a one-line link from the Embed tab. Every designer tab follows the same rules: explanations in info tips rather than hints, section headings quieter than the field labels under them, and nothing reserving space for a control that isn't there | Owner | 2026-10-24 |
+| D156 | Libraries, never hand-rolled | Parley uses popular, maintained libraries for anything they cover: shadcn components (installed with its CLI), Tailwind utilities on the standard scale or named theme tokens (no arbitrary values; ESLint's tailwindcss/no-arbitrary-value enforces it in `bun run lint`), Lucide icons, react-icons for networks' marks. Exceptions only when the owner grants one for a stated reason, such as the authorization proofs | Owner | 2026-10-24 |
+| D157 | Shared rate limits | Rate limits use rate-limiter-flexible with its Postgres store (`rate_limits`), so every server shares the counts; if the database is unreachable each server falls back to counting in memory. A process-tier service keyed by team, connection or link, which answers Q-T5: no team-tier limiter. Redis (on Suga) is a drop-in store if Postgres gets busy | Owner | 2026-10-24 |
 
 ## Implementation choices made during milestones 1 and 2 (Claude; low-stakes, open to veto)
 
@@ -221,6 +223,6 @@ Each post ends with its own **Open questions**, and those are collected below on
 
 ### Deferred to v2 design
 
-- **Q-T5** Per-team send rate limiting: an in-memory team-tier limiter, or a shared store keyed by `TeamId`?
+- **Q-T5** Per-team send rate limiting: an in-memory team-tier limiter, or a shared store keyed by `TeamId`? Answered by D157: a shared store, process tier.
 - **Q-E8** How Resend errors are split into classes, and whether user messages ever name the email provider.
 - How Resend's **Topics** map onto our subscription management.

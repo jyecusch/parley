@@ -81,13 +81,13 @@ function Connections() {
           <Table kind="settings">
             <thead>
               <tr>
-                <Th scope="col" className="w-[27%]">
+                <Th scope="col" className="w-27/100">
                   Agent
                 </Th>
-                <Th scope="col" className="w-[17%]">
+                <Th scope="col" className="w-17/100">
                   Acts as
                 </Th>
-                <Th scope="col" className="w-[19%]">
+                <Th scope="col" className="w-19/100">
                   Scopes
                 </Th>
                 <Th scope="col" className="w-28">

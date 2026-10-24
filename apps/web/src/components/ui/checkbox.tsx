@@ -13,7 +13,7 @@ function Checkbox({ className, ...props }: CheckboxPrimitive.Root.Props) {
       render={<button type="button" />}
       className={cn(
         "m-0 grid size-4 shrink-0 cursor-pointer appearance-none place-items-center rounded align-middle inset-ring inset-ring-control transition-opacity motion-reduce:transition-none",
-        "after:h-2 after:w-1 after:-translate-y-px after:rotate-45 after:border-r-2 after:border-b-2 after:border-on-primary after:opacity-0 after:content-['']",
+        "after:h-2 after:w-1 after:-translate-y-px after:rotate-45 after:border-r-2 after:border-b-2 after:border-on-primary after:opacity-0",
         "data-checked:bg-primary data-checked:inset-ring-0 data-checked:after:opacity-100",
         "data-indeterminate:bg-primary data-indeterminate:inset-ring-0 data-indeterminate:after:h-0.5 data-indeterminate:after:w-2 data-indeterminate:after:translate-y-0 data-indeterminate:after:rotate-0 data-indeterminate:after:rounded-full data-indeterminate:after:border-0 data-indeterminate:after:bg-on-primary data-indeterminate:after:opacity-100",
         "disabled:cursor-default disabled:opacity-40",

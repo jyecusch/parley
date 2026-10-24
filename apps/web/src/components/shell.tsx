@@ -400,7 +400,7 @@ export function AppShell(props: {
             </Sidebar>
           </SidebarProvider>
 
-          <div className="@container/content relative flex min-w-0 flex-[999_1_35rem] gap-1.5 py-1.5 pr-1.5">
+          <div className="@container/content relative flex min-w-0 grow-999 basis-140 gap-1.5 py-1.5 pr-1.5">
             {props.children}
           </div>
 

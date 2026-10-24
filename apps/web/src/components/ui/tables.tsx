@@ -38,9 +38,9 @@ export function Tr({
   return (
     <TableRow
       className={cn(
-        cursor && "[&>td]:bg-hover [&>td:first-child]:shadow-[inset_0.125rem_0_0_var(--color-subtle)]",
+        cursor && "[&>td]:bg-hover [&>td:first-child]:inset-shadow-marker-subtle",
         (checked || open) && "[&>td]:bg-selected hover:[&>td]:bg-selected",
-        open && "[&>td:first-child]:shadow-[inset_0.125rem_0_0_var(--color-mark)]",
+        open && "[&>td:first-child]:inset-shadow-marker",
         className,
       )}
       {...props}

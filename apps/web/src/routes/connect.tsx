@@ -186,18 +186,7 @@ function AgentHeader(props: {
         <span className="grid size-12 place-items-center rounded-xl bg-fill text-base font-semibold text-fg">
           {initialsOf(props.agent.name)}
         </span>
-        <svg
-          className="h-3 w-8"
-          viewBox="0 0 28 12"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeDasharray="2 4"
-          aria-hidden="true"
-        >
-          <path d="M2 6h24" />
-        </svg>
+        <span className="w-8 border-t-2 border-dotted border-current" />
         <span className="grid size-12 place-items-center">
           <ParleyMark className="h-9" />
         </span>
@@ -439,14 +428,14 @@ function ConsentForm(props: {
             {OFFERED.map((scope) => {
               const locked = scope === "records:read"
               return (
-                <Option key={scope} className="grid grid-cols-[1rem_8rem_minmax(0,1fr)] py-0.5">
+                <Option key={scope} className="py-0.5">
                   <Checkbox
                     className={cn(locked && "disabled:opacity-55")}
                     checked={scopes.has(scope)}
                     disabled={locked}
                     onChange={() => toggle(scope)}
                   />
-                  <span className="font-mono text-sm">{scope}</span>
+                  <span className="w-32 shrink-0 font-mono text-sm">{scope}</span>
                   <span className="text-muted">
                     {SCOPE_LABELS[scope]}
                     {locked ? <span className="text-sm text-subtle"> · Always on</span> : null}

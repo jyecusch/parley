@@ -23,6 +23,7 @@
     "jose": "6.2.12",
     "marked": "18.1.0",
     "pg": "8.23.1",
+    "rate-limiter-flexible": "11.2.3",
     "sanitize-html": "2.18.0",
     "sharp": "0.34.5"
   },

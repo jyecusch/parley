@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query"
 import { createFileRoute, getRouteApi, Link } from "@tanstack/react-router"
 import { useState } from "react"
 import { useEmailStyles } from "../components/email-style-select.tsx"
-import { InfoIcon, PaletteIcon } from "../components/icons.tsx"
+import { EmailStyleIcon, InfoIcon } from "../components/icons.tsx"
 import { Empty, LoadFailed, LoadingRows, SettingsPage, useToast } from "../components/settings.tsx"
 import {
   Badge,
@@ -89,7 +89,7 @@ function EmailStyles() {
           onRetry={() => void styles.refetch()}
         />
       ) : styles.data.length === 0 ? (
-        <Empty icon={<PaletteIcon />} title="No email styles yet">
+        <Empty icon={<EmailStyleIcon />} title="No email styles yet">
           Emails use the plain look until you make one.
         </Empty>
       ) : (
@@ -236,11 +236,11 @@ export function StyleThumbnail(props: { readonly style: Pick<EmailStyle, "layout
     return (
       <div
         aria-hidden="true"
-        className="flex h-16 w-24 flex-col gap-1 rounded-md bg-[#15171c] p-2 font-mono text-2xs text-[#9aa3b5] [text-shadow:none]"
+        className="flex h-16 w-24 flex-col gap-1 rounded-md bg-zinc-900 p-2 font-mono text-2xs text-slate-400 [text-shadow:none]"
       >
         <span>&lt;html&gt;</span>
-        <span className="h-1 w-4/5 rounded-full bg-[#3a3f4b]" />
-        <span className="text-[#e3b341]">{"{{content}}"}</span>
+        <span className="h-1 w-4/5 rounded-full bg-slate-600" />
+        <span className="text-amber-400">{"{{content}}"}</span>
       </div>
     )
   }

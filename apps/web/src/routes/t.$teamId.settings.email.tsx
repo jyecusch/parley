@@ -169,7 +169,7 @@ function Domains(props: {
             <thead>
               <tr>
                 <Th scope="col">Domain</Th>
-                <Th scope="col" className="w-[24%]">
+                <Th scope="col" className="w-6/25">
                   Status
                 </Th>
                 <Th scope="col" className="w-72">
@@ -554,7 +554,7 @@ function Topics(props: {
           <Table kind="settings">
             <thead>
               <tr>
-                <Th scope="col" className="w-[30%]">
+                <Th scope="col" className="w-3/10">
                   Name
                 </Th>
                 <Th scope="col">Description</Th>

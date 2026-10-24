@@ -39,7 +39,7 @@ function PopoverContent({
         <PopoverPrimitive.Popup
           data-slot="popover-content"
           className={cn(
-            "w-96 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl bg-raised shadow-pop outline-none",
+            "w-96 max-w-(--available-width) overflow-hidden rounded-xl bg-raised shadow-pop outline-none",
             className,
           )}
           {...props}

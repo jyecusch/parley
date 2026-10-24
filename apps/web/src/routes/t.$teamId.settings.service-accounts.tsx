@@ -101,13 +101,13 @@ function ServiceAccounts() {
           <Table kind="settings">
             <thead>
               <tr>
-                <Th scope="col" className="w-[32%]">
+                <Th scope="col" className="w-8/25">
                   Name
                 </Th>
-                <Th scope="col" className="w-[14%]">
+                <Th scope="col" className="w-7/50">
                   Role
                 </Th>
-                <Th scope="col" className="w-[24%]">
+                <Th scope="col" className="w-6/25">
                   Created by
                 </Th>
                 <Th scope="col" className="w-36">

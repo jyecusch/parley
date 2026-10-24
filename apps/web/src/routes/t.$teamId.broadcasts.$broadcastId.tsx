@@ -69,10 +69,10 @@ function BroadcastScreen() {
     queryFn: () => call("broadcasts.get", { teamId, broadcastId: broadcastId as BroadcastId }),
     refetchInterval: (query) => (query.state.data?.status === "sending" ? 2000 : false),
   })
-  if (broadcast.isPending) return <Card as="main" className="flex-[999_1_35rem]" />
+  if (broadcast.isPending) return <Card as="main" className="grow-999 basis-140" />
   if (broadcast.isError) {
     return (
-      <Card as="main" className="flex-[999_1_35rem]">
+      <Card as="main" className="grow-999 basis-140">
         <ViewBody>
           <LoadFailed
             title="This broadcast didn't load"
@@ -177,7 +177,7 @@ function DraftEditor(props: {
   const readOnly = !props.canWrite
 
   return (
-    <Card as="main" className="flex-[999_1_35rem]">
+    <Card as="main" className="grow-999 basis-140">
       <PageHeader>
         <Breadcrumb>
           <BreadcrumbList>
@@ -634,7 +634,7 @@ function Report(props: { readonly teamId: TeamId; readonly broadcast: Broadcast;
   }
 
   return (
-    <Card as="main" className="flex-[999_1_35rem]">
+    <Card as="main" className="grow-999 basis-140">
       <PageHeader>
         <Breadcrumb>
           <BreadcrumbList>

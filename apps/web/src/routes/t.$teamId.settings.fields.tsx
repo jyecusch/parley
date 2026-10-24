@@ -146,10 +146,10 @@ function Fields() {
           <Table kind="settings">
             <thead>
               <tr>
-                <Th scope="col" className="w-[34%]">
+                <Th scope="col" className="w-17/50">
                   Name
                 </Th>
-                <Th scope="col" className="w-[18%]">
+                <Th scope="col" className="w-9/50">
                   Type
                 </Th>
                 <Th scope="col">Options</Th>

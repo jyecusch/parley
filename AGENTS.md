@@ -12,6 +12,10 @@ Every concept has exactly one name, defined in [`docs/terminology.md`](docs/term
 - Third-party names (Better-Auth `organization`, Effect `Scope`, TanStack DB `collection`, MCP `tool`) are used only when talking about that library's API.
 - If two words seem to mean the same thing, stop and fix it. Don't pick one locally.
 
+## Use libraries, never hand-roll
+
+Don't build what a popular, maintained library already does (D156). Components come from shadcn, installed with its CLI; styling is Tailwind utilities, on Tailwind's standard scale or the theme's named tokens, never arbitrary values like `text-[12.5px]` (`bun run lint` fails on them); icons come from Lucide; search, parsing, validation and the like come from libraries. Exceptions only when the owner grants one for a stated reason.
+
 ## Read before building
 
 `docs/` is the contract the implementation is held to. Start with `docs/00-architecture.md`. Decisions, proposals and open questions live in `docs/decisions.md`. Don't make product or architecture decisions alone: propose them and record them there.

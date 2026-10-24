@@ -33,7 +33,7 @@ function TableRow({ className, ...props }: ComponentProps<"tr">) {
         "group/row [&>td]:transition-colors hover:[&>td]:bg-hover",
         "group-data-[kind=settings]/table:last:[&>td]:border-b-0",
         // The box's rounded corners, so a hovered last row doesn't poke out of them.
-        "group-data-[kind=settings]/table:last:[&>td:first-child]:rounded-bl-[calc(var(--radius-lg)-1px)] group-data-[kind=settings]/table:last:[&>td:last-child]:rounded-br-[calc(var(--radius-lg)-1px)]",
+        "group-data-[kind=settings]/table:last:[&>td:first-child]:rounded-bl-inner group-data-[kind=settings]/table:last:[&>td:last-child]:rounded-br-inner",
         className,
       )}
       {...props}

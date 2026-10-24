@@ -154,7 +154,7 @@ export function SettingsShell(props: { readonly team: Team; readonly children: R
               </SidebarGroup>
             </Sidebar>
           </SidebarProvider>
-          <div className="@container/content relative flex min-w-0 flex-[999_1_35rem] gap-1.5 py-1.5 pr-1.5">
+          <div className="@container/content relative flex min-w-0 grow-999 basis-140 gap-1.5 py-1.5 pr-1.5">
             {props.children}
           </div>
           <Toaster />
@@ -289,9 +289,9 @@ export const useToast = () => [null, (text: string) => void showToast(text)] as 
 
 export function LoadingRows() {
   const rows = [
-    { a: "w-[55%]", b: "w-[35%]", c: "w-[60%]" },
-    { a: "w-[45%]", b: "w-[40%]", c: "w-[75%]" },
-    { a: "w-[65%]", b: "w-[30%]", c: "w-[55%]" },
+    { a: "w-11/20", b: "w-7/20", c: "w-3/5" },
+    { a: "w-9/20", b: "w-2/5", c: "w-3/4" },
+    { a: "w-13/20", b: "w-3/10", c: "w-11/20" },
   ]
   return (
     <Box role="status" aria-label="Loading">
@@ -299,7 +299,7 @@ export function LoadingRows() {
         <tbody>
           {rows.map((row) => (
             <Tr key={row.a}>
-              <Td className="w-[27%]">
+              <Td className="w-27/100">
                 <div className="flex items-center gap-2.5">
                   <Skeleton className="size-7 shrink-0 rounded-md" />
                   <span className="flex flex-1 flex-col gap-1.5">
@@ -308,11 +308,11 @@ export function LoadingRows() {
                   </span>
                 </div>
               </Td>
-              <Td className="w-[17%]">
+              <Td className="w-17/100">
                 <Skeleton className={row.c} />
               </Td>
-              <Td className="w-[19%]">
-                <Skeleton className="w-[70%]" />
+              <Td className="w-19/100">
+                <Skeleton className="w-7/10" />
               </Td>
               <Td>
                 <Skeleton className="w-16" />

@@ -232,9 +232,9 @@ function StyleEditor(props: {
         ) : null}
       </PageHeader>
       {error ? <ErrorText className="px-4 pt-2.5">{error}</ErrorText> : null}
-      <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,28rem)_minmax(0,1fr)] overflow-auto @max-4xl/content:grid-cols-1">
+      <div className="flex min-h-0 flex-1 overflow-auto @max-4xl/content:flex-col">
         <form
-          className="flex flex-col gap-5 overflow-auto border-r border-line p-5 @max-4xl/content:border-r-0"
+          className="flex w-112 min-w-0 shrink flex-col gap-5 overflow-auto border-r border-line p-5 @max-4xl/content:w-auto @max-4xl/content:border-r-0"
           onSubmit={(event) => {
             event.preventDefault()
             if (dirty && draft.name.trim() && !contentMissing) void save()
@@ -375,7 +375,7 @@ function StyleEditor(props: {
           </Fieldset>
         </form>
 
-        <section className="flex min-h-0 flex-col bg-canvas" aria-label="Preview">
+        <section className="flex min-h-0 min-w-0 flex-1 flex-col bg-canvas" aria-label="Preview">
           <div className="flex h-11 shrink-0 items-center gap-2 px-3.5">
             <span className="text-sm text-subtle">Preview with sample content</span>
             <Spacer />
