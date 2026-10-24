@@ -2,13 +2,46 @@ import { describe, expect, it } from "@effect/vitest"
 import { Database } from "@parley/db"
 import type { ContactId, TopicId } from "@parley/domain"
 import { sql } from "drizzle-orm"
-import { Effect } from "effect"
+import { ConfigProvider, Effect, Layer } from "effect"
 import { CoreLive, implementations as run, UnsubscribeLinks, unsubscribeApply, unsubscribePage } from "../src/index.ts"
 import { Fixture } from "./fixture.ts"
 
 const unique = () => crypto.randomUUID().slice(0, 8)
 
 describe("email setup", () => {
+  it.effect("rotates the unsubscribe secret: links signed with a previous one still work", () =>
+    Effect.gen(function* () {
+      const linksWith = (config: Record<string, string>) =>
+        Effect.provide(
+          Effect.gen(function* () {
+            return yield* UnsubscribeLinks
+          }),
+          Layer.fresh(UnsubscribeLinks.layer).pipe(
+            Layer.provide(
+              ConfigProvider.layer(
+                ConfigProvider.fromUnknown({
+                  BETTER_AUTH_SECRET: "test",
+                  BETTER_AUTH_URL: "https://parley.test",
+                  ...config,
+                }),
+              ),
+            ),
+          ),
+        )
+      const facts = { teamId: "team" as never, contactId: null, topicId: null, broadcastId: null, test: false }
+      const old = yield* linksWith({ UNSUBSCRIBE_SECRET: "old-secret" })
+      const sent = old.sign(facts)
+
+      const rotated = yield* linksWith({ UNSUBSCRIBE_SECRET: "new-secret", UNSUBSCRIBE_SECRETS_PREVIOUS: "old-secret" })
+      expect(rotated.read(sent)).toEqual(facts)
+      expect(rotated.sign(facts)).not.toBe(sent)
+      expect(rotated.read(rotated.sign(facts))).toEqual(facts)
+
+      const forgotten = yield* linksWith({ UNSUBSCRIBE_SECRET: "new-secret" })
+      expect(forgotten.read(sent)).toBeUndefined()
+    }),
+  )
+
   it.effect("sets up a sender and footer on a verified sending domain, for admins only", () =>
     Effect.gen(function* () {
       const f = yield* Fixture
