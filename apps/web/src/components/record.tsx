@@ -3,6 +3,7 @@ import type { UserText } from "@parley/errors"
 import { type ReactNode, useState } from "react"
 import { isApiFailure } from "../lib/client.ts"
 import { cameFrom } from "../lib/forms.ts"
+import type { KeptValue } from "../lib/kept-values.ts"
 import { absolute, relative } from "../lib/time.ts"
 import {
   AgentIcon,
@@ -72,12 +73,16 @@ const FIELD_NAMES: Readonly<Record<string, string>> = {
   phone: "phone",
   address: "address",
   title: "title",
+  company: "company",
+  city: "city",
+  region: "region",
+  country: "country",
   avatar: "avatar",
   logo: "logo",
 }
 
 /** One activity entry in words (D111): "added Sam to this company by domain matching on acme.com". */
-const describe = (entry: ActivityEntry, recordType: RecordType): ReactNode => {
+const describe = (entry: ActivityEntry, recordType: RecordType, nameOf: (field: string) => string): ReactNode => {
   const self = recordType === "contact" ? "this contact" : "this company"
   const other = entry.related ? <b>{entry.related.name}</b> : "a record"
   const matched =
@@ -119,7 +124,7 @@ const describe = (entry: ActivityEntry, recordType: RecordType): ReactNode => {
       }
       const fields = entry.changedFields.map((field) =>
         // The record owner reads by record type (D123): never a bare "owner", which is a role.
-        field === "ownerId" ? `${recordType} owner` : (FIELD_NAMES[field] ?? field),
+        field === "ownerId" ? `${recordType} owner` : nameOf(field),
       )
       return fields.length > 0 ? `changed ${fields.join(", ")}` : `edited ${self}`
     }
@@ -163,7 +168,7 @@ const describe = (entry: ActivityEntry, recordType: RecordType): ReactNode => {
       return entry.related ? <>marked {other} as spam</> : "marked a broadcast as spam"
     case "submitted-form": {
       // The form filled empty fields only (D145); what it filled is in changedFields.
-      const filled = entry.changedFields.map((field) => FIELD_NAMES[field] ?? field)
+      const filled = entry.changedFields.map(nameOf)
       // The actor is the form ("Form: Waitlist"), so the line doesn't name it again.
       return (
         <>
@@ -175,38 +180,39 @@ const describe = (entry: ActivityEntry, recordType: RecordType): ReactNode => {
   }
 }
 
-/** A kept value as text: what the visitor typed, or a list of choices. */
-const keptText = (value: unknown) =>
-  typeof value === "string" ? value : Array.isArray(value) ? value.join(", ") : JSON.stringify(value)
+/** How a contact's timeline shows and applies values a form submission kept (D145). */
+export interface KeptHandling {
+  readonly text: (kept: KeptValue) => string
+  /** Whether the contact already has it: then it reads Applied. */
+  readonly isApplied: (kept: KeptValue) => boolean
+  readonly apply: (kept: KeptValue) => Promise<void>
+}
 
 /**
  * Values a form submission didn't write because the contact already had one (D145), each with
  * Apply for a person who decides the new one is right.
  */
-function KeptValues(props: {
-  readonly kept: ActivityEntry["kept"]
-  readonly onApply: ((kept: ActivityEntry["kept"][number]) => Promise<void>) | undefined
-}) {
-  const [applied, setApplied] = useState<ReadonlySet<string>>(new Set())
+function KeptValues(props: { readonly kept: ActivityEntry["kept"]; readonly handling: KeptHandling | undefined }) {
   const [busy, setBusy] = useState<string>()
+  const { handling } = props
   return (
     <ul className="m-0 mt-1 flex list-none flex-col gap-1 p-0 text-sm">
       {props.kept.map((entry) => (
         <li key={entry.field} className="flex flex-wrap items-center gap-x-2 text-muted">
           <span>
-            Submitted {entry.label.toLowerCase()}: <b>{keptText(entry.value)}</b>
+            Submitted {entry.label.toLowerCase()}:{" "}
+            <b>{handling ? handling.text(entry) : typeof entry.value === "string" ? entry.value : ""}</b>
           </span>
-          {applied.has(entry.field) ? (
+          {handling?.isApplied(entry) ? (
             <span className="text-subtle">Applied</span>
-          ) : props.onApply ? (
+          ) : handling ? (
             <TextButton
               className="text-sm"
               disabled={busy !== undefined}
               onClick={async () => {
                 setBusy(entry.field)
                 try {
-                  await props.onApply?.(entry)
-                  setApplied((current) => new Set([...current, entry.field]))
+                  await handling.apply(entry)
                 } finally {
                   setBusy(undefined)
                 }
@@ -261,8 +267,10 @@ export function ActivityRow(props: {
   readonly entry: ActivityEntry
   readonly recordType: RecordType
   readonly first: boolean
-  /** Writes a kept value from a form submission to the record (D145). */
-  readonly onApplyKept?: ((kept: ActivityEntry["kept"][number]) => Promise<void>) | undefined
+  /** Shows and applies a form submission's kept values (D145), on a contact's timeline. */
+  readonly kept?: KeptHandling | undefined
+  /** A field's name where FIELD_NAMES has none, such as a custom field's. */
+  readonly fieldName?: ((field: string) => string | undefined) | undefined
 }) {
   const { entry } = props
   const came = entry.tracking ? cameFrom(entry.tracking) : undefined
@@ -284,12 +292,12 @@ export function ActivityRow(props: {
         entry.kept.length > 0 || tracked ? (
           <>
             {tracked}
-            {entry.kept.length > 0 ? <KeptValues kept={entry.kept} onApply={props.onApplyKept} /> : null}
+            {entry.kept.length > 0 ? <KeptValues kept={entry.kept} handling={props.kept} /> : null}
           </>
         ) : undefined
       }
     >
-      {describe(entry, props.recordType)}
+      {describe(entry, props.recordType, (field) => props.fieldName?.(field) ?? FIELD_NAMES[field] ?? field)}
     </TimelineRow>
   )
 }

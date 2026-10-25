@@ -1,12 +1,13 @@
-import type { ActivityEntry, ContactId, Note, NoteId, RecordType, TeamId } from "@parley/domain"
+import type { ActivityEntry, Contact, CustomField, Note, NoteId, RecordType, TeamId } from "@parley/domain"
 import type { UserText } from "@parley/errors"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { getRouteApi } from "@tanstack/react-router"
 import { useState } from "react"
 import { call, messageOf } from "../lib/client.ts"
+import { keptApplied, keptChange, keptText } from "../lib/kept-values.ts"
 import { refreshRecords } from "../lib/records.ts"
 import { MoreIcon } from "./icons.tsx"
-import { ActivityRow, TimelineRow } from "./record.tsx"
+import { ActivityRow, type KeptHandling, TimelineRow } from "./record.tsx"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./ui/dropdown-menu.tsx"
 import { Button, ErrorText, IconButton, Kbd, Section, SectionHeader, Skeleton, Textarea } from "./ui/index.ts"
 
@@ -26,6 +27,9 @@ export function Timeline(props: {
   readonly activityLoading: boolean
   readonly activityError: UserText | undefined
   readonly onError: (text: UserText) => void
+  /** The contact, when it's a contact's timeline: for applying a form's kept values (D145). */
+  readonly contact?: Contact | undefined
+  readonly customFields?: ReadonlyArray<CustomField> | undefined
 }) {
   const { userId } = team.useRouteContext()
   const { team: current } = team.useLoaderData()
@@ -39,27 +43,31 @@ export function Timeline(props: {
   const refresh = () => queryClient.invalidateQueries({ queryKey: key })
 
   /** Writes a value a form submission kept (D145) to the contact, then reloads it and its activity. */
-  const applyKept = async (kept: ActivityEntry["kept"][number]) => {
-    const contactId = props.recordId as ContactId
-    try {
-      if (kept.field.startsWith("custom:")) {
-        await call("contacts.update", {
-          teamId: props.teamId,
-          contactId,
-          custom: { [kept.field.slice("custom:".length)]: kept.value as never },
-        })
-      } else {
-        await call("contacts.update", { teamId: props.teamId, contactId, [kept.field]: kept.value } as never)
+  const contact = props.contact
+  const kept: KeptHandling | undefined = contact
+    ? {
+        text: (value) => keptText(value, props.customFields ?? []),
+        isApplied: (value) => keptApplied(value, contact),
+        apply: async (value) => {
+          const change = keptChange(value, contact)
+          if (!change) return
+          try {
+            await call("contacts.update", { teamId: props.teamId, contactId: contact.id, ...change })
+          } catch (failure) {
+            props.onError(messageOf(failure))
+            return
+          }
+          await Promise.all([
+            refreshRecords(queryClient, "contacts", props.teamId),
+            queryClient.invalidateQueries({ queryKey: ["contact-activity", props.teamId] }),
+          ])
+        },
       }
-    } catch (failure) {
-      props.onError(messageOf(failure))
-      throw failure
-    }
-    await Promise.all([
-      refreshRecords(queryClient, "contacts", props.teamId),
-      queryClient.invalidateQueries({ queryKey: ["contact-activity", props.teamId] }),
-    ])
-  }
+    : undefined
+  const fieldName = (field: string) =>
+    field.startsWith("custom:")
+      ? (props.customFields?.find((entry) => entry.id === field.slice("custom:".length))?.name ?? "a custom field")
+      : undefined
 
   const entries: ReadonlyArray<Entry> = [
     ...(props.activity ?? []).map((activity) => ({ at: activity.at, activity })),
@@ -103,7 +111,8 @@ export function Timeline(props: {
             entry={entry.activity}
             recordType={props.recordType}
             first={index === 0}
-            onApplyKept={props.recordType === "contact" ? applyKept : undefined}
+            kept={kept}
+            fieldName={fieldName}
           />
         ),
       )}

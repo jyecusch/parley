@@ -108,7 +108,11 @@ export class FormSubmissions extends Context.Service<
                 content: schema.formVersions.content,
               })
               .from(schema.formSubmissions)
-              .innerJoin(schema.forms, eq(schema.forms.id, schema.formSubmissions.formId))
+              // A deleted form takes nothing more, confirmations included (forms.delete says so).
+              .innerJoin(
+                schema.forms,
+                and(eq(schema.forms.id, schema.formSubmissions.formId), isNull(schema.forms.deletedAt)),
+              )
               .innerJoin(
                 schema.formVersions,
                 and(
@@ -139,7 +143,7 @@ export class FormSubmissions extends Context.Service<
           )
           .pipe(Effect.map(([row]) => row))
 
-      /** Opt-out topics the contact left that this submission ticks: rejoining needs confirmation. */
+      /** Topics the contact left that this submission ticks, of either mode: rejoining needs confirmation (D145). */
       const leftTicked = (contactId: string, consent: ConsentRecord) => {
         const ticked = consent.consents.filter((entry) => entry.ticked).map((entry) => entry.topicId)
         if (ticked.length === 0) return Effect.succeed(false)
@@ -275,6 +279,13 @@ ${lines
           return yield* run(
             db.transaction(
               Effect.gen(function* () {
+                // One at a time per address: two submissions for the same new address at once would
+                // both create the contact, and the second would hit its unique email.
+                yield* db.query((d) =>
+                  d.execute(
+                    sql`select pg_advisory_xact_lock(hashtextextended(${`form-apply:${teamId}:${submission.email}`}, 0))`,
+                  ),
+                )
                 // Claim it: a second click on the link, or two at once, finds it already confirmed.
                 const claimed = yield* db.query((d) =>
                   d
@@ -353,7 +364,14 @@ ${lines
                         activityRow(actor, { teamId, recordType: "contact", recordId: contactId, kind: "created" }),
                       ),
                   )
-                  filled.push(...Object.keys(answers).filter((key) => !key.startsWith("topic:")))
+                  // What was written: answers to custom fields that no longer exist weren't.
+                  filled.push(
+                    ...Object.keys(contactColumns),
+                    ...Object.keys(custom).map((id) => `custom:${id}`),
+                    ...(phone ? ["phone"] : []),
+                    ...(companyName ? ["company"] : []),
+                    ...(companyName && title ? ["title"] : []),
+                  )
                 } else {
                   contactId = existing.id
                   outcome = "updated"
@@ -415,6 +433,12 @@ ${lines
 
                 // A company joins the contact's companies (adding isn't overwriting).
                 if (companyName) {
+                  // As for addresses: two new contacts naming one new company make one company.
+                  yield* db.query((d) =>
+                    d.execute(
+                      sql`select pg_advisory_xact_lock(hashtextextended(${`form-company:${teamId}:${companyName.toLowerCase()}`}, 0))`,
+                    ),
+                  )
                   const [company] = yield* db.query((d) =>
                     d
                       .select({ id: schema.companies.id, name: schema.companies.name })
@@ -489,6 +513,19 @@ ${lines
                       ),
                   )
                   for (const topic of topics) {
+                    // Someone who left is back (confirming got them here: D145), and an opt-in
+                    // topic's members are the ones who joined (D149).
+                    const rejoined = yield* db.query((d) =>
+                      d
+                        .delete(schema.topicUnsubscribes)
+                        .where(
+                          and(
+                            eq(schema.topicUnsubscribes.contactId, contactId),
+                            eq(schema.topicUnsubscribes.topicId, topic.id),
+                          ),
+                        )
+                        .returning({ topicId: schema.topicUnsubscribes.topicId }),
+                    )
                     const joined =
                       topic.mode === "opt-in"
                         ? yield* db.query((d) =>
@@ -498,18 +535,8 @@ ${lines
                               .onConflictDoNothing()
                               .returning({ topicId: schema.topicMembers.topicId }),
                           )
-                        : yield* db.query((d) =>
-                            d
-                              .delete(schema.topicUnsubscribes)
-                              .where(
-                                and(
-                                  eq(schema.topicUnsubscribes.contactId, contactId),
-                                  eq(schema.topicUnsubscribes.topicId, topic.id),
-                                ),
-                              )
-                              .returning({ topicId: schema.topicUnsubscribes.topicId }),
-                          )
-                    if (joined.length > 0 && existing) {
+                        : rejoined
+                    if (joined.length + rejoined.length > 0 && existing) {
                       yield* db.query((d) =>
                         d.insert(schema.activity).values(
                           activityRow(actor, {

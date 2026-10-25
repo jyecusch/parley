@@ -50,24 +50,29 @@ function FormPage() {
   }, [])
 
   /** Fetches the form with a fresh render token and captcha, and starts solving the proof of work. */
-  const load = useCallback(async () => {
-    const query = new URLSearchParams()
-    if (context.current?.page) query.set("page", context.current.page)
-    if (context.current?.appearance) query.set("appearance", context.current.appearance)
-    try {
-      const response = await fetch(`/api/forms/${encodeURIComponent(formId)}?${query}`, {
-        headers: { accept: "application/json" },
-      })
-      if (response.status === 404) return setLoaded({ kind: "missing" })
-      if (!response.ok) return setLoaded({ kind: "failed" })
-      const form = (await response.json()) as RenderedForm
-      if (form.captcha.provider === "builtin") solution.current = solveProofOfWork(form.captcha.challenge)
-      setLoaded({ kind: "ready", form })
-      document.title = form.content.title || "Sign up"
-    } catch {
-      setLoaded({ kind: "failed" })
-    }
-  }, [formId])
+  const load = useCallback(
+    async (again = false) => {
+      const query = new URLSearchParams()
+      if (context.current?.page) query.set("page", context.current.page)
+      // Reloading for a fresh token after a failed try isn't another view.
+      if (again) query.set("again", "1")
+      if (context.current?.appearance) query.set("appearance", context.current.appearance)
+      try {
+        const response = await fetch(`/api/forms/${encodeURIComponent(formId)}?${query}`, {
+          headers: { accept: "application/json" },
+        })
+        if (response.status === 404) return setLoaded({ kind: "missing" })
+        if (!response.ok) return setLoaded({ kind: "failed" })
+        const form = (await response.json()) as RenderedForm
+        if (form.captcha.provider === "builtin") solution.current = solveProofOfWork(form.captcha.challenge)
+        setLoaded({ kind: "ready", form })
+        document.title = form.content.title || "Sign up"
+      } catch {
+        setLoaded({ kind: "failed" })
+      }
+    },
+    [formId],
+  )
 
   useEffect(() => {
     void load()
@@ -140,7 +145,7 @@ function FormPage() {
             : { form: "This form isn't taking sign-ups right now. Try again later." },
         )
         // A render token is good for one submission; get a fresh one for the next try.
-        await load()
+        await load(true)
       }
     } catch {
       setErrors({ form: "We couldn't send that. Check your connection and try again." })

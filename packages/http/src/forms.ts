@@ -1,5 +1,5 @@
 import { FormRuntime, type SubmissionInput, type Visitor } from "@parley/core"
-import { AppearanceOverride, type DatabaseUnavailable } from "@parley/domain"
+import { AppearanceOverride, type DatabaseUnavailable, isUuid } from "@parley/domain"
 import { Config, Effect, Schema } from "effect"
 import { HttpRouter, type HttpServerRequest, HttpServerResponse } from "effect/http"
 
@@ -8,7 +8,7 @@ import { HttpRouter, type HttpServerRequest, HttpServerResponse } from "effect/h
  * form id, the signed render token and the confirmation token are the authority. Called
  * same-origin from the form's own page (inside the iframe), so no CORS.
  *
- *   GET  /api/forms/:formId?page=&appearance=   a published form to show, with a fresh render token
+ *   GET  /api/forms/:formId?page=&appearance=&again=   a published form to show, with a fresh render token
  *   GET  /api/forms/:formId/sites                where it may be framed (null for anywhere)
  *   POST /api/forms/:formId/submissions          a visitor's answers
  *   POST /api/forms/confirm/:token               the confirmation link's click (D146)
@@ -57,9 +57,6 @@ const SubmissionBody = Schema.Struct({
 })
 const decodeSubmission = Schema.decodeUnknownOption(SubmissionBody)
 
-/** A form id is a uuid; anything else is no form. */
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-
 /**
  * Who sent the request. With IP_ADDRESS_HEADER set (production, behind a proxy), only that header
  * counts: anything else is the visitor's own say-so, and a forged address could spend someone
@@ -98,7 +95,7 @@ export const FormRoutesLive = HttpRouter.use((router) =>
       run(
         Effect.gen(function* () {
           const [formId, ...rest] = pathOf(request)
-          if (!formId || !UUID.test(formId)) return notFound()
+          if (!formId || !isUuid(formId)) return notFound()
           const runtimeForSites = yield* FormRuntime
           // Where the form may be framed, for the page's frame-ancestors (the server entry asks).
           if (rest.length === 1 && rest[0] === "sites") {
@@ -112,6 +109,7 @@ export const FormRoutesLive = HttpRouter.use((router) =>
             page: (query.get("page") ?? "").slice(0, 2000),
             appearance: appearance._tag === "Some" ? appearance.value : undefined,
             ip: visitorOf(request, ipHeader).ip,
+            countView: query.get("again") !== "1",
           })
           return rendered ? json(rendered) : notFound()
         }),
@@ -129,7 +127,7 @@ export const FormRoutesLive = HttpRouter.use((router) =>
             const page = yield* runtime.confirm(second, visitor)
             return page.kind === "invalid" ? json(page, 404) : json(page)
           }
-          if (second !== "submissions" || !UUID.test(first)) return notFound()
+          if (second !== "submissions" || !isUuid(first)) return notFound()
           const body = yield* request.json.pipe(Effect.orElseSucceed(() => null))
           const decoded = decodeSubmission(body)
           if (decoded._tag === "None") {

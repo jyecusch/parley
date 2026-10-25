@@ -3,7 +3,7 @@ import { sql } from "drizzle-orm"
 import { Context, Duration, Effect, Layer, Schedule } from "effect"
 import { RESTORE_WINDOW_DAYS } from "./contacts.ts"
 
-/** How many records were purged, by kind. */
+/** How many records were purged, by kind. A purged contact's form submissions go with it. */
 export interface Purged {
   readonly contacts: number
   readonly companies: number
@@ -34,6 +34,10 @@ export class Purge extends Context.Service<Purge, { readonly run: Effect.Effect<
               yield* db.query((d) =>
                 d.execute(sql`delete from "activity" where record_type = ${recordType} and record_id in (${expired})`),
               )
+              // A purged contact's form submissions go too: their answers, address and consent records.
+              if (table === "contacts") {
+                yield* db.query((d) => d.execute(sql`delete from "form_submissions" where contact_id in (${expired})`))
+              }
               const removed = yield* db.query((d) =>
                 d.execute(sql`delete from ${sql.raw(`"${table}"`)} where id in (${expired}) returning id`),
               )
@@ -55,7 +59,7 @@ export class Purge extends Context.Service<Purge, { readonly run: Effect.Effect<
         // Unconfirmed after the link's 7 days: never a contact, so their answers go too (D146).
         const expired = yield* db.query((d) =>
           d.execute(sql`update "form_submissions" set status = 'expired', values = '{}'::jsonb
-            where status = 'waiting' and created_at < now() - make_interval(days => 7) returning id`),
+            where status = 'waiting' and waiting_since < now() - make_interval(days => 7) returning id`),
         )
         yield* db.query((d) => d.execute(sql`delete from "form_token_uses" where expires_at < now()`))
         return { spam: count(spam), expired: count(expired) }

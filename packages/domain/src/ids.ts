@@ -65,3 +65,6 @@ export type FormId = typeof FormId.Type
 
 export const SubmissionId = Schema.String.pipe(Schema.brand("SubmissionId"))
 export type SubmissionId = typeof SubmissionId.Type
+
+/** Whether a string is a uuid, as every Parley record id is: anything else can't be one, so needn't reach a query. */
+export const isUuid = Schema.is(Schema.String.check(Schema.isUUID()))

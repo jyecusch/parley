@@ -15,6 +15,7 @@ import {
   filterFields,
   InputRejected,
   isFreeEmailDomain,
+  isUuid,
   type Matching,
   normalizeDomain,
   type PostalAddress,
@@ -37,6 +38,7 @@ import { activityRow, toActivityEntry } from "./activity.ts"
 import { addressColumns, addressOfRow, normalizeAddress } from "./addresses.ts"
 import { Affiliations } from "./affiliations.ts"
 import { RESTORE_WINDOW_DAYS, SELECTION_CHUNK } from "./contacts.ts"
+import { decodeCursor, decodeOffset, encodeCursor, encodeOffset, MAX_OFFSET } from "./cursors.ts"
 import { CustomFields } from "./custom-fields.ts"
 import { FileStore, fileUrl } from "./file-store.ts"
 import { checkFilter, filterSql, sortSql } from "./filter-sql.ts"
@@ -90,35 +92,6 @@ const restorableSql = and(
   isNotNull(schema.companies.deletedAt),
   sql`${schema.companies.deletedAt} > now() - make_interval(days => ${RESTORE_WINDOW_DAYS})`,
 )
-
-const encodeCursor = (updatedAt: Date, id: string) => btoa(`${updatedAt.toISOString()}|${id}`)
-/** With a custom sort, pages are by position: "o:<offset>". */
-const encodeOffset = (offset: number) => btoa(`o:${offset}`)
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-
-/** Deep offsets get slower; past this many records a filter is the better tool. */
-const MAX_OFFSET = 1_000_000
-
-const decodeOffset = (cursor: string | undefined): number => {
-  if (!cursor) return 0
-  try {
-    const text = atob(cursor)
-    const offset = text.startsWith("o:") ? Number(text.slice(2)) : 0
-    return Number.isInteger(offset) && offset > 0 ? Math.min(offset, MAX_OFFSET) : 0
-  } catch {
-    return 0
-  }
-}
-const decodeCursor = (cursor: string): { readonly updatedAt: Date; readonly id: string } | undefined => {
-  try {
-    const [iso, id] = atob(cursor).split("|")
-    const updatedAt = new Date(iso ?? "")
-    // Only cursors shaped like ours: anything else would reach the query as a bad uuid.
-    return id && UUID.test(id) && !Number.isNaN(updatedAt.getTime()) ? { updatedAt, id } : undefined
-  } catch {
-    return undefined
-  }
-}
 
 interface NormalizedFields {
   readonly name?: string
@@ -540,7 +513,7 @@ export class Companies extends Context.Service<
                       and(
                         matching,
                         cursor
-                          ? sql`(${schema.companies.updatedAt}, ${schema.companies.id}) < (${cursor.updatedAt.toISOString()}::timestamptz, ${cursor.id}::uuid)`
+                          ? sql`(${schema.companies.updatedAt}, ${schema.companies.id}) < (${cursor.at.toISOString()}::timestamptz, ${cursor.id}::uuid)`
                           : undefined,
                       ),
                     )
@@ -611,7 +584,7 @@ export class Companies extends Context.Service<
           )
         }
         // Ids that aren't uuids can't be companies; leaving them out keeps them away from the query.
-        const ids = selected.ids.filter((id) => UUID.test(id))
+        const ids = selected.ids.filter((id) => isUuid(id))
         const where =
           ids.length === 0
             ? sql`false`

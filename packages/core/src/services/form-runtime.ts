@@ -34,6 +34,8 @@ export interface RenderContext {
   readonly appearance?: AppearanceOverride | undefined
   /** The visitor's address, for the proof of work's difficulty (D147). */
   readonly ip?: string | undefined
+  /** False when the page reloads the form for a fresh token after a failed try: not another view. */
+  readonly countView?: boolean | undefined
 }
 
 /** A visitor's submission, as the form page sends it. */

@@ -794,6 +794,8 @@ export const formSubmissions = pgTable(
     confirmIp: text("confirm_ip"),
     confirmUserAgent: text("confirm_user_agent"),
     confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+    /** When it started waiting to be confirmed: when it was sent, or released from the spam list. Unconfirmed 7 days on, it expires (D146). */
+    waitingSince: timestamp("waiting_since", { withTimezone: true }).defaultNow().notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [

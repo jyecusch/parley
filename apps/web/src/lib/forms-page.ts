@@ -23,7 +23,9 @@ export const embedContextOf = (search: string): EmbedContext => {
   for (const [key, value] of query) {
     if (!value) continue
     if (UTM_PARAMETER.test(key)) utm[key] = value.slice(0, 500)
-    else if (Object.hasOwn(CLICK_ID_PARAMETERS, key)) clickIds[key] = value.slice(0, 500)
+    // Only from embed.js, which passes them when the site opts in (D154). On the hosted page
+    // they'd come from the visitor's own address, with no site to have chosen it.
+    else if (Object.hasOwn(CLICK_ID_PARAMETERS, key) && isEmbedded()) clickIds[key] = value.slice(0, 500)
   }
   return { page: (query.get("page") ?? "").slice(0, 2000), appearance: query.get("appearance"), utm, clickIds }
 }
