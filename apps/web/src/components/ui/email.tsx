@@ -40,4 +40,4 @@ export function TitleInput({ className, ...props }: InputHTMLAttributes<HTMLInpu
 }
 
 /** Hides a list's secondary column when the content area is narrow, before anything scrolls sideways. */
-export const wideColumnClass = "@max-[40rem]/content:hidden"
+export const wideColumnClass = "@max-narrow/content:hidden"

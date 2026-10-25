@@ -370,7 +370,7 @@ describe("forms (D144–D150)", () => {
         // Answers that don't fit are reported, and nothing is stored.
         const invalid = yield* submit(form.id, { email: "not an email" })
         expect(invalid).toEqual({ kind: "invalid", problems: { email: "That doesn't look like an email address." } })
-        // A released one is handled as a real sign-up.
+        // A released one is handled as if just sent.
         const spam = yield* run["forms.submissions"](f.jane, { teamId: f.acme, formId: form.id, status: "spam" })
         const released = yield* run["forms.releaseSubmission"](f.jane, {
           teamId: f.acme,
@@ -425,13 +425,13 @@ describe("forms (D144–D150)", () => {
     30_000,
   )
 
-  it.effect("limits sign-ups per address", () =>
+  it.effect("limits submissions per address", () =>
     Effect.gen(function* () {
       const f = yield* Fixture
       const { form } = yield* publishedForm(f.jane, f.acme, (draft) => ({ ...draft, doubleOptIn: false }))
       const email = `many-${unique()}@example.com`
       for (let attempt = 0; attempt < 4; attempt++) yield* submit(form.id, { email })
-      expect((yield* latestSubmission(form.id))?.spamReason).toBe("Too many sign-ups from one address")
+      expect((yield* latestSubmission(form.id))?.spamReason).toBe("Too many from one address")
     }).pipe(Effect.provide(TestLive)),
   )
 
@@ -445,7 +445,7 @@ describe("forms (D144–D150)", () => {
       for (let load = 0; load < 30; load++) yield* runtime.render(form.id, { page: "", ip })
       const busy = yield* visit(form.id, ip)
       expect(busy.counter).toBeGreaterThanOrEqual(50_000)
-      // Still a working challenge: the sign-up goes through.
+      // Still a working challenge: the submission goes through.
       const outcome = yield* runtime.submit(
         form.id,
         {

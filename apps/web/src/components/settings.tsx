@@ -1,7 +1,8 @@
 import type { Permission, Team } from "@parley/domain"
 import type { UserText } from "@parley/errors"
 import { Link } from "@tanstack/react-router"
-import { type ReactNode, useEffect, useRef, useState } from "react"
+import { type ReactNode, useState } from "react"
+import { useCopy } from "../lib/copy.ts"
 import { relative } from "../lib/time.ts"
 import { useCrt } from "./crt.tsx"
 import {
@@ -199,33 +200,25 @@ export function SettingsPage(props: {
 
 /** A read-only value with its copy button inside the field (D97). */
 export function CopyField(props: { readonly value: string; readonly label: string; readonly code?: boolean }) {
-  const [copied, setCopied] = useState(false)
-  const timer = useRef<number>(undefined)
-  useEffect(() => () => window.clearTimeout(timer.current), [])
-  const copy = async () => {
-    await navigator.clipboard.writeText(props.value)
-    setCopied(true)
-    window.clearTimeout(timer.current)
-    timer.current = window.setTimeout(() => setCopied(false), 1600)
-  }
+  const { copied, copy } = useCopy()
   return (
     <div className={cn("relative flex min-w-0 rounded-md bg-fill", props.code ? "items-start" : "h-10 items-center")}>
-      <output
+      {/* code, not output: an output is a live region, and would read the whole value at every change. */}
+      <code
         className={cn(
           "min-w-0 flex-1 font-mono text-sm",
           props.code
             ? "py-2.5 pr-1 pl-3 leading-6 whitespace-pre-wrap wrap-anywhere select-text"
             : "truncate pr-1 pl-3 select-all",
         )}
-        aria-label={props.label}
       >
         {props.value}
-      </output>
+      </code>
       <IconButton
         label={copied ? `Copied ${props.label}` : `Copy ${props.label}`}
         tip={copied ? "Copied" : "Copy"}
         className={cn("mr-1", props.code && "mt-1")}
-        onClick={() => void copy()}
+        onClick={() => void copy(props.value)}
       >
         {copied ? <CheckIcon /> : <CopyIcon />}
       </IconButton>

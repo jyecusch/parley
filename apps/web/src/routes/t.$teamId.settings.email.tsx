@@ -12,6 +12,7 @@ import {
   Field,
   Fieldset,
   Hint,
+  InfoTip,
   Input,
   Notice,
   RadioCard,
@@ -561,8 +562,11 @@ function Topics(props: {
                 <Th scope="col" className="w-3/25">
                   Mode
                 </Th>
-                <Th scope="col" className="w-4/25" title="Opt-in: who joined. Opt-out: who left.">
-                  People
+                <Th scope="col" className="w-4/25">
+                  <span className="inline-flex items-center gap-1">
+                    People
+                    <InfoTip label="people">Opt-in topics: who joined. Opt-out topics: who left.</InfoTip>
+                  </span>
                 </Th>
                 <Th scope="col" className="w-44">
                   <span className="sr-only">Actions</span>

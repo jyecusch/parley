@@ -29,6 +29,7 @@ import {
   propertyValueClass,
   RecordTitle,
   Spacer,
+  Strong,
   TextButton,
 } from "./ui/index.ts"
 
@@ -84,7 +85,7 @@ const FIELD_NAMES: Readonly<Record<string, string>> = {
 /** One activity entry in words (D111): "added Sam to this company by domain matching on acme.com". */
 const describe = (entry: ActivityEntry, recordType: RecordType, nameOf: (field: string) => string): ReactNode => {
   const self = recordType === "contact" ? "this contact" : "this company"
-  const other = entry.related ? <b>{entry.related.name}</b> : "a record"
+  const other = entry.related ? <Strong>{entry.related.name}</Strong> : "a record"
   const matched =
     entry.reason === "domain-matching" ? (
       <span className="text-subtle"> by domain matching{entry.matchedDomain ? ` on ${entry.matchedDomain}` : ""}</span>
@@ -138,7 +139,7 @@ const describe = (entry: ActivityEntry, recordType: RecordType, nameOf: (field: 
     case "resubscribed": {
       // From the unsubscribe link, the contact is the actor: "Ada unsubscribed from Newsletter".
       const fromLink = entry.via === "unsubscribe link"
-      const what = entry.topicName ? <b>{entry.topicName}</b> : "all marketing email"
+      const what = entry.topicName ? <Strong>{entry.topicName}</Strong> : "all marketing email"
       if (entry.kind === "unsubscribed") {
         return fromLink ? (
           <>unsubscribed from {what}</>
@@ -172,7 +173,7 @@ const describe = (entry: ActivityEntry, recordType: RecordType, nameOf: (field: 
       // The actor is the form ("Form: Waitlist"), so the line doesn't name it again.
       return (
         <>
-          signed {self} up
+          {recordType === "contact" ? "received a submission for this contact" : "received a submission"}
           {filled.length > 0 ? <span className="text-subtle">, filling in {filled.join(", ")}</span> : null}
         </>
       )
@@ -201,7 +202,7 @@ function KeptValues(props: { readonly kept: ActivityEntry["kept"]; readonly hand
         <li key={entry.field} className="flex flex-wrap items-center gap-x-2 text-muted">
           <span>
             Submitted {entry.label.toLowerCase()}:{" "}
-            <b>{handling ? handling.text(entry) : typeof entry.value === "string" ? entry.value : ""}</b>
+            <Strong>{handling ? handling.text(entry) : typeof entry.value === "string" ? entry.value : ""}</Strong>
           </span>
           {handling?.isApplied(entry) ? (
             <span className="text-subtle">Applied</span>
@@ -249,8 +250,8 @@ export function TimelineRow(props: {
     >
       <Avatar badge={props.via ? <AgentIcon /> : undefined}>{initialsOfName(props.actorName)}</Avatar>
       <div className="min-w-0 flex-1">
-        <div className="text-pretty text-muted [&_b]:font-medium [&_b]:text-fg">
-          <b>{props.actorName}</b>
+        <div className="text-pretty text-muted">
+          <Strong>{props.actorName}</Strong>
           {props.via ? <span className="text-subtle"> via {props.via}</span> : null} {props.children}
         </div>
         {props.body}
@@ -277,7 +278,11 @@ export function ActivityRow(props: {
   const tracked =
     entry.tracking && (came || entry.tracking.page) ? (
       <p className="m-0 mt-1 text-sm text-subtle">
-        {[entry.tracking.page ? `On ${entry.tracking.page}` : null, came?.main, ...(came?.more ?? [])]
+        {[
+          entry.tracking.page ? `On ${entry.tracking.page}` : null,
+          came ? `Came from ${came.main}` : null,
+          ...(came?.more ?? []),
+        ]
           .filter(Boolean)
           .join(" · ")}
       </p>

@@ -164,6 +164,13 @@
   --inset-shadow-marker-subtle: inset 0.125rem 0 0 var(--color-subtle);
   /* Inside a rounded box with a 1px edge, such as a settings table's last row. */
   --radius-inner: calc(var(--radius-lg) - 1px);
+  /* An image filling a rounded box takes the box's corners. */
+  --radius-inherit: inherit;
+  /* Widths the content area's container queries break at: a record panel overlays the list below 69rem; wide columns hide below 40rem. */
+  --container-panel: 69rem;
+  --container-narrow: 40rem;
+  /* Side padding that centers a 54rem column, never less than 1rem: the scroll area stays full width. */
+  --spacing-readable: max(1rem, calc((100% - 54rem) / 2));
 
   --animate-breathe: breathe 1.6s ease-in-out infinite;
 }

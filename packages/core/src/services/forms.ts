@@ -149,7 +149,7 @@ export class Forms extends Context.Service<
         Effect.gen(function* () {
           const result = new Map<
             string,
-            { views: number; submitted: number; confirmed: number; waiting: number; spam: number }
+            { views: number; submitted: number; confirmed: number; waiting: number; expired: number; spam: number }
           >()
           if (formIds.length === 0) return result
           const [views, statuses] = yield* Effect.all(
@@ -182,7 +182,8 @@ export class Forms extends Context.Service<
             ],
             { concurrency: 2 },
           )
-          for (const id of formIds) result.set(id, { views: 0, submitted: 0, confirmed: 0, waiting: 0, spam: 0 })
+          for (const id of formIds)
+            result.set(id, { views: 0, submitted: 0, confirmed: 0, waiting: 0, expired: 0, spam: 0 })
           for (const row of views) {
             const entry = result.get(row.formId)
             if (entry) entry.views = Number(row.views)
@@ -195,6 +196,7 @@ export class Forms extends Context.Service<
             if (row.status !== "spam") entry.submitted += count
             if (row.status === "confirmed") entry.confirmed += count
             if (row.status === "waiting") entry.waiting += count
+            if (row.status === "expired") entry.expired += count
             if (row.status === "spam") entry.spam += count
           }
           return result
@@ -237,7 +239,10 @@ export class Forms extends Context.Service<
           )
           const counts = yield* countsOf(rows.map((row) => row.id))
           return rows.map((row) =>
-            toForm(row, counts.get(row.id) ?? { views: 0, submitted: 0, confirmed: 0, waiting: 0, spam: 0 }),
+            toForm(
+              row,
+              counts.get(row.id) ?? { views: 0, submitted: 0, confirmed: 0, waiting: 0, expired: 0, spam: 0 },
+            ),
           )
         })
 
@@ -389,7 +394,7 @@ export class Forms extends Context.Service<
                   problem(
                     "draft.segmentId",
                     "not-allowed",
-                    userText`Sign-ups can join a fixed segment only. A dynamic segment follows its filter.`,
+                    userText`A form can add contacts to a fixed segment only. A dynamic segment follows its filter.`,
                   ),
                 ],
               })
@@ -498,7 +503,7 @@ export class Forms extends Context.Service<
         analytics: (target) =>
           Effect.gen(function* () {
             const formId = target.form.value
-            /** Confirmed sign-ups by one UTM parameter's value. */
+            /** Confirmed submissions by one UTM parameter's value. */
             const byUtm = (parameter: string) =>
               run(
                 db.query((d) =>
@@ -624,7 +629,7 @@ export class Forms extends Context.Service<
                   .returning({ id: schema.formSubmissions.id }),
               ),
             )
-            // Handled as a new sign-up: the confirmation email, or straight in (D147).
+            // Handled as if just sent: the confirmation email, or straight in (D147).
             if (released.length > 0) yield* processor.accept(id)
             const [row] = yield* run(
               db.query((d) => d.select().from(schema.formSubmissions).where(eq(schema.formSubmissions.id, id))),

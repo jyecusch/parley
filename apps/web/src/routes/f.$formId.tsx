@@ -43,6 +43,7 @@ function FormPage() {
   const turnstileBox = useRef<HTMLDivElement>(null)
   const frame = useRef<HTMLDivElement>(null)
   const context = useRef(typeof window === "undefined" ? undefined : embedContextOf(window.location.search))
+  const embedded = isEmbedded()
 
   // This page runs on Parley's domain, so the app's own appearance settings would apply; they mustn't.
   useEffect(() => {
@@ -142,7 +143,7 @@ function FormPage() {
         setErrors(
           outcome.kind === "invalid"
             ? outcome.problems
-            : { form: "This form isn't taking sign-ups right now. Try again later." },
+            : { form: "This form isn't taking submissions right now. Try again later." },
         )
         // A render token is good for one submission; get a fresh one for the next try.
         await load(true)
@@ -154,7 +155,8 @@ function FormPage() {
   }
 
   return (
-    <div className="FormPage" ref={frame} lang="en">
+    // On its own (the hosted page) the form is the page: its main landmark, its title the h1.
+    <div className="FormPage" ref={frame} lang="en" role={embedded ? undefined : "main"}>
       <style>{PAGE_CSS}</style>
       {loaded.kind === "loading" ? <div role="status" aria-label="Loading" className="min-h-30" /> : null}
       {loaded.kind === "missing" ? <Notice>This form isn't available.</Notice> : null}
@@ -174,6 +176,7 @@ function FormPage() {
           busy={busy}
           errors={errors}
           idPrefix={`f-${formId.slice(0, 8)}`}
+          titleLevel={embedded ? 2 : 1}
           beforeButton={turnstile ? <div ref={turnstileBox} /> : null}
         />
       ) : null}
@@ -181,9 +184,10 @@ function FormPage() {
   )
 }
 
+/** On its own light card, so it reads on any site's page behind the frame, dark or light. */
 function Notice(props: { readonly children: string }) {
   return (
-    <p className="m-0 p-4 font-sans text-neutral-600" role="status">
+    <p className="m-0 rounded-lg bg-white p-4 font-sans text-neutral-700" role="status">
       {props.children}
     </p>
   )

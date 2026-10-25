@@ -23,7 +23,7 @@ export const useForms = (teamId: TeamId) =>
 export const useTopics = (teamId: TeamId) =>
   useQuery({ queryKey: ["topics", teamId], queryFn: () => call("topics.list", { teamId }) })
 
-/** Sign-ups ÷ views, as a percentage with one decimal, or "—" before any view. */
+/** Confirmed submissions ÷ views, as a percentage with one decimal, or "—" before any view. */
 export const conversionOf = (form: Pick<Form, "counts">) =>
   form.counts.views > 0 ? `${((form.counts.confirmed / form.counts.views) * 100).toFixed(1)}%` : "—"
 
@@ -53,19 +53,18 @@ export const whatHappened = (submission: Submission) => {
     case "confirmed":
       return submission.outcome === "created" ? "Confirmed · new contact" : "Confirmed · existing contact"
     case "waiting":
-      return "Waiting for them to confirm"
+      return "Waiting"
     case "expired":
-      return "Never confirmed · link expired"
+      return "Expired · never confirmed"
     case "spam":
       return submission.spamReason ? `Spam · ${submission.spamReason}` : "Spam"
   }
 }
 
-/** Where the app is served from, for embed snippets and hosted links. */
 const MAIN_UTM = ["utm_source", "utm_medium", "utm_campaign"] as const
 
 /**
- * Where a sign-up came from (D153), for a person: source / medium / campaign, then the other UTM
+ * Where a submission came from (D153), for a person: source / medium / campaign, then the other UTM
  * parameters and any ad click, or undefined when nothing was recorded.
  */
 export const cameFrom = (
@@ -86,11 +85,12 @@ export const cameFrom = (
   return { main: main || "No source given", more }
 }
 
+/** Where the app is served from, for embed snippets and hosted page links. */
 export const appOrigin = () => (typeof window === "undefined" ? "" : window.location.origin)
 
 export const TEMPLATES = [
   { id: "newsletter", label: "Newsletter", description: "Email and first name, with a consent box." },
   { id: "waitlist", label: "Waitlist", description: "For a launch: email, and what they'd use it for." },
-  { id: "event", label: "Event sign-up", description: "Name, email and company for a webinar or meetup." },
+  { id: "event", label: "Event", description: "Name, email and company for a webinar or meetup." },
   { id: "blank", label: "Blank", description: "Just an email field. Add the rest yourself." },
 ] as const

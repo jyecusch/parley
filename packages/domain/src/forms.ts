@@ -3,7 +3,7 @@ import type { CustomField } from "./custom-field.ts"
 import { CustomFieldId, FormId, SegmentId, SubmissionId, TopicId } from "./ids.ts"
 
 /*
- * Forms (D144–D150): sign-up forms a team designs in Parley and embeds on its websites.
+ * Forms (D144–D150): forms a team designs in Parley and embeds on its websites.
  * See docs/06-forms.md.
  */
 
@@ -121,7 +121,7 @@ export const FormAppearance = Schema.Struct({
   radius: Schema.Number.check(Schema.isBetween({ minimum: 0, maximum: 24 })),
   /** Space between fields in px, 8–32. */
   spacing: Schema.Number.check(Schema.isBetween({ minimum: 8, maximum: 32 })),
-  labels: Schema.Literals(["above", "floating", "hidden"]),
+  labels: Schema.Literals(["above", "hidden"]),
   /** Selector (".Button", ".Input:focus", ".Input--invalid"…) to CSS properties. */
   rules: Schema.Record(Schema.String, Schema.Record(Schema.String, Schema.String.check(Schema.isMaxLength(200)))),
   /**
@@ -174,9 +174,9 @@ export const FormContent = Schema.Struct({
   afterSubmit: AfterSubmit,
   /** On by default (D146): nothing touches contacts until the confirmation link is clicked. */
   doubleOptIn: Schema.Boolean,
-  /** A fixed segment every confirmed sign-up joins, or null. */
+  /** A fixed segment every confirmed submission's contact joins, or null. */
   segmentId: Schema.NullOr(SegmentId),
-  /** Values set on every sign-up, keyed like import targets ("custom:<field id>", "title"). */
+  /** Values set on every submission, keyed like import targets ("custom:<field id>", "title"). */
   set: Schema.Record(Schema.String, Schema.String.check(Schema.isMaxLength(500))),
   /** Record the page the form is on and its tracking parameters with each submission (D153). */
   captureTracking: Schema.Boolean,
@@ -186,12 +186,14 @@ export type FormContent = typeof FormContent.Type
 
 export const FormName = Schema.String.check(Schema.isTrimmed(), Schema.isMinLength(1), Schema.isMaxLength(120))
 
-/** Counts over a form's life (D144 analytics). Sign-ups are confirmed submissions. */
+/** Counts over a form's life (D144 analytics). */
 export const FormCounts = Schema.Struct({
   views: Schema.Number,
   submitted: Schema.Number,
   confirmed: Schema.Number,
   waiting: Schema.Number,
+  /** Never confirmed within the link's 7 days (D146). */
+  expired: Schema.Number,
   spam: Schema.Number,
 })
 export type FormCounts = typeof FormCounts.Type
@@ -271,11 +273,11 @@ export type FormSettings = typeof FormSettings.Type
 
 const UtmCount = Schema.Struct({ value: Schema.String, confirmed: Schema.Number })
 
-/** Where a form's sign-ups come from (D144 analytics), over its life. */
+/** Where a form's submissions come from (D144 analytics), over its life. */
 export const FormAnalytics = Schema.Struct({
   /** By page: host and path, or "" for the hosted page. */
   pages: Schema.Array(Schema.Struct({ page: Schema.String, views: Schema.Number, confirmed: Schema.Number })),
-  /** Confirmed sign-ups by utm_source, utm_medium and utm_campaign; "" for none. */
+  /** Confirmed submissions by utm_source, utm_medium and utm_campaign; "" for none. */
   sources: Schema.Array(UtmCount),
   mediums: Schema.Array(UtmCount),
   campaigns: Schema.Array(UtmCount),
@@ -300,7 +302,7 @@ export const CLICK_ID_PARAMETERS: Readonly<Record<string, string>> = {
 /** A UTM parameter's name: utm_ then lowercase letters and underscores, as GA4's utm_source_platform. */
 export const UTM_PARAMETER = /^utm_[a-z][a-z_]{0,39}$/
 
-/** Where a sign-up came from (D153): the page and its tracking parameters, as a submission recorded them. */
+/** Where a submission came from (D153): the page and its tracking parameters, as a submission recorded them. */
 export const Tracking = Schema.Struct({
   page: Schema.NullOr(Schema.String),
   utm: Schema.Record(Schema.String, Schema.String),

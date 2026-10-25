@@ -4,6 +4,7 @@ import { createFileRoute, getRouteApi, Link, useNavigate } from "@tanstack/react
 import { useState } from "react"
 import { FormIcon } from "../components/icons.tsx"
 import { LoadFailed } from "../components/record.tsx"
+import { LoadingRows } from "../components/settings.tsx"
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage } from "../components/ui/breadcrumb.tsx"
 import { ItemTile, NameText, nameLinkClass, wideColumnClass } from "../components/ui/email.tsx"
 import {
@@ -17,7 +18,7 @@ import {
   ErrorText,
   Field,
   Fieldset,
-  Hint,
+  InfoTip,
   Input,
   PageHeader,
   RadioCard,
@@ -55,7 +56,7 @@ export const Route = createFileRoute("/t/$teamId/forms/")({
 
 const teamRoute = getRouteApi("/t/$teamId")
 
-/** The forms index view (D144): each form with its counts. Sign-ups are confirmed submissions. */
+/** The forms index view (D144): each form with its counts. */
 function FormsScreen() {
   const { team } = teamRoute.useLoaderData()
   const teamId = team.id as TeamId
@@ -89,13 +90,15 @@ function FormsScreen() {
         {items.length > 0 ? newButton : null}
       </PageHeader>
       <ViewBody>
-        {forms.isPending ? null : forms.isError ? (
+        {forms.isPending ? (
+          <LoadingRows />
+        ) : forms.isError ? (
           <LoadFailed title="Forms didn't load" message={messageOf(forms.error)} onRetry={() => void forms.refetch()} />
         ) : items.length === 0 ? (
           <Centered>
             <EmptyState icon={<FormIcon />} title="No forms yet" actions={newButton}>
-              A form signs people up from your own websites: a newsletter, a waitlist, an event. Each sign-up becomes a
-              contact once they confirm their email.
+              A form on your own websites: a newsletter, a waitlist, an event. Each submission becomes a contact once
+              they confirm their email.
             </EmptyState>
           </Centered>
         ) : (
@@ -113,11 +116,14 @@ function FormsScreen() {
                   <Th className="w-24 text-right" scope="col">
                     Views
                   </Th>
-                  <Th className="w-24 text-right" scope="col" title="Confirmed submissions">
-                    Sign-ups
+                  <Th className="w-28 text-right" scope="col">
+                    Confirmed
                   </Th>
-                  <Th className={`w-28 text-right ${wideColumnClass}`} scope="col" title="Sign-ups ÷ views">
-                    Conversion
+                  <Th className={`w-32 text-right ${wideColumnClass}`} scope="col">
+                    <span className="inline-flex items-center gap-1">
+                      Conversion
+                      <InfoTip label="conversion">Confirmed submissions ÷ views.</InfoTip>
+                    </span>
                   </Th>
                   <Th className={`w-44 ${wideColumnClass}`} scope="col">
                     Topics
@@ -168,9 +174,6 @@ function FormsScreen() {
             </Table>
           </TableScroll>
         )}
-        {items.length > 0 ? (
-          <Hint className="px-4 py-3">Sign-ups count confirmed submissions. Conversion is sign-ups ÷ views.</Hint>
-        ) : null}
       </ViewBody>
       {creating ? <NewFormDialog teamId={teamId} onClose={() => setCreating(false)} /> : null}
     </Card>
@@ -192,7 +195,7 @@ function NewFormDialog(props: { readonly teamId: TeamId; readonly onClose: () =>
     try {
       const form = await call("forms.create", {
         teamId: props.teamId,
-        name: name.trim() || (template === "blank" ? "Untitled form" : `${placeholder} sign-up`),
+        name: name.trim() || (template === "blank" ? "Untitled form" : `${placeholder}`),
         template,
       })
       await queryClient.invalidateQueries({ queryKey: formsKey(props.teamId) })
@@ -224,11 +227,11 @@ function NewFormDialog(props: { readonly teamId: TeamId; readonly onClose: () =>
           ))}
         </RadioCards>
       </Fieldset>
-      <Field label="Name" htmlFor="form-name" hint="For your team. Visitors don't see it.">
+      <Field label="Name" htmlFor="form-name" info="For your team. Visitors don't see it.">
         <Input
           id="form-name"
           maxLength={120}
-          placeholder={template === "blank" ? "Untitled form" : `${placeholder} sign-up`}
+          placeholder={template === "blank" ? "Untitled form" : `${placeholder}`}
           value={name}
           onChange={(event) => setName(event.target.value)}
           onKeyDown={(event) => {

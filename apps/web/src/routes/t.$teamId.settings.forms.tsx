@@ -3,11 +3,11 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { createFileRoute, getRouteApi } from "@tanstack/react-router"
 import { useEffect, useState } from "react"
 import { CheckIcon, InfoIcon } from "../components/icons.tsx"
-import { SettingsPage, useToast } from "../components/settings.tsx"
+import { LoadFailed } from "../components/record.tsx"
+import { LoadingRows, SettingsPage, useToast } from "../components/settings.tsx"
 import {
   Button,
   Checkbox,
-  ErrorText,
   Field,
   Fieldset,
   Hint,
@@ -56,7 +56,14 @@ function FormSettingsScreen() {
   return (
     <SettingsPage title="Forms" intro="Bot protection and consent for every form. Visitors never see a puzzle.">
       {canManage ? null : <Notice icon={<InfoIcon />}>Only owners and admins can change these.</Notice>}
-      {settings.isError ? <ErrorText>{messageOf(settings.error)}</ErrorText> : null}
+      {settings.isPending ? <LoadingRows /> : null}
+      {settings.isError ? (
+        <LoadFailed
+          title="Form settings didn't load"
+          message={messageOf(settings.error)}
+          onRetry={() => void settings.refetch()}
+        />
+      ) : null}
       {settings.data ? (
         <FormSettingsPanels settings={settings.data} canManage={canManage} save={save} onError={showToast} />
       ) : null}
@@ -210,7 +217,6 @@ function FormSettingsPanels(props: {
               ) : null}
             </div>
           ) : null}
-          <Hint>hCaptcha, reCAPTCHA and Friendly Captcha are planned.</Hint>
         </Fieldset>
       </SettingsPanel>
       <SettingsPanel>
@@ -234,7 +240,11 @@ function FormSettingsPanels(props: {
         </Fieldset>
       </SettingsPanel>
       <SettingsPanel>
-        <Field label="Privacy policy" htmlFor="privacy-url" hint="Linked under every form's consent text.">
+        <Field
+          label="Privacy policy"
+          htmlFor="privacy-url"
+          info="Linked on every form, after the fine print under its button."
+        >
           <div className="flex gap-1.5">
             <Input
               id="privacy-url"

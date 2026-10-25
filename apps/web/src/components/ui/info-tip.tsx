@@ -4,8 +4,8 @@ import { cn } from "./cn.ts"
 import { Popover, PopoverContent, PopoverTrigger } from "./popover.tsx"
 
 /**
- * An info tip: a small (i) button beside a label whose explanation opens on hover, focus or click,
- * so a setting's details are a glance away without crowding the screen. Built on the popover, not
+ * An info tip: a small (i) button beside a label whose explanation opens on hover or click (Enter
+ * or Space from the keyboard), so a setting's details are a glance away without crowding the screen. Built on the popover, not
  * the tooltip, because it holds a few lines and must open by click on touch screens.
  */
 export function InfoTip(props: { readonly label: string; readonly children: ReactNode; readonly className?: string }) {

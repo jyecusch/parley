@@ -494,10 +494,10 @@ function SendDialog(props: {
         </>
       }
     >
-      <dl className="m-0 flex flex-col gap-2 [&_dd]:m-0 [&_dd]:min-w-0 [&_dt]:w-24 [&_dt]:shrink-0 [&_dt]:text-subtle [&>div]:flex [&>div]:gap-3">
-        <div>
-          <dt>To</dt>
-          <dd>
+      <dl className="m-0 flex flex-col gap-2">
+        <div className="flex gap-3">
+          <dt className="w-24 shrink-0 text-subtle">To</dt>
+          <dd className="m-0 min-w-0">
             {segment.data ? (
               <>
                 {segment.data.name}: {count} of {segment.data.contactCount} contacts are subscribed and have an email.
@@ -508,20 +508,20 @@ function SendDialog(props: {
           </dd>
         </div>
         {props.broadcast.topicName ? (
-          <div>
-            <dt>Topic</dt>
-            <dd>{props.broadcast.topicName}. Anyone who left it is skipped.</dd>
+          <div className="flex gap-3">
+            <dt className="w-24 shrink-0 text-subtle">Topic</dt>
+            <dd className="m-0 min-w-0">{props.broadcast.topicName}. Anyone who left it is skipped.</dd>
           </div>
         ) : null}
-        <div>
-          <dt>From</dt>
-          <dd>
+        <div className="flex gap-3">
+          <dt className="w-24 shrink-0 text-subtle">From</dt>
+          <dd className="m-0 min-w-0">
             {settings.data?.senderName ?? "—"} &lt;{settings.data?.senderAddress ?? "—"}&gt;
           </dd>
         </div>
-        <div>
-          <dt>Subject</dt>
-          <dd>{props.broadcast.subject || "—"}</dd>
+        <div className="flex gap-3">
+          <dt className="w-24 shrink-0 text-subtle">Subject</dt>
+          <dd className="m-0 min-w-0">{props.broadcast.subject || "—"}</dd>
         </div>
       </dl>
       {missing.length > 0 ? (
