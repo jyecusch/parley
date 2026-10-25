@@ -37,14 +37,15 @@ import {
 } from "@parley/domain"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
-import { Fragment, type ReactNode, useEffect, useMemo, useState } from "react"
+import { Fragment, type ReactNode, useEffect, useId, useMemo, useState } from "react"
 import { call, messageOf } from "../lib/client.ts"
+import { useCopy } from "../lib/copy.ts"
 import { useFields } from "../lib/custom-fields.ts"
 import { appOrigin, formKey, formsKey, useTopics } from "../lib/forms.ts"
 import { SaveState, useAutosave } from "./composer.tsx"
 import { type FormValues, FormView, fieldKey } from "./form-view.tsx"
-import { CheckIcon, ChevronDown, CloseIcon, CopyIcon, GripIcon, PlusIcon } from "./icons.tsx"
-import { problemFor, problemsOf } from "./record.tsx"
+import { CheckIcon, ChevronDown, ChevronUp, CloseIcon, CopyIcon, GripIcon, PlusIcon } from "./icons.tsx"
+import { LoadFailed, problemFor, problemsOf } from "./record.tsx"
 import { CopyField } from "./settings.tsx"
 import {
   Breadcrumb,
@@ -67,6 +68,7 @@ import { TitleInput } from "./ui/email.tsx"
 import {
   Badge,
   Button,
+  buttonClass,
   Card,
   Checkbox,
   cn,
@@ -84,6 +86,7 @@ import {
   RadioCards,
   SegmentedControl,
   Select,
+  Skeleton,
   Slider,
   SmallInput,
   Spacer,
@@ -111,7 +114,7 @@ export const CONTACT_FIELD_LABELS: Readonly<Record<FormContactField, string>> = 
   country: "Country",
 }
 
-/** Contact fields "Set on every sign-up" can fill, as import targets name them. */
+/** Contact fields "Set on every submission" can fill, as import targets name them. */
 const SET_TARGETS: ReadonlyArray<{ readonly key: (typeof FORM_SET_FIELDS)[number]; readonly label: string }> = [
   { key: "company", label: "Company" },
   { key: "title", label: "Job title" },
@@ -131,12 +134,22 @@ const stateOf = (form: Form): DraftState => ({ name: form.name, content: form.dr
 export const DESIGNER_TABS = ["fields", "submit", "topics", "style", "embed"] as const
 export type DesignerTab = (typeof DESIGNER_TABS)[number]
 
+/** How long embed.js remembers UTM parameters, if at all (D154). */
+export const REMEMBER_OPTIONS = ["off", "visit", "30", "90"] as const
+/** The Embed tab's tracking options, which shape the snippet. */
+export interface EmbedTracking {
+  readonly remember: (typeof REMEMBER_OPTIONS)[number]
+  readonly clickIds: boolean
+}
+
 export function FormDesigner(props: {
   readonly teamId: TeamId
   readonly form: Form
   readonly canWrite: boolean
   readonly tab: DesignerTab
   readonly onTab: (tab: DesignerTab) => void
+  readonly tracking: EmbedTracking
+  readonly onTracking: (tracking: EmbedTracking) => void
 }) {
   const { teamId } = props
   const queryClient = useQueryClient()
@@ -203,9 +216,12 @@ export function FormDesigner(props: {
     setPublishing(false)
   }
 
+  /** Bumped by Discard changes, so panels holding text of their own (the rules) start again. */
+  const [discarded, setDiscarded] = useState(0)
   const discard = () => {
     const published = saved.published
     if (published) setDraft((current) => ({ ...current, content: published }))
+    setDiscarded((count) => count + 1)
   }
 
   const live = saved.published !== null
@@ -245,7 +261,7 @@ export function FormDesigner(props: {
         {props.canWrite ? <SaveState state={state} /> : null}
         <Spacer />
         <Link
-          className="inline-flex h-8 items-center rounded-md px-2.5 text-muted no-underline hover:bg-hover hover:text-fg"
+          className={cn(buttonClass({ variant: "ghost" }), "no-underline")}
           to="/t/$teamId/forms/$formId/submissions"
           params={{ teamId, formId: saved.id }}
         >
@@ -296,10 +312,11 @@ export function FormDesigner(props: {
                 <AfterSubmitPanel content={content} problems={fieldProblems} onChange={setContent} />
               </TabsContent>
               <TabsContent value="topics" className="p-4">
-                <TopicsPanel teamId={teamId} content={content} topics={topics.data ?? []} onChange={setContent} />
+                <TopicsPanel teamId={teamId} content={content} topics={topics} onChange={setContent} />
               </TabsContent>
               <TabsContent value="style" className="p-4">
                 <StylePanel
+                  key={discarded}
                   appearance={content.appearance}
                   problems={problems}
                   onChange={setContent}
@@ -314,6 +331,8 @@ export function FormDesigner(props: {
                   appearance={content.appearance}
                   allowedSites={draft.allowedSites}
                   onSites={(allowedSites) => setDraft((current) => ({ ...current, allowedSites }))}
+                  tracking={props.tracking}
+                  onTracking={props.onTracking}
                 />
               </TabsContent>
             </fieldset>
@@ -348,11 +367,8 @@ function Preview(props: {
       <div className="absolute top-8 flex items-center gap-2 rounded-lg bg-surface shadow-card">
         <SegmentedControl
           name="preview-page"
-          label="Preview on"
-          options={[
-            { value: "dark", label: "Dark page" },
-            { value: "light", label: "Light page" },
-          ]}
+          label="Preview page"
+          options={PAGE_OPTIONS}
           value={page}
           onChange={setPage}
         />
@@ -453,9 +469,9 @@ function FieldsPanel(props: {
             />
           </Field>
           <Field
-            label="Under the button"
+            label="Fine print"
             htmlFor="form-fine-print"
-            info="Small print under the button. Your privacy policy link follows it, if the team has one (Settings → Forms)."
+            info="The line under the button. Your privacy policy link follows it, if the team has one (Settings → Forms)."
           >
             <Input
               id="form-fine-print"
@@ -541,13 +557,13 @@ function FieldsPanel(props: {
         </div>
       </Fieldset>
 
-      <SetOnEverySignUp content={content} customFields={props.customFields} onChange={onChange} />
+      <SetOnEverySubmission content={content} customFields={props.customFields} onChange={onChange} />
     </div>
   )
 }
 
-/** Fixed values every sign-up gets (D144), such as Source = Launch page. */
-function SetOnEverySignUp(props: {
+/** Fixed values every submission gets (D144), such as Source = Launch page. */
+function SetOnEverySubmission(props: {
   readonly content: FormContent
   readonly customFields: ReadonlyArray<CustomField>
   readonly onChange: ContentChange
@@ -562,9 +578,9 @@ function SetOnEverySignUp(props: {
   const free = targets.filter((target) => !(target.key in props.content.set))
   return (
     <Fieldset
-      legend="Set on every sign-up"
+      legend="Set on every submission"
       section
-      info="Values every sign-up gets, such as Source = Website footer. A sign-up's own answer wins."
+      info="Values every submission's contact gets, such as Source = Website footer. The visitor's own answer wins."
     >
       {entries.map(([key, value], index) => (
         <div key={key} className="flex items-center gap-2">
@@ -598,7 +614,7 @@ function SetOnEverySignUp(props: {
       {free.length > 0 ? (
         <TextButton className="self-start" onClick={() => write([...entries, [free[0]?.key ?? "", ""] as const])}>
           <PlusIcon className="size-3.5" />
-          Add a value
+          Add value
         </TextButton>
       ) : null}
     </Fieldset>
@@ -703,7 +719,7 @@ function AfterSubmitPanel(props: {
         </RadioCards>
         {after.kind === "message" ? (
           <>
-            <Field label="Heading" htmlFor="after-title">
+            <Field label="Title" htmlFor="after-title">
               <Input
                 id="after-title"
                 maxLength={120}
@@ -765,7 +781,9 @@ function AfterSubmitPanel(props: {
           </InfoTip>
         </div>
         {content.doubleOptIn ? null : (
-          <Notice tone="warn">Sign-ups become contacts straight away. In the EU you may need proof they asked.</Notice>
+          <Notice tone="warn">
+            Submissions become contacts straight away. In the EU you may need proof they asked.
+          </Notice>
         )}
       </Fieldset>
     </div>
@@ -773,8 +791,8 @@ function AfterSubmitPanel(props: {
 }
 
 /**
- * The fields as cards to reorder (dnd-kit): drag a card by its grip, or focus the grip and use
- * Space and the arrow keys. The dragged card follows the pointer, tilted, while a faded copy holds
+ * The fields as cards to reorder (dnd-kit): drag a card by its grip, focus the grip and use Space
+ * and the arrow keys, or use its Move up and Move down buttons (no dragging needed). The dragged card follows the pointer, tilted, while a faded copy holds
  * its place. Email stays first: the form always asks it first (D144).
  */
 function SortableFields(props: {
@@ -800,6 +818,10 @@ function SortableFields(props: {
       field={field}
       customFields={props.customFields}
       handle={handle}
+      // Email stays first, so the others move among positions 1 and on.
+      move={
+        index === 0 ? undefined : { index: index - 1, count: rest.length, onMove: (to) => props.onMove(index, to + 1) }
+      }
       onUpdate={(change) => props.onUpdate(index, change)}
       onRemove={() => props.onRemove(index)}
     />
@@ -867,16 +889,16 @@ function SortableField(props: {
       className={cn(sortable.isDragging && "opacity-35")}
     >
       {props.children(
-        <button
-          type="button"
+        <IconButton
+          size="xs"
           ref={sortable.setActivatorNodeRef}
-          className="grid size-6 cursor-grab touch-none place-items-center rounded-sm text-subtle hover:bg-hover hover:text-fg active:cursor-grabbing"
-          aria-label={`Move ${props.label}`}
+          className="cursor-grab touch-none active:cursor-grabbing"
+          label={`Drag ${props.label}`}
           {...sortable.attributes}
           {...sortable.listeners}
         >
           <GripIcon className="size-4" />
-        </button>,
+        </IconButton>,
       )}
     </li>
   )
@@ -888,6 +910,8 @@ function FieldCard(props: {
   readonly customFields: ReadonlyArray<CustomField>
   /** The grip, for fields that can move; Email has none. */
   readonly handle?: ReactNode
+  /** Its place among the fields that move, for Move up and Move down; Email has none. */
+  readonly move?: { readonly index: number; readonly count: number; readonly onMove: (to: number) => void } | undefined
   readonly onUpdate: (change: Partial<FormField>) => void
   readonly onRemove: () => void
 }) {
@@ -902,11 +926,19 @@ function FieldCard(props: {
         <span className={cn("min-w-0 truncate text-sm text-muted", !props.handle && "pl-1")}>{kindLabel}</span>
         {isEmail ? (
           <InfoTip label="why email is always asked">
-            Every sign-up needs an email address: it's how Parley finds or creates the contact, and how it confirms the
-            sign-up. So it's always asked first, and required.
+            Every submission needs an email address: it's how Parley finds or creates the contact, and how it confirms
+            the submission. So it's always asked first, and required.
           </InfoTip>
         ) : null}
         <span className="flex-1" />
+        {props.move ? (
+          <MoveButtons
+            label={field.label}
+            index={props.move.index}
+            count={props.move.count}
+            onMove={props.move.onMove}
+          />
+        ) : null}
         {isEmail ? null : (
           <IconButton size="xs" label={`Remove ${field.label}`} onClick={props.onRemove}>
             <CloseIcon className="size-4" />
@@ -941,6 +973,35 @@ function FieldCard(props: {
   )
 }
 
+/** Move up and Move down for a card in a list, the way custom fields reorder in Settings. */
+function MoveButtons(props: {
+  readonly label: string
+  readonly index: number
+  readonly count: number
+  readonly onMove: (to: number) => void
+}) {
+  return (
+    <>
+      <IconButton
+        size="xs"
+        label={`Move ${props.label} up`}
+        disabled={props.index === 0}
+        onClick={() => props.onMove(props.index - 1)}
+      >
+        <ChevronUp className="size-4" />
+      </IconButton>
+      <IconButton
+        size="xs"
+        label={`Move ${props.label} down`}
+        disabled={props.index === props.count - 1}
+        onClick={() => props.onMove(props.index + 1)}
+      >
+        <ChevronDown className="size-4" />
+      </IconButton>
+    </>
+  )
+}
+
 /** Template copy that only fits one way of signing up: with a confirmation email, and without. */
 const CONFIRM_COPY = {
   on: {
@@ -972,20 +1033,60 @@ const withConfirmCopy = (content: FormContent): FormContent => {
 function TopicsPanel(props: {
   readonly teamId: TeamId
   readonly content: FormContent
+  readonly topics: ReturnType<typeof useTopics>
+  readonly onChange: ContentChange
+}) {
+  const { teamId } = props
+  const segments = useQuery({ queryKey: ["segments", teamId], queryFn: () => call("segments.list", { teamId }) })
+  // Until topics and segments are in, a box's topic or the chosen segment would read as missing.
+  if (props.topics.isPending || segments.isPending) {
+    return (
+      <div role="status" aria-label="Loading" className="flex flex-col gap-3">
+        <Skeleton className="w-2/5" />
+        <Skeleton className="h-20 w-full" />
+        <Skeleton className="w-3/5" />
+      </div>
+    )
+  }
+  if (props.topics.isError || segments.isError) {
+    return (
+      <LoadFailed
+        title="Topics didn't load"
+        message={messageOf(props.topics.error ?? segments.error)}
+        onRetry={() => {
+          void props.topics.refetch()
+          void segments.refetch()
+        }}
+      />
+    )
+  }
+  return <TopicsEditor {...props} topics={props.topics.data} segments={segments.data} />
+}
+
+function TopicsEditor(props: {
+  readonly teamId: TeamId
+  readonly content: FormContent
   readonly topics: ReadonlyArray<Topic>
+  readonly segments: ReadonlyArray<Segment>
   readonly onChange: ContentChange
 }) {
   const { content, onChange, teamId } = props
   const queryClient = useQueryClient()
   const consents = consentFields(content)
-  const segments = useQuery({ queryKey: ["segments", teamId], queryFn: () => call("segments.list", { teamId }) })
-  const fixed = (segments.data ?? []).filter((segment: Segment) => segment.kind === "fixed")
+  const fixed = props.segments.filter((segment) => segment.kind === "fixed")
   const [newTopic, setNewTopic] = useState("")
   const [error, setError] = useState<string>()
   const setConsents = (next: ReadonlyArray<FormField>) =>
     onChange((current) => ({ ...current, fields: [...inputFields(current), ...next] }))
   const used = new Set(consents.map((field) => (field.kind === "consent" ? (field.topicId as string) : "")))
   const free = props.topics.filter((topic) => !used.has(topic.id))
+  const moveConsent = (from: number, to: number) => {
+    if (to < 0 || to >= consents.length) return
+    const next = [...consents]
+    const [moved] = next.splice(from, 1)
+    if (moved) next.splice(to, 0, moved)
+    setConsents(next)
+  }
   const add = (topic: Topic) =>
     setConsents([
       ...consents,
@@ -1021,9 +1122,15 @@ function TopicsPanel(props: {
                   {topic?.name ?? "A deleted topic"}{" "}
                   <span className="text-subtle">· {topic?.mode === "opt-in" ? "opt-in" : "opt-out"}</span>
                 </span>
+                <MoveButtons
+                  label={topic?.name ?? "this box"}
+                  index={index}
+                  count={consents.length}
+                  onMove={(to) => moveConsent(index, to)}
+                />
                 <IconButton
                   size="xs"
-                  label="Remove"
+                  label={`Remove ${topic?.name ?? "this box"}`}
                   onClick={() => setConsents(consents.filter((_, i) => i !== index))}
                 >
                   <CloseIcon className="size-4" />
@@ -1049,7 +1156,7 @@ function TopicsPanel(props: {
                     )
                   }
                 />
-                Required to submit
+                Required
               </Option>
             </div>
           )
@@ -1060,7 +1167,7 @@ function TopicsPanel(props: {
               render={
                 <TextButton className="self-start">
                   <PlusIcon className="size-3.5" />
-                  Add a consent box
+                  Add consent box
                 </TextButton>
               }
             />
@@ -1094,9 +1201,9 @@ function TopicsPanel(props: {
         {error ? <ErrorText>{error}</ErrorText> : null}
       </Fieldset>
       <Field
-        label="Add every sign-up to a segment"
+        label="Add to a segment"
         htmlFor="form-segment"
-        info="A fixed segment every confirmed sign-up joins, such as a launch list. Dynamic segments pick their own contacts, so they aren't offered."
+        info="A fixed segment every confirmed submission's contact joins, such as a launch list. Dynamic segments pick their own contacts, so they aren't offered."
       >
         <Select
           id="form-segment"
@@ -1154,9 +1261,10 @@ const COLOR_MODE_OPTIONS = [
   { value: "light-dark", label: "Light and dark" },
 ] as const
 
-const EDITING_OPTIONS = [
-  { value: "light", label: "Light mode" },
-  { value: "dark", label: "Dark mode" },
+/** The preview's page, which with light and dark colors is also the set being edited: one wording, one order. */
+const PAGE_OPTIONS = [
+  { value: "light", label: "Light" },
+  { value: "dark", label: "Dark" },
 ] as const
 
 /** A scheme's colors, in the order the panel lists them (D148). */
@@ -1172,7 +1280,7 @@ const COLORS: ReadonlyArray<readonly [Exclude<keyof FormColors & string, "backgr
 const HEX = /^#[0-9a-f]{6}$/i
 
 /** One color: a swatch to pick it and its value to type, kept in step. */
-function ColourRow(props: {
+function ColorRow(props: {
   readonly id: string
   readonly label: string
   readonly value: string
@@ -1189,7 +1297,7 @@ function ColourRow(props: {
         disabled={props.disabled}
         onChange={(event) => props.onChange(event.target.value)}
       />
-      <label htmlFor={props.id} className="flex-1">
+      <label htmlFor={props.id} className="flex-1 font-medium">
         {props.label}
       </label>
       <SmallInput
@@ -1243,15 +1351,15 @@ function StylePanel(props: {
         {appearance.colorMode === "light-dark" ? (
           <SegmentedControl
             name="editing-mode"
-            label="Colors for"
-            options={EDITING_OPTIONS}
+            label="Editing"
+            options={PAGE_OPTIONS}
             value={props.page}
             onChange={props.onPage}
           />
         ) : null}
         <div className="flex flex-col gap-2">
           {COLORS.map(([key, label]) => (
-            <ColourRow
+            <ColorRow
               key={key}
               id={`color-${set}-${key}`}
               label={label}
@@ -1259,7 +1367,7 @@ function StylePanel(props: {
               onChange={(value) => setColor(key, value)}
             />
           ))}
-          <ColourRow
+          <ColorRow
             id={`color-${set}-background`}
             label="Background"
             value={seeThrough ? "" : colors.background}
@@ -1306,7 +1414,6 @@ function StylePanel(props: {
             onChange={(event) => setAppearance({ labels: event.target.value as FormAppearance["labels"] })}
           >
             <option value="above">Above</option>
-            <option value="floating">Floating</option>
             <option value="hidden">Hidden</option>
           </Select>
         </Field>
@@ -1314,7 +1421,7 @@ function StylePanel(props: {
       <FontStylesheetField value={appearance.fonts[0] ?? ""} onChange={(fonts) => setAppearance({ fonts })} />
       <Slider
         label="Corners"
-        labelClassName="w-24"
+        labelClassName="w-24 font-medium text-fg"
         min={0}
         max={24}
         step={1}
@@ -1324,7 +1431,7 @@ function StylePanel(props: {
       />
       <Slider
         label="Spacing"
-        labelClassName="w-24"
+        labelClassName="w-24 font-medium text-fg"
         min={8}
         max={32}
         step={1}
@@ -1368,13 +1475,16 @@ function EmbedPanel(props: {
   readonly appearance: FormAppearance
   readonly allowedSites: ReadonlyArray<string> | null
   readonly onSites: (sites: ReadonlyArray<string> | null) => void
+  /** Tracking options belong to the site, which answers for its visitors' consent (D154). */
+  readonly tracking: EmbedTracking
+  readonly onTracking: (tracking: EmbedTracking) => void
 }) {
   const { form, teamId } = props
   const origin = appOrigin()
   const [site, setSite] = useState("")
-  // Tracking options belong to the site, which answers for its visitors' consent (D154).
-  const [remember, setRemember] = useState<"off" | "visit" | "30" | "90">("off")
-  const [clickIds, setClickIds] = useState(false)
+  const { remember, clickIds } = props.tracking
+  const setRemember = (next: EmbedTracking["remember"]) => props.onTracking({ ...props.tracking, remember: next })
+  const setClickIds = (next: boolean) => props.onTracking({ ...props.tracking, clickIds: next })
   const options = [
     remember === "off" ? null : remember === "visit" ? "data-remember-utm" : `data-remember-utm="${remember}"`,
     clickIds ? "data-click-ids" : null,
@@ -1402,12 +1512,14 @@ function EmbedPanel(props: {
   const trackingSummary =
     remember === "off" && !clickIds
       ? "Off"
-      : [REMEMBER_SUMMARY[remember], clickIds ? "click IDs" : null].filter(Boolean).join(" · ")
+      : [REMEMBER_SUMMARY[remember], clickIds ? (remember === "off" ? "Click IDs" : "click IDs") : null]
+          .filter(Boolean)
+          .join(" · ")
   const sitesSummary =
     sites === null
       ? "Any site"
       : sites.length === 0
-        ? "No sites yet"
+        ? "Hosted page only"
         : `Only ${sites.length} site${sites.length === 1 ? "" : "s"}`
 
   return (
@@ -1424,10 +1536,10 @@ function EmbedPanel(props: {
       </section>
       <section className="flex flex-col gap-2">
         <Heading
-          title="Hosted link"
+          title="Hosted page"
           info="The form on its own page, for social posts and emails. It works whatever sites you allow."
         />
-        <CopyField value={`${origin}/f/${form.id}`} label="hosted link" />
+        <CopyField value={`${origin}/f/${form.id}`} label="hosted page link" />
       </section>
 
       <section className="flex flex-col">
@@ -1437,14 +1549,11 @@ function EmbedPanel(props: {
           info="What your site passes on about where a visitor came from. These change the embed snippet, and your site stores and sends them."
           summary={trackingSummary}
         >
-          <div className="flex flex-col gap-1.5">
-            <div className="flex items-center gap-1">
-              <label htmlFor="remember-utm">Remember UTM parameters</label>
-              <InfoTip label="remembering UTM parameters">
-                Without it, a submission gets only the UTM parameters of the page the form is on. Remembering keeps the
-                ones from the page a visitor lands on, in your site's browser storage, for as long as you pick.
-              </InfoTip>
-            </div>
+          <Field
+            label="Remember UTM parameters"
+            htmlFor="remember-utm"
+            info="Without it, a submission gets only the UTM parameters of the page the form is on. Remembering keeps the ones from the page a visitor lands on, in your site's browser storage, for as long as you pick."
+          >
             <Select
               id="remember-utm"
               value={remember}
@@ -1455,15 +1564,15 @@ function EmbedPanel(props: {
               <option value="30">For 30 days</option>
               <option value="90">For 90 days</option>
             </Select>
-          </div>
+          </Field>
           <div className="flex items-center gap-1">
             <Option>
               <Checkbox checked={clickIds} onChange={(event) => setClickIds(event.target.checked)} />
               Pass ad click IDs
             </Option>
             <InfoTip label="click IDs">
-              Google, Meta, Microsoft, LinkedIn, TikTok and X add an ID to ad clicks. Passing it lets you tie a sign-up
-              to the ad.
+              Google, Meta, Microsoft, LinkedIn, TikTok and X add an ID to ad clicks. Passing it lets you tie a
+              submission to the ad.
             </InfoTip>
           </div>
           {remember !== "off" ? (
@@ -1480,7 +1589,7 @@ function EmbedPanel(props: {
         </OptionRow>
         <OptionRow
           title="Where it can appear"
-          info="Browsers refuse to show the form on any other site. The hosted link always works."
+          info="Browsers refuse to show the form on any other site. The hosted page always works."
           summary={sitesSummary}
         >
           <SegmentedControl
@@ -1509,7 +1618,7 @@ function EmbedPanel(props: {
                         label={`Remove ${entry}`}
                         onClick={() => props.onSites(sites.filter((s) => s !== entry))}
                       >
-                        <CloseIcon className="size-3.5" />
+                        <CloseIcon className="size-4" />
                       </IconButton>
                     </li>
                   ))}
@@ -1546,7 +1655,7 @@ function EmbedPanel(props: {
   )
 }
 
-const REMEMBER_SUMMARY = { off: null, visit: "for the visit", "30": "30 days", "90": "90 days" } as const
+const REMEMBER_SUMMARY = { off: null, visit: "For the visit", "30": "30 days", "90": "90 days" } as const
 
 /** A section heading with its info tip. */
 function Heading(props: { readonly title: string; readonly info: string; readonly small?: boolean }) {
@@ -1560,18 +1669,11 @@ function Heading(props: { readonly title: string; readonly info: string; readonl
 
 /** The embed snippet, wrapped to fit (never scrolled), with one plain button to copy it all. */
 function SnippetCopy(props: { readonly value: string }) {
-  const [copied, setCopied] = useState(false)
-  const copy = async () => {
-    await navigator.clipboard.writeText(props.value)
-    setCopied(true)
-    window.setTimeout(() => setCopied(false), 1600)
-  }
+  const { copied, copy } = useCopy()
   return (
     <>
-      <output
-        aria-label="Embed snippet"
-        className="rounded-md bg-fill px-3 py-2.5 font-mono text-sm leading-6 select-text"
-      >
+      {/* code, not output: an output is a live region, and would read the whole tag at every change. */}
+      <code className="block rounded-md bg-fill px-3 py-2.5 font-mono text-sm leading-6 select-text">
         {/* Long addresses may break after a slash, never mid-word; the copy is untouched. */}
         {props.value.split(/(?<=[^<]\/)/).map((part, index) => (
           // biome-ignore lint/suspicious/noArrayIndexKey: parts of a fixed string, never reordered
@@ -1580,8 +1682,8 @@ function SnippetCopy(props: { readonly value: string }) {
             <wbr />
           </Fragment>
         ))}
-      </output>
-      <Button variant="primary" onClick={() => void copy()}>
+      </code>
+      <Button variant="primary" onClick={() => void copy(props.value)}>
         {copied ? <CheckIcon /> : <CopyIcon />}
         {copied ? "Copied" : "Copy embed snippet"}
       </Button>
@@ -1596,15 +1698,22 @@ function OptionRow(props: {
   readonly summary: string
   readonly children: ReactNode
 }) {
+  const summaryId = useId()
   return (
     <Collapsible className="border-t border-line last:border-b">
       <div className="flex h-11 items-center gap-1">
-        <CollapsibleTrigger className="group flex h-8 items-center gap-2 rounded text-fg">
+        {/* The summary describes the trigger, so screen readers hear how it's set. */}
+        <CollapsibleTrigger
+          className="group flex h-8 items-center gap-2 rounded font-medium text-fg"
+          aria-describedby={summaryId}
+        >
           <ChevronDown className="size-3.5 -rotate-90 text-subtle transition-transform group-data-panel-open:rotate-0" />
           {props.title}
         </CollapsibleTrigger>
         <InfoTip label={props.title.toLowerCase()}>{props.info}</InfoTip>
-        <span className="ml-auto truncate text-sm text-muted">{props.summary}</span>
+        <span id={summaryId} className="ml-auto truncate text-sm text-muted">
+          {props.summary}
+        </span>
       </div>
       <CollapsibleContent className="flex flex-col gap-3 pb-4 pl-5.5">{props.children}</CollapsibleContent>
     </Collapsible>
@@ -1619,7 +1728,7 @@ function SeenOnLink(props: { readonly teamId: TeamId; readonly formId: FormId })
   })
   const pages = analytics.data?.pages ?? []
   const views = pages.reduce((sum, entry) => sum + entry.views, 0)
-  const signUps = pages.reduce((sum, entry) => sum + entry.confirmed, 0)
+  const confirmed = pages.reduce((sum, entry) => sum + entry.confirmed, 0)
   const top = pages[0]
   return (
     <Link
@@ -1634,12 +1743,12 @@ function SeenOnLink(props: { readonly teamId: TeamId; readonly formId: FormId })
         </span>
         {pages.length > 0 ? (
           <span className="truncate text-sm text-muted">
-            {views.toLocaleString()} views · {signUps.toLocaleString()} sign-ups
+            {views.toLocaleString()} views · {confirmed.toLocaleString()} confirmed
             {top ? ` · top: ${top.page || "Hosted page"}` : ""}
           </span>
         ) : null}
       </span>
-      <span className="text-sm text-muted">Submissions</span>
+      <span className="text-sm text-muted">Seen on</span>
     </Link>
   )
 }

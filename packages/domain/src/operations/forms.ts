@@ -34,7 +34,7 @@ const SiteList = Schema.NullOr(
 
 export const listForms = defineTeamOperation({
   name: "forms.list",
-  description: "The team's sign-up forms, with their counts: views, submissions, confirmed sign-ups, waiting and spam.",
+  description: "The team's forms, with their counts: views, submissions, confirmed, waiting, expired and spam.",
   input: Schema.Struct(InTeam),
   output: Schema.Array(Form),
   errors: [],
@@ -57,7 +57,7 @@ export const getForm = defineTeamOperation({
 export const createForm = defineTeamOperation({
   name: "forms.create",
   description:
-    "Create a sign-up form from a template. It starts as a draft: edit it with forms.update, then forms.publish to put it live. Embed it with the snippet in the app, or link to https://<parley>/f/<form id>.",
+    "Create a form from a template. It starts as a draft: edit it with forms.update, then forms.publish to put it live. Embed it with the snippet in the app, or link to https://<parley>/f/<form id>.",
   input: Schema.Struct({ ...InTeam, name: FormName.annotate({ title: "Name" }), template: FormTemplate }),
   output: Form,
   errors: [],
@@ -109,7 +109,8 @@ export const deleteForm = defineTeamOperation({
 
 export const formAnalytics = defineTeamOperation({
   name: "forms.analytics",
-  description: "Where a form's sign-ups come from: views and confirmed sign-ups by page, and sign-ups by UTM source.",
+  description:
+    "Where a form's submissions come from: views and confirmed submissions by page, and confirmed submissions by UTM source, medium and campaign.",
   input: Schema.Struct(OneForm),
   output: FormAnalytics,
   errors: [FormNotFound],
@@ -137,8 +138,7 @@ export const listSubmissions = defineTeamOperation({
 
 export const releaseSubmission = defineTeamOperation({
   name: "forms.releaseSubmission",
-  description:
-    "Treat a submission held as spam as a real one: it's handled like a new sign-up, double opt-in included.",
+  description: "Treat a submission held as spam as a real one: it's handled as if just sent, double opt-in included.",
   input: Schema.Struct({ ...OneForm, submissionId: SubmissionId }),
   output: Submission,
   errors: [FormNotFound, SubmissionNotFound],

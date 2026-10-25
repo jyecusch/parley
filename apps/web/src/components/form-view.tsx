@@ -1,6 +1,6 @@
 import type { CustomField, FormContent, FormField } from "@parley/domain"
 import { appearanceCss } from "@parley/domain"
-import type { FormEvent, ReactNode } from "react"
+import { type FormEvent, type ReactNode, useEffect, useRef } from "react"
 
 /*
  * A form as visitors see it (D144): the one renderer behind the designer's preview, the embedded
@@ -53,8 +53,8 @@ export interface FormViewProps {
   readonly beforeButton?: ReactNode
   /** Forces light or dark mode for light and dark colors, as the designer's preview does. */
   readonly mode?: "light" | "dark"
-  /** The designer's edit-in-place affordances, around each piece of copy. */
-  readonly editable?: boolean
+  /** The title's heading level: 1 on the hosted page, where the form is the page; 2 inside a site's page. */
+  readonly titleLevel?: 1 | 2
 }
 
 export function FormView(props: FormViewProps) {
@@ -62,20 +62,37 @@ export function FormView(props: FormViewProps) {
   const prefix = props.idPrefix ?? "pf"
   const errors = props.errors ?? {}
   const css = appearanceCss(content.appearance, `.Form[data-form="${prefix}"]`, props.mode)
+  const form = useRef<HTMLFormElement>(null)
+  const message = useRef<HTMLDivElement>(null)
+  /** Set by a submit, so the problems it brings back move focus to the first one; typing doesn't. */
+  const focusProblem = useRef(false)
   const submit = (event: FormEvent) => {
     event.preventDefault()
-    if (!props.busy) props.onSubmit()
+    if (props.busy) return
+    focusProblem.current = true
+    props.onSubmit()
   }
+  const sent = props.state === "sent" && content.afterSubmit.kind === "message"
+  // Screen readers hear the message once it replaces the form: focus moves to it.
+  useEffect(() => {
+    if (sent) message.current?.focus()
+  }, [sent])
+  useEffect(() => {
+    if (!focusProblem.current || Object.keys(errors).length === 0) return
+    focusProblem.current = false
+    form.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus()
+  }, [errors])
+  const Title = props.titleLevel === 1 ? "h1" : "h2"
 
-  if (props.state === "sent" && content.afterSubmit.kind === "message") {
+  if (sent && content.afterSubmit.kind === "message") {
     return (
-      <div className="Form" data-form={prefix} role="status">
+      <div className="Form" data-form={prefix}>
         <style>{css}</style>
         {content.appearance.fonts.map((href) => (
           <link key={href} rel="stylesheet" href={href} />
         ))}
-        <div className="Message">
-          <p className="Title">{content.afterSubmit.title}</p>
+        <div className="Message" ref={message} tabIndex={-1}>
+          <Title className="Title">{content.afterSubmit.title}</Title>
           <p className="Description">{content.afterSubmit.body}</p>
         </div>
       </div>
@@ -83,12 +100,19 @@ export function FormView(props: FormViewProps) {
   }
 
   return (
-    <form className="Form" data-form={prefix} onSubmit={submit} noValidate aria-busy={props.busy || undefined}>
+    <form
+      ref={form}
+      className="Form"
+      data-form={prefix}
+      onSubmit={submit}
+      noValidate
+      aria-busy={props.busy || undefined}
+    >
       <style>{css}</style>
       {content.appearance.fonts.map((href) => (
         <link key={href} rel="stylesheet" href={href} />
       ))}
-      {content.title ? <h2 className="Title">{content.title}</h2> : null}
+      {content.title ? <Title className="Title">{content.title}</Title> : null}
       {content.description ? <p className="Description">{content.description}</p> : null}
       {content.fields.map((field) => (
         <FieldView
@@ -120,8 +144,9 @@ export function FormView(props: FormViewProps) {
           {errors.form}
         </p>
       ) : null}
-      <button className="Button" type="submit" disabled={props.busy}>
-        {content.submitLabel}
+      {/* aria-disabled, not disabled, so focus stays on the button while it sends. */}
+      <button className="Button" type="submit" aria-disabled={props.busy || undefined}>
+        {props.busy ? "Sending…" : content.submitLabel}
       </button>
       {content.finePrint || props.privacyPolicyUrl ? (
         <p className="FinePrint">

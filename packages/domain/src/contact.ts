@@ -151,7 +151,7 @@ export const ActivityEntry = Schema.Struct({
    * (D145), for a person to apply. `field` is a contacts.update key or "custom:<field id>".
    */
   kept: Schema.Array(Schema.Struct({ field: Schema.String, label: Schema.String, value: Schema.Unknown })),
-  /** For "submitted-form": where the sign-up came from, when the form records it (D153). */
+  /** For "submitted-form": where the submission came from, when the form records it (D153). */
   tracking: Schema.NullOr(Tracking),
   /** The other record an affiliation change was about, by its name at the time. */
   related: Schema.NullOr(

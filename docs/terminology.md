@@ -104,7 +104,7 @@ How to pick a name: choose the most common name for the concept. Reject anything
 | **Import** / **Export** | Moving records into or out of Parley as CSV. | upload, download, sync, migrate |
 | **Selection** | The records an action on an index view applies to: the rows picked, or every record matching its search and filter (D137). | bulk selection, batch, checked rows |
 | **Toast** | A brief, non-blocking message (e.g. "Contact deleted · Undo"). | snackbar, notification, flash |
-| **Info tip** | A small (i) button beside a label that shows a short explanation on hover, focus or click (D155). | tooltip (that's a one-line label on hover), help icon, hint (that's text shown under a field) |
+| **Info tip** | A small (i) button beside a label that shows a short explanation on hover or click (D155). | tooltip (that's a one-line label on hover), help icon, hint (that's text shown under a field) |
 | **Design asset** | The artifact we agree on before building a screen. | mockup, wireframe, concept, comp |
 
 ## Marketing email (v2)
@@ -113,11 +113,24 @@ How to pick a name: choose the most common name for the concept. Reject anything
 | --- | --- | --- |
 | **Segment** | A group of contacts that a broadcast is sent to. It comes in two kinds: a **dynamic segment** is defined by filters and its contacts change as records change; a **fixed segment** is a hand-picked set of contacts. It matches Resend's current term (Resend replaced "Audiences" with "Segments" in Nov 2025). | audience, list, group, cohort, contact set |
 
-| **Form** | A sign-up form a team designs in Parley and embeds on its websites, such as a newsletter sign-up or a waitlist (D144). | widget, embed (as a noun), sign-up widget, landing form |
+| **Form** | A form a team designs in Parley and embeds on its websites, such as a newsletter or a waitlist (D144). | widget, embed (as a noun), sign-up form, sign-up widget, landing form |
 | **Submission** | One visitor's answers to a form, with its consent record. It becomes a contact once confirmed (D146). | entry, response, lead (as a noun for the record) |
-| **Appearance** | How a form looks: its colors (fixed, or light and dark), design tokens and allowed style rules (D148). | theme (alone), skin, custom CSS |
+| **Appearance** | How a form looks: its colors (fixed, or light and dark), font, sizes, corners, spacing, label position and allowed style rules (D148). | theme (alone), skin, custom CSS |
 | **Tracking parameters** | What a submission records about where a visitor came from: its UTM parameters and, when the embedding site opts in, click IDs (D153, D154). Shown to people as "Came from". | attribution (that means who made a change), source (alone), referral data |
 | **Click ID** | An ad network's identifier for one ad click, passed in the page's address (`gclid`, `fbclid`, `msclkid`…). | click identifier, ad ID |
+| **Submission statuses** | **Waiting** (sent, not yet confirmed), **confirmed**, **expired** (not confirmed within the confirmation link's 7 days) and **spam** (D146, D147). | pending, unconfirmed, sign-up (any meaning), lead |
+| **Double opt-in** | A form's setting that a submission reaches contacts only once the visitor clicks the confirmation link (D146). | confirmed opt-in, verification, email verification |
+| **Confirmation link** | The link in the email double opt-in sends, which confirms a submission. | verify link, activation link, magic link |
+| **Consent box** | A checkbox on a form that joins one topic when ticked, never ticked to start (D149). | opt-in checkbox, marketing checkbox, permission box |
+| **Consent record** | What a submission keeps as proof of consent: the form version and wording shown, which consent boxes were ticked, when and from where it was sent and confirmed (D150). | audit log, consent log, proof (alone) |
+| **Kept value** | An answer a submission didn't write because the contact already had a different one; shown in the contact's activity with Apply (D145). | conflict, rejected value, pending change |
+| **Spam list** | The submissions held as spam, each with its reason, kept 30 days and releasable (D147). | quarantine, junk, blocked list |
+| **Render token** | The signed value a form's page gets when it loads, which a submission must carry (D147). | form token, nonce (alone), CSRF token |
+| **Opt-in topic** / **Opt-out topic** | A topic's **mode** (D149): an opt-in topic reaches only contacts who joined it; an opt-out topic reaches every subscribed contact who hasn't left it. | double-opt-in topic, list type |
+| **Hosted page** | A form on its own page at Parley (`/f/<form id>`), for linking from posts and emails. | hosted link, landing page, form link |
+| **Embed snippet** | The script tag that puts a form on a site. | embed code, widget code, script (alone) |
+| **Fine print** | The line under a form's button, followed by the team's privacy policy link. | small print, disclaimer, footer (that's a broadcast's) |
+| **Form settings** | A team's settings for every form: its captcha, disposable email blocking and privacy policy link (Settings → Forms). | protection settings, form config |
 | **Broadcast** | One marketing email sent to a segment at once: its subject, content, segment and topic, and, once sent, its recipients and results (D140). | campaign (reserved: in marketing it means something broader), blast, newsletter (as a noun for the thing sent), mailing, send |
 | **Draft** | A broadcast that hasn't been sent. A status of a broadcast, not a separate thing. | unsent broadcast, pending broadcast |
 | **Template** | Reusable content (subject and body) that a new broadcast starts from. The broadcast takes a copy; editing the template later doesn't change it. | layout, design (for email content), theme |
@@ -162,3 +175,4 @@ How to pick a name: choose the most common name for the concept. Reject anything
 | 2026-10-24 | American spelling throughout (D151). |
 | 2026-10-24 | Added **tracking parameters** and **click ID** (D153, D154). |
 | 2026-10-24 | Added **info tip** (D155). |
+| 2026-10-25 | Added the form terms the review found missing: submission statuses, double opt-in, confirmation link, consent box, consent record, kept value, spam list, render token, opt-in and opt-out topics, hosted page, embed snippet, fine print, form settings. "Sign-up" is banned in every meaning (owner's call). Appearance no longer says "design tokens". |

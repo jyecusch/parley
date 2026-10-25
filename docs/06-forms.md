@@ -2,7 +2,7 @@
 
 Status: **agreed** (D144–D150), version one in progress on `feat/forms`.
 
-A **form** is a sign-up form a team designs in Parley and embeds on its own websites: a newsletter sign-up, an event registration, a waitlist for a launch. Each **submission** creates or updates a contact, records consent, and can subscribe them to topics and add them to a segment.
+A **form** is one a team designs in Parley and embeds on its own websites: a newsletter, an event registration, a waitlist for a launch. Each **submission** creates or updates a contact, records consent, and can subscribe them to topics and add them to a segment.
 
 ## What others do, and where we can do better
 
@@ -11,7 +11,7 @@ Research (Oct 2026) across HubSpot, Mailchimp, Kit, Loops, Brevo, Customer.io, T
 | Gap in other tools | What Parley does instead |
 | --- | --- |
 | **Submissions overwrite contacts** (HubSpot's longest-running complaint). A public form is an anonymous write API keyed by email: anyone can rename `ceo@acme.com` or re-subscribe someone. | **Safe upsert.** A submission only fills empty fields; it never overwrites. Re-subscribing someone who left always needs them to confirm by email. The response is the same whether the email exists or not. |
-| Styling: "the iframe can't be styled" (HubSpot), CSS collisions (Mailchimp), custom CSS only on paid plans (Tally, HubSpot). | **A typed appearance object**, like Stripe's: fixed or light-and-dark colors, design tokens and a short list of allowed rules. It can be set in the designer and overridden where the form is embedded, so it can follow the host site's look. Easy for agents to write, impossible to break the form with. |
+| Styling: "the iframe can't be styled" (HubSpot), CSS collisions (Mailchimp), custom CSS only on paid plans (Tally, HubSpot). | **A typed appearance object**, like Stripe's: fixed or light-and-dark colors, font, sizes and spacing, and a short list of allowed rules. It can be set in the designer and overridden where the form is embedded, so it can follow the host site's look. Easy for agents to write, impossible to break the form with. |
 | Spam protection is an afterthought or a paid add-on, and owners can't see why something was blocked. | **Invisible protection on by default**, in layers, with a reason kept for every blocked submission and a spam list to review. The captcha provider is pluggable per team. |
 | Consent records left to the user. German courts want proof of *what* was agreed, not just an IP and time. | **Consent records built in**: the exact text shown, the form version, the page, time, IP and user agent, for both the submission and the confirmation click. |
 | Double opt-in only on some paths (Loops: forms only; Mailchimp's API skips it). Confirmation emails become a bombing vector. | **Double opt-in on by default**, covering re-subscriptions too, and throttled per address. |
@@ -22,14 +22,14 @@ Research (Oct 2026) across HubSpot, Mailchimp, Kit, Loops, Brevo, Customer.io, T
 
 One screen, the form itself in the middle, edited in place. No separate "builder" and "preview": what you see is what visitors see.
 
-- **Start from a template**: Newsletter, Waitlist, Event sign-up, or blank. Each picks sensible fields, copy and topics.
+- **Start from a template**: Newsletter, Waitlist, Event, or blank. Each picks sensible fields, copy and topics.
 - **Fields**: click to edit a label or placeholder in place; drag to reorder; "Add field" offers the contact's fields (first and last name, company, phone, address…) and the team's custom fields, so every answer lands on the contact. Email is always there and required.
 - **Hidden fields**: the page and its tracking parameters (every `utm_*` parameter) are captured automatically (D153). Fixed values can be added, such as `Source = Launch page`.
 - **Tracking options for the embedding site** (D154), off by default and turned on with attributes on the embed script, since the site answers for its visitors' consent:
-  - `data-remember-utm` remembers UTM parameters for the visit (sessionStorage), or `="30"` for that many days (localStorage), so a sign-up on another page still counts the campaign. The latest UTMs replace remembered ones. Adding the script to every page, without a form, catches the landing page.
+  - `data-remember-utm` remembers UTM parameters for the visit (sessionStorage), or `="30"` for that many days (localStorage), so a submission on another page still counts the campaign. The latest UTMs replace remembered ones. Adding the script to every page, without a form, catches the landing page.
   - `data-click-ids` passes ad click IDs: `gclid`, `gbraid`, `wbraid`, `fbclid`, `msclkid`, `li_fat_id`, `ttclid`, `twclid`. The hosted page never records them: there's no site to have opted in.
   - The Embed tab builds the snippet with them, under Options (D155). Where a form is seen, by page and UTM parameter, is a tab on its Submissions screen.
-- **Where sign-ups came from**: each submission and the contact's sign-up activity show source / medium / campaign, the other UTM parameters and any ad click.
+- **Where submissions came from**: each submission and the contact's "submitted the form" activity show source / medium / campaign, the other UTM parameters and any ad click.
 - **Consent**: a checkbox per topic the form subscribes to, never pre-ticked, with editable wording. A link to the team's privacy policy.
 - **After submitting**: a message (default "Check your inbox to confirm"), or a redirect to a URL.
 - **Side panel tabs**: Fields · Submit (what happens after submitting, and confirming by email) · Topics · Style · Embed. Bot protection is per team, in Settings → Forms.
@@ -53,7 +53,7 @@ The form is served from Parley's own origin, `https://app.parley.page/f/<form id
 - **Appearance** (one shape in the designer, the embed and the API):
   - `colorMode`: `fixed` (the same colors whatever the visitor's light or dark mode) or `light-dark` (switches with it).
   - `colors`: the colors, always when fixed and in light mode otherwise. `darkColors`: dark mode's, used only with `light-dark`. Each set has `heading`, `text`, `muted`, `accent`, `buttonText`, `background` (a color, or `transparent` to show the page behind the form) and `border`.
-  - Shared by both sets: `fontFamily`, `fontSizeBase`, `radius`, `spacing`, `labels` (above, floating or hidden).
+  - Shared by both sets: `fontFamily`, `fontSizeBase`, `radius`, `spacing`, `labels` (above or hidden).
   - Overrides at the embed site change only what they name, down to a single color in one set.
   - `rules`: CSS for a fixed set of public classes (`.Input`, `.Label`, `.Button`, `.Checkbox`, `.Message`) and states (`:focus`, `--invalid`), with an allowlist of properties per class.
   - `fonts`: a font stylesheet from Google Fonts, Bunny Fonts or Adobe Fonts. Nothing else: any other stylesheet on Parley's page could read what visitors type, or hide the consent wording, so the form's page also refuses stylesheets from anywhere else (CSP `style-src`). Fonts can't be overridden at the embed site, since anyone can write an override into a form's address. `fontFamily` is a name only, like `Inter`.

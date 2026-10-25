@@ -196,11 +196,11 @@ ${scope} .Input--invalid{border-color:var(--pf-error)}
 ${scope} .Checkbox{display:flex;gap:10px;align-items:flex-start;font-size:0.9em}
 ${scope} .Checkbox input{margin-top:0.2em;width:1em;height:1em;accent-color:var(--pf-primary)}
 ${scope} .Button{height:2.75em;border:0;border-radius:var(--pf-radius);background:var(--pf-primary);color:var(--pf-on-primary);font:inherit;font-weight:600;cursor:pointer}
-${scope} .Button:disabled{opacity:0.6;cursor:default}
+${scope} .Button:disabled,${scope} .Button[aria-disabled="true"]{opacity:0.6;cursor:default}
 ${scope} .FinePrint{margin:0;font-size:0.78em;color:var(--pf-muted)}
 ${scope} .FinePrint a{color:inherit}
 ${scope} .Error{margin:0;font-size:0.85em;color:var(--pf-error)}
-${scope} .Message{display:flex;flex-direction:column;gap:4px}
+${scope} .Message{display:flex;flex-direction:column;gap:4px;outline:none}
 ${scope} .Honey{position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden}`
   const rules = Object.entries(appearance.rules)
     .flatMap(([selector, declarations]) => {
@@ -216,7 +216,9 @@ ${scope} .Honey{position:absolute;left:-10000px;width:1px;height:1px;overflow:hi
       const base = parts.state === "--invalid" ? `${parts.base}--invalid` : parts.base
       // .Form is the scope itself; the others sit inside it.
       const target = base === ".Form" ? `${scope}${state}` : `${scope} ${base}${state}`
-      return [`${target}{${body}}`]
+      // A sending button is aria-disabled (it keeps focus), so :disabled rules style it too.
+      const targets = state === ":disabled" ? `${target},${scope} ${base}[aria-disabled="true"]` : target
+      return [`${targets}{${body}}`]
     })
     .join("\n")
   return `${theme}\n${structure}\n${rules}`

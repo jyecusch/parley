@@ -365,7 +365,7 @@ function SegmentView(props: {
               <caption className="sr-only">Contacts in {segment.name}</caption>
               <thead>
                 <tr>
-                  <Th className="w-8/25 pl-4 @max-[40rem]/content:w-auto" scope="col">
+                  <Th className="w-8/25 pl-4 @max-narrow/content:w-auto" scope="col">
                     Name
                   </Th>
                   <Th className={`w-9/25 ${wideColumnClass}`} scope="col">

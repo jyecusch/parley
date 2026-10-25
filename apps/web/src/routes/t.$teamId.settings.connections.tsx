@@ -14,7 +14,7 @@ import {
   useToast,
   When,
 } from "../components/settings.tsx"
-import { Avatar, Box, Hint, Table, Td, Th, Tr } from "../components/ui/index.ts"
+import { Avatar, Box, Hint, Strong, Table, Td, Th, Tr } from "../components/ui/index.ts"
 import { Byline, RowIdentity, SettingsPanel } from "../components/ui/settings-extra.tsx"
 import { call, messageOf } from "../lib/client.ts"
 
@@ -55,9 +55,9 @@ function Connections() {
         <h3 className="sr-only" id="mcp-h">
           MCP URL
         </h3>
-        <p className="m-0 text-muted [&_b]:font-medium [&_b]:text-fg">
-          Add Parley as a custom connector in <b>Claude</b>, <b>ChatGPT</b>, <b>Claude Code</b>, <b>Cursor</b> or{" "}
-          <b>opencode</b> using this URL:
+        <p className="m-0 text-muted">
+          Add Parley as a custom connector in <Strong>Claude</Strong>, <Strong>ChatGPT</Strong>,{" "}
+          <Strong>Claude Code</Strong>, <Strong>Cursor</Strong> or <Strong>opencode</Strong> using this URL:
         </p>
         <CopyField value={mcpUrl} label="MCP URL" />
         <Hint>Your agent opens Parley in the browser. You sign in, pick who it acts as, and it shows up below.</Hint>

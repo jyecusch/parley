@@ -87,7 +87,7 @@ export function RecordPanel({
       className={cn(
         full
           ? "w-auto flex-auto"
-          : "w-md shrink-0 @max-[69rem]/content:absolute @max-[69rem]/content:inset-y-1.5 @max-[69rem]/content:right-1.5 @max-[69rem]/content:z-5 @max-[69rem]/content:left-1.5 @max-[69rem]/content:ml-auto @max-[69rem]/content:w-auto @max-[69rem]/content:max-w-md @max-[69rem]/content:shadow-pop",
+          : "w-md shrink-0 @max-panel/content:absolute @max-panel/content:inset-y-1.5 @max-panel/content:right-1.5 @max-panel/content:z-5 @max-panel/content:left-1.5 @max-panel/content:ml-auto @max-panel/content:w-auto @max-panel/content:max-w-md @max-panel/content:shadow-pop",
         className,
       )}
       {...props}
@@ -96,7 +96,7 @@ export function RecordPanel({
 }
 
 /** Keeps a full record view's content in a readable column. */
-export const readableColumnClass = "px-[max(1rem,calc((100%-54rem)/2))]"
+export const readableColumnClass = "px-readable"
 
 export function PanelHeader({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return <div className={cn("flex flex-col gap-3 border-b border-line pt-2 pr-3 pb-4 pl-4", className)} {...props} />
@@ -150,3 +150,8 @@ export function PropertyRow({ label, children, htmlFor }: { label: ReactNode; ch
 /** The classes for a property's value when clicking it starts editing. */
 export const propertyValueClass =
   "-mx-1.5 flex min-w-0 cursor-text flex-col rounded-md px-1.5 py-1 text-left leading-6 hover:bg-hover"
+
+/** A name or thing picked out in running text: "**Jane** added **Acme** to this contact". */
+export function Strong(props: { readonly children: ReactNode }) {
+  return <b className="font-medium text-fg">{props.children}</b>
+}

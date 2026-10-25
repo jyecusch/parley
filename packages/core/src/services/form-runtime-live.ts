@@ -398,7 +398,7 @@ export const FormRuntimeLive = Layer.effect(
             if (settings?.blockDisposableEmails && emailChecks.isDisposable(domain)) return "Disposable email address"
             if (!(yield* emailChecks.acceptsMail(domain))) return "No mail server for that domain"
             if (!(yield* takes(`form-email:${form.id}:${digest(email)}`, LIMITS.emailPerForm))) {
-              return "Too many sign-ups from one address"
+              return "Too many from one address"
             }
             return undefined
           })

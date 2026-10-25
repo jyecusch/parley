@@ -58,8 +58,7 @@ const AVATAR_SIZES: Readonly<Record<MarkSize, string>> = {
 const TILE_RADII: Readonly<Record<MarkSize, string>> = { sm: "rounded-sm", md: "rounded-md", lg: "rounded-lg" }
 
 /** How a mark is filled: by an image, or by initials or an icon. */
-const IMAGE_FILL =
-  "bg-surface inset-ring inset-ring-line [&>img]:size-full [&>img]:rounded-[inherit] [&>img]:object-cover"
+const IMAGE_FILL = "bg-surface inset-ring inset-ring-line"
 const INITIALS_FILL = "bg-fill text-muted"
 
 /**
@@ -72,7 +71,6 @@ export function Avatar({
   shape = "round",
   src,
   crossOrigin,
-  image,
   dashed,
   badge,
   children,
@@ -83,14 +81,13 @@ export function Avatar({
   src?: string | undefined
   /** "anonymous" for images from other sites that CRT mode (D81) must be able to draw. */
   crossOrigin?: "anonymous" | undefined
-  image?: ReactNode | undefined
   dashed?: boolean | undefined
   badge?: ReactNode | undefined
   children?: ReactNode | undefined
   className?: string | undefined
 }) {
   const [loaded, setLoaded] = useState<string>()
-  const showsImage = image !== undefined || (src !== undefined && loaded === src)
+  const showsImage = src !== undefined && loaded === src
   return (
     <AvatarBase
       aria-hidden="true"
@@ -105,6 +102,7 @@ export function Avatar({
       {src !== undefined ? (
         <>
           <AvatarImage
+            className="size-full rounded-inherit object-cover"
             src={src}
             alt=""
             crossOrigin={crossOrigin}
@@ -113,7 +111,7 @@ export function Avatar({
           <AvatarFallback>{children}</AvatarFallback>
         </>
       ) : (
-        (image ?? children)
+        children
       )}
       {badge ? <AvatarBadge>{badge}</AvatarBadge> : null}
     </AvatarBase>
