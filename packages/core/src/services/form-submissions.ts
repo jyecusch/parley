@@ -1,5 +1,13 @@
 import { Database, schema } from "@parley/db"
-import type { DatabaseUnavailable, FormContent, FormField, TeamId } from "@parley/domain"
+import {
+  type CustomField,
+  countryCodeOf,
+  type DatabaseUnavailable,
+  type FormContent,
+  type FormField,
+  setValueOf,
+  type TeamId,
+} from "@parley/domain"
 import { and, eq, inArray, isNull, sql } from "drizzle-orm"
 import { Context, Duration, Effect, Layer } from "effect"
 import type { SqlError } from "effect/sql"
@@ -9,7 +17,7 @@ import { Mailer } from "../mail/mailer.ts"
 import type { SystemActor } from "../principal.ts"
 import { activityRow } from "./activity.ts"
 import { Affiliations } from "./affiliations.ts"
-import { RateLimiter } from "./rate-limiter.ts"
+import { digest, RateLimiter } from "./rate-limiter.ts"
 import { Sending } from "./sending.ts"
 import { classifySqlError } from "./sql-errors.ts"
 
@@ -156,7 +164,7 @@ export class FormSubmissions extends Context.Service<
           const teamId = submission.teamId as TeamId
           // A few a day per address, so nobody can flood an inbox through a form (D146).
           const allowed = yield* limiter
-            .take(`form-confirm:${teamId}:${submission.email}`, CONFIRMATIONS_PER_DAY, Duration.days(1))
+            .take(`form-confirm:${teamId}:${digest(submission.email)}`, CONFIRMATIONS_PER_DAY, Duration.days(1))
             .pipe(
               Effect.as(true),
               Effect.catchTag("RequestsTooFrequent", () => Effect.succeed(false)),
@@ -232,6 +240,8 @@ ${lines
           // The form's fixed values fill in too, behind the visitor's own answers.
           const answers: Record<string, unknown> = { ...(content.set as Record<string, unknown>) }
           for (const [key, value] of Object.entries(values)) if (!isEmpty(value)) answers[key] = value
+          // A fixed country may be written as a name; the contact keeps its code.
+          if (typeof answers.country === "string") answers.country = countryCodeOf(answers.country) ?? answers.country
           const labels = new Map<string, string>(
             content.fields.map((field: FormField) => [
               field.kind === "contact"
@@ -259,15 +269,7 @@ ${lines
           /** A fixed value from `set` is text; custom fields take their own kind of value. */
           const customValue = (id: string, value: unknown) => {
             const type = customTypes.get(id)?.type
-            if (typeof value !== "string") return value
-            if (type === "number") return Number.isFinite(Number(value)) ? Number(value) : undefined
-            if (type === "checkbox") return value === "true" || value === "yes"
-            if (type === "multi-select")
-              return value
-                .split(";")
-                .map((part) => part.trim())
-                .filter(Boolean)
-            return value
+            return typeof value === "string" && type ? setValueOf(type as CustomField["type"], value) : value
           }
 
           return yield* run(

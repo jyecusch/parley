@@ -56,7 +56,7 @@ The form is served from Parley's own origin, `https://app.parley.page/f/<form id
   - Shared by both sets: `fontFamily`, `fontSizeBase`, `radius`, `spacing`, `labels` (above, floating or hidden).
   - Overrides at the embed site change only what they name, down to a single color in one set.
   - `rules`: CSS for a fixed set of public classes (`.Input`, `.Label`, `.Button`, `.Checkbox`, `.Message`) and states (`:focus`, `--invalid`), with an allowlist of properties per class.
-  - `fonts`: a Google Fonts or other https CSS URL.
+  - `fonts`: a font stylesheet from Google Fonts, Bunny Fonts or Adobe Fonts. Nothing else: any other stylesheet on Parley's page could read what visitors type, or hide the consent wording, so the form's page also refuses stylesheets from anywhere else (CSP `style-src`). Fonts can't be overridden at the embed site, since anyone can write an override into a form's address. `fontFamily` is a name only, like `Inter`.
 - **Plain iframe** fallback for sites that can't run scripts (fixed height, no overrides).
 - **Hosted page**: the same URL works on its own, for linking from social posts or emails.
 - **Where it may be embedded**: an optional list of domains per form, enforced with CSP `frame-ancestors`, so browsers refuse to frame it elsewhere. It isn't anti-spam on its own (headers are forgeable outside browsers); the other layers handle that.
@@ -80,11 +80,15 @@ Layers, all invisible, all on by default:
 1. **Signed render token**: when the iframe loads, Parley issues a token (form, time, nonce, HMAC-signed). A submission must carry one that's unused, not expired, and at least ~2 seconds old. This stops replayed and scripted POSTs that never load the form.
 2. **Honeypot**: a hidden field people never fill.
 3. **Proof of work** (built in, ALTCHA): ALTCHA's widget, invisible, solves a PBKDF2 challenge in the browser's background (about a second), and altcha-lib verifies it once. No third party, no cookies. This is the default captcha. An address loading forms more than 30 times in 10 minutes gets a challenge ten times harder: it isn't refused, so a busy office still gets its form, but bots looping load-and-submit pay far more.
-4. **Rate limits**: per IP, per form, and per email address (subscription bombing comes from many IPs at once), plus a cap on confirmation emails per address.
+4. **Rate limits**: per IP, per form, and per email address (subscription bombing comes from many IPs at once), plus a cap on confirmation emails per address. They count only submissions that passed the layers above, so a script can't use up a visitor's allowance, and one over a limit goes to the spam list rather than away, so a real one (a conference booth behind one router) can be released. The visitor's IP comes from `IP_ADDRESS_HEADER` alone when it's set, never from a header the visitor could write.
 5. **Email checks**: syntax, MX record, and an optional block on disposable-email domains.
 6. **Double opt-in**: the strongest layer. A bot can't click the link.
 
-**Pluggable captcha, per team** (Settings → Forms): Built-in proof of work (default), **Cloudflare Turnstile** (invisible or managed), hCaptcha, reCAPTCHA v3 (with a score threshold), Friendly Captcha. They share one interface: the browser gets a token, and the server verifies it with the provider. Because the form is served from Parley's origin, one Turnstile site key works on every site the form is embedded on. Secret keys are stored encrypted (Parley gains encrypted secret storage), with a key that can be rotated (D152): move the old key to `PARLEY_ENCRYPTION_KEYS_PREVIOUS`, set a new `PARLEY_ENCRYPTION_KEY`, and the next start re-encrypts every stored secret.
+**Pluggable captcha, per team** (Settings → Forms): Built-in proof of work (default), **Cloudflare Turnstile** (invisible or managed), hCaptcha, reCAPTCHA v3 (with a score threshold), Friendly Captcha. They share one interface: the browser gets a token, and the server verifies it with the provider. Because the form is served from Parley's origin, one Turnstile site key works on every site the form is embedded on. Secret keys are stored encrypted (Parley gains encrypted secret storage), with a key that can be rotated (D152) in two deploys, so no server ever meets a secret it can't read:
+  1. Add the new key to `PARLEY_ENCRYPTION_KEYS_PREVIOUS` and deploy. Every server can now read it.
+  2. Swap: the new key becomes `PARLEY_ENCRYPTION_KEY`, the old one moves to `PARLEY_ENCRYPTION_KEYS_PREVIOUS`, and deploy. The start re-encrypts every stored secret; after it, the old key can go.
+
+  A secret no key opens (a lost key) counts as Turnstile off: the team's forms fall back to the built-in proof of work, and the server logs a warning.
 
 **Spam list**: blocked submissions are kept for 30 days with their reason ("honeypot filled", "token too fresh", "Turnstile failed"…) and can be released if a real person was caught.
 

@@ -1,5 +1,12 @@
 import type { FieldProblem } from "./errors/input.ts"
-import type { AppearanceOverride, FormAppearance, FormColors } from "./forms.ts"
+import {
+  type AppearanceOverride,
+  FONT_FAMILY,
+  FONT_HOSTS,
+  FONT_STYLESHEET,
+  type FormAppearance,
+  type FormColors,
+} from "./forms.ts"
 
 /*
  * A form's appearance (D148) as CSS: its colors and the shared sizes, then the
@@ -56,11 +63,28 @@ const selectorParts = (selector: string) => {
 }
 
 /** A value can't break out of its declaration or load anything. */
-const safeValue = (value: string) => !/[;{}<>\\]|url\s*\(|expression\s*\(|@import|javascript:/i.test(value)
+const safeValue = (value: string) =>
+  !/[;{}<>\\]|(?:url|image|image-set|cross-fade|element|src|expression)\s*\(|@import|javascript:/i.test(value)
 
 /** Problems with an appearance's rules, as InputRejected takes them. */
 export const appearanceProblems = (appearance: FormAppearance): Array<FieldProblem> => {
   const problems: Array<FieldProblem> = []
+  if (appearance.fontFamily !== null && !FONT_FAMILY.test(appearance.fontFamily)) {
+    problems.push({
+      field: "appearance.fontFamily",
+      problem: "invalid-format",
+      userMessage: "A font's name has only letters, digits, spaces and hyphens, like Inter or Source Sans 3." as never,
+    })
+  }
+  for (const [index, href] of appearance.fonts.entries()) {
+    if (!FONT_STYLESHEET.test(href)) {
+      problems.push({
+        field: `appearance.fonts.${index}`,
+        problem: "not-allowed",
+        userMessage: `Font stylesheets come from ${FONT_HOSTS.join(", ")}.` as never,
+      })
+    }
+  }
   for (const [selector, declarations] of Object.entries(appearance.rules)) {
     const parts = selectorParts(selector)
     const allowed = parts ? APPEARANCE_CLASSES[parts.base] : undefined
@@ -232,5 +256,5 @@ export const mergeAppearance = (base: FormAppearance, override: AppearanceOverri
   spacing: override.spacing ?? base.spacing,
   labels: override.labels ?? base.labels,
   rules: { ...base.rules, ...override.rules },
-  fonts: [...base.fonts, ...(override.fonts ?? [])].slice(0, 3),
+  fonts: base.fonts,
 })

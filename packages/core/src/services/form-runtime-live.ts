@@ -26,7 +26,7 @@ import {
 import { Encryption } from "./encryption.ts"
 import { FormRuntime, type RenderedForm, type SubmissionOutcome } from "./form-runtime.ts"
 import { type ConsentRecord, FormSubmissions } from "./form-submissions.ts"
-import { RateLimiter } from "./rate-limiter.ts"
+import { digest, RateLimiter } from "./rate-limiter.ts"
 import { classifySqlError } from "./sql-errors.ts"
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -219,6 +219,18 @@ export const FormRuntimeLive = Layer.effect(
         (rows) => rows.length > 0,
       )
 
+    /**
+     * The team's Turnstile secret, if Turnstile is on and the secret can be read. One no key opens
+     * (a lost key, or a server without a newly added one) counts as Turnstile off: the form falls
+     * back to the built-in proof of work rather than marking every submission spam (D152).
+     */
+    const turnstileSecretOf = (
+      settings: { readonly captchaProvider: string; readonly turnstileSecret: string | null } | null,
+    ) => {
+      if (settings?.captchaProvider !== "turnstile" || !settings.turnstileSecret) return undefined
+      return encryption.decrypt(settings.turnstileSecret)
+    }
+
     const takes = (key: string, limit: { readonly count: number; readonly window: Duration.Duration }) =>
       limiter.take(key, limit.count, limit.window).pipe(
         Effect.as(true),
@@ -241,19 +253,23 @@ export const FormRuntimeLive = Layer.effect(
           }
           const now = Date.now()
           const day = new Date(now).toISOString().slice(0, 10)
-          yield* run(
-            db.query((d) =>
-              d
-                .insert(schema.formViews)
-                .values({ formId: form.id, day, page: pageKey(context.page), views: 1 })
-                .onConflictDoUpdate({
-                  target: [schema.formViews.formId, schema.formViews.day, schema.formViews.page],
-                  set: { views: sql`${schema.formViews.views} + 1` },
-                }),
-            ),
-          )
-          const turnstileReady =
-            settings?.captchaProvider === "turnstile" && settings.turnstileSiteKey && settings.turnstileSecret
+          // Loads aren't refused, so a busy office still gets its form; bots looping load-and-submit
+          // just pay more for each one. Nor are they counted, so a script can't fill the views table.
+          const busy = !!context.ip && !(yield* takes(`form-render:${context.ip}`, LIMITS.rendersPerIp))
+          if (!busy) {
+            yield* run(
+              db.query((d) =>
+                d
+                  .insert(schema.formViews)
+                  .values({ formId: form.id, day, page: pageKey(context.page), views: 1 })
+                  .onConflictDoUpdate({
+                    target: [schema.formViews.formId, schema.formViews.day, schema.formViews.page],
+                    set: { views: sql`${schema.formViews.views} + 1` },
+                  }),
+              ),
+            )
+          }
+          const turnstileReady = settings?.turnstileSiteKey && turnstileSecretOf(settings) !== undefined
           const rendered: RenderedForm = {
             formId: form.id as FormId,
             version: form.version,
@@ -269,12 +285,7 @@ export const FormRuntimeLive = Layer.effect(
                 }
               : {
                   provider: "builtin",
-                  challenge: yield* tokens.challenge(
-                    now,
-                    // Loads aren't refused, so a busy office still gets its form; bots looping
-                    // load-and-submit just pay more for each one.
-                    context.ip && !(yield* takes(`form-render:${context.ip}`, LIMITS.rendersPerIp)) ? "hard" : "normal",
-                  ),
+                  challenge: yield* tokens.challenge(now, busy ? "hard" : "normal"),
                 },
           }
           return rendered
@@ -304,15 +315,6 @@ export const FormRuntimeLive = Layer.effect(
             afterSubmit: content.afterSubmit,
             confirmByEmail: content.doubleOptIn,
           }
-          // Floods from one visitor: answered the same, and not stored (D145, D147).
-          const withinLimits =
-            (yield* takes(`form-ip:${form.id}:${visitor.ip}`, LIMITS.ipPerForm)) &&
-            (yield* takes(`form-ip:${visitor.ip}`, LIMITS.ipOverall))
-          if (!withinLimits) {
-            yield* Effect.logInfo(`form ${form.id}: submission from ${visitor.ip} over the limit`)
-            return accepted
-          }
-
           const customFields = yield* customFieldsOf(form.teamId, content)
           const { values, problems } = readAnswers(content, customFields, input.values)
           if (Object.keys(problems).length > 0) return { kind: "invalid", problems } satisfies SubmissionOutcome
@@ -336,10 +338,7 @@ export const FormRuntimeLive = Layer.effect(
             if (!(yield* useOnce(`render:${token.nonce}`, new Date(token.issuedAt + RENDER_TOKEN_MAX_AGE_MS)))) {
               return "The same form sent twice"
             }
-            const turnstileSecret =
-              settings?.captchaProvider === "turnstile" && settings.turnstileSecret
-                ? encryption.decrypt(settings.turnstileSecret)
-                : undefined
+            const turnstileSecret = turnstileSecretOf(settings)
             if (turnstileSecret) {
               if (!input.captchaToken) return "Turnstile missing"
               const result = yield* turnstile.verify({
@@ -360,10 +359,18 @@ export const FormRuntimeLive = Layer.effect(
                 return "Proof of work used twice"
               }
             }
+            // Counted only once the form was really loaded and its work done, so a script can't use
+            // up a visitor's allowance. Over it, kept on the spam list where it can be released (D147).
+            if (
+              !(yield* takes(`form-ip:${form.id}:${visitor.ip}`, LIMITS.ipPerForm)) ||
+              !(yield* takes(`form-ip:${visitor.ip}`, LIMITS.ipOverall))
+            ) {
+              return "Too many from one visitor"
+            }
             const domain = email.split("@")[1] ?? ""
             if (settings?.blockDisposableEmails && emailChecks.isDisposable(domain)) return "Disposable email address"
             if (!(yield* emailChecks.acceptsMail(domain))) return "No mail server for that domain"
-            if (!(yield* takes(`form-email:${form.id}:${email}`, LIMITS.emailPerForm))) {
+            if (!(yield* takes(`form-email:${form.id}:${digest(email)}`, LIMITS.emailPerForm))) {
               return "Too many sign-ups from one address"
             }
             return undefined

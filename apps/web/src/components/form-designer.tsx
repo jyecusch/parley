@@ -17,10 +17,13 @@ import { CSS } from "@dnd-kit/utilities"
 import {
   appearanceProblems,
   type CustomField,
+  countryCodeOf,
   DEFAULT_COLORS,
   DEFAULT_DARK_COLORS,
   type FieldProblem,
+  FONT_HOSTS,
   FORM_REDIRECT_URL,
+  type FORM_SET_FIELDS,
   type Form,
   type FormAppearance,
   type FormColors,
@@ -34,7 +37,7 @@ import {
 } from "@parley/domain"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
-import { Fragment, type ReactNode, useMemo, useState } from "react"
+import { Fragment, type ReactNode, useEffect, useMemo, useState } from "react"
 import { call, messageOf } from "../lib/client.ts"
 import { useFields } from "../lib/custom-fields.ts"
 import { appOrigin, formKey, formsKey, useTopics } from "../lib/forms.ts"
@@ -109,7 +112,7 @@ export const CONTACT_FIELD_LABELS: Readonly<Record<FormContactField, string>> = 
 }
 
 /** Contact fields "Set on every sign-up" can fill, as import targets name them. */
-const SET_TARGETS: ReadonlyArray<{ readonly key: string; readonly label: string }> = [
+const SET_TARGETS: ReadonlyArray<{ readonly key: (typeof FORM_SET_FIELDS)[number]; readonly label: string }> = [
   { key: "company", label: "Company" },
   { key: "title", label: "Job title" },
   { key: "city", label: "City" },
@@ -581,14 +584,11 @@ function SetOnEverySignUp(props: {
                 </option>
               ))}
           </Select>
-          <Input
-            aria-label="Value"
-            className="flex-1"
-            maxLength={500}
+          <SetValueInput
+            target={key}
+            customField={props.customFields.find((field) => `custom:${field.id}` === key)}
             value={value}
-            onChange={(event) =>
-              write(entries.map((entry, i) => (i === index ? ([entry[0], event.target.value] as const) : entry)))
-            }
+            onChange={(next) => write(entries.map((entry, i) => (i === index ? ([entry[0], next] as const) : entry)))}
           />
           <IconButton size="xs" label="Remove" onClick={() => write(entries.filter((_, i) => i !== index))}>
             <CloseIcon className="size-4" />
@@ -605,12 +605,60 @@ function SetOnEverySignUp(props: {
   )
 }
 
+/** A fixed value's input, shaped by what it sets: a custom field's options, a number, a date, yes or no. */
+function SetValueInput(props: {
+  readonly target: string
+  readonly customField: CustomField | undefined
+  readonly value: string
+  readonly onChange: (value: string) => void
+}) {
+  const field = props.customField
+  const common = { "aria-label": "Value", className: "flex-1" }
+  if (field?.type === "single-select" || field?.type === "multi-select" || field?.type === "checkbox") {
+    const options =
+      field.type === "checkbox"
+        ? [
+            { id: "true", label: "Yes" },
+            { id: "false", label: "No" },
+          ]
+        : field.options
+    return (
+      <Select {...common} value={props.value} onChange={(event) => props.onChange(event.target.value)}>
+        <option value="" disabled>
+          Choose…
+        </option>
+        {options.map((option) => (
+          <option key={option.id} value={option.id}>
+            {option.label}
+          </option>
+        ))}
+      </Select>
+    )
+  }
+  return (
+    <Input
+      {...common}
+      type={field?.type === "number" ? "number" : field?.type === "date" ? "date" : "text"}
+      maxLength={500}
+      value={props.value}
+      aria-invalid={setValueProblem(props.target, props.value) ? true : undefined}
+      onChange={(event) => props.onChange(event.target.value)}
+    />
+  )
+}
+
+/** What's wrong with a fixed value the server would refuse, if anything; the rest it checks itself. */
+const setValueProblem = (target: string, value: string) =>
+  value.trim() === "" || (target === "country" && !countryCodeOf(value))
+
 /**
  * Whether the draft can be saved: nothing is still being filled in. Until then it waits ("Not
  * saved yet"), which isn't an error: the field itself says what it needs.
  */
 const draftComplete = (value: DraftState) =>
-  appearanceProblems(value.content.appearance).length === 0 && !redirectProblem(value.content)
+  appearanceProblems(value.content.appearance).length === 0 &&
+  !redirectProblem(value.content) &&
+  !Object.entries(value.content.set).some(([target, text]) => setValueProblem(target, text))
 
 /** The draft fields whose problems show beside them, by the path the server names them. */
 const INLINE_FIELDS: ReadonlySet<string> = new Set(["draft.afterSubmit.url"])
@@ -1263,22 +1311,7 @@ function StylePanel(props: {
           </Select>
         </Field>
       </div>
-      <Field
-        label="Font stylesheet"
-        htmlFor="form-font-url"
-        info="A stylesheet that loads the font, such as https://fonts.googleapis.com/css2?family=Inter."
-      >
-        <Input
-          id="form-font-url"
-          type="url"
-          maxLength={500}
-          placeholder="https://"
-          value={appearance.fonts[0] ?? ""}
-          onChange={(event) =>
-            setAppearance({ fonts: event.target.value.startsWith("https://") ? [event.target.value] : [] })
-          }
-        />
-      </Field>
+      <FontStylesheetField value={appearance.fonts[0] ?? ""} onChange={(fonts) => setAppearance({ fonts })} />
       <Slider
         label="Corners"
         labelClassName="w-24"
@@ -1608,5 +1641,40 @@ function SeenOnLink(props: { readonly teamId: TeamId; readonly formId: FormId })
       </span>
       <span className="text-sm text-muted">Submissions</span>
     </Link>
+  )
+}
+
+/** A font stylesheet's address, kept as typed and saved once it's on a font service (FONT_HOSTS). */
+function FontStylesheetField({
+  value,
+  onChange,
+}: {
+  readonly value: string
+  readonly onChange: (fonts: ReadonlyArray<string>) => void
+}) {
+  const [text, setText] = useState(value)
+  useEffect(() => setText(value), [value])
+  const valid = (address: string) => FONT_HOSTS.some((host) => address.startsWith(`https://${host}/`))
+  return (
+    <Field
+      label="Font stylesheet"
+      htmlFor="form-font-url"
+      info={`A stylesheet that loads the font, such as https://fonts.googleapis.com/css2?family=Inter. From ${FONT_HOSTS.join(", ")}.`}
+      error={text && !valid(text) ? `Use a stylesheet from ${FONT_HOSTS.join(", ")}.` : undefined}
+    >
+      <Input
+        id="form-font-url"
+        type="url"
+        maxLength={500}
+        placeholder="https://fonts.googleapis.com/css2?family=…"
+        value={text}
+        onChange={(event) => {
+          const next = event.target.value.trim()
+          setText(event.target.value)
+          if (!next) onChange([])
+          else if (valid(next)) onChange([next])
+        }}
+      />
+    </Field>
   )
 }

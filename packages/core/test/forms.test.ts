@@ -38,6 +38,11 @@ const TestLive = coreLiveWith(Outside)
 
 const unique = () => crypto.randomUUID().slice(0, 8)
 const visitor = { ip: "203.0.113.7", userAgent: "Mozilla/5.0 test" }
+/** A visitor of their own, so tests don't share (and use up) one address's limits. */
+const someVisitor = () => ({
+  ...visitor,
+  ip: `203.0.${Math.floor(Math.random() * 250)}.${Math.floor(Math.random() * 250)}`,
+})
 
 const setUpSending = (owner: Principal, teamId: TeamId) =>
   Effect.gen(function* () {
@@ -110,7 +115,7 @@ const submit = (
         utm: { utm_source: "newsletter", utm_medium: "email", utm_source_platform: "Klaviyo", other: "dropped" },
         clickIds: { gclid: "Cj0KCQ", other: "dropped" },
       },
-      visitor,
+      someVisitor(),
     )
   })
 
@@ -351,9 +356,9 @@ describe("forms (D144–D150)", () => {
           utm: {},
           clickIds: {},
         }
-        yield* runtime.submit(form.id, input, visitor)
+        yield* runtime.submit(form.id, input, someVisitor())
         expect((yield* latestSubmission(form.id))?.status).toBe("confirmed")
-        yield* runtime.submit(form.id, { ...input, values: { email: `h-${unique()}@example.com` } }, visitor)
+        yield* runtime.submit(form.id, { ...input, values: { email: `h-${unique()}@example.com` } }, someVisitor())
         expect((yield* latestSubmission(form.id))?.spamReason).toBe("The same form sent twice")
         // Answers that don't fit are reported, and nothing is stored.
         const invalid = yield* submit(form.id, { email: "not an email" })
@@ -366,6 +371,49 @@ describe("forms (D144–D150)", () => {
           submissionId: spam.items.find((entry) => entry.spamReason === "Hidden field filled in")?.id ?? ("" as never),
         })
         expect(released).toMatchObject({ status: "confirmed", outcome: "created", spamReason: null })
+      }).pipe(Effect.provide(TestLive)),
+    30_000,
+  )
+
+  it.effect(
+    "keeps submissions over a visitor's limit on the spam list, counting only really loaded forms",
+    () =>
+      Effect.gen(function* () {
+        const f = yield* Fixture
+        const { form } = yield* publishedForm(f.jane, f.acme, (draft) => ({ ...draft, doubleOptIn: false }))
+        const runtime = yield* FormRuntime
+        const from = { ip: `192.0.2.${Math.floor(Math.random() * 200) + 20}`, userAgent: "test" }
+        const send = (override: Partial<{ renderToken: string }> = {}) =>
+          Effect.gen(function* () {
+            const loaded = yield* visit(form.id)
+            return yield* runtime.submit(
+              form.id,
+              {
+                renderToken: override.renderToken ?? loaded.renderToken,
+                captchaToken: loaded.captchaToken,
+                honeypot: "",
+                values: { email: `ip-${unique()}@example.com` },
+                page: "",
+                utm: {},
+                clickIds: {},
+              },
+              from,
+            )
+          })
+        // Forged sends (no loaded form) don't use up the visitor's allowance.
+        for (let attempt = 0; attempt < 12; attempt++) yield* send({ renderToken: "made-up" })
+        for (let attempt = 0; attempt < 10; attempt++) yield* send()
+        expect((yield* latestSubmission(form.id))?.status).toBe("confirmed")
+        expect((yield* send()).kind).toBe("accepted")
+        const over = yield* latestSubmission(form.id)
+        expect(over).toMatchObject({ status: "spam", spamReason: "Too many from one visitor" })
+        // Kept, so a real one (a booth behind one router) can be released.
+        const released = yield* run["forms.releaseSubmission"](f.jane, {
+          teamId: f.acme,
+          formId: form.id,
+          submissionId: over?.id as never,
+        })
+        expect(released.status).toBe("confirmed")
       }).pipe(Effect.provide(TestLive)),
     30_000,
   )
@@ -447,6 +495,80 @@ describe("forms (D144–D150)", () => {
       expect((yield* latestSubmission(form.id))?.spamReason).toBe("Turnstile failed")
       yield* submit(form.id, { email: `u-${unique()}@example.com` }, { captchaToken: "good" })
       expect((yield* latestSubmission(form.id))?.status).toBe("confirmed")
+    }).pipe(Effect.provide(TestLive)),
+  )
+
+  it.effect("falls back to the proof of work when Turnstile's secret can't be read", () =>
+    Effect.gen(function* () {
+      const f = yield* Fixture
+      const db = yield* Database
+      // Encrypted with a key this server doesn't have (lost, or added on a newer server).
+      const unreadable = {
+        captchaProvider: "turnstile" as const,
+        turnstileSiteKey: "0x4AAA",
+        turnstileSecret: "v1.abcdefgh.AAAA",
+      }
+      yield* db
+        .query((d) =>
+          d
+            .insert(schema.formSettings)
+            .values({ teamId: f.acme, ...unreadable })
+            .onConflictDoUpdate({ target: schema.formSettings.teamId, set: unreadable }),
+        )
+        .pipe(Effect.orDie)
+      const { form } = yield* publishedForm(f.jane, f.acme, (draft) => ({ ...draft, doubleOptIn: false }))
+      expect((yield* visit(form.id)).rendered.captcha.provider).toBe("builtin")
+      yield* submit(form.id, { email: `fallback-${unique()}@example.com` })
+      expect((yield* latestSubmission(form.id))?.status).toBe("confirmed")
+    }).pipe(Effect.provide(TestLive)),
+  )
+
+  it.effect("takes fonts only from font services, and fixed values only of the right kind", () =>
+    Effect.gen(function* () {
+      const f = yield* Fixture
+      const form = yield* run["forms.create"](f.jane, { teamId: f.acme, name: "Styled", template: "waitlist" })
+      const update = (draft: FormContent) =>
+        run["forms.update"](f.jane, { teamId: f.acme, formId: form.id, draft }).pipe(Effect.flip)
+      const withAppearance = (appearance: Partial<FormContent["appearance"]>) => ({
+        ...form.draft,
+        appearance: { ...form.draft.appearance, ...appearance },
+      })
+      expect((yield* update(withAppearance({ fonts: ["https://evil.example/steal.css"] })))._tag).toBe("InputRejected")
+      expect((yield* update(withAppearance({ fontFamily: 'Inter"}*{color:red' })))._tag).toBe("InputRejected")
+      expect(
+        (yield* update(
+          withAppearance({ rules: { ".Button": { background: "image-set('https://x.example/a.png' 1x)" } } }),
+        ))._tag,
+      ).toBe("InputRejected")
+      yield* run["forms.update"](f.jane, {
+        teamId: f.acme,
+        formId: form.id,
+        draft: withAppearance({ fonts: ["https://fonts.googleapis.com/css2?family=Inter"], fontFamily: "Inter" }),
+      })
+
+      const plan = yield* run["fields.create"](f.jane, {
+        teamId: f.acme,
+        recordType: "contact",
+        name: `Plan ${unique()}`,
+        type: "single-select",
+        options: [{ id: "free", label: "Free" }],
+      })
+      const rejected = yield* update({
+        ...form.draft,
+        set: { [`custom:${plan.id}`]: "Free", country: "Atlantis", lastName: "Smith" },
+      })
+      expect(rejected._tag).toBe("InputRejected")
+      expect(rejected._tag === "InputRejected" && rejected.problems.map((entry) => entry.field).sort()).toEqual([
+        "draft.set.country",
+        `draft.set.custom:${plan.id}`,
+        "draft.set.lastName",
+      ])
+      const saved = yield* run["forms.update"](f.jane, {
+        teamId: f.acme,
+        formId: form.id,
+        draft: { ...form.draft, set: { [`custom:${plan.id}`]: "free", country: "Australia" } },
+      })
+      expect(saved.draft.set).toEqual({ [`custom:${plan.id}`]: "free", country: "Australia" })
     }).pipe(Effect.provide(TestLive)),
   )
 
