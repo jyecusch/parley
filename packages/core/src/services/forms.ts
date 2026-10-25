@@ -29,6 +29,7 @@ import type { SqlError } from "effect/sql"
 import { type FormTemplateName, templateContent } from "../forms/templates.ts"
 import type { FormInTeam, SubmissionOfForm } from "../proofs/form-in-team.ts"
 import type { CanManageEmail, CanWriteEmail, CanWriteRecords, MemberOf } from "../proofs/permissions.ts"
+import { decodeCursor, encodeCursor } from "./cursors.ts"
 import { Encryption } from "./encryption.ts"
 import { FormSubmissions } from "./form-submissions.ts"
 import { classifySqlError } from "./sql-errors.ts"
@@ -98,10 +99,11 @@ export class Forms extends Context.Service<
       input: FormUpdate,
       access: CanWriteEmail<P, T>,
     ) => Effect.Effect<Form, InputRejected | TopicNotFound | SegmentNotFound | DatabaseUnavailable>
+    /** Publishes the draft, checked again: a topic, field or segment it uses may have gone since it was saved. */
     readonly publish: <P, T, F>(
       target: FormInTeam<F, T>,
       access: CanWriteEmail<P, T>,
-    ) => Effect.Effect<Form, DatabaseUnavailable>
+    ) => Effect.Effect<Form, InputRejected | TopicNotFound | SegmentNotFound | DatabaseUnavailable>
     readonly delete: <P, T, F>(
       target: FormInTeam<F, T>,
       access: CanWriteEmail<P, T>,
@@ -451,10 +453,11 @@ export class Forms extends Context.Service<
             )
             return yield* one(teamId, target.form.value)
           }).pipe(Effect.withSpan("Forms.update")),
-        publish: (target) =>
+        publish: (target, access) =>
           Effect.gen(function* () {
             const teamId = target.team.value
             const formId = target.form.value
+            yield* check(teamId, access.member.teamName, target.found.draft)
             yield* run(
               db.transaction(
                 Effect.gen(function* () {
@@ -566,22 +569,13 @@ export class Forms extends Context.Service<
         submissions: (target, query) =>
           Effect.gen(function* () {
             const limit = query.limit ?? 50
-            const [at, id] = query.cursor
-              ? (() => {
-                  try {
-                    return atob(query.cursor).split("|")
-                  } catch {
-                    return []
-                  }
-                })()
-              : []
-            const after =
-              at && id && !Number.isNaN(Date.parse(at))
-                ? or(
-                    lt(schema.formSubmissions.createdAt, new Date(at)),
-                    and(eq(schema.formSubmissions.createdAt, new Date(at)), lt(schema.formSubmissions.id, id)),
-                  )
-                : undefined
+            const cursor = query.cursor ? decodeCursor(query.cursor) : undefined
+            const after = cursor
+              ? or(
+                  lt(schema.formSubmissions.createdAt, cursor.at),
+                  and(eq(schema.formSubmissions.createdAt, cursor.at), lt(schema.formSubmissions.id, cursor.id)),
+                )
+              : undefined
             const rows = yield* run(
               db.query((d) =>
                 d
@@ -602,7 +596,7 @@ export class Forms extends Context.Service<
             const last = page.at(-1)
             return {
               items: page.map(toSubmission),
-              nextCursor: rows.length > limit && last ? btoa(`${last.createdAt.toISOString()}|${last.id}`) : null,
+              nextCursor: rows.length > limit && last ? encodeCursor(last.createdAt, last.id) : null,
             }
           }),
         locateSubmission: (formId, submissionId) =>
@@ -624,7 +618,8 @@ export class Forms extends Context.Service<
               db.query((d) =>
                 d
                   .update(schema.formSubmissions)
-                  .set({ status: "waiting", spamReason: null })
+                  // Its 7 days to be confirmed start now, not when it was first sent (D146).
+                  .set({ status: "waiting", spamReason: null, waitingSince: sql`now()` })
                   .where(and(eq(schema.formSubmissions.id, id), eq(schema.formSubmissions.status, "spam")))
                   .returning({ id: schema.formSubmissions.id }),
               ),

@@ -89,7 +89,7 @@ export const publishForm = defineTeamOperation({
     "Put a form's draft live, as a new version. Submissions record which version they saw. A form with double opt-in needs the team's sender set up first (emailSettings), since it emails a confirmation link.",
   input: Schema.Struct(OneForm),
   output: Form,
-  errors: [FormNotFound, SenderNotReady],
+  errors: [FormNotFound, SenderNotReady, TopicNotFound, SegmentNotFound],
   http: { method: "POST", path: "/teams/:teamId/forms/:formId/publish" },
   hints: { readOnly: false, destructive: true, idempotent: false },
   permissions: ["records:read", "email:write"],

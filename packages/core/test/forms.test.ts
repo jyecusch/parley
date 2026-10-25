@@ -135,6 +135,13 @@ const latestSubmission = (formId: FormId) =>
     return row
   })
 
+/** Clicks the latest confirmation link sent to an address. */
+const runtimeConfirm = (to: string) =>
+  Effect.gen(function* () {
+    const runtime = yield* FormRuntime
+    return (yield* runtime.confirm((yield* confirmToken(to)) ?? "", visitor)).kind
+  })
+
 const confirmToken = (to: string) =>
   Effect.gen(function* () {
     const mailer = yield* Mailer
@@ -677,6 +684,96 @@ describe("forms (D144–D150)", () => {
     }).pipe(Effect.provide(TestLive)),
   )
 
+  it.effect("someone who left an opt-in topic is back only by confirming, even without double opt-in", () =>
+    Effect.gen(function* () {
+      const f = yield* Fixture
+      yield* setUpSending(f.jane, f.acme)
+      const { form, topic } = yield* publishedForm(f.jane, f.acme, (draft, topicId) => ({
+        ...withConsent(draft, topicId),
+        doubleOptIn: false,
+      }))
+      const email = `rejoin-${unique()}@example.com`
+      yield* submit(form.id, { email, [`topic:${topic.id}`]: true })
+      const [contact] = (yield* run["contacts.list"](f.jane, { teamId: f.acme, search: email })).items
+      const contactId = contact?.id as never
+      const subscribed = () =>
+        run["contacts.subscriptions"](f.jane, { teamId: f.acme, contactId }).pipe(
+          Effect.map((result) => result.topics.find((entry) => entry.topicId === topic.id)?.subscribed),
+        )
+      expect(yield* subscribed()).toBe(true)
+      yield* run["contacts.updateSubscriptions"](f.jane, {
+        teamId: f.acme,
+        contactId,
+        topics: [{ topicId: topic.id, subscribed: false }],
+      })
+      expect(yield* subscribed()).toBe(false)
+      // Ticking the box again doesn't put them back: it asks them to confirm (D145).
+      yield* submit(form.id, { email, [`topic:${topic.id}`]: true })
+      expect((yield* latestSubmission(form.id))?.status).toBe("waiting")
+      expect(yield* subscribed()).toBe(false)
+      // Nor does switching the topic to opt-out.
+      yield* run["topics.update"](f.jane, { teamId: f.acme, topicId: topic.id, mode: "opt-out" })
+      expect(yield* subscribed()).toBe(false)
+      yield* run["topics.update"](f.jane, { teamId: f.acme, topicId: topic.id, mode: "opt-in" })
+      const runtime = yield* FormRuntime
+      yield* runtime.confirm((yield* confirmToken(email)) ?? "", visitor)
+      expect(yield* subscribed()).toBe(true)
+    }).pipe(Effect.provide(TestLive)),
+  )
+
+  it.effect("two submissions for one new address at once make one contact", () =>
+    Effect.gen(function* () {
+      const f = yield* Fixture
+      const { form } = yield* publishedForm(f.jane, f.acme, (draft) => ({ ...draft, doubleOptIn: false }))
+      const email = `twice-${unique()}@example.com`
+      const company = `Twice ${unique()}`
+      yield* Effect.all(
+        [submit(form.id, { email, company }), submit(form.id, { email: email.replace("twice", "other"), company })],
+        { concurrency: "unbounded" },
+      )
+      yield* Effect.all([submit(form.id, { email }), submit(form.id, { email })], { concurrency: "unbounded" })
+      const contacts = yield* run["contacts.list"](f.jane, { teamId: f.acme, search: email })
+      expect(contacts.items).toHaveLength(1)
+      const companies = yield* run["companies.list"](f.jane, { teamId: f.acme, search: company })
+      expect(companies.items).toHaveLength(1)
+      const db = yield* Database
+      const rows = yield* db
+        .query((d) => d.select().from(schema.formSubmissions).where(eq(schema.formSubmissions.formId, form.id)))
+        .pipe(Effect.orDie)
+      expect(rows.map((row) => row.status)).toEqual(["confirmed", "confirmed", "confirmed", "confirmed"])
+    }).pipe(Effect.provide(TestLive)),
+  )
+
+  it.effect("publishes only a draft that still checks out, and drops boxes for deleted topics", () =>
+    Effect.gen(function* () {
+      const f = yield* Fixture
+      const { form, topic } = yield* publishedForm(f.jane, f.acme, (draft, topicId) => ({
+        ...withConsent(draft, topicId),
+        doubleOptIn: false,
+      }))
+      yield* run["topics.delete"](f.jane, { teamId: f.acme, topicId: topic.id })
+      const refused = yield* run["forms.publish"](f.jane, { teamId: f.acme, formId: form.id }).pipe(Effect.flip)
+      expect(refused._tag).toBe("TopicNotFound")
+      const loaded = yield* visit(form.id)
+      expect(loaded.rendered.content.fields.some((field) => field.kind === "consent")).toBe(false)
+    }).pipe(Effect.provide(TestLive)),
+  )
+
+  it.effect("a deleted form takes no confirmations, and a bad cursor reads as the first page", () =>
+    Effect.gen(function* () {
+      const f = yield* Fixture
+      yield* setUpSending(f.jane, f.acme)
+      const { form } = yield* publishedForm(f.jane, f.acme, (draft) => draft)
+      const email = `gone-${unique()}@example.com`
+      yield* submit(form.id, { email })
+      const page = yield* run["forms.submissions"](f.jane, { teamId: f.acme, formId: form.id, cursor: "bm90fGF1dWlk" })
+      expect(page.items).toHaveLength(1)
+      yield* run["forms.delete"](f.jane, { teamId: f.acme, formId: form.id })
+      const runtime = yield* FormRuntime
+      expect((yield* runtime.confirm((yield* confirmToken(email)) ?? "", visitor)).kind).toBe("invalid")
+    }).pipe(Effect.provide(TestLive)),
+  )
+
   it.effect("purges old spam and expires unconfirmed submissions", () =>
     Effect.gen(function* () {
       const f = yield* Fixture
@@ -689,7 +786,11 @@ describe("forms (D144–D150)", () => {
           .query((d) =>
             d
               .update(schema.formSubmissions)
-              .set({ status, createdAt: sql`now() - make_interval(days => ${days})` })
+              .set({
+                status,
+                createdAt: sql`now() - make_interval(days => ${days})`,
+                waitingSince: sql`now() - make_interval(days => ${days})`,
+              })
               .where(eq(schema.formSubmissions.id, id)),
           )
           .pipe(Effect.orDie)
@@ -706,6 +807,61 @@ describe("forms (D144–D150)", () => {
         .pipe(Effect.orDie)
       expect(rows.find((row) => row.id === spam?.id)).toBeUndefined()
       expect(rows.find((row) => row.id === waiting?.id)).toMatchObject({ status: "expired", values: {} })
+
+      // Released from spam 10 days on, it has its own 7 days to be confirmed.
+      yield* submit(form.id, { email: `late-${unique()}@example.com` }, { honeypot: "x" })
+      const late = yield* latestSubmission(form.id)
+      yield* age(late?.id ?? "", 10, "spam")
+      yield* setUpSending(f.jane, f.acme)
+      yield* db
+        .query((d) =>
+          d
+            .update(schema.formVersions)
+            .set({ content: sql`jsonb_set(${schema.formVersions.content}, '{doubleOptIn}', 'true')` })
+            .where(eq(schema.formVersions.formId, form.id)),
+        )
+        .pipe(Effect.orDie)
+      yield* run["forms.releaseSubmission"](f.jane, {
+        teamId: f.acme,
+        formId: form.id,
+        submissionId: late?.id as never,
+      })
+      yield* purge.run
+      const [released] = yield* db
+        .query((d) =>
+          d
+            .select()
+            .from(schema.formSubmissions)
+            .where(eq(schema.formSubmissions.id, late?.id ?? "")),
+        )
+        .pipe(Effect.orDie)
+      expect(released?.status).toBe("waiting")
+
+      // A purged contact's submissions go with it.
+      const email = `purged-${unique()}@example.com`
+      yield* submit(form.id, { email })
+      const confirmed = yield* runtimeConfirm(email)
+      expect(confirmed).toBe("confirmed")
+      const mine = yield* latestSubmission(form.id)
+      yield* run["contacts.delete"](f.jane, { teamId: f.acme, contactId: mine?.contactId as never })
+      yield* db
+        .query((d) =>
+          d
+            .update(schema.contacts)
+            .set({ deletedAt: sql`now() - make_interval(days => 31)` })
+            .where(eq(schema.contacts.id, mine?.contactId ?? "")),
+        )
+        .pipe(Effect.orDie)
+      yield* purge.run
+      const left = yield* db
+        .query((d) =>
+          d
+            .select()
+            .from(schema.formSubmissions)
+            .where(eq(schema.formSubmissions.id, mine?.id ?? "")),
+        )
+        .pipe(Effect.orDie)
+      expect(left).toHaveLength(0)
     }).pipe(Effect.provide(Layer.provideMerge(Purge.layer, TestLive))),
   )
 })

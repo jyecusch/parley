@@ -27,7 +27,7 @@ One screen, the form itself in the middle, edited in place. No separate "builder
 - **Hidden fields**: the page and its tracking parameters (every `utm_*` parameter) are captured automatically (D153). Fixed values can be added, such as `Source = Launch page`.
 - **Tracking options for the embedding site** (D154), off by default and turned on with attributes on the embed script, since the site answers for its visitors' consent:
   - `data-remember-utm` remembers UTM parameters for the visit (sessionStorage), or `="30"` for that many days (localStorage), so a sign-up on another page still counts the campaign. The latest UTMs replace remembered ones. Adding the script to every page, without a form, catches the landing page.
-  - `data-click-ids` passes ad click IDs: `gclid`, `gbraid`, `wbraid`, `fbclid`, `msclkid`, `li_fat_id`, `ttclid`, `twclid`.
+  - `data-click-ids` passes ad click IDs: `gclid`, `gbraid`, `wbraid`, `fbclid`, `msclkid`, `li_fat_id`, `ttclid`, `twclid`. The hosted page never records them: there's no site to have opted in.
   - The Embed tab builds the snippet with them, under Options (D155). Where a form is seen, by page and UTM parameter, is a tab on its Submissions screen.
 - **Where sign-ups came from**: each submission and the contact's sign-up activity show source / medium / campaign, the other UTM parameters and any ad click.
 - **Consent**: a checkbox per topic the form subscribes to, never pre-ticked, with editable wording. A link to the team's privacy policy.
@@ -90,16 +90,18 @@ Layers, all invisible, all on by default:
 
   A secret no key opens (a lost key) counts as Turnstile off: the team's forms fall back to the built-in proof of work, and the server logs a warning.
 
-**Spam list**: blocked submissions are kept for 30 days with their reason ("honeypot filled", "token too fresh", "Turnstile failed"…) and can be released if a real person was caught.
+**Spam list**: blocked submissions are kept for 30 days with their reason ("honeypot filled", "token too fresh", "Turnstile failed"…) and can be released if a real person was caught. A released one is handled as if just sent, with its own 7 days to be confirmed.
+
+**Unconfirmed and deleted**: a submission unconfirmed 7 days after it was sent (or released) expires, and its answers go. A deleted form takes nothing more, confirmations included. When a contact is purged (30 days after it's deleted), its submissions go with it: answers, address and consent records.
 
 ## Topics: opt-in as well as opt-out
 
 Today every topic is opt-out: a contact gets it unless they've left. That's wrong for forms: someone who joins a launch waitlist hasn't agreed to the newsletter. **Topics gain a mode**:
 
 - **Opt-out** (today's behavior, the default for existing topics): sent to everyone subscribed who hasn't left the topic.
-- **Opt-in**: sent only to contacts who joined it, through a form, an import or by hand.
+- **Opt-in**: sent only to contacts who joined it, through a form or by hand (joining through an import isn't built yet).
 
-A form subscribes people to opt-in topics they ticked. Broadcasts to an opt-in topic reach only its members.
+A form subscribes people to opt-in topics they ticked. Broadcasts to an opt-in topic reach only its members. Leaving is recorded whatever the mode: someone who left an opt-in topic is back only through a confirmed submission, and stays out if the topic's mode changes. The unsubscribe page can leave an opt-in topic but not join one; joining takes a form.
 
 ## Analytics
 

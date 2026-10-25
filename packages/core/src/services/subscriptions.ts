@@ -127,7 +127,33 @@ export class Subscriptions extends Context.Service<
           return result
         })
 
-      /** Leaves or rejoins one topic, or joins and leaves an opt-in one (D149). Returns whether anything changed. */
+      const join = (contactId: string, topicId: string) =>
+        db
+          .query((d) =>
+            d
+              .delete(schema.topicUnsubscribes)
+              .where(
+                and(eq(schema.topicUnsubscribes.contactId, contactId), eq(schema.topicUnsubscribes.topicId, topicId)),
+              )
+              .returning({ topicId: schema.topicUnsubscribes.topicId }),
+          )
+          .pipe(Effect.map((rows) => rows.length > 0))
+      const leave = (teamId: TeamId, contactId: string, topicId: string) =>
+        db
+          .query((d) =>
+            d
+              .insert(schema.topicUnsubscribes)
+              .values({ teamId, contactId, topicId })
+              .onConflictDoNothing()
+              .returning({ topicId: schema.topicUnsubscribes.topicId }),
+          )
+          .pipe(Effect.map((rows) => rows.length > 0))
+
+      /**
+       * Leaves or rejoins one topic (D149). Leaving is recorded whatever the topic's mode, so someone
+       * who left an opt-in topic is back only by confirming (D145), and stays out if the mode
+       * changes. Returns whether anything changed.
+       */
       const setTopic = (
         teamId: TeamId,
         contactId: string,
@@ -135,48 +161,26 @@ export class Subscriptions extends Context.Service<
         subscribed: boolean,
         mode: "opt-out" | "opt-in" = "opt-out",
       ) =>
-        mode === "opt-in"
-          ? subscribed
-            ? db
-                .query((d) =>
-                  d
-                    .insert(schema.topicMembers)
-                    .values({ teamId, contactId, topicId })
-                    .onConflictDoNothing()
-                    .returning({ topicId: schema.topicMembers.topicId }),
-                )
-                .pipe(Effect.map((rows) => rows.length > 0))
-            : db
-                .query((d) =>
-                  d
-                    .delete(schema.topicMembers)
-                    .where(and(eq(schema.topicMembers.contactId, contactId), eq(schema.topicMembers.topicId, topicId)))
-                    .returning({ topicId: schema.topicMembers.topicId }),
-                )
-                .pipe(Effect.map((rows) => rows.length > 0))
-          : subscribed
-            ? db
-                .query((d) =>
-                  d
-                    .delete(schema.topicUnsubscribes)
-                    .where(
-                      and(
-                        eq(schema.topicUnsubscribes.contactId, contactId),
-                        eq(schema.topicUnsubscribes.topicId, topicId),
-                      ),
-                    )
-                    .returning({ topicId: schema.topicUnsubscribes.topicId }),
-                )
-                .pipe(Effect.map((rows) => rows.length > 0))
-            : db
-                .query((d) =>
-                  d
-                    .insert(schema.topicUnsubscribes)
-                    .values({ teamId, contactId, topicId })
-                    .onConflictDoNothing()
-                    .returning({ topicId: schema.topicUnsubscribes.topicId }),
-                )
-                .pipe(Effect.map((rows) => rows.length > 0))
+        Effect.gen(function* () {
+          if (mode === "opt-out")
+            return subscribed ? yield* join(contactId, topicId) : yield* leave(teamId, contactId, topicId)
+          const members = subscribed
+            ? yield* db.query((d) =>
+                d
+                  .insert(schema.topicMembers)
+                  .values({ teamId, contactId, topicId })
+                  .onConflictDoNothing()
+                  .returning({ topicId: schema.topicMembers.topicId }),
+              )
+            : yield* db.query((d) =>
+                d
+                  .delete(schema.topicMembers)
+                  .where(and(eq(schema.topicMembers.contactId, contactId), eq(schema.topicMembers.topicId, topicId)))
+                  .returning({ topicId: schema.topicMembers.topicId }),
+              )
+          const left = subscribed ? yield* join(contactId, topicId) : yield* leave(teamId, contactId, topicId)
+          return members.length > 0 || left
+        })
 
       const updateTopics = <P, T, C>(
         target: ContactInTeam<C, T>,

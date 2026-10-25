@@ -9,6 +9,7 @@ import {
   FormAppearance,
   type FormContent,
   type FormId,
+  isUuid,
   mergeAppearance,
   UTM_PARAMETER,
 } from "@parley/domain"
@@ -29,7 +30,6 @@ import { type ConsentRecord, FormSubmissions } from "./form-submissions.ts"
 import { digest, RateLimiter } from "./rate-limiter.ts"
 import { classifySqlError } from "./sql-errors.ts"
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const PHONE = /^\+[1-9]\d{6,14}$/
 
@@ -163,7 +163,7 @@ export const FormRuntimeLive = Layer.effect(
     /** A live, published form with its team's settings. */
     const live = (formId: string) =>
       Effect.gen(function* () {
-        if (!UUID.test(formId)) return undefined
+        if (!isUuid(formId)) return undefined
         const [row] = yield* run(
           db.query((d) =>
             d
@@ -202,6 +202,26 @@ export const FormRuntimeLive = Layer.effect(
             },
           ]),
         )
+      })
+
+    /** The form without consent boxes for topics deleted since it was published: there's nothing to agree to. */
+    const withoutDeletedTopics = (teamId: string, content: FormContent) =>
+      Effect.gen(function* () {
+        const ids = content.fields.flatMap((field) => (field.kind === "consent" ? [field.topicId as string] : []))
+        if (ids.length === 0) return content
+        const rows = yield* run(
+          db.query((d) =>
+            d
+              .select({ id: schema.topics.id })
+              .from(schema.topics)
+              .where(and(eq(schema.topics.teamId, teamId), inArray(schema.topics.id, ids))),
+          ),
+        )
+        const live = new Set(rows.map((row) => row.id))
+        return {
+          ...content,
+          fields: content.fields.filter((field) => field.kind !== "consent" || live.has(field.topicId)),
+        }
       })
 
     /** Marks a one-time token or challenge used. False when it already was. */
@@ -243,7 +263,7 @@ export const FormRuntimeLive = Layer.effect(
           const found = yield* live(formId)
           if (!found) return undefined
           const { form, settings } = found
-          let content = found.content
+          let content = yield* withoutDeletedTopics(form.teamId, found.content)
           // Overrides from where it's embedded (D148): kept only if the result is a valid appearance.
           if (context.appearance) {
             const merged = decodeAppearance(mergeAppearance(content.appearance, context.appearance))
@@ -256,12 +276,18 @@ export const FormRuntimeLive = Layer.effect(
           // Loads aren't refused, so a busy office still gets its form; bots looping load-and-submit
           // just pay more for each one. Nor are they counted, so a script can't fill the views table.
           const busy = !!context.ip && !(yield* takes(`form-render:${context.ip}`, LIMITS.rendersPerIp))
-          if (!busy) {
+          if (!busy && context.countView !== false) {
             yield* run(
               db.query((d) =>
                 d
                   .insert(schema.formViews)
-                  .values({ formId: form.id, day, page: pageKey(context.page), views: 1 })
+                  // By page only when the form records pages, as its submissions do; else all as one.
+                  .values({
+                    formId: form.id,
+                    day,
+                    page: content.captureTracking ? pageKey(context.page) : "",
+                    views: 1,
+                  })
                   .onConflictDoUpdate({
                     target: [schema.formViews.formId, schema.formViews.day, schema.formViews.page],
                     set: { views: sql`${schema.formViews.views} + 1` },
@@ -293,7 +319,7 @@ export const FormRuntimeLive = Layer.effect(
 
       allowedSites: (formId) =>
         Effect.gen(function* () {
-          if (!UUID.test(formId)) return null
+          if (!isUuid(formId)) return null
           const [row] = yield* run(
             db.query((d) =>
               d
@@ -309,7 +335,8 @@ export const FormRuntimeLive = Layer.effect(
         Effect.gen(function* () {
           const found = yield* live(formId)
           if (!found) return { kind: "unavailable" } satisfies SubmissionOutcome
-          const { form, content, settings } = found
+          const { form, settings } = found
+          const content = yield* withoutDeletedTopics(form.teamId, found.content)
           const accepted: SubmissionOutcome = {
             kind: "accepted",
             afterSubmit: content.afterSubmit,

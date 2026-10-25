@@ -232,6 +232,8 @@ export function ContactPanel(props: {
           activityLoading={activity.isLoading}
           activityError={activity.isError ? messageOf(activity.error) : undefined}
           onError={(text) => props.onError(text)}
+          contact={contact}
+          customFields={fields}
         />
       </PanelBody>
     </RecordPanel>
