@@ -1,4 +1,5 @@
 import { Schema } from "effect"
+import type { CustomField } from "./custom-field.ts"
 import { CustomFieldId, FormId, SegmentId, SubmissionId, TopicId } from "./ids.ts"
 
 /*
@@ -97,6 +98,14 @@ export type FormColors = typeof FormColors.Type
  * "light-dark" (`colors` in light mode, `darkColors` in dark mode). Font, size, corners, spacing and labels are shared. Rules style a fixed set of public classes,
  * with an allowlist of properties checked on save.
  */
+/** Where a form's font stylesheets may come from: Google Fonts, Bunny Fonts and Adobe Fonts. */
+export const FONT_HOSTS = ["fonts.googleapis.com", "fonts.bunny.net", "use.typekit.net"] as const
+/** A font family's name: letters, digits, spaces and hyphens. */
+export const FONT_FAMILY = /^[\p{L}\p{N} _-]*$/u
+export const FONT_STYLESHEET = new RegExp(
+  `^https://(${FONT_HOSTS.map((host) => host.replaceAll(".", "\\.")).join("|")})/`,
+)
+
 export const FormAppearance = Schema.Struct({
   colorMode: Schema.Literals(["fixed", "light-dark"]).annotate({
     title: "Colors",
@@ -104,7 +113,8 @@ export const FormAppearance = Schema.Struct({
   }),
   colors: FormColors.annotate({ title: "Colors", description: "Always when fixed; in light mode otherwise." }),
   darkColors: FormColors.annotate({ title: "Dark mode colors", description: 'Only with "light-dark".' }),
-  fontFamily: Schema.NullOr(Text(120)),
+  /** A font family's name, such as "Inter": letters, digits, spaces and hyphens, so it can't break out of the CSS. */
+  fontFamily: Schema.NullOr(Text(120).check(Schema.isPattern(FONT_FAMILY))),
   /** In px, 12–20. */
   fontSizeBase: Schema.Number.check(Schema.isBetween({ minimum: 12, maximum: 20 })),
   /** Corner radius in px, 0–24. */
@@ -114,8 +124,11 @@ export const FormAppearance = Schema.Struct({
   labels: Schema.Literals(["above", "floating", "hidden"]),
   /** Selector (".Button", ".Input:focus", ".Input--invalid"…) to CSS properties. */
   rules: Schema.Record(Schema.String, Schema.Record(Schema.String, Schema.String.check(Schema.isMaxLength(200)))),
-  /** Stylesheets with @font-face, such as a Google Fonts URL. */
-  fonts: Schema.Array(Schema.String.check(Schema.isMaxLength(500), Schema.isPattern(/^https:\/\//))).check(
+  /**
+   * Stylesheets with @font-face, from a font service (FONT_HOSTS) only: any other stylesheet on
+   * Parley's own page could read what visitors type or hide the consent wording (D148).
+   */
+  fonts: Schema.Array(Schema.String.check(Schema.isMaxLength(500), Schema.isPattern(FONT_STYLESHEET))).check(
     Schema.isMaxLength(3),
   ),
 })
@@ -133,8 +146,9 @@ const FormColorsOverride = Schema.Struct({
 })
 
 /**
- * Overrides from where a form is embedded (D148): any part of the appearance, colors
- * one by one. What isn't given stays as the form has it.
+ * Overrides from where a form is embedded (D148): any part of the appearance but its font
+ * stylesheets, colors one by one. What isn't given stays as the form has it. Fonts aren't
+ * overridable: anyone can write an override into the form's address.
  */
 export const AppearanceOverride = Schema.Struct({
   colorMode: Schema.optional(FormAppearance.fields.colorMode),
@@ -146,7 +160,6 @@ export const AppearanceOverride = Schema.Struct({
   spacing: Schema.optional(FormAppearance.fields.spacing),
   labels: Schema.optional(FormAppearance.fields.labels),
   rules: Schema.optional(FormAppearance.fields.rules),
-  fonts: Schema.optional(FormAppearance.fields.fonts),
 })
 export type AppearanceOverride = typeof AppearanceOverride.Type
 
@@ -294,3 +307,25 @@ export const Tracking = Schema.Struct({
   clickIds: Schema.Record(Schema.String, Schema.String),
 })
 export type Tracking = typeof Tracking.Type
+
+/** Contact fields a form can set on every submission (`set`), besides custom fields. */
+export const FORM_SET_FIELDS = ["company", "title", "city", "country"] as const
+
+/**
+ * A fixed value from `set` (always text) as the value its custom field takes: a number, a
+ * checkbox's true or false, or a multi-select's option ids separated by ";". Undefined when the
+ * text isn't one.
+ */
+export const setValueOf = (
+  type: CustomField["type"],
+  text: string,
+): string | number | boolean | ReadonlyArray<string> | undefined => {
+  if (type === "number") return text.trim() !== "" && Number.isFinite(Number(text)) ? Number(text) : undefined
+  if (type === "checkbox") return text === "true" ? true : text === "false" ? false : undefined
+  if (type === "multi-select")
+    return text
+      .split(";")
+      .map((part) => part.trim())
+      .filter(Boolean)
+  return text
+}

@@ -1,8 +1,12 @@
 import { Database, schema } from "@parley/db"
 import {
   appearanceProblems,
+  type CustomField,
+  checkCustomValue,
+  countryCodeOf,
   type DatabaseUnavailable,
   type FieldProblem,
+  FORM_SET_FIELDS,
   type Form,
   type FormAnalytics,
   type FormContent,
@@ -14,6 +18,7 @@ import {
   type Submission,
   type SubmissionId,
   type SubmissionStatus,
+  setValueOf,
   type TeamId,
   TopicNotFound,
 } from "@parley/domain"
@@ -265,12 +270,22 @@ export class Forms extends Context.Service<
             }
             keys.add(key)
           }
-          const customIds = draft.fields.flatMap((field) => (field.kind === "custom" ? [field.fieldId as string] : []))
+          const setIds = Object.keys(draft.set).flatMap((key) =>
+            key.startsWith("custom:") ? [key.slice("custom:".length)] : [],
+          )
+          const customIds = [
+            ...draft.fields.flatMap((field) => (field.kind === "custom" ? [field.fieldId as string] : [])),
+            ...setIds,
+          ]
           if (customIds.length > 0) {
             const found = yield* run(
               db.query((d) =>
                 d
-                  .select({ id: schema.customFields.id })
+                  .select({
+                    id: schema.customFields.id,
+                    type: schema.customFields.type,
+                    options: schema.customFields.options,
+                  })
                   .from(schema.customFields)
                   .where(
                     and(
@@ -281,7 +296,7 @@ export class Forms extends Context.Service<
                   ),
               ),
             )
-            const known = new Set(found.map((row) => row.id))
+            const known = new Map(found.map((row) => [row.id, row]))
             for (const [index, field] of draft.fields.entries()) {
               if (field.kind === "custom" && !known.has(field.fieldId)) {
                 problems.push(
@@ -292,6 +307,54 @@ export class Forms extends Context.Service<
                   ),
                 )
               }
+            }
+            for (const id of setIds) {
+              const definition = known.get(id)
+              const value = definition
+                ? setValueOf(definition.type as CustomField["type"], draft.set[`custom:${id}`] ?? "")
+                : undefined
+              if (!definition) {
+                problems.push(
+                  problem(
+                    `draft.set.custom:${id}`,
+                    "not-allowed",
+                    userText`This custom field isn't one of the team's contact fields any more.`,
+                  ),
+                )
+              } else if (
+                value === undefined ||
+                checkCustomValue(
+                  {
+                    type: definition.type as CustomField["type"],
+                    options: definition.options as CustomField["options"],
+                  },
+                  value as never,
+                )
+              ) {
+                problems.push(
+                  problem(
+                    `draft.set.custom:${id}`,
+                    "invalid-format",
+                    userText`That isn't a valid value for this field.`,
+                  ),
+                )
+              }
+            }
+          }
+          for (const [key, value] of Object.entries(draft.set)) {
+            if (key.startsWith("custom:")) continue
+            if (!(FORM_SET_FIELDS as ReadonlyArray<string>).includes(key)) {
+              problems.push(
+                problem(
+                  `draft.set.${key}`,
+                  "not-allowed",
+                  userText`A form can set the company, job title, city, country or a custom field.`,
+                ),
+              )
+            } else if (key === "country" && !countryCodeOf(value)) {
+              problems.push(problem(`draft.set.${key}`, "invalid-format", userText`We don't recognize that country.`))
+            } else if (value.trim() === "") {
+              problems.push(problem(`draft.set.${key}`, "missing", userText`Give it a value, or remove it.`))
             }
           }
           if (problems.length > 0) return yield* new InputRejected({ problems })

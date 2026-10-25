@@ -1,3 +1,4 @@
+import { FONT_HOSTS } from "@parley/domain"
 import handler, { createServerEntry } from "@tanstack/react-start/server-entry"
 import { handle } from "./server/app.ts"
 
@@ -14,6 +15,13 @@ const SECURITY_HEADERS: Readonly<Record<string, string>> = {
 }
 
 const FORM_PAGE = /^\/f\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/?$/i
+
+/**
+ * A form's page and its confirmation page take stylesheets and fonts only from Parley and the font
+ * services a form may use (D148), so no stylesheet that gets past the appearance checks can load.
+ * Inline styles stay: the form's own appearance is one.
+ */
+const FORM_STYLES = `style-src 'self' 'unsafe-inline' ${FONT_HOSTS.map((host) => `https://${host}`).join(" ")}; font-src 'self' data: https://fonts.gstatic.com https://fonts.bunny.net https://use.typekit.net`
 
 /**
  * The frame-ancestors for a form's page: any site when the team hasn't limited it, else the
@@ -39,8 +47,11 @@ export default createServerEntry({
     const form = FORM_PAGE.exec(new URL(request.url).pathname)
     const security: Record<string, string> = { ...SECURITY_HEADERS }
     if (form?.[1] && request.method === "GET") {
-      security["content-security-policy"] = `frame-ancestors ${await formFrameAncestors(request, form[1])}`
+      security["content-security-policy"] =
+        `${FORM_STYLES}; frame-ancestors ${await formFrameAncestors(request, form[1])}`
       delete security["x-frame-options"]
+    } else if (new URL(request.url).pathname.startsWith("/f/confirm/")) {
+      security["content-security-policy"] = `${FORM_STYLES}; frame-ancestors 'none'`
     }
     for (const [name, value] of Object.entries(security)) {
       // A route's own policy (the file route sets one) is kept; frame-ancestors is added to it.

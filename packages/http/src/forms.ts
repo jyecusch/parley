@@ -60,15 +60,20 @@ const decodeSubmission = Schema.decodeUnknownOption(SubmissionBody)
 /** A form id is a uuid; anything else is no form. */
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-/** Who sent the request: the configured proxy header (IP_ADDRESS_HEADER), else the usual ones. */
+/**
+ * Who sent the request. With IP_ADDRESS_HEADER set (production, behind a proxy), only that header
+ * counts: anything else is the visitor's own say-so, and a forged address could spend someone
+ * else's limits. Without it (development), the usual forwarding headers.
+ */
 const visitorOf = (request: HttpServerRequest.HttpServerRequest, ipHeader: string): Visitor => {
   const header = (name: string) => {
     const value = request.headers[name]
     return typeof value === "string" ? value : undefined
   }
-  const forwarded = header("x-forwarded-for")?.split(",")[0]?.trim()
-  const ip = (ipHeader ? header(ipHeader.toLowerCase()) : undefined) ?? forwarded ?? header("x-real-ip") ?? "unknown"
-  return { ip: ip.slice(0, 100), userAgent: (header("user-agent") ?? "").slice(0, 500) }
+  const ip = ipHeader
+    ? header(ipHeader.toLowerCase())
+    : (header("x-forwarded-for")?.split(",")[0]?.trim() ?? header("x-real-ip"))
+  return { ip: (ip || "unknown").slice(0, 100), userAgent: (header("user-agent") ?? "").slice(0, 500) }
 }
 
 const pathOf = (request: HttpServerRequest.HttpServerRequest) =>

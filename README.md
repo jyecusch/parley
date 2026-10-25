@@ -44,7 +44,7 @@ docker run -p 3000:3000 \
 ```
 
 - `BETTER_AUTH_URL` is the public address people and agents use; sign-in and OAuth only work there.
-- Behind a proxy or Cloudflare, set `IP_ADDRESS_HEADER` (for example `cf-connecting-ip`) so sign-in rate limits apply per visitor.
+- Behind a proxy or Cloudflare, set `IP_ADDRESS_HEADER` (for example `cf-connecting-ip`) so sign-in and form rate limits apply per visitor. When it's set, it's the only header trusted for a visitor's address.
 - Email, file storage and the rest are optional; see `.env.example`.
 - Without Docker: `bun install`, `bun run --cwd apps/web build`, then `bun packages/db/src/migrate.ts && bun apps/web/serve.ts`.
 
