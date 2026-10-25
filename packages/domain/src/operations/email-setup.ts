@@ -1,6 +1,6 @@
 import { Schema } from "effect"
 import { Domain } from "../company.ts"
-import { EmailAddress } from "../contact.ts"
+import { EmailAddress } from "../contact-values.ts"
 import {
   ContactSubscriptions,
   EmailSettings,

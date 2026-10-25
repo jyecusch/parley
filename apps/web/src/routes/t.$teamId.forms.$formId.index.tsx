@@ -7,7 +7,7 @@ import {
   type EmbedTracking,
   FormDesigner,
   REMEMBER_OPTIONS,
-} from "../components/form-designer.tsx"
+} from "../components/form-designer/index.tsx"
 import { LoadFailed } from "../components/record.tsx"
 import { Card, Centered, Skeleton } from "../components/ui/index.ts"
 import { call, messageOf } from "../lib/client.ts"

@@ -13,6 +13,7 @@ import {
   type FormCounts,
   type FormId,
   type FormSettings,
+  formFieldKey,
   InputRejected,
   SegmentNotFound,
   type Submission,
@@ -266,12 +267,7 @@ export class Forms extends Context.Service<
           }
           const keys = new Set<string>()
           for (const [index, field] of draft.fields.entries()) {
-            const key =
-              field.kind === "contact"
-                ? field.field
-                : field.kind === "custom"
-                  ? `custom:${field.fieldId}`
-                  : `topic:${field.topicId}`
+            const key = formFieldKey(field)
             if (keys.has(key)) {
               problems.push(problem(`draft.fields.${index}`, "conflict", userText`This field is on the form twice.`))
             }

@@ -1,6 +1,6 @@
 import { Schema } from "effect"
 import { PostalAddress } from "./address.ts"
-import { PhoneNumber } from "./contact.ts"
+import { PhoneNumber } from "./contact-values.ts"
 import { CustomValues, CustomValuesPatch } from "./custom-field.ts"
 import { AffiliationId, CompanyId, ContactId, TeamId, UserId } from "./ids.ts"
 import { SocialProfiles } from "./social.ts"

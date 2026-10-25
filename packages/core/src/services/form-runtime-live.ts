@@ -4,34 +4,24 @@ import {
   CLICK_ID_PARAMETERS,
   type CustomField,
   type CustomFieldId,
-  checkCustomValue,
-  countryCodeOf,
   FormAppearance,
   type FormContent,
   type FormId,
   isUuid,
   mergeAppearance,
+  readAnswers,
   UTM_PARAMETER,
 } from "@parley/domain"
 import { and, eq, inArray, isNull, sql } from "drizzle-orm"
 import { Duration, Effect, Layer, Schema } from "effect"
 import type { SqlError } from "effect/sql"
 import { PublicUrl } from "../config/public-url.ts"
-import {
-  EmailChecks,
-  FormTokens,
-  RENDER_TOKEN_MAX_AGE_MS,
-  RENDER_TOKEN_MIN_AGE_MS,
-  Turnstile,
-} from "../forms/protection.ts"
+import { EmailChecks, FormTokens, RENDER_TOKEN_MAX_AGE, RENDER_TOKEN_MIN_AGE, Turnstile } from "../forms/protection.ts"
 import { Encryption } from "./encryption.ts"
 import { FormRuntime, type RenderedForm, type SubmissionOutcome } from "./form-runtime.ts"
 import { type ConsentRecord, FormSubmissions } from "./form-submissions.ts"
 import { digest, RateLimiter } from "./rate-limiter.ts"
 import { classifySqlError } from "./sql-errors.ts"
-
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-const PHONE = /^\+[1-9]\d{6,14}$/
 
 /** Limits per visitor (IP), per form and per address (D147). Generous for people, tight for scripts. */
 const LIMITS = {
@@ -43,7 +33,7 @@ const LIMITS = {
 } as const
 
 /** Host and path of the page a form was on, or "" for the hosted page. */
-export const pageKey = (url: string): string => {
+const pageKey = (url: string): string => {
   if (!url) return ""
   try {
     const parsed = new URL(url)
@@ -55,95 +45,6 @@ export const pageKey = (url: string): string => {
 }
 
 const decodeAppearance = Schema.decodeUnknownOption(FormAppearance)
-
-/** The key a field's answer goes under. */
-const keyOf = (field: FormContent["fields"][number]) =>
-  field.kind === "contact"
-    ? field.field
-    : field.kind === "custom"
-      ? `custom:${field.fieldId}`
-      : `topic:${field.topicId}`
-
-/** Short fields on the contact, and how long each may be. */
-const TEXT_LIMITS: Readonly<Record<string, number>> = {
-  firstName: 100,
-  lastName: 100,
-  company: 200,
-  title: 100,
-  city: 100,
-  region: 100,
-}
-
-/** Answers checked against the form and turned into contact values, or problems by field key. */
-const readAnswers = (
-  content: FormContent,
-  customFields: ReadonlyMap<string, CustomField>,
-  raw: Readonly<Record<string, unknown>>,
-): { readonly values: Record<string, unknown>; readonly problems: Record<string, string> } => {
-  const values: Record<string, unknown> = {}
-  const problems: Record<string, string> = {}
-  for (const field of content.fields) {
-    const key = keyOf(field)
-    const given = raw[key]
-    if (field.kind === "consent") {
-      const ticked = given === true || given === "true" || given === "on"
-      if (field.required && !ticked) problems[key] = "Tick this to continue."
-      values[key] = ticked
-      continue
-    }
-    const text = typeof given === "string" ? given.trim() : ""
-    const missing =
-      given === undefined || given === null || text === "" ? (Array.isArray(given) ? given.length === 0 : true) : false
-    if (missing) {
-      if (field.required)
-        problems[key] =
-          field.kind === "contact" && field.field === "email" ? "Enter your email address." : "This one's needed."
-      continue
-    }
-    if (field.kind === "contact") {
-      switch (field.field) {
-        case "email": {
-          const email = text.toLowerCase()
-          if (!EMAIL.test(email) || email.length > 254) problems[key] = "That doesn't look like an email address."
-          else values[key] = email
-          break
-        }
-        case "phone": {
-          const phone = text.replace(/[\s().-]/g, "")
-          if (!PHONE.test(phone)) problems[key] = "Enter your number with its country code, like +61 400 000 000."
-          else values[key] = phone
-          break
-        }
-        case "country": {
-          const code = countryCodeOf(text)
-          if (!code) problems[key] = "We don't recognize that country."
-          else values[key] = code
-          break
-        }
-        default:
-          if (text.length > (TEXT_LIMITS[field.field] ?? 200)) problems[key] = "That's too long."
-          else values[key] = text
-      }
-      continue
-    }
-    const definition = customFields.get(field.fieldId)
-    if (!definition) continue
-    const value =
-      definition.type === "number"
-        ? Number(text)
-        : definition.type === "checkbox"
-          ? given === true || given === "true" || given === "on"
-          : definition.type === "multi-select"
-            ? Array.isArray(given)
-              ? given.filter((entry): entry is string => typeof entry === "string")
-              : []
-            : text
-    const fault = checkCustomValue(definition, value as never)
-    if (fault) problems[key] = fault === "too-long" ? "That's too long." : "That isn't a valid answer here."
-    else values[key] = value
-  }
-  return { values, problems }
-}
 
 /** The public side of forms (D144–D147), for the form page, embed.js and confirmation links. */
 export const FormRuntimeLive = Layer.effect(
@@ -302,7 +203,7 @@ export const FormRuntimeLive = Layer.effect(
             content,
             customFields: [...(yield* customFieldsOf(form.teamId, content)).values()],
             privacyPolicyUrl: settings?.privacyPolicyUrl ?? null,
-            renderToken: tokens.signRender(form.id, now),
+            renderToken: yield* tokens.signRender(form.id, now),
             captcha: turnstileReady
               ? {
                   provider: "turnstile",
@@ -348,8 +249,8 @@ export const FormRuntimeLive = Layer.effect(
           const email = values.email as string
           const now = Date.now()
 
-          const token = tokens.readRender(input.renderToken)
-          if (token && token.formId === form.id && now - token.issuedAt > RENDER_TOKEN_MAX_AGE_MS) {
+          const token = yield* tokens.readRender(input.renderToken)
+          if (token && token.formId === form.id && now - token.issuedAt > Duration.toMillis(RENDER_TOKEN_MAX_AGE)) {
             return {
               kind: "invalid",
               problems: { form: "This form has been open a while. Reload the page and try again." },
@@ -360,9 +261,15 @@ export const FormRuntimeLive = Layer.effect(
           const spamReason = yield* Effect.gen(function* () {
             if (!token || token.formId !== form.id) return "Sent without loading the form"
             const age = now - token.issuedAt
-            if (age < RENDER_TOKEN_MIN_AGE_MS) return `Sent ${(age / 1000).toFixed(1)}s after the form loaded`
+            if (age < Duration.toMillis(RENDER_TOKEN_MIN_AGE))
+              return `Sent ${(age / 1000).toFixed(1)}s after the form loaded`
             if (input.honeypot !== "") return "Hidden field filled in"
-            if (!(yield* useOnce(`render:${token.nonce}`, new Date(token.issuedAt + RENDER_TOKEN_MAX_AGE_MS)))) {
+            if (
+              !(yield* useOnce(
+                `render:${token.nonce}`,
+                new Date(token.issuedAt + Duration.toMillis(RENDER_TOKEN_MAX_AGE)),
+              ))
+            ) {
               return "The same form sent twice"
             }
             const turnstileSecret = turnstileSecretOf(settings)
@@ -382,7 +289,7 @@ export const FormRuntimeLive = Layer.effect(
               if (!input.captchaToken) return "Proof of work missing"
               const signature = yield* tokens.verifyWork(input.captchaToken)
               if (!signature) return "Proof of work wrong"
-              if (!(yield* useOnce(`pow:${signature}`, new Date(now + RENDER_TOKEN_MAX_AGE_MS)))) {
+              if (!(yield* useOnce(`pow:${signature}`, new Date(now + Duration.toMillis(RENDER_TOKEN_MAX_AGE))))) {
                 return "Proof of work used twice"
               }
             }
@@ -468,7 +375,7 @@ export const FormRuntimeLive = Layer.effect(
 
       confirm: (token, visitor) =>
         Effect.gen(function* () {
-          const submissionId = tokens.readConfirm(token, Date.now())
+          const submissionId = yield* tokens.readConfirm(token, Date.now())
           if (!submissionId) return { kind: "invalid" } as const
           const outcome = yield* processor.apply(submissionId, visitor)
           if (outcome === "missing") return { kind: "invalid" } as const

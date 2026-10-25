@@ -2,6 +2,7 @@ import { createCipheriv, createDecipheriv, createHash, hkdfSync, randomBytes } f
 import { Database, schema } from "@parley/db"
 import { and, eq, isNotNull } from "drizzle-orm"
 import { Config, Context, Effect, Layer, Option, Redacted } from "effect"
+import { rotatingSecret } from "../config/rotating-secret.ts"
 
 /**
  * "v1.", the key's id, ".", then base64url of a 12-byte IV, the ciphertext and the 16-byte tag.
@@ -43,29 +44,19 @@ export class Encryption extends Context.Service<
   static readonly layer = Layer.effect(
     Encryption,
     Effect.gen(function* () {
-      const own = yield* Config.option(Config.Redacted("PARLEY_ENCRYPTION_KEY")).pipe(Effect.orDie)
-      const previous = yield* Config.option(Config.Redacted("PARLEY_ENCRYPTION_KEYS_PREVIOUS")).pipe(Effect.orDie)
+      // In production the key can't be the sign-in secret: rotating that would make stored secrets
+      // unreadable, since nothing would know to keep the old one.
+      const { current: own, previous } = yield* rotatingSecret(
+        "PARLEY_ENCRYPTION_KEY",
+        "PARLEY_ENCRYPTION_KEYS_PREVIOUS",
+        `${KEY_HELP}.`,
+      )
       const auth = yield* Config.Redacted("BETTER_AUTH_SECRET").pipe(Effect.orDie)
-      const sendsForReal = yield* Config.option(Config.String("RESEND_API_KEY")).pipe(Effect.orDie)
-      // In production the key can't be the sign-in secret: rotating that would make stored
-      // secrets unreadable, since nothing would know to keep the old one.
-      if (Option.isNone(own) && Option.isSome(sendsForReal) && sendsForReal.value.trim() !== "") {
-        return yield* Effect.die(
-          new Error(`PARLEY_ENCRYPTION_KEY is required when RESEND_API_KEY is set: ${KEY_HELP}.`),
-        )
-      }
       const current = Option.match(own, {
-        onSome: (value) => parseKey("PARLEY_ENCRYPTION_KEY", Redacted.value(value)),
+        onSome: (value) => parseKey("PARLEY_ENCRYPTION_KEY", value),
         onNone: () => Buffer.from(hkdfSync("sha256", Redacted.value(auth), "parley", "parley-encryption-v1", 32)),
       })
-      const retired = Option.match(previous, {
-        onSome: (value) =>
-          Redacted.value(value)
-            .split(",")
-            .filter((entry) => entry.trim() !== "")
-            .map((entry) => parseKey("Each key in PARLEY_ENCRYPTION_KEYS_PREVIOUS", entry)),
-        onNone: () => [],
-      })
+      const retired = previous.map((entry) => parseKey("Each key in PARLEY_ENCRYPTION_KEYS_PREVIOUS", entry))
       const currentId = keyId(current)
       const keys = new Map([...retired, current].map((key) => [keyId(key), key]))
 

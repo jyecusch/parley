@@ -93,7 +93,7 @@ const visit = (formId: FormId, ip?: string) =>
       // The payload ALTCHA's widget sends: the challenge and its solution, as base64 JSON.
       captchaToken = Buffer.from(JSON.stringify({ challenge, solution })).toString("base64")
     }
-    return { rendered, renderToken: tokens.signRender(formId, Date.now() - 5000), captchaToken, counter }
+    return { rendered, renderToken: yield* tokens.signRender(formId, Date.now() - 5000), captchaToken, counter }
   })
 
 const submit = (
@@ -335,7 +335,7 @@ describe("forms (D144–D150)", () => {
           [
             "fresh",
             { email: `a-${unique()}@example.com` },
-            { renderToken: tokens.signRender(form.id, Date.now()) },
+            { renderToken: yield* tokens.signRender(form.id, Date.now()) },
             "after the form loaded",
           ],
           ["none", { email: `b-${unique()}@example.com` }, { renderToken: "made-up" }, "Sent without loading the form"],
@@ -369,7 +369,10 @@ describe("forms (D144–D150)", () => {
         expect((yield* latestSubmission(form.id))?.spamReason).toBe("The same form sent twice")
         // Answers that don't fit are reported, and nothing is stored.
         const invalid = yield* submit(form.id, { email: "not an email" })
-        expect(invalid).toEqual({ kind: "invalid", problems: { email: "That doesn't look like an email address." } })
+        expect(invalid).toEqual({
+          kind: "invalid",
+          problems: { email: "Enter an email address like you@example.com." },
+        })
         // A released one is handled as if just sent.
         const spam = yield* run["forms.submissions"](f.jane, { teamId: f.acme, formId: form.id, status: "spam" })
         const released = yield* run["forms.releaseSubmission"](f.jane, {

@@ -1,4 +1,4 @@
-import { FONT_HOSTS } from "@parley/domain"
+import { FONT_HOSTS, isUuid } from "@parley/domain"
 import handler, { createServerEntry } from "@tanstack/react-start/server-entry"
 import { handle } from "./server/app.ts"
 
@@ -14,7 +14,8 @@ const SECURITY_HEADERS: Readonly<Record<string, string>> = {
   "referrer-policy": "strict-origin-when-cross-origin",
 }
 
-const FORM_PAGE = /^\/f\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/?$/i
+/** A form's page: /f/<form id>, where the id is a uuid (anything else is another page). */
+const FORM_PAGE = /^\/f\/([^/]+)\/?$/
 
 /**
  * A form's page and its confirmation page take stylesheets and fonts only from Parley and the font
@@ -46,7 +47,7 @@ export default createServerEntry({
     const headers = new Headers(response.headers)
     const form = FORM_PAGE.exec(new URL(request.url).pathname)
     const security: Record<string, string> = { ...SECURITY_HEADERS }
-    if (form?.[1] && request.method === "GET") {
+    if (form?.[1] && isUuid(form[1]) && request.method === "GET") {
       security["content-security-policy"] =
         `${FORM_STYLES}; frame-ancestors ${await formFrameAncestors(request, form[1])}`
       delete security["x-frame-options"]

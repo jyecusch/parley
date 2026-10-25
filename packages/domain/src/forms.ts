@@ -331,3 +331,16 @@ export const setValueOf = (
       .filter(Boolean)
   return text
 }
+
+/**
+ * Copy that fits one way of confirming only: with a confirmation email (`on`), and without. New
+ * forms start with it, and the designer swaps it when double opt-in changes, unless it was edited.
+ */
+export const FORM_CONFIRM_COPY = {
+  on: {
+    title: "Check your inbox",
+    body: "Click the link we sent you to confirm.",
+    finePrint: "We'll email you to confirm.",
+  },
+  off: { title: "You're in", body: "Thanks for signing up.", finePrint: "Unsubscribe anytime." },
+} as const

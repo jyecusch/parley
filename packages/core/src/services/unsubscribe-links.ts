@@ -1,7 +1,8 @@
 import { createHmac, timingSafeEqual } from "node:crypto"
 import type { BroadcastId, ContactId, TeamId, TopicId } from "@parley/domain"
-import { Config, Context, Effect, Layer, Option, Redacted } from "effect"
+import { Config, Context, Effect, Layer, Option, Redacted, Schema } from "effect"
 import { PublicUrl } from "../config/public-url.ts"
+import { rotatingSecret } from "../config/rotating-secret.ts"
 
 /** What an unsubscribe link is about. A test send's link changes nothing (R45). */
 export interface UnsubscribeLinkFacts {
@@ -12,13 +13,16 @@ export interface UnsubscribeLinkFacts {
   readonly test: boolean
 }
 
-interface Payload {
-  readonly t: string
-  readonly c?: string
-  readonly p?: string
-  readonly m?: string
-  readonly x?: 1
-}
+/** A link's payload: team, contact, topic, broadcast and test flag, in one letter each to keep links short. */
+const Payload = Schema.Struct({
+  t: Schema.String,
+  c: Schema.optional(Schema.String),
+  p: Schema.optional(Schema.String),
+  m: Schema.optional(Schema.String),
+  x: Schema.optional(Schema.Literal(1)),
+})
+type Payload = typeof Payload.Type
+const decodePayload = Schema.decodeUnknownOption(Schema.fromJsonString(Payload))
 
 const encode = (text: string) => Buffer.from(text).toString("base64url")
 
@@ -46,29 +50,15 @@ export class UnsubscribeLinks extends Context.Service<
   static readonly layer = Layer.effect(
     UnsubscribeLinks,
     Effect.gen(function* () {
-      const own = yield* Config.option(Config.Redacted("UNSUBSCRIBE_SECRET")).pipe(Effect.orDie)
-      const previous = yield* Config.option(Config.Redacted("UNSUBSCRIBE_SECRETS_PREVIOUS")).pipe(Effect.orDie)
+      // Links already sent must keep working (R39), so a changed secret stays in the previous ones.
+      const { current, previous: retired } = yield* rotatingSecret(
+        "UNSUBSCRIBE_SECRET",
+        "UNSUBSCRIBE_SECRETS_PREVIOUS",
+        "to change it later, keep the old one in UNSUBSCRIBE_SECRETS_PREVIOUS.",
+      )
       const auth = yield* Config.Redacted("BETTER_AUTH_SECRET").pipe(Effect.orDie)
-      const sendsForReal = yield* Config.option(Config.String("RESEND_API_KEY")).pipe(Effect.orDie)
-      // Links already sent must keep working (R39), so once email really goes out the secret can't
-      // be the sign-in secret: rotating that would break them, since nothing would keep the old one.
-      if (Option.isNone(own) && Option.isSome(sendsForReal) && sendsForReal.value.trim() !== "") {
-        return yield* Effect.die(
-          new Error(
-            "UNSUBSCRIBE_SECRET is required when RESEND_API_KEY is set. To change it later, keep the old one in UNSUBSCRIBE_SECRETS_PREVIOUS.",
-          ),
-        )
-      }
       const base = yield* PublicUrl.pipe(Effect.orDie)
-      const secret = Redacted.value(Option.getOrElse(own, () => auth))
-      const retired = Option.match(previous, {
-        onSome: (value) =>
-          Redacted.value(value)
-            .split(",")
-            .map((entry) => entry.trim())
-            .filter((entry) => entry !== ""),
-        onNone: () => [],
-      })
+      const secret = Option.getOrElse(current, () => Redacted.value(auth))
       const macWith = (key: string, body: string) =>
         createHmac("sha256", key).update(`parley-unsubscribe:${body}`).digest().subarray(0, 16)
       const mac = (body: string) => macWith(secret, body)
@@ -99,18 +89,15 @@ export class UnsubscribeLinks extends Context.Service<
           const [body, signature, extra] = token.split(".")
           if (!body || !signature || extra !== undefined) return undefined
           if (!signed(body, Buffer.from(signature, "base64url"))) return undefined
-          try {
-            const payload = JSON.parse(Buffer.from(body, "base64url").toString()) as Payload
-            if (typeof payload.t !== "string") return undefined
-            return {
-              teamId: payload.t as TeamId,
-              contactId: (payload.c ?? null) as ContactId | null,
-              topicId: (payload.p ?? null) as TopicId | null,
-              broadcastId: (payload.m ?? null) as BroadcastId | null,
-              test: payload.x === 1,
-            }
-          } catch {
-            return undefined
+          const payload = decodePayload(Buffer.from(body, "base64url").toString())
+          if (Option.isNone(payload)) return undefined
+          const { t, c, p, m, x } = payload.value
+          return {
+            teamId: t as TeamId,
+            contactId: (c ?? null) as ContactId | null,
+            topicId: (p ?? null) as TopicId | null,
+            broadcastId: (m ?? null) as BroadcastId | null,
+            test: x === 1,
           }
         },
       }

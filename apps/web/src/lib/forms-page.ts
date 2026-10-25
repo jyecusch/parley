@@ -1,5 +1,5 @@
-import { CLICK_ID_PARAMETERS, type FormContent, type FormField, UTM_PARAMETER } from "@parley/domain"
-import { type FormValues, fieldKey } from "../components/form-view.tsx"
+import { CLICK_ID_PARAMETERS, type CustomField, type FormContent, readAnswers, UTM_PARAMETER } from "@parley/domain"
+import type { FormValues } from "../components/form-view.tsx"
 
 /*
  * Shared by the form page (/f/$formId) and the confirmation page: reading what embed.js passed in
@@ -30,29 +30,13 @@ export const embedContextOf = (search: string): EmbedContext => {
   return { page: (query.get("page") ?? "").slice(0, 2000), appearance: query.get("appearance"), utm, clickIds }
 }
 
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-
-const filled = (value: FormValues[string] | undefined) =>
-  typeof value === "string" ? value.trim() !== "" : Array.isArray(value) ? value.length > 0 : value === true
-
-/** Problems with the answers by field key, the way the server words them. */
-export const checkAnswers = (content: FormContent, values: FormValues): Record<string, string> => {
-  const problems: Record<string, string> = {}
-  for (const field of content.fields) {
-    const key = fieldKey(field)
-    const value = values[key]
-    if (field.kind === "contact" && field.field === "email") {
-      if (!filled(value)) problems[key] = "Enter your email address."
-      else if (typeof value === "string" && !EMAIL.test(value.trim()))
-        problems[key] = "Enter an email address like you@example.com."
-    } else if (field.required && !filled(value)) {
-      problems[key] = field.kind === "consent" ? "Tick this to continue." : `Enter ${describe(field)}.`
-    }
-  }
-  return problems
-}
-
-const describe = (field: FormField) => (field.kind === "consent" ? "this" : field.label.toLowerCase())
+/** Problems with the answers by field key, worded as the server words them: it's the same check. */
+export const checkAnswers = (
+  content: FormContent,
+  customFields: ReadonlyArray<CustomField>,
+  values: FormValues,
+): Record<string, string> =>
+  readAnswers(content, new Map(customFields.map((field) => [field.id as string, field])), values).problems
 
 /** Tells the page embedding the form something, if there is one. */
 export const tellParent = (message: { readonly type: string } & Record<string, unknown>) => {

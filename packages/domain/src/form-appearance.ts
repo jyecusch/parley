@@ -52,13 +52,12 @@ export const APPEARANCE_CLASSES: Readonly<Record<string, ReadonlyArray<string>>>
   ".Message": [...TEXT, ...BOX],
   ".Error": TEXT,
 }
-const STATES = [":hover", ":focus", ":focus-visible", ":disabled", "::placeholder", "--invalid"]
+export const APPEARANCE_STATES = [":hover", ":focus", ":focus-visible", ":disabled", "::placeholder", "--invalid"]
+const SELECTOR = new RegExp(`^(\\.[A-Z][A-Za-z]+)(${APPEARANCE_STATES.join("|")})?$`)
 
 /** A rule's selector: one public class, with at most one state. */
 const selectorParts = (selector: string) => {
-  const match = /^(\.[A-Z][A-Za-z]+)(:hover|:focus|:focus-visible|:disabled|::placeholder|--invalid)?$/.exec(
-    selector.trim(),
-  )
+  const match = SELECTOR.exec(selector.trim())
   return match ? { base: match[1] ?? "", state: match[2] } : undefined
 }
 
@@ -93,7 +92,7 @@ export const appearanceProblems = (appearance: FormAppearance): Array<FieldProbl
         field: `appearance.rules.${selector}`,
         problem: "not-allowed",
         userMessage:
-          `Rules can style ${Object.keys(APPEARANCE_CLASSES).join(", ")}, with ${STATES.join(", ")}. "${selector}" isn't one of those.` as never,
+          `Rules can style ${Object.keys(APPEARANCE_CLASSES).join(", ")}, with ${APPEARANCE_STATES.join(", ")}. "${selector}" isn't one of those.` as never,
       })
       continue
     }

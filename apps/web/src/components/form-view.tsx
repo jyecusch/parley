@@ -1,5 +1,5 @@
 import type { CustomField, FormContent, FormField } from "@parley/domain"
-import { appearanceCss } from "@parley/domain"
+import { appearanceCss, formFieldKey } from "@parley/domain"
 import { type FormEvent, type ReactNode, useEffect, useRef } from "react"
 
 /*
@@ -13,12 +13,7 @@ import { type FormEvent, type ReactNode, useEffect, useRef } from "react"
 export type FormValues = Readonly<Record<string, string | boolean | ReadonlyArray<string>>>
 
 /** A field's key in the answers. */
-export const fieldKey = (field: FormField): string =>
-  field.kind === "contact"
-    ? field.field
-    : field.kind === "custom"
-      ? `custom:${field.fieldId}`
-      : `topic:${field.topicId}`
+export const fieldKey = formFieldKey
 
 const AUTOCOMPLETE: Readonly<Record<string, string>> = {
   email: "email",
