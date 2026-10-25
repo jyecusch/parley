@@ -5,6 +5,7 @@ import {
   type DatabaseUnavailable,
   type FormContent,
   type FormField,
+  formFieldKey,
   setValueOf,
   type TeamId,
 } from "@parley/domain"
@@ -12,7 +13,7 @@ import { and, eq, inArray, isNull, sql } from "drizzle-orm"
 import { Context, Duration, Effect, Layer } from "effect"
 import type { SqlError } from "effect/sql"
 import { PublicUrl } from "../config/public-url.ts"
-import { CONFIRM_LINK_DAYS, FormTokens } from "../forms/protection.ts"
+import { CONFIRM_LINK_AGE, CONFIRM_LINK_DAYS, FormTokens } from "../forms/protection.ts"
 import { Mailer } from "../mail/mailer.ts"
 import type { SystemActor } from "../principal.ts"
 import { activityRow } from "./activity.ts"
@@ -177,8 +178,8 @@ export class FormSubmissions extends Context.Service<
           const sender = yield* sending.senderForTeam(teamId)
           // Publishing refuses double opt-in without a sender; one removed since leaves it waiting.
           if (!sender) return yield* Effect.logWarning(`form confirmation for ${submission.id} not sent: no sender`)
-          const expiresAt = Date.now() + CONFIRM_LINK_DAYS * 24 * 60 * 60 * 1000
-          const link = `${base.replace(/\/$/, "")}/f/confirm/${tokens.signConfirm(submission.id, expiresAt)}`
+          const expiresAt = Date.now() + Duration.toMillis(CONFIRM_LINK_AGE)
+          const link = `${base.replace(/\/$/, "")}/f/confirm/${yield* tokens.signConfirm(submission.id, expiresAt)}`
           const consent = submission.consent as ConsentRecord
           const topics = consent.consents.filter((entry) => entry.ticked).map((entry) => entry.topicName)
           const what = content.title || row.formName
@@ -247,14 +248,7 @@ ${lines
           // A fixed country may be written as a name; the contact keeps its code.
           if (typeof answers.country === "string") answers.country = countryCodeOf(answers.country) ?? answers.country
           const labels = new Map<string, string>(
-            content.fields.map((field: FormField) => [
-              field.kind === "contact"
-                ? field.field
-                : field.kind === "custom"
-                  ? `custom:${field.fieldId}`
-                  : `topic:${field.topicId}`,
-              field.label,
-            ]),
+            content.fields.map((field: FormField) => [formFieldKey(field), field.label]),
           )
           const customTypes = new Map(
             (yield* run(

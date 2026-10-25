@@ -1,5 +1,6 @@
 import { Schema } from "effect"
 import { PostalAddress } from "./address.ts"
+import { EmailAddress, PhoneNumber } from "./contact-values.ts"
 import { CustomValues, CustomValuesPatch } from "./custom-field.ts"
 import { Tracking } from "./forms.ts"
 import { AffiliationId, CompanyId, ContactId, TeamId, UserId } from "./ids.ts"
@@ -7,16 +8,6 @@ import { RecordType } from "./record-type.ts"
 import { SocialProfiles } from "./social.ts"
 
 const Timestamp = Schema.String.annotate({ description: "ISO 8601 timestamp" })
-
-export const EmailAddress = Schema.String.check(
-  Schema.isMaxLength(254),
-  Schema.isPattern(/^[^\s@]+@[^\s@]+\.[^\s@]+$/),
-).pipe(Schema.brand("EmailAddress"))
-export type EmailAddress = typeof EmailAddress.Type
-
-/** E.164, for example +61400812337 (D34). */
-export const PhoneNumber = Schema.String.check(Schema.isPattern(/^\+[1-9]\d{6,14}$/)).pipe(Schema.brand("PhoneNumber"))
-export type PhoneNumber = typeof PhoneNumber.Type
 
 const Name = Schema.String.check(Schema.isTrimmed(), Schema.isMinLength(1), Schema.isMaxLength(100))
 const PhoneLabel = Schema.String.check(Schema.isTrimmed(), Schema.isMinLength(1), Schema.isMaxLength(40))

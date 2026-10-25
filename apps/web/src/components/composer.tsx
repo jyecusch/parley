@@ -24,7 +24,6 @@ const MERGE_TAGS: ReadonlyArray<{ readonly tag: string; readonly label: string }
   { tag: "{{company}}", label: "Company" },
 ]
 
-/** Calls `save` once edits have paused, and reports whether everything is saved. */
 /**
  * Saves `value` a moment after it stops changing. `isComplete` holds a save back while something
  * is still being filled in (a half-typed address), which is "waiting", not a failure.

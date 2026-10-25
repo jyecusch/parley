@@ -1,4 +1,6 @@
-import { DEFAULT_APPEARANCE, type FormContent } from "@parley/domain"
+import { DEFAULT_APPEARANCE, FORM_CONFIRM_COPY, type FormContent } from "@parley/domain"
+
+const { on } = FORM_CONFIRM_COPY
 
 /** Where a new form starts (docs/06-forms.md): fitting fields and copy, double opt-in on. */
 export type FormTemplateName = "newsletter" | "waitlist" | "event" | "blank"
@@ -31,9 +33,9 @@ export const templateContent = (template: FormTemplateName): FormContent => {
         title: "Get our newsletter",
         description: "News and updates from us, now and then. Unsubscribe any time.",
         submitLabel: "Subscribe",
-        finePrint: "We'll email you to confirm.",
+        finePrint: on.finePrint,
         fields: [email, firstName],
-        afterSubmit: { kind: "message", title: "Check your inbox", body: "Click the link we sent you to confirm." },
+        afterSubmit: { kind: "message", title: on.title, body: on.body },
       }
     case "waitlist":
       return {
@@ -41,11 +43,11 @@ export const templateContent = (template: FormTemplateName): FormContent => {
         title: "Join the waitlist",
         description: "Be the first to know when we open up.",
         submitLabel: "Join the waitlist",
-        finePrint: "We'll email you to confirm.",
+        finePrint: on.finePrint,
         fields: [email, firstName, company],
         afterSubmit: {
           kind: "message",
-          title: "Check your inbox",
+          title: on.title,
           body: "Click the link we sent you to join the waitlist.",
         },
       }
@@ -59,7 +61,7 @@ export const templateContent = (template: FormTemplateName): FormContent => {
         fields: [email, firstName, lastName, company],
         afterSubmit: {
           kind: "message",
-          title: "Check your inbox",
+          title: on.title,
           body: "Click the link we sent you to confirm your spot.",
         },
       }

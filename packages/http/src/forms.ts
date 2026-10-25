@@ -1,7 +1,7 @@
 import { FormRuntime, type SubmissionInput, type Visitor } from "@parley/core"
-import { AppearanceOverride, type DatabaseUnavailable, isUuid } from "@parley/domain"
+import { AppearanceOverride, type DatabaseUnavailable } from "@parley/domain"
 import { Config, Effect, Schema } from "effect"
-import { HttpRouter, type HttpServerRequest, HttpServerResponse } from "effect/http"
+import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http"
 
 /*
  * The public side of forms (D144): what a form's page asks of the server. Nobody signs in; the
@@ -55,7 +55,6 @@ const SubmissionBody = Schema.Struct({
   utm: Schema.optional(Schema.Record(Schema.String, Schema.String.check(Schema.isMaxLength(500)))),
   clickIds: Schema.optional(Schema.Record(Schema.String, Schema.String.check(Schema.isMaxLength(500)))),
 })
-const decodeSubmission = Schema.decodeUnknownOption(SubmissionBody)
 
 /**
  * Who sent the request. With IP_ADDRESS_HEADER set (production, behind a proxy), only that header
@@ -73,82 +72,104 @@ const visitorOf = (request: HttpServerRequest.HttpServerRequest, ipHeader: strin
   return { ip: (ip || "unknown").slice(0, 100), userAgent: (header("user-agent") ?? "").slice(0, 500) }
 }
 
-const pathOf = (request: HttpServerRequest.HttpServerRequest) =>
-  new URL(request.url, "http://parley").pathname
-    .replace(/^\/api\/forms\//, "")
-    .split("/")
-    .map(decodeURIComponent)
+const FormPath = Schema.Struct({ formId: Schema.String.check(Schema.isUUID()) })
+const ConfirmPath = Schema.Struct({ token: Schema.String.check(Schema.isMaxLength(2000)) })
+const RenderQuery = Schema.Struct({
+  page: Schema.optional(Schema.String),
+  appearance: Schema.optional(Schema.String),
+  again: Schema.optional(Schema.String),
+})
+
+const invalidBody = () =>
+  json({ kind: "invalid", problems: { form: "Something's wrong with this form. Reload the page and try again." } }, 422)
 
 export const FormRoutesLive = HttpRouter.use((router) =>
   Effect.gen(function* () {
     const services = yield* Effect.context<FormRuntime>()
     const ipHeader = yield* Config.String("IP_ADDRESS_HEADER").pipe(Config.withDefault(""), Effect.orDie)
-    const run = (
-      effect: Effect.Effect<HttpServerResponse.HttpServerResponse, DatabaseUnavailable, FormRuntime>,
-    ): Effect.Effect<HttpServerResponse.HttpServerResponse> =>
+    const run = <R>(
+      effect: Effect.Effect<HttpServerResponse.HttpServerResponse, DatabaseUnavailable, FormRuntime | R>,
+    ): Effect.Effect<HttpServerResponse.HttpServerResponse, never, R> =>
       effect.pipe(
         Effect.catchTag("DatabaseUnavailable", () => Effect.succeed(unavailable())),
         Effect.provide(services),
       )
+    /** The route's form id; a path that isn't one is no form. */
+    const formIdOf = HttpRouter.schemaPathParams(FormPath).pipe(
+      Effect.map(({ formId }) => formId),
+      Effect.option,
+    )
 
-    yield* router.add("GET", "/api/forms/*", (request) =>
+    yield* router.add(
+      "GET",
+      "/api/forms/:formId",
       run(
         Effect.gen(function* () {
-          const [formId, ...rest] = pathOf(request)
-          if (!formId || !isUuid(formId)) return notFound()
-          const runtimeForSites = yield* FormRuntime
-          // Where the form may be framed, for the page's frame-ancestors (the server entry asks).
-          if (rest.length === 1 && rest[0] === "sites") {
-            return json({ allowedSites: yield* runtimeForSites.allowedSites(formId) })
-          }
-          if (rest.length > 0) return notFound()
-          const query = new URL(request.url, "http://parley").searchParams
-          const appearance = decodeAppearance(query.get("appearance") ?? "")
-          const runtime = yield* FormRuntime
-          const rendered = yield* runtime.render(formId, {
-            page: (query.get("page") ?? "").slice(0, 2000),
+          const formId = yield* formIdOf
+          if (formId._tag === "None") return notFound()
+          const request = yield* HttpServerRequest.HttpServerRequest
+          const query = yield* HttpRouter.schemaParams(RenderQuery).pipe(
+            Effect.orElseSucceed((): typeof RenderQuery.Type => ({})),
+          )
+          const appearance = decodeAppearance(query.appearance ?? "")
+          const rendered = yield* (yield* FormRuntime).render(formId.value, {
+            page: (query.page ?? "").slice(0, 2000),
             appearance: appearance._tag === "Some" ? appearance.value : undefined,
             ip: visitorOf(request, ipHeader).ip,
-            countView: query.get("again") !== "1",
+            countView: query.again !== "1",
           })
           return rendered ? json(rendered) : notFound()
         }),
       ),
     )
 
-    yield* router.add("POST", "/api/forms/*", (request) =>
+    // Where the form may be framed, for the page's frame-ancestors (the server entry asks).
+    yield* router.add(
+      "GET",
+      "/api/forms/:formId/sites",
       run(
         Effect.gen(function* () {
-          const [first, second, ...rest] = pathOf(request)
-          if (rest.length > 0 || !first || !second) return notFound()
-          const runtime = yield* FormRuntime
-          const visitor = visitorOf(request, ipHeader)
-          if (first === "confirm") {
-            const page = yield* runtime.confirm(second, visitor)
-            return page.kind === "invalid" ? json(page, 404) : json(page)
-          }
-          if (second !== "submissions" || !isUuid(first)) return notFound()
-          const body = yield* request.json.pipe(Effect.orElseSucceed(() => null))
-          const decoded = decodeSubmission(body)
-          if (decoded._tag === "None") {
-            return json(
-              {
-                kind: "invalid",
-                problems: { form: "Something's wrong with this form. Reload the page and try again." },
-              },
-              422,
-            )
-          }
+          const formId = yield* formIdOf
+          if (formId._tag === "None") return notFound()
+          return json({ allowedSites: yield* (yield* FormRuntime).allowedSites(formId.value) })
+        }),
+      ),
+    )
+
+    yield* router.add(
+      "POST",
+      "/api/forms/confirm/:token",
+      run(
+        Effect.gen(function* () {
+          const path = yield* HttpRouter.schemaPathParams(ConfirmPath).pipe(Effect.option)
+          if (path._tag === "None") return notFound()
+          const request = yield* HttpServerRequest.HttpServerRequest
+          const page = yield* (yield* FormRuntime).confirm(path.value.token, visitorOf(request, ipHeader))
+          return page.kind === "invalid" ? json(page, 404) : json(page)
+        }),
+      ),
+    )
+
+    yield* router.add(
+      "POST",
+      "/api/forms/:formId/submissions",
+      run(
+        Effect.gen(function* () {
+          const formId = yield* formIdOf
+          if (formId._tag === "None") return notFound()
+          const request = yield* HttpServerRequest.HttpServerRequest
+          const body = yield* HttpServerRequest.schemaBodyJson(SubmissionBody).pipe(Effect.option)
+          if (body._tag === "None") return invalidBody()
           const input: SubmissionInput = {
-            renderToken: decoded.value.renderToken,
-            values: decoded.value.values,
-            honeypot: decoded.value.honeypot ?? "",
-            captchaToken: decoded.value.captchaToken ?? "",
-            page: decoded.value.page ?? "",
-            utm: decoded.value.utm ?? {},
-            clickIds: decoded.value.clickIds ?? {},
+            renderToken: body.value.renderToken,
+            values: body.value.values,
+            honeypot: body.value.honeypot ?? "",
+            captchaToken: body.value.captchaToken ?? "",
+            page: body.value.page ?? "",
+            utm: body.value.utm ?? {},
+            clickIds: body.value.clickIds ?? {},
           }
-          const outcome = yield* runtime.submit(first, input, visitor)
+          const outcome = yield* (yield* FormRuntime).submit(formId.value, input, visitorOf(request, ipHeader))
           return json(outcome, outcome.kind === "invalid" ? 422 : outcome.kind === "unavailable" ? 404 : 200)
         }),
       ),

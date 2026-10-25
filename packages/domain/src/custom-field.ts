@@ -1,4 +1,5 @@
 import { Schema } from "effect"
+import { isEmailAddress, isPhoneNumber } from "./contact-values.ts"
 import { CustomFieldId } from "./ids.ts"
 import { RecordType } from "./record-type.ts"
 
@@ -63,8 +64,6 @@ export const BUILT_IN_FIELD_NAMES: Readonly<Record<RecordType, ReadonlyArray<str
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/
 const URL_PATTERN = /^https?:\/\/[^\s]+$/i
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-const PHONE = /^\+[1-9]\d{6,14}$/
 
 /**
  * Whether a value suits a field, and if not, why. Shared by the server (which enforces it) and the web
@@ -97,9 +96,9 @@ export const checkCustomValue = (
       return URL_PATTERN.test(value) && value.length <= 2000 ? undefined : "invalid-format"
     case "email":
       if (typeof value !== "string") return "wrong-type"
-      return EMAIL.test(value) && value.length <= 254 ? undefined : "invalid-format"
+      return isEmailAddress(value) ? undefined : "invalid-format"
     case "phone":
       if (typeof value !== "string") return "wrong-type"
-      return PHONE.test(value) ? undefined : "invalid-format"
+      return isPhoneNumber(value) ? undefined : "invalid-format"
   }
 }

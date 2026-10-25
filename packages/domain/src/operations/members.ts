@@ -1,6 +1,6 @@
 import { Schema } from "effect"
 import { Role } from "../access.ts"
-import { EmailAddress } from "../contact.ts"
+import { EmailAddress } from "../contact-values.ts"
 import { SignInRequired } from "../errors/access.ts"
 import { EmailErrors } from "../errors/email.ts"
 import {
