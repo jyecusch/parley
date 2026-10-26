@@ -52,7 +52,7 @@ export class Topics extends Context.Service<
                 unsubscribed: sql<number>`(select count(*)::int from "topic_unsubscribes" u
                   join "contacts" c on c.id = u.contact_id
                   where u.topic_id = "topics"."id" and c.deleted_at is null)`,
-                members: sql<number>`(select count(*)::int from "topic_members" m
+                subscribers: sql<number>`(select count(*)::int from "topic_subscribers" m
                   join "contacts" c on c.id = m.contact_id
                   where m.topic_id = "topics"."id" and c.deleted_at is null)`,
               })
@@ -63,13 +63,13 @@ export class Topics extends Context.Service<
         ).pipe(
           Effect.map((rows) =>
             rows.map(
-              ({ row, unsubscribed, members }): Topic => ({
+              ({ row, unsubscribed, subscribers }): Topic => ({
                 id: row.id as TopicId,
                 name: row.name,
                 description: row.description,
                 mode: row.mode,
                 unsubscribedCount: Number(unsubscribed),
-                memberCount: Number(members),
+                subscriberCount: Number(subscribers),
                 createdAt: row.createdAt.toISOString(),
                 updatedAt: row.updatedAt.toISOString(),
               }),
@@ -112,7 +112,7 @@ export class Topics extends Context.Service<
                   .set({
                     ...(input.name !== undefined ? { name: input.name } : {}),
                     ...(input.description !== undefined ? { description: input.description } : {}),
-                    // A topic's mode can change; members and unsubscribes are both kept, so changing
+                    // A topic's mode can change; subscribers and unsubscribes are both kept, so changing
                     // back restores who gets it (D149).
                     ...(input.mode !== undefined ? { mode: input.mode } : {}),
                     updatedAt: sql`now()`,

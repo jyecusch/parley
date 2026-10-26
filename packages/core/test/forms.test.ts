@@ -636,13 +636,13 @@ describe("forms (D144–D150)", () => {
     }).pipe(Effect.provide(TestLive)),
   )
 
-  it.effect("sends a broadcast with an opt-in topic only to its members", () =>
+  it.effect("sends a broadcast with an opt-in topic only to its subscribers", () =>
     Effect.gen(function* () {
       const f = yield* Fixture
       yield* setUpSending(f.jane, f.acme)
       const tag = unique()
       const topic = yield* run["topics.create"](f.jane, { teamId: f.acme, name: `Opt in ${tag}`, mode: "opt-in" })
-      expect(topic).toMatchObject({ mode: "opt-in", memberCount: 0 })
+      expect(topic).toMatchObject({ mode: "opt-in", subscriberCount: 0 })
       const ada = yield* run["contacts.create"](f.jane, {
         teamId: f.acme,
         firstName: "Ada",

@@ -54,8 +54,8 @@ export const Topic = Schema.Struct({
   mode: Schema.Literals(["opt-out", "opt-in"]),
   /** Contacts unsubscribed from this topic alone (opt-out topics). */
   unsubscribedCount: Schema.Number,
-  /** Contacts who joined it (opt-in topics). */
-  memberCount: Schema.Number,
+  /** Its subscribers: contacts who joined it (opt-in topics). */
+  subscriberCount: Schema.Number,
   createdAt: Timestamp,
   updatedAt: Timestamp,
 })

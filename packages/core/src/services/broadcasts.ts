@@ -352,7 +352,7 @@ export class Broadcasts extends Context.Service<
                 const topicJoin = topicId
                   ? sql`left join lateral (select "contacts"."id" as contact_id where case
                       when (select t.mode from "topics" t where t.id = ${topicId}) = 'opt-in'
-                        then not exists (select 1 from "topic_members" m
+                        then not exists (select 1 from "topic_subscribers" m
                           where m.contact_id = "contacts"."id" and m.topic_id = ${topicId})
                       else exists (select 1 from "topic_unsubscribes" u
                           where u.contact_id = "contacts"."id" and u.topic_id = ${topicId}) end) tu on true`

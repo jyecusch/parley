@@ -166,6 +166,7 @@ What we decided, who decided it, and what's still open. Nothing becomes "decided
 | D158 | Review fixes: forms data | A submission over a per-IP limit goes to the spam list, releasable, instead of being dropped. Purging a contact deletes its form submissions and their consent records. A deleted form takes no more confirmations | Owner | 2026-10-25 |
 | D159 | No "sign-up" | "Sign-up" isn't a Parley term in any meaning: copy says submission, or confirmed submission. Visitor-facing copy may still say "sign up" as plain English | Owner | 2026-10-25 |
 | D160 | Consent records shown | A submission's consent record shows in its detail on the Submissions screen (design asset: canvas board "Submission detail"), and on submissions in the API and MCP | Owner | 2026-10-25 |
+| D161 | Topic subscribers | Contacts who joined an opt-in topic are its **subscribers**, not "members" (a team's word). The table is `topic_subscribers` and the API field `subscriberCount` (was `memberCount`) | Owner | 2026-10-26 |
 
 ## Implementation choices made during milestones 1 and 2 (Claude; low-stakes, open to veto)
 
