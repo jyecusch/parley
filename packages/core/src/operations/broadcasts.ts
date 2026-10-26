@@ -143,14 +143,17 @@ const lookFor = <P, T>(member: MemberOf<P, T>, given: EmailStyleId | null | unde
   })
 
 /** The team's footer for a preview, with placeholders for what isn't set up yet. */
-export const previewFooter = <P, T>(member: MemberOf<P, T>): Effect.Effect<Footer, DatabaseUnavailable, Sending> =>
+export const previewFooter = <P, T>(
+  member: MemberOf<P, T>,
+  topicName: string | null = null,
+): Effect.Effect<Footer, DatabaseUnavailable, Sending> =>
   Effect.gen(function* () {
     const sending = yield* Sending
     const settings = yield* sending.settings(member)
     return {
       legalName: settings.legalName ?? "Your legal name",
       postalAddress: settings.postalAddress ?? "Your postal address",
-      reason: settings.footerReason ?? "Why recipients get your email.",
+      topicName,
       unsubscribeUrl: null,
     }
   })
@@ -271,7 +274,7 @@ export const previewOneBroadcast = (principal: Principal, input: OperationInput<
       const target = yield* proveBroadcastInTeam(member, broadcast)
       const found = target.found
       const values = yield* valuesFor(member, canRead, input.contactId)
-      const footer = yield* previewFooter(member)
+      const footer = yield* previewFooter(member, found.topicName)
       // A sent broadcast shows the look it was sent with, unless another is asked for.
       const look =
         found.status !== "draft" && input.styleId === undefined
@@ -329,7 +332,7 @@ export const testSend = (principal: Principal, input: OperationInput<typeof test
         {
           legalName: sender.legalName,
           postalAddress: sender.postalAddress,
-          reason: sender.footerReason,
+          topicName: found.topicName,
           unsubscribeUrl: urls.page,
         },
         look,

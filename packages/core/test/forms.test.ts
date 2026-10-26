@@ -54,7 +54,6 @@ const setUpSending = (owner: Principal, teamId: TeamId) =>
       senderAddress: `news@${domain}` as never,
       legalName: "Acme Pty Ltd",
       postalAddress: "1 Market St, Sydney NSW 2000",
-      footerReason: "You're getting this because you're an Acme customer.",
     })
   })
 

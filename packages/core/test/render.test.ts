@@ -4,7 +4,7 @@ import { PLAIN_STYLE, type RenderStyle, renderEmail, SAMPLE_VALUES } from "../sr
 const footer = {
   legalName: "Acme Pty Ltd",
   postalAddress: "1 Market St",
-  reason: "Because.",
+  topicName: null,
   unsubscribeUrl: "https://x/u",
 }
 const render = (body: string, values = SAMPLE_VALUES) =>
@@ -43,6 +43,18 @@ describe("email rendering", () => {
 
 const styled = (body: string, style: Partial<RenderStyle>) =>
   renderEmail({ subject: "Hi", previewText: "", body }, SAMPLE_VALUES, footer, { ...PLAIN_STYLE, ...style })
+
+describe("the footer", () => {
+  it("says why when the broadcast has a topic, and nothing when it hasn't", () => {
+    const withTopic = renderEmail({ subject: "Hi", previewText: "", body: "Hello" }, SAMPLE_VALUES, {
+      ...footer,
+      topicName: "Product <news>",
+    })
+    expect(withTopic.html).toContain("You&#39;re getting this because you&#39;re subscribed to Product &lt;news&gt;.")
+    expect(withTopic.text).toContain("You're getting this because you're subscribed to Product <news>.")
+    expect(render("Hello").text).not.toContain("getting this because")
+  })
+})
 
 describe("email styles", () => {
   it("renders the plain look by default: no card, the reader's font, a rule, then the footer", () => {

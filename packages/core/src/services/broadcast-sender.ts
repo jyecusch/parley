@@ -187,7 +187,7 @@ export class BroadcastSender extends Context.Service<
             {
               legalName: sender.legalName,
               postalAddress: sender.postalAddress,
-              reason: sender.footerReason,
+              topicName: broadcast.topicName,
               unsubscribeUrl: urls.page,
             },
             styleSentWith(broadcast.sentAs),
