@@ -16,6 +16,7 @@ import {
   formFieldKey,
   InputRejected,
   SegmentNotFound,
+  type StoredConsent,
   type Submission,
   type SubmissionId,
   type SubmissionStatus,
@@ -78,6 +79,14 @@ const toSubmission = (row: typeof schema.formSubmissions.$inferSelect): Submissi
   version: row.version,
   createdAt: row.createdAt.toISOString(),
   confirmedAt: row.confirmedAt?.toISOString() ?? null,
+  consent: {
+    ...(row.consent as StoredConsent),
+    sent: { at: row.createdAt.toISOString(), ip: row.ip ?? "", userAgent: row.userAgent ?? "" },
+    confirmed:
+      row.confirmedAt && row.confirmIp !== null
+        ? { at: row.confirmedAt.toISOString(), ip: row.confirmIp, userAgent: row.confirmUserAgent ?? "" }
+        : null,
+  },
 })
 
 /**

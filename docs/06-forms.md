@@ -64,7 +64,7 @@ The form is served from Parley's own origin, `https://app.parley.page/f/<form id
 ## What a submission does
 
 1. **Bot checks** (below). Failures go to the spam list with a reason; the visitor sees the normal success message, so bots learn nothing.
-2. **The submission is stored** with every answer, the page and UTMs, and its consent record.
+2. **The submission is stored** with every answer, the page and UTMs, and its consent record. Clicking a submission on the Submissions screen opens it beside the list: its answers, where it came from, and the consent record (D160). `forms.submissions` returns the same record, for the API and MCP.
 3. **With double opt-in (the default)**, nothing touches contacts yet. Parley emails a confirmation link (no marketing content, from the team's sender and sending domain). Unconfirmed submissions never become contacts, so bots and typos leave no junk.
 4. **When confirmed** (or straight away without double opt-in):
    - **New email**: a contact is created with the answers, subscribed to the form's topics. Domain matching affiliates them with a company as usual.

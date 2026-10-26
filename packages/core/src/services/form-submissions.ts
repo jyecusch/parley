@@ -6,6 +6,7 @@ import {
   type FormContent,
   type FormField,
   formFieldKey,
+  type StoredConsent,
   setValueOf,
   type TeamId,
 } from "@parley/domain"
@@ -26,23 +27,6 @@ import { classifySqlError } from "./sql-errors.ts"
 export interface ConfirmingVisitor {
   readonly ip: string
   readonly userAgent: string
-}
-
-/** One consent box as shown, and whether it was ticked: the heart of the consent record (D150). */
-export interface ConsentEntry {
-  readonly topicId: string
-  readonly topicName: string
-  readonly label: string
-  readonly ticked: boolean
-}
-
-/** What a submission's consent record holds besides its own columns (D150). */
-export interface ConsentRecord {
-  readonly version: number
-  readonly title: string
-  readonly finePrint: string
-  readonly privacyPolicyUrl: string | null
-  readonly consents: ReadonlyArray<ConsentEntry>
 }
 
 /** Confirmation emails one address may get from a team in a day (D146): no bombing through forms. */
@@ -145,7 +129,7 @@ export class FormSubmissions extends Context.Service<
           .pipe(Effect.map(([row]) => row))
 
       /** Topics the contact left that this submission ticks, of either mode: rejoining needs confirmation (D145). */
-      const leftTicked = (contactId: string, consent: ConsentRecord) => {
+      const leftTicked = (contactId: string, consent: StoredConsent) => {
         const ticked = consent.consents.filter((entry) => entry.ticked).map((entry) => entry.topicId)
         if (ticked.length === 0) return Effect.succeed(false)
         return db
@@ -180,7 +164,7 @@ export class FormSubmissions extends Context.Service<
           if (!sender) return yield* Effect.logWarning(`form confirmation for ${submission.id} not sent: no sender`)
           const expiresAt = Date.now() + Duration.toMillis(CONFIRM_LINK_AGE)
           const link = `${base.replace(/\/$/, "")}/f/confirm/${yield* tokens.signConfirm(submission.id, expiresAt)}`
-          const consent = submission.consent as ConsentRecord
+          const consent = submission.consent as StoredConsent
           const topics = consent.consents.filter((entry) => entry.ticked).map((entry) => entry.topicName)
           const what = content.title || row.formName
           const name = sender.legalName
@@ -225,7 +209,7 @@ ${lines
           const needsConsent =
             existing !== undefined &&
             (existing.status === "unsubscribed" ||
-              (yield* run(leftTicked(existing.id, row.submission.consent as ConsentRecord))))
+              (yield* run(leftTicked(existing.id, row.submission.consent as StoredConsent))))
           if (needsConsent) return yield* sendConfirmation(row)
           yield* apply(submissionId, null)
         })
@@ -241,7 +225,7 @@ ${lines
           const actor: SystemActor = { _tag: "SystemActor", name: `Form: ${row.formName}` }
           const related = { recordType: "form" as const, id: submission.formId, name: row.formName }
           const values = submission.values as Record<string, unknown>
-          const consent = submission.consent as ConsentRecord
+          const consent = submission.consent as StoredConsent
           // The form's fixed values fill in too, behind the visitor's own answers.
           const answers: Record<string, unknown> = { ...(content.set as Record<string, unknown>) }
           for (const [key, value] of Object.entries(values)) if (!isEmpty(value)) answers[key] = value

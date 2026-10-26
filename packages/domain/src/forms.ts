@@ -222,6 +222,40 @@ export const SubmissionStatus = Schema.Literals(["waiting", "confirmed", "spam",
 export type SubmissionStatus = typeof SubmissionStatus.Type
 
 /** One visitor's answers (D146), with what happened to them. */
+/** One consent box as the visitor saw it, and whether they ticked it (D150). */
+export const ConsentEntry = Schema.Struct({
+  topicId: Schema.String,
+  topicName: Schema.String,
+  /** The box's exact wording. */
+  label: Schema.String,
+  ticked: Schema.Boolean,
+})
+export type ConsentEntry = typeof ConsentEntry.Type
+
+/** What a submission stores as proof of what the visitor saw and agreed to (D150). */
+export const StoredConsent = Schema.Struct({
+  /** The form version shown. */
+  version: Schema.Number,
+  title: Schema.String,
+  /** The line under the button, exactly as shown. */
+  finePrint: Schema.String,
+  privacyPolicyUrl: Schema.NullOr(Schema.String),
+  consents: Schema.Array(ConsentEntry),
+})
+export type StoredConsent = typeof StoredConsent.Type
+
+/** Where a submission was sent or confirmed from. */
+const Origin = Schema.Struct({ at: Timestamp, ip: Schema.String, userAgent: Schema.String })
+
+/** A submission's consent record (D150): what was shown and agreed to, and when and from where. */
+export const ConsentRecord = Schema.Struct({
+  ...StoredConsent.fields,
+  sent: Origin,
+  /** Null until confirmed, and for a submission applied without a confirmation link. */
+  confirmed: Schema.NullOr(Origin.annotate({ description: "When the confirmation link was clicked, and from where." })),
+})
+export type ConsentRecord = typeof ConsentRecord.Type
+
 export const Submission = Schema.Struct({
   id: SubmissionId,
   formId: FormId,
@@ -242,6 +276,7 @@ export const Submission = Schema.Struct({
   version: Schema.Number,
   createdAt: Timestamp,
   confirmedAt: Schema.NullOr(Timestamp),
+  consent: ConsentRecord,
 })
 export type Submission = typeof Submission.Type
 
