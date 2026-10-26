@@ -10,6 +10,7 @@ import {
   isUuid,
   mergeAppearance,
   readAnswers,
+  type StoredConsent,
   UTM_PARAMETER,
 } from "@parley/domain"
 import { and, eq, inArray, isNull, sql } from "drizzle-orm"
@@ -19,7 +20,7 @@ import { PublicUrl } from "../config/public-url.ts"
 import { EmailChecks, FormTokens, RENDER_TOKEN_MAX_AGE, RENDER_TOKEN_MIN_AGE, Turnstile } from "../forms/protection.ts"
 import { Encryption } from "./encryption.ts"
 import { FormRuntime, type RenderedForm, type SubmissionOutcome } from "./form-runtime.ts"
-import { type ConsentRecord, FormSubmissions } from "./form-submissions.ts"
+import { FormSubmissions } from "./form-submissions.ts"
 import { digest, RateLimiter } from "./rate-limiter.ts"
 import { classifySqlError } from "./sql-errors.ts"
 
@@ -318,7 +319,7 @@ export const FormRuntimeLive = Layer.effect(
                 .where(eq(schema.topics.teamId, form.teamId)),
             ),
           )
-          const consent: ConsentRecord = {
+          const consent: StoredConsent = {
             version: form.version,
             title: content.title,
             finePrint: content.finePrint,

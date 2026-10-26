@@ -241,6 +241,15 @@ describe("forms (D144–D150)", () => {
 
       const confirmed = yield* latestSubmission(form.id)
       expect(confirmed).toMatchObject({ status: "confirmed", outcome: "created", confirmIp: "198.51.100.2" })
+      // The consent record (D150): what was shown and ticked, and when and from where.
+      const [listedSubmission] = (yield* run["forms.submissions"](f.jane, { teamId: f.acme, formId: form.id })).items
+      expect(listedSubmission?.consent).toMatchObject({
+        version: 1,
+        title: form.draft.title,
+        consents: [{ topicId: topic.id, label: "Send me launch news.", ticked: true }],
+        sent: { userAgent: "Mozilla/5.0 test" },
+        confirmed: { ip: "198.51.100.2", userAgent: "Mail app" },
+      })
       const [contact] = (yield* run["contacts.list"](f.jane, { teamId: f.acme, search: email })).items
       expect(contact).toMatchObject({ firstName: "Ada", subscriptionStatus: "subscribed" })
       expect(contact?.affiliations.map((entry) => entry.companyName)).toEqual(["Hooli"])

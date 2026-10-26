@@ -122,7 +122,7 @@ export const formAnalytics = defineTeamOperation({
 export const listSubmissions = defineTeamOperation({
   name: "forms.submissions",
   description:
-    "A form's submissions, newest first: confirmed ones (with the contact they created or updated), ones waiting for the visitor to confirm, and spam with the reason it was held.",
+    "A form's submissions, newest first: confirmed ones (with the contact they created or updated), ones waiting for the visitor to confirm, expired ones, and spam with the reason it was held. Each has its consent record: the form version, title, fine print and privacy policy link shown, each consent box's wording and whether it was ticked, and when and from where (IP, browser) it was sent and confirmed.",
   input: Schema.Struct({
     ...OneForm,
     status: Schema.optional(SubmissionStatus),

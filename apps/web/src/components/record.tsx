@@ -335,7 +335,7 @@ export function LoadFailed(props: {
  * page toggle, a menu of more actions, and close.
  */
 export function PanelBar(props: {
-  readonly noun: "contact" | "company"
+  readonly noun: "contact" | "company" | "submission"
   readonly position: { readonly index: number; readonly total: number }
   readonly onMove: (delta: number) => void
   readonly layout: "panel" | "full" | undefined
