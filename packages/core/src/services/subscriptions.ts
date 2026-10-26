@@ -240,13 +240,22 @@ export class Subscriptions extends Context.Service<
 
       const page = <L>(link: UnsubscribeLinkValid<L>) =>
         Effect.gen(function* () {
-          const { teamId, contactId, topicId, test } = link.facts
+          const { teamId, contactId, topicId, broadcastId, test } = link.facts
+          // The legal name of the sender whose email the link came from (D162): as the broadcast was
+          // sent, else the sender a draft names (a test send), else the team's default sender.
+          const broadcast = broadcastId
+            ? sql`(select b.sent_as->>'legalName' from broadcasts b where b.id = ${broadcastId} and b.team_id = ${teamId}),
+                (select s.legal_name from broadcasts b join senders s on s.id = b.sender_id where b.id = ${broadcastId} and b.team_id = ${teamId}),`
+            : sql``
           const [team] = yield* run(
             db.query((d) =>
               d
-                .select({ name: schema.organization.name, legalName: schema.emailSettings.legalName })
+                .select({
+                  name: schema.organization.name,
+                  legalName: sql<string | null>`coalesce(${broadcast}
+                    (select s.legal_name from senders s where s.team_id = ${teamId} and s.is_default))`,
+                })
                 .from(schema.organization)
-                .leftJoin(schema.emailSettings, eq(schema.emailSettings.teamId, schema.organization.id))
                 .where(eq(schema.organization.id, teamId)),
             ),
           )

@@ -7,6 +7,7 @@ import {
   type RecipientStatus,
   ROLE_PERMISSIONS,
   type SegmentId,
+  type SenderId,
   type TeamId,
   type TopicId,
   type UserId,
@@ -18,6 +19,7 @@ import { Composer, type Content, SaveState, useAutosave } from "../components/co
 import { EMAIL_FRAME_CLASS, EmailPreview } from "../components/email-preview.tsx"
 import { EmailStyleSelect } from "../components/email-style-select.tsx"
 import { LoadFailed } from "../components/record.tsx"
+import { SenderSelect, senderFor, senderLabel, useSenders } from "../components/sender-select.tsx"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -108,6 +110,7 @@ interface DraftFields extends Content {
   readonly segmentId: SegmentId | null
   readonly topicId: TopicId | null
   readonly styleId: EmailStyleId | null
+  readonly senderId: SenderId | null
 }
 
 const fieldsOf = (broadcast: Broadcast): DraftFields => ({
@@ -118,6 +121,7 @@ const fieldsOf = (broadcast: Broadcast): DraftFields => ({
   segmentId: broadcast.segmentId,
   topicId: broadcast.topicId,
   styleId: broadcast.styleId,
+  senderId: broadcast.senderId,
 })
 
 /** A draft in the composer (R42), with its segment and topic. Edits save once typing pauses. */
@@ -250,18 +254,27 @@ function DraftEditor(props: {
         content={draft}
         readOnly={readOnly}
         onChange={(change) => setDraft((current) => ({ ...current, ...change }))}
-        previewKey={`${previewAs}:${draft.styleId ?? ""}`}
+        previewKey={`${previewAs}:${draft.styleId ?? ""}:${draft.senderId ?? ""}`}
         preview={(content) =>
           call("broadcasts.preview", {
             teamId,
             broadcastId: saved.id,
             ...content,
             styleId: draft.styleId,
+            senderId: draft.senderId,
             ...(previewAs ? { contactId: previewAs } : {}),
           })
         }
         settings={
-          <div className="grid grid-cols-3 gap-3.5 @max-3xl/content:grid-cols-2 @max-xl/content:grid-cols-1">
+          <div className="grid grid-cols-2 gap-3.5 @max-xl/content:grid-cols-1">
+            <SenderSelect
+              teamId={teamId}
+              id="cmp-sender"
+              label="From"
+              value={draft.senderId}
+              disabled={readOnly}
+              onChange={(senderId) => setDraft((current) => ({ ...current, senderId }))}
+            />
             <div className="flex min-w-0 flex-col">
               <FieldLabel htmlFor="cmp-segment">To</FieldLabel>
               <Select
@@ -451,10 +464,8 @@ function SendDialog(props: {
   readonly onClose: () => void
   readonly onSent: (broadcast: Broadcast) => Promise<void>
 }) {
-  const settings = useQuery({
-    queryKey: ["email-settings", props.teamId],
-    queryFn: () => call("emailSettings.get", { teamId: props.teamId }),
-  })
+  const senders = useSenders(props.teamId)
+  const sender = senderFor(senders.data, props.broadcast.senderId)
   const segment = useQuery({
     queryKey: ["segment", props.teamId, props.broadcast.segmentId],
     enabled: props.broadcast.segmentId !== null,
@@ -464,7 +475,7 @@ function SendDialog(props: {
   const [error, setError] = useState<string>()
   const [busy, setBusy] = useState(false)
   const count = segment.data?.sendableCount ?? 0
-  const missing = settings.data?.missing ?? []
+  const senderReady = sender?.ready === true
   const send = async () => {
     setBusy(true)
     try {
@@ -486,7 +497,7 @@ function SendDialog(props: {
           </Button>
           <Button
             variant="primary"
-            disabled={!consent || busy || missing.length > 0 || count === 0}
+            disabled={!consent || busy || !senderReady || count === 0}
             onClick={() => void send()}
           >
             Send to {count} {count === 1 ? "person" : "people"}
@@ -515,18 +526,16 @@ function SendDialog(props: {
         ) : null}
         <div className="flex gap-3">
           <dt className="w-24 shrink-0 text-subtle">From</dt>
-          <dd className="m-0 min-w-0">
-            {settings.data?.senderName ?? "—"} &lt;{settings.data?.senderAddress ?? "—"}&gt;
-          </dd>
+          <dd className="m-0 min-w-0">{sender ? senderLabel(sender) : "—"}</dd>
         </div>
         <div className="flex gap-3">
           <dt className="w-24 shrink-0 text-subtle">Subject</dt>
           <dd className="m-0 min-w-0">{props.broadcast.subject || "—"}</dd>
         </div>
       </dl>
-      {missing.length > 0 ? (
+      {senders.isSuccess && !senderReady ? (
         <Notice tone="warn">
-          Finish the sender and footer in{" "}
+          {sender ? "Verify the sender's domain" : "Add a sender"} in{" "}
           <Link className="underline" to="/t/$teamId/settings/email" params={{ teamId: props.teamId }}>
             Settings → Email
           </Link>{" "}

@@ -1,5 +1,5 @@
 import { Schema } from "effect"
-import { SegmentNotFound, SenderNotReady, TopicNotFound } from "../errors/broadcasts.ts"
+import { SegmentNotFound, SenderNotFound, SenderNotReady, TopicNotFound } from "../errors/broadcasts.ts"
 import { FormNotFound, SubmissionNotFound } from "../errors/forms.ts"
 import {
   Form,
@@ -77,7 +77,7 @@ export const updateForm = defineTeamOperation({
     allowedSites: Schema.optional(SiteList),
   }),
   output: Form,
-  errors: [FormNotFound, TopicNotFound, SegmentNotFound],
+  errors: [FormNotFound, TopicNotFound, SegmentNotFound, SenderNotFound],
   http: { method: "PATCH", path: "/teams/:teamId/forms/:formId" },
   hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: ["records:read", "email:write"],
@@ -86,10 +86,10 @@ export const updateForm = defineTeamOperation({
 export const publishForm = defineTeamOperation({
   name: "forms.publish",
   description:
-    "Put a form's draft live, as a new version. Submissions record which version they saw. A form with double opt-in needs the team's sender set up first (emailSettings), since it emails a confirmation link.",
+    "Put a form's draft live, as a new version. Submissions record which version they saw. A form with double opt-in needs a ready sender first (its own, else the team's default, from senders.list), since it emails a confirmation link.",
   input: Schema.Struct(OneForm),
   output: Form,
-  errors: [FormNotFound, SenderNotReady, TopicNotFound, SegmentNotFound],
+  errors: [FormNotFound, SenderNotReady, TopicNotFound, SegmentNotFound, SenderNotFound],
   http: { method: "POST", path: "/teams/:teamId/forms/:formId/publish" },
   hints: { readOnly: false, destructive: true, idempotent: false },
   permissions: ["records:read", "email:write"],

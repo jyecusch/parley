@@ -190,6 +190,20 @@
       "when": 1793005374325,
       "tag": "0026_drop_footer_reason",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1793005887830,
+      "tag": "0027_senders",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1793005888101,
+      "tag": "0028_senders_from_email_settings",
+      "breakpoints": true
     }
   ]
 }

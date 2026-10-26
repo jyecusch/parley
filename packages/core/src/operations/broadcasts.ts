@@ -18,6 +18,7 @@ import {
   type previewBroadcast,
   type previewTemplate,
   type SegmentId,
+  type SenderId,
   type sendBroadcast,
   TestRecipientNotMember,
   type TopicId,
@@ -42,6 +43,7 @@ import {
 } from "../proofs/permissions.ts"
 import { named } from "../proofs/proof.ts"
 import { proveSegmentInTeam, proveSegmentOfTeam } from "../proofs/segment-in-team.ts"
+import { proveSenderChoice } from "../proofs/sender-in-team.ts"
 import { proveTemplateInTeam, proveTemplateOfTeam } from "../proofs/template-in-team.ts"
 import { proveTopicsInTeam } from "../proofs/topic-in-team.ts"
 import { Broadcasts } from "../services/broadcasts.ts"
@@ -142,17 +144,18 @@ const lookFor = <P, T>(member: MemberOf<P, T>, given: EmailStyleId | null | unde
     return yield* styles.renderStyle(member.team.value, choice === undefined ? saved : (choice?.found.id ?? null))
   })
 
-/** The team's footer for a preview, with placeholders for what isn't set up yet. */
+/** The footer for a preview: the sender's (else the default's), with placeholders when the team has none yet. */
 export const previewFooter = <P, T>(
   member: MemberOf<P, T>,
+  senderId: SenderId | null = null,
   topicName: string | null = null,
 ): Effect.Effect<Footer, DatabaseUnavailable, Sending> =>
   Effect.gen(function* () {
     const sending = yield* Sending
-    const settings = yield* sending.settings(member)
+    const sender = yield* sending.footerSender(member.team.value, senderId)
     return {
-      legalName: settings.legalName ?? "Your legal name",
-      postalAddress: settings.postalAddress ?? "Your postal address",
+      legalName: sender?.legalName ?? "Your legal name",
+      postalAddress: sender?.postalAddress ?? "Your postal address",
       topicName,
       unsubscribeUrl: null,
     }
@@ -222,7 +225,8 @@ export const addBroadcast = (principal: Principal, input: OperationInput<typeof 
       const links = yield* proveLinks(member, input.segmentId, input.topicId)
       const template = input.templateId === undefined ? undefined : yield* proveTemplateOfTeam(member, input.templateId)
       const style = yield* proveStyleChoice(member, input.styleId)
-      return yield* broadcasts.create(access, { ...input, ...links, template, style })
+      const sender = yield* proveSenderChoice(member, input.senderId)
+      return yield* broadcasts.create(access, { ...input, ...links, template, style, sender })
     }),
   )
 
@@ -237,7 +241,8 @@ export const changeBroadcast = (principal: Principal, input: OperationInput<type
       const draft = yield* proveBroadcastIsDraft(target)
       const links = yield* proveLinks(member, input.segmentId, input.topicId)
       const style = yield* proveStyleChoice(member, input.styleId)
-      return yield* broadcasts.update(target, draft, { ...input, ...links, style }, access)
+      const sender = yield* proveSenderChoice(member, input.senderId)
+      return yield* broadcasts.update(target, draft, { ...input, ...links, style, sender }, access)
     }),
   )
 
@@ -274,7 +279,9 @@ export const previewOneBroadcast = (principal: Principal, input: OperationInput<
       const target = yield* proveBroadcastInTeam(member, broadcast)
       const found = target.found
       const values = yield* valuesFor(member, canRead, input.contactId)
-      const footer = yield* previewFooter(member, found.topicName)
+      const choice = yield* proveSenderChoice(member, input.senderId)
+      const senderId = choice === undefined ? found.senderId : (choice?.found.id ?? null)
+      const footer = yield* previewFooter(member, senderId, found.topicName)
       // A sent broadcast shows the look it was sent with, unless another is asked for.
       const look =
         found.status !== "draft" && input.styleId === undefined
@@ -315,7 +322,7 @@ export const testSend = (principal: Principal, input: OperationInput<typeof test
         if (!person) return yield* new TestRecipientNotMember({ team: member.teamName, userId })
         to.push(person.email)
       }
-      const sender = yield* sending.sender(member)
+      const sender = yield* sending.sendAs(member, found.senderId)
       const values = yield* valuesFor(member, canRead, input.contactId)
       const token = links.sign({
         teamId: team.value,
@@ -372,7 +379,7 @@ export const send = (principal: Principal, input: OperationInput<typeof sendBroa
       if (missing.length > 0 || !found.segmentId) {
         return yield* new BroadcastIncomplete({ broadcast: DisplayName.fromRecord(found.name), missing })
       }
-      const sender = yield* sending.sender(member)
+      const sender = yield* sending.sendAs(member, found.senderId)
       // The look is copied with the sender, so editing the style later doesn't change what went out.
       const style = yield* (yield* EmailStyles).renderStyle(team.value, found.styleId)
       return yield* named(found.segmentId, (segmentId) =>

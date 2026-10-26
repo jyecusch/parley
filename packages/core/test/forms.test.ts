@@ -48,10 +48,10 @@ const setUpSending = (owner: Principal, teamId: TeamId) =>
   Effect.gen(function* () {
     const domain = `send-${unique()}.example.com`
     yield* run["sendingDomains.create"](owner, { teamId, domain: domain as never })
-    yield* run["emailSettings.update"](owner, {
+    yield* run["senders.create"](owner, {
       teamId,
-      senderName: "Acme News",
-      senderAddress: `news@${domain}` as never,
+      name: "Acme News",
+      address: `news@${domain}` as never,
       legalName: "Acme Pty Ltd",
       postalAddress: "1 Market St, Sydney NSW 2000",
     })
