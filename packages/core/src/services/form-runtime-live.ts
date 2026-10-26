@@ -374,6 +374,27 @@ export const FormRuntimeLive = Layer.effect(
           return accepted
         }),
 
+      look: (token) =>
+        Effect.gen(function* () {
+          const submissionId = yield* tokens.readConfirm(token, Date.now())
+          if (!submissionId) return undefined
+          const [row] = yield* run(
+            db.query((d) =>
+              d
+                .select({ content: schema.formVersions.content })
+                .from(schema.formSubmissions)
+                .innerJoin(
+                  schema.formVersions,
+                  and(
+                    eq(schema.formVersions.formId, schema.formSubmissions.formId),
+                    eq(schema.formVersions.version, schema.formSubmissions.version),
+                  ),
+                )
+                .where(eq(schema.formSubmissions.id, submissionId)),
+            ),
+          )
+          return row ? (row.content as FormContent).appearance : undefined
+        }),
       confirm: (token, visitor) =>
         Effect.gen(function* () {
           const submissionId = yield* tokens.readConfirm(token, Date.now())

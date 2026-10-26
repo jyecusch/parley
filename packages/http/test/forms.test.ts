@@ -51,6 +51,7 @@ const FakeRuntime = Layer.succeed(FormRuntime, {
         ? { kind: "invalid", problems: { email: "Enter an email address like you@example.com." } }
         : { kind: "accepted", afterSubmit: content.afterSubmit, confirmByEmail: true }
     }),
+  look: (token) => Effect.succeed(token === "good" ? content.appearance : undefined),
   confirm: (token) =>
     Effect.sync(() => {
       seen.confirm = token
@@ -141,6 +142,12 @@ describe("public form routes (D144)", () => {
   })
 
   it("confirms with a POST, and 404s a bad token", async () => {
+    // The page asks for the form's look first; that confirms nothing.
+    delete seen.confirm
+    const look = await call("GET", "/api/forms/confirm/good")
+    expect(look).toMatchObject({ status: 200, body: { appearance: { colorMode: "fixed" } } })
+    expect(seen.confirm).toBeUndefined()
+    expect((await call("GET", "/api/forms/confirm/nope")).status).toBe(404)
     const good = await call("POST", "/api/forms/confirm/good")
     expect(good.body).toMatchObject({ kind: "confirmed" })
     // A real link's token is a JWT, longer than the router's default limit of 100 for a parameter.

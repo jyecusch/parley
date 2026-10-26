@@ -11,6 +11,7 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http"
  *   GET  /api/forms/:formId?page=&appearance=&again=   a published form to show, with a fresh render token
  *   GET  /api/forms/:formId/sites                where it may be framed (null for anywhere)
  *   POST /api/forms/:formId/submissions          a visitor's answers
+ *   GET  /api/forms/confirm/:token               the form's look for a confirmation link, confirming nothing
  *   POST /api/forms/confirm/:token               the confirmation link's click (D146)
  *
  * Confirming is a POST, made by the confirmation page's script: email link scanners open links
@@ -138,6 +139,19 @@ export const FormRoutesLive = HttpRouter.use((router) =>
           const formId = yield* formIdOf
           if (formId._tag === "None") return notFound()
           return json({ allowedSites: yield* (yield* FormRuntime).allowedSites(formId.value) })
+        }),
+      ),
+    )
+
+    yield* router.add(
+      "GET",
+      "/api/forms/confirm/:token",
+      run(
+        Effect.gen(function* () {
+          const path = yield* HttpRouter.schemaPathParams(ConfirmPath).pipe(Effect.option)
+          if (path._tag === "None") return notFound()
+          const appearance = yield* (yield* FormRuntime).look(path.value.token)
+          return appearance ? json({ appearance }) : notFound()
         }),
       ),
     )

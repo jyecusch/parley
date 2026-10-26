@@ -241,6 +241,10 @@ describe("forms (D144–D150)", () => {
         ),
       )
       const runtime = yield* FormRuntime
+      // Looking up the form's look for the page confirms nothing.
+      expect(yield* runtime.look(token ?? "")).toMatchObject({ colorMode: "fixed" })
+      expect(yield* runtime.look("nope")).toBeUndefined()
+      expect((yield* latestSubmission(form.id))?.status).toBe("waiting")
       const page = yield* runtime.confirm(token ?? "", { ip: "198.51.100.2", userAgent: "Mail app" })
       // The page doesn't name the address: whoever opens a forwarded link would see it.
       expect(page.kind).toBe("confirmed")
