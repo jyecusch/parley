@@ -232,6 +232,14 @@ describe("forms (D144–D150)", () => {
 
       const token = yield* confirmToken(email)
       expect(token).toBeDefined()
+      // Short: what they're joining, the button, "not you?", and the sender's footer.
+      const sent = (yield* (yield* Mailer).outbox).filter((message) => message.to === email).at(-1)
+      expect(sent?.subject).toBe("Confirm your email: Join the waitlist")
+      expect(sent?.text).toMatch(
+        new RegExp(
+          `^One click and you're in: Join the waitlist, and ${topic.name}\\.\n\nConfirm my email: \\S+\n\nNot you\\? Ignore this and you won't hear from us\\.\n\nAcme Pty Ltd · 1 Market St, Sydney NSW 2000 · The link expires in 7 days\\.\n$`,
+        ),
+      )
       const runtime = yield* FormRuntime
       const page = yield* runtime.confirm(token ?? "", { ip: "198.51.100.2", userAgent: "Mail app" })
       // The page doesn't name the address: whoever opens a forwarded link would see it.
