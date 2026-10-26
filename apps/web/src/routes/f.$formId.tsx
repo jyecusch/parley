@@ -1,5 +1,6 @@
 import { Turnstile } from "@marsidev/react-turnstile"
 import type { RenderedForm, SubmissionOutcome } from "@parley/core"
+import { pageBackgroundCss } from "@parley/domain"
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
 import { useEffect, useRef, useState } from "react"
@@ -133,6 +134,8 @@ function FormPage() {
     // On its own (the hosted page) the form is the page: its main landmark, its title the h1.
     <div className="FormPage" ref={frame} lang="en" role={embedded ? undefined : "main"}>
       <style>{PAGE_CSS}</style>
+      {/* The hosted page has no site behind it, so it gets a background the form's text reads on. */}
+      {form && !embedded ? <style>{pageBackgroundCss(form.content.appearance, "html body")}</style> : null}
       {loaded.isPending ? <div role="status" aria-label="Loading" className="min-h-30" /> : null}
       {loaded.data === null ? <Notice>This form isn't available.</Notice> : null}
       {loaded.isError ? <Notice>This form didn't load. Refresh the page to try again.</Notice> : null}

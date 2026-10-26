@@ -71,7 +71,6 @@ export type SubmissionOutcome =
 export type ConfirmationPage =
   | {
       readonly kind: "confirmed"
-      readonly email: string
       readonly content: FormContent
       readonly privacyPolicyUrl: string | null
     }

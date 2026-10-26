@@ -1,5 +1,5 @@
 import type { ConfirmationPage } from "@parley/core"
-import { appearanceCss } from "@parley/domain"
+import { appearanceCss, pageBackgroundCss } from "@parley/domain"
 import { createFileRoute } from "@tanstack/react-router"
 import { useEffect, useState } from "react"
 
@@ -67,11 +67,13 @@ function ConfirmPage() {
 
   const { content } = state.page
   // The form's own title says what they joined, under a fixed "You're in".
-  const message = { title: "You're in", body: `Thanks for confirming, ${state.page.email}.` }
+  const message = { title: "You're in", body: "Thanks for confirming." }
   return (
     <main className="ConfirmPage" lang="en">
       <style>{PAGE_CSS}</style>
       <style>{appearanceCss(content.appearance, ".Form")}</style>
+      {/* The form's text must read on the page: a see-through form made for a dark site gets a dark one. */}
+      <style>{pageBackgroundCss(content.appearance, ".ConfirmPage")}</style>
       {content.appearance.fonts.map((href) => (
         <link key={href} rel="stylesheet" href={href} />
       ))}
