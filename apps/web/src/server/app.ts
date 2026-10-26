@@ -8,6 +8,7 @@ import {
   FileRoutesLive,
   FormRoutesLive,
   limitBody,
+  ROUTER_CONFIG,
   UnsubscribeRoutesLive,
   WebhookRoutesLive,
 } from "@parley/http"
@@ -31,7 +32,7 @@ const AppLive = Layer.mergeAll(
   BackgroundLive,
 ).pipe(Layer.provide(CoreLive), Layer.provide(HttpServer.layerServices))
 
-const makeApp = () => HttpRouter.toWebHandler(AppLive)
+const makeApp = () => HttpRouter.toWebHandler(AppLive, { routerConfig: ROUTER_CONFIG })
 type App = ReturnType<typeof makeApp>
 
 /*

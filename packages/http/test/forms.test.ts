@@ -3,7 +3,7 @@ import { DEFAULT_APPEARANCE, type FormContent, type FormId } from "@parley/domai
 import { Effect, Layer } from "effect"
 import { HttpRouter, HttpServer } from "effect/http"
 import { afterAll, describe, expect, it } from "vitest"
-import { FormRoutesLive } from "../src/forms.ts"
+import { FormRoutesLive, ROUTER_CONFIG } from "../src/forms.ts"
 
 const FORM = "11111111-2222-4333-8444-555555555555"
 const content: FormContent = {
@@ -23,6 +23,9 @@ const content: FormContent = {
 
 /** A FormRuntime that records what the routes pass it. */
 const seen: { render?: RenderContext; submit?: SubmissionInput; visitor?: Visitor; confirm?: string } = {}
+/** As long as a real confirmation token, with its dots. */
+const JWT_LENGTH = `eyJhbGciOiJIUzI1NiJ9.${"x".repeat(110)}.${"y".repeat(43)}`
+
 const FakeRuntime = Layer.succeed(FormRuntime, {
   render: (formId, context) =>
     Effect.sync(() => {
@@ -51,13 +54,15 @@ const FakeRuntime = Layer.succeed(FormRuntime, {
   confirm: (token) =>
     Effect.sync(() => {
       seen.confirm = token
-      return token === "good" ? { kind: "confirmed", content, privacyPolicyUrl: null } : { kind: "invalid" }
+      return token === "good" || token === JWT_LENGTH
+        ? { kind: "confirmed", content, privacyPolicyUrl: null }
+        : { kind: "invalid" }
     }),
 })
 
 const { handler, dispose } = HttpRouter.toWebHandler(
   FormRoutesLive.pipe(Layer.provide(FakeRuntime), Layer.provide(HttpServer.layerServices)),
-  { disableLogger: true },
+  { disableLogger: true, routerConfig: ROUTER_CONFIG },
 )
 afterAll(() => dispose())
 
@@ -138,6 +143,9 @@ describe("public form routes (D144)", () => {
   it("confirms with a POST, and 404s a bad token", async () => {
     const good = await call("POST", "/api/forms/confirm/good")
     expect(good.body).toMatchObject({ kind: "confirmed" })
+    // A real link's token is a JWT, longer than the router's default limit of 100 for a parameter.
+    const long = await call("POST", `/api/forms/confirm/${JWT_LENGTH}`)
+    expect(long).toMatchObject({ status: 200, body: { kind: "confirmed" } })
     expect((await call("POST", "/api/forms/confirm/nope")).status).toBe(404)
   })
 })
