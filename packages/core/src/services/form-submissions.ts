@@ -492,7 +492,7 @@ ${lines
                   )
                   for (const topic of topics) {
                     // Someone who left is back (confirming got them here: D145), and an opt-in
-                    // topic's members are the ones who joined (D149).
+                    // topic's subscribers are the ones who joined (D149).
                     const rejoined = yield* db.query((d) =>
                       d
                         .delete(schema.topicUnsubscribes)
@@ -508,10 +508,10 @@ ${lines
                       topic.mode === "opt-in"
                         ? yield* db.query((d) =>
                             d
-                              .insert(schema.topicMembers)
+                              .insert(schema.topicSubscribers)
                               .values({ teamId, contactId, topicId: topic.id, submissionId: submission.id })
                               .onConflictDoNothing()
-                              .returning({ topicId: schema.topicMembers.topicId }),
+                              .returning({ topicId: schema.topicSubscribers.topicId }),
                           )
                         : rejoined
                     if (joined.length + rejoined.length > 0 && existing) {

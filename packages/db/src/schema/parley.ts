@@ -423,7 +423,7 @@ export const topics = pgTable(
     teamId: teamId(),
     name: text("name").notNull(),
     description: text("description"),
-    /** opt-out: everyone subscribed who hasn't left. opt-in: only its members (D149). */
+    /** opt-out: everyone subscribed who hasn't left. opt-in: only its subscribers (D149). */
     mode: text("mode", { enum: ["opt-out", "opt-in"] })
       .notNull()
       .default("opt-out"),
@@ -432,9 +432,9 @@ export const topics = pgTable(
   (t) => [index("topics_team_idx").on(t.teamId)],
 )
 
-/** A contact who joined an opt-in topic (D149), and how. */
-export const topicMembers = pgTable(
-  "topic_members",
+/** A subscriber: a contact who joined an opt-in topic (D149), and how. */
+export const topicSubscribers = pgTable(
+  "topic_subscribers",
   {
     teamId: teamId(),
     contactId: uuid("contact_id")
@@ -447,7 +447,10 @@ export const topicMembers = pgTable(
     submissionId: uuid("submission_id"),
     at: timestamp("at", { withTimezone: true }).defaultNow().notNull(),
   },
-  (t) => [unique("topic_members_key").on(t.contactId, t.topicId), index("topic_members_topic_idx").on(t.topicId)],
+  (t) => [
+    unique("topic_subscribers_key").on(t.contactId, t.topicId),
+    index("topic_subscribers_topic_idx").on(t.topicId),
+  ],
 )
 
 /** A contact unsubscribed from one topic. */

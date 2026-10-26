@@ -565,7 +565,9 @@ function Topics(props: {
                 <Th scope="col" className="w-4/25">
                   <span className="inline-flex items-center gap-1">
                     People
-                    <InfoTip label="people">Opt-in topics: who joined. Opt-out topics: who left.</InfoTip>
+                    <InfoTip label="people">
+                      Opt-in topics: their subscribers, who joined. Opt-out topics: who left.
+                    </InfoTip>
                   </span>
                 </Th>
                 <Th scope="col" className="w-44">
@@ -580,7 +582,9 @@ function Topics(props: {
                   <Td className="text-subtle">{topic.description ?? "—"}</Td>
                   <Td className="text-subtle">{topic.mode === "opt-in" ? "Opt-in" : "Opt-out"}</Td>
                   <Td className="text-subtle tabular-nums">
-                    {topic.mode === "opt-in" ? `${topic.memberCount} joined` : `${topic.unsubscribedCount} left`}
+                    {topic.mode === "opt-in"
+                      ? `${topic.subscriberCount} ${topic.subscriberCount === 1 ? "subscriber" : "subscribers"}`
+                      : `${topic.unsubscribedCount} left`}
                   </Td>
                   <Td className="text-right">
                     {!props.canManage ? null : confirming === topic.id ? (

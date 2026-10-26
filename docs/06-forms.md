@@ -101,7 +101,7 @@ Today every topic is opt-out: a contact gets it unless they've left. That's wron
 - **Opt-out** (today's behavior, the default for existing topics): sent to everyone subscribed who hasn't left the topic.
 - **Opt-in**: sent only to contacts who joined it, through a form or by hand (joining through an import isn't built yet).
 
-A form subscribes people to opt-in topics they ticked. Broadcasts to an opt-in topic reach only its members. Leaving is recorded whatever the mode: someone who left an opt-in topic is back only through a confirmed submission, and stays out if the topic's mode changes. The unsubscribe page can leave an opt-in topic but not join one; joining takes a form.
+A form subscribes people to opt-in topics they ticked. Broadcasts to an opt-in topic reach only its subscribers. Leaving is recorded whatever the mode: someone who left an opt-in topic is back only through a confirmed submission, and stays out if the topic's mode changes. The unsubscribe page can leave an opt-in topic but not join one; joining takes a form.
 
 ## Analytics
 

@@ -78,7 +78,7 @@ export class Subscriptions extends Context.Service<
                 mode: schema.topics.mode,
                 left: sql<boolean>`exists (select 1 from "topic_unsubscribes" u
                   where u.topic_id = "topics"."id" and u.contact_id = ${contactId})`,
-                member: sql<boolean>`exists (select 1 from "topic_members" m
+                subscriber: sql<boolean>`exists (select 1 from "topic_subscribers" m
                   where m.topic_id = "topics"."id" and m.contact_id = ${contactId})`,
               })
               .from(schema.topics)
@@ -88,7 +88,7 @@ export class Subscriptions extends Context.Service<
         ).pipe(
           // Opt-out topics: in unless they left. Opt-in topics: in only if they joined (D149).
           Effect.map((rows) =>
-            rows.map((row) => ({ ...row, subscribed: row.mode === "opt-in" ? row.member : !row.left })),
+            rows.map((row) => ({ ...row, subscribed: row.mode === "opt-in" ? row.subscriber : !row.left })),
           ),
         )
 
@@ -164,22 +164,24 @@ export class Subscriptions extends Context.Service<
         Effect.gen(function* () {
           if (mode === "opt-out")
             return subscribed ? yield* join(contactId, topicId) : yield* leave(teamId, contactId, topicId)
-          const members = subscribed
+          const subscribers = subscribed
             ? yield* db.query((d) =>
                 d
-                  .insert(schema.topicMembers)
+                  .insert(schema.topicSubscribers)
                   .values({ teamId, contactId, topicId })
                   .onConflictDoNothing()
-                  .returning({ topicId: schema.topicMembers.topicId }),
+                  .returning({ topicId: schema.topicSubscribers.topicId }),
               )
             : yield* db.query((d) =>
                 d
-                  .delete(schema.topicMembers)
-                  .where(and(eq(schema.topicMembers.contactId, contactId), eq(schema.topicMembers.topicId, topicId)))
-                  .returning({ topicId: schema.topicMembers.topicId }),
+                  .delete(schema.topicSubscribers)
+                  .where(
+                    and(eq(schema.topicSubscribers.contactId, contactId), eq(schema.topicSubscribers.topicId, topicId)),
+                  )
+                  .returning({ topicId: schema.topicSubscribers.topicId }),
               )
           const left = subscribed ? yield* join(contactId, topicId) : yield* leave(teamId, contactId, topicId)
-          return members.length > 0 || left
+          return subscribers.length > 0 || left
         })
 
       const updateTopics = <P, T, C>(

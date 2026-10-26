@@ -133,7 +133,7 @@ export const listTopics = defineTeamOperation({
 export const createTopic = defineTeamOperation({
   name: "topics.create",
   description:
-    "Add a topic. Its name and description are shown on the unsubscribe page. Opt-out topics (the default) reach everyone subscribed who hasn't left; opt-in topics reach only contacts who joined them.",
+    "Add a topic. Its name and description are shown on the unsubscribe page. Opt-out topics (the default) reach everyone subscribed who hasn't left; opt-in topics reach only their subscribers, the contacts who joined them.",
   input: Schema.Struct({
     ...InTeam,
     name: TopicName.annotate({ title: "Name" }),

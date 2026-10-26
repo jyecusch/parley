@@ -127,6 +127,7 @@ How to pick a name: choose the most common name for the concept. Reject anything
 | **Spam list** | The submissions held as spam, each with its reason, kept 30 days and releasable (D147). | quarantine, junk, blocked list |
 | **Render token** | The signed value a form's page gets when it loads, which a submission must carry (D147). | form token, nonce (alone), CSRF token |
 | **Opt-in topic** / **Opt-out topic** | A topic's **mode** (D149): an opt-in topic reaches only contacts who joined it; an opt-out topic reaches every subscribed contact who hasn't left it. | double-opt-in topic, list type |
+| **Subscriber** | A contact who joined an opt-in topic, through a form or by hand (D149). "Ada is a subscriber to Launch news." Code: `topicSubscribers`, `subscriberCount`. | member (that's a team's), joiner, follower |
 | **Hosted page** | A form on its own page at Parley (`/f/<form id>`), for linking from posts and emails. | hosted link, landing page, form link |
 | **Embed snippet** | The script tag that puts a form on a site. | embed code, widget code, script (alone) |
 | **Fine print** | The line under a form's button, followed by the team's privacy policy link. | small print, disclaimer, footer (that's a broadcast's) |
@@ -138,7 +139,7 @@ How to pick a name: choose the most common name for the concept. Reject anything
 | **Preview text** | The line inbox apps show after a broadcast's subject. | preheader, snippet, teaser |
 | **Merge tag** | A placeholder in a subject or body, like `{{first_name}}`, filled in per recipient. | variable, placeholder, token, personalization tag |
 | **Test send** | Sending a draft to members of the team (not contacts) to check it. | preview email, proof, test email |
-| **Recipient** | A contact a broadcast was sent, or is being sent, to. | subscriber (as a noun for a contact), target |
+| **Recipient** | A contact a broadcast was sent, or is being sent, to. | subscriber (that's an opt-in topic's), target |
 | **Topic** | A kind of marketing email a team sends (for example "Product updates"). A broadcast can have one; a contact can unsubscribe from a single topic. Kept by Parley, not Resend. | category, list, channel, preference |
 | **Subscription status** | Whether a contact receives marketing email: subscribed, unsubscribed, bounced or marked as spam. | opt-in status, consent status, email status |
 | **Unsubscribe** | A contact choosing to stop getting marketing email, from one topic or all of them, through the unsubscribe link. | opt out (as a verb), remove me |
@@ -176,3 +177,4 @@ How to pick a name: choose the most common name for the concept. Reject anything
 | 2026-10-24 | Added **tracking parameters** and **click ID** (D153, D154). |
 | 2026-10-24 | Added **info tip** (D155). |
 | 2026-10-25 | Added the form terms the review found missing: submission statuses, double opt-in, confirmation link, consent box, consent record, kept value, spam list, render token, opt-in and opt-out topics, hosted page, embed snippet, fine print, form settings. "Sign-up" is banned in every meaning (owner's call). Appearance no longer says "design tokens". |
+| 2026-10-26 | **Subscriber** replaces topic "member", which clashed with **Member** (owner's call). The API's `memberCount` is now `subscriberCount`. |
