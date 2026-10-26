@@ -167,28 +167,26 @@ export class FormSubmissions extends Context.Service<
           const consent = submission.consent as StoredConsent
           const topics = consent.consents.filter((entry) => entry.ticked).map((entry) => entry.topicName)
           const what = content.title || row.formName
-          const name = sender.legalName
+          // What they're joining: the form, and any topics they ticked ("Waitlist, and News and Events").
+          const joining = [what, ...topics].reduce((list, item, index, all) =>
+            index === 0 ? item : `${list}${index === all.length - 1 ? ", and " : ", "}${item}`,
+          )
           // No marketing here: German courts treat it as advertising sent without consent (D146).
-          const lines = [
-            `Someone, hopefully you, asked to sign up to "${what}" from ${name} with this address. Confirm to finish:`,
-            ...(topics.length > 0 ? [`You also asked for: ${topics.join(", ")}.`] : []),
-            "If this wasn't you, ignore this email. Nothing happens until you confirm, and we won't email you again about it.",
-          ]
-          const html = `<!doctype html><html><body style="margin:0;padding:24px;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;font-size:16px;line-height:1.5;color:#1a1a1a">
-<p>Hi,</p>
-<p>${escapeHtml(lines[0] ?? "")}</p>
-<p><a href="${escapeHtml(link)}" style="display:inline-block;padding:12px 20px;border-radius:8px;background:#1a1a1a;color:#ffffff;text-decoration:none;font-weight:600">Confirm</a></p>
-${lines
-  .slice(1)
-  .map((line) => `<p style="color:#555555;font-size:14px">${escapeHtml(line)}</p>`)
-  .join("\n")}
-<p style="color:#888888;font-size:12px">${escapeHtml(sender.legalName)} · ${escapeHtml(sender.postalAddress)} · This link works for ${CONFIRM_LINK_DAYS} days.</p>
+          // Two text styles only: the message, and the footer.
+          const message = `One click and you're in: ${joining}.`
+          const notYou = "Not you? Ignore this and you won't hear from us."
+          const footer = `${sender.legalName} · ${sender.postalAddress} · The link expires in ${CONFIRM_LINK_DAYS} days.`
+          const html = `<!doctype html><html><body style="margin:0;padding:32px 24px;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;font-size:16px;line-height:1.5;color:#1a1a1a">
+<p style="margin:0 0 20px">${escapeHtml(message)}</p>
+<p style="margin:0 0 20px"><a href="${escapeHtml(link)}" style="display:inline-block;padding:12px 20px;border-radius:8px;background:#1a1a1a;color:#ffffff;text-decoration:none;font-weight:600">Confirm my email</a></p>
+<p style="margin:0 0 28px">${escapeHtml(notYou)}</p>
+<p style="margin:0;font-size:13px;color:#6b6b6b">${escapeHtml(footer)}</p>
 </body></html>`
-          const text = `Hi,\n\n${lines[0]}\n\n${link}\n\n${lines.slice(1).join("\n\n")}\n\n${sender.legalName} · ${sender.postalAddress}\n`
+          const text = `${message}\n\nConfirm my email: ${link}\n\n${notYou}\n\n${footer}\n`
           yield* mailer
             .send({
               to: submission.email,
-              subject: `Confirm: ${what}`,
+              subject: `Confirm your email: ${what}`,
               html,
               text,
               from: sender.from,
