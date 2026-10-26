@@ -1,6 +1,6 @@
 # Forms
 
-Status: **agreed** (D144–D150), version one in progress on `feat/forms`.
+Status: **agreed** (D144–D161), version one built.
 
 A **form** is one a team designs in Parley and embeds on its own websites: a newsletter, an event registration, a waitlist for a launch. Each **submission** creates or updates a contact, records consent, and can subscribe them to topics and add them to a segment.
 
@@ -41,15 +41,15 @@ The form is served from Parley's own origin, `https://app.parley.page/f/<form id
 
 - **The embed snippet** is one script tag:
   ```html
-  <script src="https://app.parley.page/embed.js" data-parley-form="frm_…" async></script>
+  <script src="https://app.parley.page/embed.js" data-parley-form="<form id>" async></script>
   ```
   It creates the iframe, resizes it to fit its content (our own `postMessage`, ~30 lines; the common library is GPL), forwards the host page's URL and UTM parameters, and passes appearance overrides.
 - **Appearance overrides at the embed site**, so a form can match the page it's on:
   ```html
-  <script src=".../embed.js" data-parley-form="frm_…"
+  <script src=".../embed.js" data-parley-form="<form id>"
     data-appearance='{"colors":{"accent":"#0a7a5c"},"fontFamily":"Inter"}'></script>
   ```
-  or in JavaScript: `Parley.form("#signup", { form: "frm_…", appearance: {…}, onSubmit })`.
+  or in JavaScript: `Parley.form("#signup", { form: "<form id>", appearance: {…}, onSubmit })`.
 - **Appearance** (one shape in the designer, the embed and the API):
   - `colorMode`: `fixed` (the same colors whatever the visitor's light or dark mode) or `light-dark` (switches with it).
   - `colors`: the colors, always when fixed and in light mode otherwise. `darkColors`: dark mode's, used only with `light-dark`. Each set has `heading`, `text`, `muted`, `accent`, `buttonText`, `background` (a color, or `transparent` to show the page behind the form) and `border`.
@@ -105,11 +105,11 @@ A form subscribes people to opt-in topics they ticked. Broadcasts to an opt-in t
 
 ## Analytics
 
-Per form: views (iframe loads), submissions, confirmations, spam, and conversion (confirmed ÷ views), over time and broken down by page and by UTM source, medium and campaign. Shown on the form's page and in the forms list.
+Per form: views (iframe loads), submissions, confirmations, spam, and conversion (confirmed ÷ views), over the form's life, broken down by page and by UTM source, medium and campaign. Trends over time aren't built yet. Shown on the form's page and in the forms list.
 
 ## API and MCP
 
-Parity as always: `forms.list`, `forms.get`, `forms.create`, `forms.update`, `forms.publish`, `forms.delete`, `forms.submissions` (with spam), `forms.releaseSubmission`, and the team's protection settings. The public pieces sit outside `/api/v1`: the form page (`/f/:id`), `embed.js`, the submit endpoint, and the confirmation link.
+Parity as always: `forms.list`, `forms.get`, `forms.create`, `forms.update`, `forms.publish`, `forms.delete`, `forms.submissions` (with spam and consent records), `forms.releaseSubmission`, `forms.analytics`, and the team's form settings (`formSettings.get`, `formSettings.update`). The public pieces sit outside `/api/v1`: the form page (`/f/:id`), `embed.js`, the submit endpoint, and the confirmation link.
 
 ## Version one (the prototype) and later
 
