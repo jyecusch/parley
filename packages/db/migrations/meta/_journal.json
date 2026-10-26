@@ -183,6 +183,13 @@
       "when": 1792979420182,
       "tag": "0025_topic_subscribers",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1793005374325,
+      "tag": "0026_drop_footer_reason",
+      "breakpoints": true
     }
   ]
 }

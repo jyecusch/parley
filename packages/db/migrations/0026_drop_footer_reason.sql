@@ -1,0 +1,1 @@
+ALTER TABLE "email_settings" DROP COLUMN "footer_reason";

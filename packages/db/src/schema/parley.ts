@@ -394,8 +394,6 @@ export const emailSettings = pgTable("email_settings", {
   replyTo: text("reply_to"),
   legalName: text("legal_name"),
   postalAddress: text("postal_address"),
-  /** Why recipients get the email ("You're getting this because you signed up at acme.com."). */
-  footerReason: text("footer_reason"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 })
 

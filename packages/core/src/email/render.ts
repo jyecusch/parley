@@ -34,7 +34,8 @@ export const SAMPLE_VALUES: MergeValues = {
 export interface Footer {
   readonly legalName: string
   readonly postalAddress: string
-  readonly reason: string
+  /** The broadcast's topic, named in a line saying why the recipient gets it (D162); null for none. */
+  readonly topicName: string | null
   readonly unsubscribeUrl: string | null
 }
 
@@ -422,14 +423,15 @@ export const renderEmail = (
   const bodyText = fill(plainTextOf(content.body), values, plain, unknown).trim()
 
   const unsubscribe = footer.unsubscribeUrl
+  const why = footer.topicName ? `You're getting this because you're subscribed to ${footer.topicName}.` : null
   const footerHtml = [
-    `<p style="margin:0 0 6px">${escapeHtml(footer.reason)}</p>`,
+    ...(why ? [`<p style="margin:0 0 6px">${escapeHtml(why)}</p>`] : []),
     `<p style="margin:0 0 6px">${escapeHtml(footer.legalName)} · ${escapeHtml(footer.postalAddress)}</p>`,
     `<p style="margin:0"><a href="${escapeHtml(unsubscribe ?? "#")}" style="color:${FOOTER_GRAY};text-decoration:underline">Unsubscribe</a> or choose which email you get.</p>`,
   ].join("\n")
   const footerText = [
     "—",
-    footer.reason,
+    ...(why ? [why] : []),
     `${footer.legalName} · ${footer.postalAddress}`,
     `Unsubscribe or choose which email you get: ${unsubscribe ?? "(your unsubscribe link)"}`,
   ].join("\n")

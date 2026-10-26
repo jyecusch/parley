@@ -100,17 +100,9 @@ export const EmailSettings = Schema.Struct({
   replyTo: Schema.NullOr(Schema.String),
   legalName: Schema.NullOr(Schema.String),
   postalAddress: Schema.NullOr(Schema.String),
-  footerReason: Schema.NullOr(Schema.String),
   /** What's still missing before the team can send; empty when ready. */
   missing: Schema.Array(
-    Schema.Literals([
-      "sender-name",
-      "sender-address",
-      "verified-domain",
-      "legal-name",
-      "postal-address",
-      "footer-reason",
-    ]),
+    Schema.Literals(["sender-name", "sender-address", "verified-domain", "legal-name", "postal-address"]),
   ),
 })
 export type EmailSettings = typeof EmailSettings.Type
@@ -122,7 +114,6 @@ export const SenderPostalAddress = Schema.String.check(
   Schema.isMinLength(1),
   Schema.isMaxLength(300),
 )
-export const FooterReason = Schema.String.check(Schema.isTrimmed(), Schema.isMinLength(1), Schema.isMaxLength(300))
 
 // Segments
 

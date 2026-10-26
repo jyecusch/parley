@@ -4,7 +4,6 @@ import { EmailAddress } from "../contact-values.ts"
 import {
   ContactSubscriptions,
   EmailSettings,
-  FooterReason,
   LegalName,
   SenderName,
   SenderPostalAddress,
@@ -49,7 +48,7 @@ export const getEmailSettings = defineTeamOperation({
 export const updateEmailSettings = defineTeamOperation({
   name: "emailSettings.update",
   description:
-    "Set the team's sender (name and address on a sending domain), reply-to address and footer (legal name, postal address, and why recipients get the email). Null clears a value.",
+    "Set the team's sender (name and address on a sending domain), reply-to address and footer (legal name and postal address). Null clears a value.",
   input: Schema.Struct({
     ...InTeam,
     senderName: Schema.optional(Schema.NullOr(SenderName.annotate({ title: "Sender name" }))),
@@ -57,14 +56,6 @@ export const updateEmailSettings = defineTeamOperation({
     replyTo: Schema.optional(Schema.NullOr(EmailAddress.annotate({ title: "Reply-to address" }))),
     legalName: Schema.optional(Schema.NullOr(LegalName.annotate({ title: "Legal name" }))),
     postalAddress: Schema.optional(Schema.NullOr(SenderPostalAddress.annotate({ title: "Postal address" }))),
-    footerReason: Schema.optional(
-      Schema.NullOr(
-        FooterReason.annotate({
-          title: "Why recipients get this",
-          description: 'For example "You\'re getting this because you signed up at acme.com."',
-        }),
-      ),
-    ),
   }),
   output: EmailSettings,
   errors: [SenderAddressNotOnSendingDomain],

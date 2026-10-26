@@ -28,7 +28,6 @@ export interface EmailSettingsInput {
   readonly replyTo?: string | null | undefined
   readonly legalName?: string | null | undefined
   readonly postalAddress?: string | null | undefined
-  readonly footerReason?: string | null | undefined
 }
 
 /** Who a team's broadcast email is from, and its footer, as sent (R40). Copied onto a broadcast when it starts. */
@@ -37,7 +36,6 @@ export interface Sender {
   readonly replyTo: string | null
   readonly legalName: string
   readonly postalAddress: string
-  readonly footerReason: string
 }
 
 /** How many sending domains a team may have; each is registered with the email provider. */
@@ -133,14 +131,12 @@ export class Sending extends Context.Service<
           else if (!verified.has(domainOf(senderAddress))) missing.push("verified-domain")
           if (!row?.legalName) missing.push("legal-name")
           if (!row?.postalAddress) missing.push("postal-address")
-          if (!row?.footerReason) missing.push("footer-reason")
           const settings: EmailSettings = {
             senderName: row?.senderName ?? null,
             senderAddress,
             replyTo: row?.replyTo ?? null,
             legalName: row?.legalName ?? null,
             postalAddress: row?.postalAddress ?? null,
-            footerReason: row?.footerReason ?? null,
             missing,
           }
           return settings
@@ -164,7 +160,6 @@ export class Sending extends Context.Service<
             ...(input.replyTo !== undefined ? { replyTo: input.replyTo } : {}),
             ...(input.legalName !== undefined ? { legalName: input.legalName } : {}),
             ...(input.postalAddress !== undefined ? { postalAddress: input.postalAddress } : {}),
-            ...(input.footerReason !== undefined ? { footerReason: input.footerReason } : {}),
           }
           yield* run(
             db.query((d) =>
@@ -183,15 +178,13 @@ export class Sending extends Context.Service<
           !settings.senderName ||
           !settings.senderAddress ||
           !settings.legalName ||
-          !settings.postalAddress ||
-          !settings.footerReason
+          !settings.postalAddress
             ? undefined
             : {
                 from: fromHeader(settings.senderName, settings.senderAddress),
                 replyTo: settings.replyTo,
                 legalName: settings.legalName,
                 postalAddress: settings.postalAddress,
-                footerReason: settings.footerReason,
               },
         )
 
@@ -203,8 +196,7 @@ export class Sending extends Context.Service<
             !settings.senderName ||
             !settings.senderAddress ||
             !settings.legalName ||
-            !settings.postalAddress ||
-            !settings.footerReason
+            !settings.postalAddress
           ) {
             return yield* new SenderNotReady({ team: member.teamName, missing: settings.missing })
           }
@@ -213,7 +205,6 @@ export class Sending extends Context.Service<
             replyTo: settings.replyTo,
             legalName: settings.legalName,
             postalAddress: settings.postalAddress,
-            footerReason: settings.footerReason,
           }
           return ready
         })

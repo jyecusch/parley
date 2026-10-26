@@ -47,7 +47,7 @@ describe("email setup", () => {
       const f = yield* Fixture
       const domain = `mail-${unique()}.example.com`
       const before = yield* run["emailSettings.get"](f.jane, { teamId: f.acme })
-      expect(before.missing).toEqual(["sender-name", "sender-address", "legal-name", "postal-address", "footer-reason"])
+      expect(before.missing).toEqual(["sender-name", "sender-address", "legal-name", "postal-address"])
 
       // A member can draft but not change the sender.
       const denied = yield* run["sendingDomains.create"](f.sam, { teamId: f.acme, domain: domain as never }).pipe(
@@ -78,7 +78,6 @@ describe("email setup", () => {
         senderAddress: `news@${domain}` as never,
         legalName: "Acme Pty Ltd",
         postalAddress: "1 Market St, Sydney NSW 2000",
-        footerReason: "You're getting this because you're an Acme customer.",
       })
       expect(ready.missing).toEqual([])
 

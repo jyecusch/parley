@@ -144,8 +144,9 @@ How to pick a name: choose the most common name for the concept. Reject anything
 | **Subscription status** | Whether a contact receives marketing email: subscribed, unsubscribed, bounced or marked as spam. | opt-in status, consent status, email status |
 | **Unsubscribe** | A contact choosing to stop getting marketing email, from one topic or all of them, through the unsubscribe link. | opt out (as a verb), remove me |
 | **Unsubscribe link** | The link in every broadcast email (and its List-Unsubscribe header) that unsubscribes the recipient. | opt-out link, manage preferences link |
-| **Footer** | What Parley adds to the end of every broadcast email: the sender's legal name and postal address, and the unsubscribe link. Required by anti-spam law. | signature, compliance block, legal text |
-| **Sender** | Who a broadcast email is from: a name and an address on a sending domain. | from, sender identity, mailbox |
+| **Footer** | What Parley adds to the end of every broadcast email: the sender's legal name and postal address, the unsubscribe link and, when the broadcast has a topic, a line naming it. Required by anti-spam law. | signature, compliance block, legal text |
+| **Sender** | Who an email from the team is from: a name and an address on a sending domain, a reply-to, and the legal name and postal address its footer shows. A team has one or more; each broadcast and form picks one (D162). | from, sender identity, mailbox, brand |
+| **Default sender** | The sender new broadcasts and forms start with, and the one that takes over when a sender is deleted (D162). | primary sender, main sender |
 | **Sending domain** | A domain the team has verified with DNS records so Parley can send email from it. Not a company's domain. | email domain (here), verified domain, DKIM domain |
 
 ## Changelog

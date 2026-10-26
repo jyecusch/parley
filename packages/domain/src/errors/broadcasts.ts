@@ -166,14 +166,7 @@ export class SenderNotReady
   extends Schema.TaggedError<SenderNotReady>()("SenderNotReady", {
     team: DisplayName.schema,
     missing: Schema.Array(
-      Schema.Literals([
-        "sender-name",
-        "sender-address",
-        "verified-domain",
-        "legal-name",
-        "postal-address",
-        "footer-reason",
-      ]),
+      Schema.Literals(["sender-name", "sender-address", "verified-domain", "legal-name", "postal-address"]),
     ),
   })
   implements DomainError

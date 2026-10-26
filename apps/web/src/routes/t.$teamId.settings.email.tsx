@@ -37,7 +37,6 @@ const MISSING_LABELS: Readonly<Record<EmailSettings["missing"][number], string>>
   "verified-domain": "a verified sending domain for the sender address",
   "legal-name": "a legal name",
   "postal-address": "a postal address",
-  "footer-reason": "why recipients get your email",
 }
 
 const listOf = (items: ReadonlyArray<string>) =>
@@ -366,7 +365,6 @@ function SenderForm(props: {
     replyTo: props.settings.replyTo ?? "",
     legalName: props.settings.legalName ?? "",
     postalAddress: props.settings.postalAddress ?? "",
-    footerReason: props.settings.footerReason ?? "",
   }
   const [draft, setDraft] = useState(initial)
   const [busy, setBusy] = useState(false)
@@ -391,7 +389,6 @@ function SenderForm(props: {
         replyTo: orNull(draft.replyTo) as never,
         legalName: orNull(draft.legalName),
         postalAddress: orNull(draft.postalAddress),
-        footerReason: orNull(draft.footerReason),
       })
       await props.onSaved()
     } catch (failure) {
@@ -463,26 +460,10 @@ function SenderForm(props: {
           onChange={set("postalAddress")}
         />
       </Field>
-      <Field
-        label="Why recipients get your email"
-        htmlFor="footer-reason"
-        className="col-span-full"
-        hint={neededIfEmpty(draft.footerReason)}
-      >
-        <Textarea
-          id="footer-reason"
-          rows={2}
-          maxLength={300}
-          disabled={disabled}
-          placeholder="You're getting this because you signed up at acme.com."
-          value={draft.footerReason}
-          onChange={set("footerReason")}
-        />
-      </Field>
       <div className="col-span-full flex flex-col gap-1.5">
         <span className="font-medium">Footer preview</span>
         <div className="flex flex-col gap-1 border-t border-dashed border-line-strong pt-3 text-center text-sm text-subtle [&>p]:m-0">
-          <p>{draft.footerReason || <MissingPart>Why recipients get your email</MissingPart>}</p>
+          <p>You're getting this because you're subscribed to Product news.</p>
           <p>
             {draft.legalName || <MissingPart>Legal name</MissingPart>} ·{" "}
             {draft.postalAddress || <MissingPart>Postal address</MissingPart>}
@@ -493,7 +474,7 @@ function SenderForm(props: {
         </div>
         <Hint>
           Anti-spam laws need every broadcast to say who sent it and how to unsubscribe, so Parley adds this to each
-          one.
+          one. The first line appears only when the broadcast has a topic.
         </Hint>
       </div>
       {props.canManage ? (
