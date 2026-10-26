@@ -146,6 +146,28 @@ const isDark = (background: string): boolean => {
   return 0.299 * (r ?? 0) + 0.587 * (g ?? 0) + 0.114 * (b ?? 0) < 128
 }
 
+/**
+ * The page color behind a form that's alone on a Parley page (the hosted and confirmation pages),
+ * where there's no site of the team's to show through. A see-through form gets a page its text
+ * reads on; a form with its own background sits on a neutral one of the same lightness.
+ */
+const pageColorOf = (colors: FormColors) =>
+  colors.background === "transparent"
+    ? isDark(colors.text)
+      ? "#ffffff"
+      : "#111111"
+    : isDark(colors.background)
+      ? "#0a0a0a"
+      : "#f5f5f4"
+
+/** The background rule for a page with only the form on it, following the form's light and dark colors. */
+export const pageBackgroundCss = (appearance: FormAppearance, selector: string): string => {
+  const light = `${selector}{background:${pageColorOf(appearance.colors)}!important}`
+  return appearance.colorMode === "fixed"
+    ? light
+    : `${light}@media (prefers-color-scheme: dark){${selector}{background:${pageColorOf(appearance.darkColors)}!important}}`
+}
+
 /** The CSS variables for one set of colors, plus the shared ones. */
 const variablesFor = (colors: FormColors, error: string, appearance: FormAppearance) =>
   [

@@ -234,7 +234,9 @@ describe("forms (D144–D150)", () => {
       expect(token).toBeDefined()
       const runtime = yield* FormRuntime
       const page = yield* runtime.confirm(token ?? "", { ip: "198.51.100.2", userAgent: "Mail app" })
-      expect(page).toMatchObject({ kind: "confirmed", email })
+      // The page doesn't name the address: whoever opens a forwarded link would see it.
+      expect(page.kind).toBe("confirmed")
+      expect(page).not.toHaveProperty("email")
       expect((yield* runtime.confirm(token ?? "", visitor)).kind).toBe("confirmed")
       expect((yield* runtime.confirm("nope", visitor)).kind).toBe("invalid")
 

@@ -384,7 +384,6 @@ export const FormRuntimeLive = Layer.effect(
             db.query((d) =>
               d
                 .select({
-                  email: schema.formSubmissions.email,
                   content: schema.formVersions.content,
                   privacyPolicyUrl: schema.formSettings.privacyPolicyUrl,
                 })
@@ -403,7 +402,6 @@ export const FormRuntimeLive = Layer.effect(
           if (!row) return { kind: "invalid" } as const
           return {
             kind: "confirmed",
-            email: row.email,
             content: row.content as FormContent,
             privacyPolicyUrl: row.privacyPolicyUrl ?? null,
           } as const

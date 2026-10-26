@@ -51,9 +51,7 @@ const FakeRuntime = Layer.succeed(FormRuntime, {
   confirm: (token) =>
     Effect.sync(() => {
       seen.confirm = token
-      return token === "good"
-        ? { kind: "confirmed", email: "ada@example.com", content, privacyPolicyUrl: null }
-        : { kind: "invalid" }
+      return token === "good" ? { kind: "confirmed", content, privacyPolicyUrl: null } : { kind: "invalid" }
     }),
 })
 
@@ -139,7 +137,7 @@ describe("public form routes (D144)", () => {
 
   it("confirms with a POST, and 404s a bad token", async () => {
     const good = await call("POST", "/api/forms/confirm/good")
-    expect(good.body).toMatchObject({ kind: "confirmed", email: "ada@example.com" })
+    expect(good.body).toMatchObject({ kind: "confirmed" })
     expect((await call("POST", "/api/forms/confirm/nope")).status).toBe(404)
   })
 })
