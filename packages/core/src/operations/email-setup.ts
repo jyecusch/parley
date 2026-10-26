@@ -1,15 +1,18 @@
 import type {
+  createSender,
   createSendingDomain,
   createTopic,
+  deleteSender,
   deleteSendingDomain,
   deleteTopic,
   getContactSubscriptions,
-  getEmailSettings,
+  listSenders,
   listSendingDomains,
   listTopics,
   OperationInput,
+  setDefaultSender,
   updateContactSubscriptions,
-  updateEmailSettings,
+  updateSender,
   updateTopic,
   verifySendingDomain,
 } from "@parley/domain"
@@ -24,29 +27,63 @@ import {
   proveCanWriteRecords,
 } from "../proofs/permissions.ts"
 import { named } from "../proofs/proof.ts"
+import { proveSenderInTeam } from "../proofs/sender-in-team.ts"
 import { proveSendingDomainInTeam } from "../proofs/sending-domain-in-team.ts"
 import { proveTopicInTeam, proveTopicsInTeam } from "../proofs/topic-in-team.ts"
 import { Sending } from "../services/sending.ts"
 import { Subscriptions } from "../services/subscriptions.ts"
 import { Topics } from "../services/topics.ts"
 
-export const getSettings = (principal: Principal, input: OperationInput<typeof getEmailSettings>) =>
+export const listAllSenders = (principal: Principal, input: OperationInput<typeof listSenders>) =>
   named(principal, input.teamId, (principal, team) =>
     Effect.gen(function* () {
       const sending = yield* Sending
       const member = yield* proveMemberOf(principal, team)
       yield* proveCanWriteEmail(member)
-      return yield* sending.settings(member)
+      return yield* sending.senders(member)
     }),
   )
 
-export const updateSettings = (principal: Principal, input: OperationInput<typeof updateEmailSettings>) =>
+export const addSender = (principal: Principal, input: OperationInput<typeof createSender>) =>
   named(principal, input.teamId, (principal, team) =>
     Effect.gen(function* () {
       const sending = yield* Sending
       const member = yield* proveMemberOf(principal, team)
       const access = yield* proveCanManageEmail(member)
-      return yield* sending.updateSettings(access, input)
+      return yield* sending.createSender(access, input)
+    }),
+  )
+
+export const changeSender = (principal: Principal, input: OperationInput<typeof updateSender>) =>
+  named(principal, input.teamId, input.senderId, (principal, team, sender) =>
+    Effect.gen(function* () {
+      const sending = yield* Sending
+      const member = yield* proveMemberOf(principal, team)
+      const access = yield* proveCanManageEmail(member)
+      const target = yield* proveSenderInTeam(member, sender)
+      return yield* sending.updateSender(target, input, access)
+    }),
+  )
+
+export const makeDefaultSender = (principal: Principal, input: OperationInput<typeof setDefaultSender>) =>
+  named(principal, input.teamId, input.senderId, (principal, team, sender) =>
+    Effect.gen(function* () {
+      const sending = yield* Sending
+      const member = yield* proveMemberOf(principal, team)
+      const access = yield* proveCanManageEmail(member)
+      const target = yield* proveSenderInTeam(member, sender)
+      return yield* sending.setDefaultSender(target, access)
+    }),
+  )
+
+export const removeSender = (principal: Principal, input: OperationInput<typeof deleteSender>) =>
+  named(principal, input.teamId, input.senderId, (principal, team, sender) =>
+    Effect.gen(function* () {
+      const sending = yield* Sending
+      const member = yield* proveMemberOf(principal, team)
+      const access = yield* proveCanManageEmail(member)
+      const target = yield* proveSenderInTeam(member, sender)
+      return yield* sending.deleteSender(target, access)
     }),
   )
 

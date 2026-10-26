@@ -1,6 +1,6 @@
 import { Schema } from "effect"
 import type { CustomField } from "./custom-field.ts"
-import { CustomFieldId, FormId, SegmentId, SubmissionId, TopicId } from "./ids.ts"
+import { CustomFieldId, FormId, SegmentId, SenderId, SubmissionId, TopicId } from "./ids.ts"
 
 /*
  * Forms (D144–D150): forms a team designs in Parley and embeds on its websites.
@@ -174,6 +174,8 @@ export const FormContent = Schema.Struct({
   afterSubmit: AfterSubmit,
   /** On by default (D146): nothing touches contacts until the confirmation link is clicked. */
   doubleOptIn: Schema.Boolean,
+  /** Who the confirmation email is from; null, or a sender deleted since, means the team's default sender (D162). */
+  senderId: Schema.NullOr(SenderId),
   /** A fixed segment every confirmed submission's contact joins, or null. */
   segmentId: Schema.NullOr(SegmentId),
   /** Values set on every submission, keyed like import targets ("custom:<field id>", "title"). */

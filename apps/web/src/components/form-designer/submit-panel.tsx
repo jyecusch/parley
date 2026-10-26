@@ -1,6 +1,7 @@
-import { type FieldProblem, FORM_CONFIRM_COPY, type FormContent } from "@parley/domain"
+import { type FieldProblem, FORM_CONFIRM_COPY, type FormContent, type TeamId } from "@parley/domain"
 import { useState } from "react"
 import { problemFor } from "../record.tsx"
+import { SenderSelect } from "../sender-select.tsx"
 import {
   Checkbox,
   Field,
@@ -16,6 +17,7 @@ import {
 import { type ContentChange, redirectProblem } from "./shared.tsx"
 
 export function AfterSubmitPanel(props: {
+  readonly teamId: TeamId
   readonly content: FormContent
   /** Problems from the last save, by field. */
   readonly problems: ReadonlyArray<FieldProblem> | undefined
@@ -113,7 +115,16 @@ export function AfterSubmitPanel(props: {
             unsubscribed always has to confirm before they're subscribed again.
           </InfoTip>
         </div>
-        {content.doubleOptIn ? null : (
+        {content.doubleOptIn ? (
+          <SenderSelect
+            teamId={props.teamId}
+            id="confirm-sender"
+            label="Send it from"
+            value={content.senderId}
+            disabled={false}
+            onChange={(senderId) => onChange((current) => ({ ...current, senderId }))}
+          />
+        ) : (
           <Notice tone="warn">
             Submissions become contacts straight away. In the EU you may need proof they asked.
           </Notice>

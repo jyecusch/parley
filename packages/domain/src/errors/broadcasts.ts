@@ -1,7 +1,7 @@
 import { DisplayName, type DomainError, EchoedInput, userText } from "@parley/errors"
 import { Schema } from "effect"
 import * as ErrorReporter from "effect/ErrorReporter"
-import { BroadcastId, SegmentId, SendingDomainId, TemplateId, TopicId, UserId } from "../ids.ts"
+import { BroadcastId, SegmentId, SenderId, SendingDomainId, TemplateId, TopicId, UserId } from "../ids.ts"
 
 /** No topic with that id in this team. */
 export class TopicNotFound
@@ -161,25 +161,54 @@ export class SegmentHasNoRecipients
   }
 }
 
-/** The team hasn't finished setting up its sender and footer (R40). */
+/** The team has no sender yet, or the one an email would come from isn't on a verified domain (R40, D162). */
 export class SenderNotReady
   extends Schema.TaggedError<SenderNotReady>()("SenderNotReady", {
     team: DisplayName.schema,
-    missing: Schema.Array(
-      Schema.Literals(["sender-name", "sender-address", "verified-domain", "legal-name", "postal-address"]),
-    ),
+    /** "sender": the team has none; "verified-domain": the sender's domain isn't verified. */
+    missing: Schema.Literals(["sender", "verified-domain"]),
   })
   implements DomainError
 {
   readonly isRetryable = false
   override readonly [ErrorReporter.severity] = "Info" as const
   override get message() {
-    return `sender not ready: ${this.missing.join(", ")}`
+    return `sender not ready: ${this.missing}`
   }
   get userMessage() {
-    return this.missing.includes("verified-domain")
-      ? userText`${this.team} can't send email until a sending domain is verified. An admin can add one in Settings → Email. Your draft is saved.`
-      : userText`${this.team} can't send email until its sender and footer are set up. An admin can finish them in Settings → Email. Your draft is saved.`
+    return this.missing === "verified-domain"
+      ? userText`${this.team} can't send this email until its sender's domain is verified. An admin can check it in Settings → Email. Your draft is saved.`
+      : userText`${this.team} can't send email until it has a sender. An admin can add one in Settings → Email. Your draft is saved.`
+  }
+}
+
+/** No sender with that id in this team. */
+export class SenderNotFound
+  extends Schema.TaggedError<SenderNotFound>()("SenderNotFound", { team: DisplayName.schema, senderId: SenderId })
+  implements DomainError
+{
+  readonly isRetryable = false
+  override readonly [ErrorReporter.severity] = "Info" as const
+  override get message() {
+    return `sender ${this.senderId} not found in team`
+  }
+  get userMessage() {
+    return userText`We can't find that sender in ${this.team}. It may have been deleted.`
+  }
+}
+
+/** The default sender can't be deleted: everything without a sender of its own uses it (D162). */
+export class SenderIsDefault
+  extends Schema.TaggedError<SenderIsDefault>()("SenderIsDefault", { sender: DisplayName.schema })
+  implements DomainError
+{
+  readonly isRetryable = false
+  override readonly [ErrorReporter.severity] = "Info" as const
+  override get message() {
+    return "cannot delete the default sender"
+  }
+  get userMessage() {
+    return userText`${this.sender} is your team's default sender. Make another sender the default before deleting it.`
   }
 }
 

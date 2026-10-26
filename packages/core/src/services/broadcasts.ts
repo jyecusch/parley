@@ -11,6 +11,7 @@ import {
   type RecipientStatus,
   SegmentHasNoRecipients,
   type SegmentId,
+  type SenderId,
   type SkipReason,
   type TeamId,
   type TopicId,
@@ -24,10 +25,11 @@ import { PLAIN_STYLE, type RenderStyle } from "../email/render.ts"
 import type { BroadcastInTeam, BroadcastIsDraft } from "../proofs/broadcast-in-team.ts"
 import type { CanSendEmail, CanWriteEmail, MemberOf } from "../proofs/permissions.ts"
 import type { SegmentInTeam, SegmentOfTeam } from "../proofs/segment-in-team.ts"
+import type { SenderOfTeam } from "../proofs/sender-in-team.ts"
 import type { TemplateOfTeam } from "../proofs/template-in-team.ts"
 import type { TopicsInTeam } from "../proofs/topic-in-team.ts"
 import type { ContactScope } from "./contacts.ts"
-import type { Sender } from "./sending.ts"
+import type { SendAs } from "./sending.ts"
 import { classifySqlError } from "./sql-errors.ts"
 import { type ContentInput, type StyleChoice, styleColumnOf } from "./templates.ts"
 
@@ -54,7 +56,7 @@ const ZERO: BroadcastCounts = {
  * What a broadcast was sent as, copied when sending starts (R42): the sender, footer and email
  * style. Broadcasts sent before email styles have no style and render plain.
  */
-export interface SentAs extends Sender {
+export interface SentAs extends SendAs {
   readonly style?: RenderStyle | undefined
 }
 
@@ -78,6 +80,8 @@ const COUNT_KEY: Readonly<Record<RecipientStatus, keyof BroadcastCounts>> = {
 
 /** What changes on a draft. Undefined leaves a field; null clears the segment or topic. */
 export interface DraftChanges<T> extends ContentInput, StyleChoice<T> {
+  /** Who it's from: undefined leaves it, null is the team's default sender (D162). */
+  readonly sender?: SenderOfTeam<T> | null | undefined
   readonly name?: string | undefined
   readonly segment?: SegmentOfTeam<T> | null | undefined
   /** At most one topic: a broadcast has one or none. */
@@ -243,6 +247,7 @@ export class Broadcasts extends Context.Service<
         body: row.body,
         status: row.status,
         styleId: row.styleId as EmailStyleId | null,
+        senderId: row.senderId as SenderId | null,
         segmentId: row.segmentId as SegmentId | null,
         segmentName:
           row.status === "draft" ? (row.segmentId ? (names.get(row.segmentId) ?? null) : null) : row.segmentName,
@@ -313,6 +318,7 @@ export class Broadcasts extends Context.Service<
         ...(input.segment !== undefined ? { segmentId: input.segment?.found.id ?? null } : {}),
         ...(input.topic !== undefined ? { topicId: input.topic?.found[0]?.id ?? null } : {}),
         ...styleColumnOf(input),
+        ...(input.sender !== undefined ? { senderId: input.sender?.found.id ?? null } : {}),
       })
 
       const insertDraft = (teamId: string, values: Partial<typeof schema.broadcasts.$inferInsert> & { name: string }) =>
@@ -604,6 +610,7 @@ export class Broadcasts extends Context.Service<
               segmentId: source.segmentId,
               topicId: source.topicId,
               styleId: source.styleId,
+              senderId: source.senderId,
             })
           }).pipe(Effect.withSpan("Broadcasts.duplicate")),
         queue,

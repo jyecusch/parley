@@ -383,19 +383,29 @@ export const files = pgTable("files", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 })
 
-/** A team's sender and footer (R40). One row per team, made on first save. */
-export const emailSettings = pgTable("email_settings", {
-  teamId: text("team_id")
-    .primaryKey()
-    .references(() => organization.id, { onDelete: "cascade" }),
-  senderName: text("sender_name"),
-  /** The full address, on one of the team's sending domains. */
-  senderAddress: text("sender_address"),
-  replyTo: text("reply_to"),
-  legalName: text("legal_name"),
-  postalAddress: text("postal_address"),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-})
+/**
+ * Who a team's email is from, with its footer (R40, D162). One per team is the default, used by
+ * broadcasts and forms that don't name a sender.
+ */
+export const senders = pgTable(
+  "senders",
+  {
+    id: uuid("id").primaryKey(),
+    teamId: teamId(),
+    name: text("name").notNull(),
+    /** The full address, on one of the team's sending domains. */
+    address: text("address").notNull(),
+    replyTo: text("reply_to"),
+    legalName: text("legal_name").notNull(),
+    postalAddress: text("postal_address").notNull(),
+    isDefault: boolean("is_default").notNull().default(false),
+    ...timestamps,
+  },
+  (t) => [
+    index("senders_team_idx").on(t.teamId),
+    uniqueIndex("senders_default_key").on(t.teamId).where(sql`${t.isDefault}`),
+  ],
+)
 
 /** A domain a team sends from, registered with the email provider (R44). Unique across teams. */
 export const sendingDomains = pgTable(
@@ -585,6 +595,8 @@ export const broadcasts = pgTable(
     body: text("body").notNull().default(""),
     /** Null uses the team's default style (D117). A sent broadcast's look is in sent_as. */
     styleId: uuid("style_id").references(() => emailStyles.id, { onDelete: "set null" }),
+    /** Null uses the team's default sender, as does a sender deleted since (D162). A sent broadcast's is in sent_as. */
+    senderId: uuid("sender_id").references(() => senders.id, { onDelete: "set null" }),
     segmentId: uuid("segment_id").references(() => segments.id, { onDelete: "set null" }),
     topicId: uuid("topic_id").references(() => topics.id, { onDelete: "set null" }),
     status: text("status", { enum: ["draft", "sending", "sent", "canceled"] })

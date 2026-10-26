@@ -51,6 +51,9 @@ export type BroadcastId = typeof BroadcastId.Type
 export const SendingDomainId = Schema.String.pipe(Schema.brand("SendingDomainId"))
 export type SendingDomainId = typeof SendingDomainId.Type
 
+export const SenderId = Schema.String.pipe(Schema.brand("SenderId"))
+export type SenderId = typeof SenderId.Type
+
 export const EmailStyleId = Schema.String.pipe(Schema.brand("EmailStyleId"))
 export type EmailStyleId = typeof EmailStyleId.Type
 

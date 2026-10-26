@@ -3,8 +3,8 @@ import { Domain } from "../company.ts"
 import { EmailAddress } from "../contact-values.ts"
 import {
   ContactSubscriptions,
-  EmailSettings,
   LegalName,
+  Sender,
   SenderName,
   SenderPostalAddress,
   SendingDomain,
@@ -15,6 +15,8 @@ import {
 } from "../email.ts"
 import {
   SenderAddressNotOnSendingDomain,
+  SenderIsDefault,
+  SenderNotFound,
   SendingDomainLimitReached,
   SendingDomainNotFound,
   SendingDomainTaken,
@@ -22,7 +24,7 @@ import {
 } from "../errors/broadcasts.ts"
 import { ContactNotFound } from "../errors/contacts.ts"
 import { EmailErrors } from "../errors/email.ts"
-import { ContactId, SendingDomainId, TeamId, TopicId } from "../ids.ts"
+import { ContactId, SenderId, SendingDomainId, TeamId, TopicId } from "../ids.ts"
 import { defineTeamOperation } from "../operation.ts"
 
 const InTeam = { teamId: TeamId.annotate({ description: "The team, from teams.list." }) }
@@ -31,36 +33,90 @@ const OneDomain = {
   ...InTeam,
   sendingDomainId: SendingDomainId.annotate({ description: "The sending domain's id, from sendingDomains.list." }),
 }
+const OneSender = { ...InTeam, senderId: SenderId.annotate({ description: "The sender's id, from senders.list." }) }
 const OneContact = { ...InTeam, contactId: ContactId.annotate({ description: "The contact's id." }) }
 
-export const getEmailSettings = defineTeamOperation({
-  name: "emailSettings.get",
+export const listSenders = defineTeamOperation({
+  name: "senders.list",
   description:
-    "The team's sender and footer for marketing email, and what's still missing before it can send. Every broadcast email ends with the footer.",
+    "List who the team's email can come from: each sender's name and address on a sending domain, reply-to, and the legal name and postal address its footer shows. One is the default, used by broadcasts and forms that don't pick a sender. A sender is ready when its domain is verified.",
   input: Schema.Struct(InTeam),
-  output: EmailSettings,
+  output: Schema.Array(Sender),
   errors: [],
-  http: { method: "GET", path: "/teams/:teamId/email-settings" },
+  http: { method: "GET", path: "/teams/:teamId/senders" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: ["email:write"],
 })
 
-export const updateEmailSettings = defineTeamOperation({
-  name: "emailSettings.update",
+const SenderFields = {
+  name: SenderName.annotate({ title: "Sender name", description: "What people see in their inbox." }),
+  address: EmailAddress.annotate({
+    title: "Sender address",
+    description: "On one of the team's sending domains, from sendingDomains.list.",
+  }),
+  replyTo: Schema.NullOr(
+    EmailAddress.annotate({ title: "Reply-to address", description: "Null sends replies to the sender address." }),
+  ),
+  legalName: LegalName.annotate({ title: "Legal name" }),
+  postalAddress: SenderPostalAddress.annotate({ title: "Postal address" }),
+}
+
+export const createSender = defineTeamOperation({
+  name: "senders.create",
   description:
-    "Set the team's sender (name and address on a sending domain), reply-to address and footer (legal name and postal address). Null clears a value.",
+    "Add a sender. Anti-spam laws need the legal name and postal address, which every email from it ends with. The team's first sender becomes its default; isDefault makes a later one the default.",
   input: Schema.Struct({
     ...InTeam,
-    senderName: Schema.optional(Schema.NullOr(SenderName.annotate({ title: "Sender name" }))),
-    senderAddress: Schema.optional(Schema.NullOr(EmailAddress.annotate({ title: "Sender address" }))),
-    replyTo: Schema.optional(Schema.NullOr(EmailAddress.annotate({ title: "Reply-to address" }))),
-    legalName: Schema.optional(Schema.NullOr(LegalName.annotate({ title: "Legal name" }))),
-    postalAddress: Schema.optional(Schema.NullOr(SenderPostalAddress.annotate({ title: "Postal address" }))),
+    ...SenderFields,
+    replyTo: Schema.optional(SenderFields.replyTo),
+    isDefault: Schema.optional(Schema.Boolean),
   }),
-  output: EmailSettings,
+  output: Sender,
   errors: [SenderAddressNotOnSendingDomain],
-  http: { method: "PATCH", path: "/teams/:teamId/email-settings" },
+  http: { method: "POST", path: "/teams/:teamId/senders" },
+  hints: { readOnly: false, destructive: false, idempotent: false },
+  permissions: ["email:manage"],
+})
+
+export const updateSender = defineTeamOperation({
+  name: "senders.update",
+  description:
+    "Change a sender. Drafts and forms that send from it change with it; broadcasts already sent keep the sender they went out with.",
+  input: Schema.Struct({
+    ...OneSender,
+    name: Schema.optional(SenderFields.name),
+    address: Schema.optional(SenderFields.address),
+    replyTo: Schema.optional(SenderFields.replyTo),
+    legalName: Schema.optional(SenderFields.legalName),
+    postalAddress: Schema.optional(SenderFields.postalAddress),
+  }),
+  output: Sender,
+  errors: [SenderNotFound, SenderAddressNotOnSendingDomain],
+  http: { method: "PATCH", path: "/teams/:teamId/senders/:senderId" },
   hints: { readOnly: false, destructive: true, idempotent: true },
+  permissions: ["email:manage"],
+})
+
+export const setDefaultSender = defineTeamOperation({
+  name: "senders.setDefault",
+  description: "Make a sender the team's default: broadcasts and forms that don't pick a sender send from it.",
+  input: Schema.Struct(OneSender),
+  output: Sender,
+  errors: [SenderNotFound],
+  http: { method: "POST", path: "/teams/:teamId/senders/:senderId/default" },
+  hints: { readOnly: false, destructive: true, idempotent: true },
+  permissions: ["email:manage"],
+})
+
+export const deleteSender = defineTeamOperation({
+  name: "senders.delete",
+  description:
+    "Delete a sender. Draft broadcasts and forms that sent from it send from the default sender instead; broadcasts already sent keep it. The default sender can't be deleted.",
+  input: Schema.Struct(OneSender),
+  output: Sender,
+  errors: [SenderNotFound, SenderIsDefault],
+  http: { method: "DELETE", path: "/teams/:teamId/senders/:senderId" },
+  hints: { readOnly: false, destructive: true, idempotent: false },
   permissions: ["email:manage"],
 })
 
@@ -100,7 +156,7 @@ export const verifySendingDomain = defineTeamOperation({
 
 export const deleteSendingDomain = defineTeamOperation({
   name: "sendingDomains.delete",
-  description: "Stop sending from a domain. A sender address on it stops working until another is set.",
+  description: "Stop sending from a domain. Senders on it can't send until it's added and verified again.",
   input: Schema.Struct(OneDomain),
   output: SendingDomain,
   errors: [SendingDomainNotFound, ...EmailErrors],

@@ -159,8 +159,8 @@ export class FormSubmissions extends Context.Service<
               Effect.catchTag("RequestsTooFrequent", () => Effect.succeed(false)),
             )
           if (!allowed) return yield* Effect.logInfo(`form confirmation for ${submission.id} not sent: too many today`)
-          const sender = yield* sending.senderForTeam(teamId)
-          // Publishing refuses double opt-in without a sender; one removed since leaves it waiting.
+          const sender = yield* sending.sendAsForTeam(teamId, content.senderId)
+          // Publishing refuses double opt-in without a ready sender; one removed since leaves it waiting.
           if (!sender) return yield* Effect.logWarning(`form confirmation for ${submission.id} not sent: no sender`)
           const expiresAt = Date.now() + Duration.toMillis(CONFIRM_LINK_AGE)
           const link = `${base.replace(/\/$/, "")}/f/confirm/${yield* tokens.signConfirm(submission.id, expiresAt)}`

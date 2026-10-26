@@ -5,7 +5,7 @@ import { Config, Context, Duration, Effect, Layer, Ref } from "effect"
 import { type MergeValues, renderEmail } from "../email/render.ts"
 import { Mailer, type OutgoingEmail } from "../mail/mailer.ts"
 import { styleSentWith } from "./broadcasts.ts"
-import type { Sender } from "./sending.ts"
+import type { SendAs } from "./sending.ts"
 import { UnsubscribeLinks } from "./unsubscribe-links.ts"
 
 const BATCH = 100
@@ -160,7 +160,7 @@ export class BroadcastSender extends Context.Service<
         const ready: Array<{ readonly row: Claimed; readonly email: OutgoingEmail }> = []
         for (const row of claimed) {
           const broadcast = byId.get(row.broadcast_id)
-          const sender = broadcast?.sentAs as Sender | null | undefined
+          const sender = broadcast?.sentAs as SendAs | null | undefined
           if (!broadcast || !sender || !row.address) {
             yield* markFailed([row.id], "This broadcast couldn't be prepared for sending.")
             continue

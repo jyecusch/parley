@@ -18,6 +18,7 @@ const company = { kind: "contact", field: "company", label: "Company", required:
 
 const base = {
   doubleOptIn: true,
+  senderId: null,
   segmentId: null,
   set: {},
   captureTracking: true,

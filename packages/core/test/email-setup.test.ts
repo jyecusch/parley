@@ -3,7 +3,14 @@ import { Database } from "@parley/db"
 import type { ContactId, TopicId } from "@parley/domain"
 import { sql } from "drizzle-orm"
 import { ConfigProvider, Effect, Layer } from "effect"
-import { CoreLive, implementations as run, UnsubscribeLinks, unsubscribeApply, unsubscribePage } from "../src/index.ts"
+import {
+  CoreLive,
+  Mailer,
+  implementations as run,
+  UnsubscribeLinks,
+  unsubscribeApply,
+  unsubscribePage,
+} from "../src/index.ts"
 import { Fixture } from "./fixture.ts"
 
 const unique = () => crypto.randomUUID().slice(0, 8)
@@ -42,14 +49,15 @@ describe("email setup", () => {
     }),
   )
 
-  it.effect("sets up a sender and footer on a verified sending domain, for admins only", () =>
+  it.effect("sets up senders on verified sending domains, for admins only", () =>
     Effect.gen(function* () {
       const f = yield* Fixture
+      const mailer = yield* Mailer
       const domain = `mail-${unique()}.example.com`
-      const before = yield* run["emailSettings.get"](f.jane, { teamId: f.acme })
-      expect(before.missing).toEqual(["sender-name", "sender-address", "legal-name", "postal-address"])
+      const other = `labs-${unique()}.example.com`
+      expect(yield* run["senders.list"](f.jane, { teamId: f.acme })).toEqual([])
 
-      // A member can draft but not change the sender.
+      // A member can draft but not change senders.
       const denied = yield* run["sendingDomains.create"](f.sam, { teamId: f.acme, domain: domain as never }).pipe(
         Effect.flip,
       )
@@ -65,26 +73,111 @@ describe("email setup", () => {
         Effect.flip,
       )
       expect(taken._tag).toBe("SendingDomainTaken")
+      yield* run["sendingDomains.create"](f.jane, { teamId: f.acme, domain: other as never })
 
-      const offDomain = yield* run["emailSettings.update"](f.jane, {
+      const fields = { legalName: "Acme Pty Ltd", postalAddress: "1 Market St, Sydney NSW 2000" }
+      const offDomain = yield* run["senders.create"](f.jane, {
         teamId: f.acme,
-        senderAddress: "news@elsewhere.example" as never,
+        name: "Acme",
+        address: "news@elsewhere.example" as never,
+        ...fields,
       }).pipe(Effect.flip)
       expect(offDomain._tag).toBe("SenderAddressNotOnSendingDomain")
 
-      const ready = yield* run["emailSettings.update"](f.jane, {
+      // The first sender is the default; the next isn't, unless asked.
+      const acme = yield* run["senders.create"](f.jane, {
         teamId: f.acme,
-        senderName: "Acme",
-        senderAddress: `news@${domain}` as never,
-        legalName: "Acme Pty Ltd",
-        postalAddress: "1 Market St, Sydney NSW 2000",
+        name: "Acme",
+        address: `Hello@${domain}` as never,
+        ...fields,
       })
-      expect(ready.missing).toEqual([])
+      expect(acme).toMatchObject({ address: `hello@${domain}`, isDefault: true, ready: true })
+      const labs = yield* run["senders.create"](f.jane, {
+        teamId: f.acme,
+        name: "Acme Labs",
+        address: `team@${other}` as never,
+        replyTo: `support@${other}` as never,
+        legalName: "Acme Labs Inc",
+        postalAddress: "500 Howard St, San Francisco CA 94105",
+      })
+      expect(labs.isDefault).toBe(false)
 
-      // Removing the domain makes the sender address unusable again.
+      // A broadcast without a sender goes out as the default; one with a sender, as that sender.
+      const broadcast = yield* run["broadcasts.create"](f.sam, {
+        teamId: f.acme,
+        name: "Labs news",
+        subject: "Hi",
+        body: "News",
+      })
+      expect(broadcast.senderId).toBeNull()
+      yield* run["broadcasts.testSend"](f.sam, { teamId: f.acme, broadcastId: broadcast.id })
+      expect((yield* mailer.outbox).at(-1)?.from).toBe(`Acme <hello@${domain}>`)
+      const outsider = yield* run["broadcasts.update"](f.sam, {
+        teamId: f.acme,
+        broadcastId: broadcast.id,
+        senderId: (yield* run["senders.list"](f.bob, { teamId: f.globex }))[0]?.id ?? (crypto.randomUUID() as never),
+      }).pipe(Effect.flip)
+      expect(outsider._tag).toBe("SenderNotFound")
+      yield* run["broadcasts.update"](f.sam, { teamId: f.acme, broadcastId: broadcast.id, senderId: labs.id })
+      yield* run["broadcasts.testSend"](f.sam, { teamId: f.acme, broadcastId: broadcast.id })
+      const sent = (yield* mailer.outbox).at(-1)
+      expect(sent).toMatchObject({ from: `Acme Labs <team@${other}>`, replyTo: `support@${other}` })
+      expect(sent?.text).toContain("Acme Labs Inc · 500 Howard St")
+      // The unsubscribe page names the sender the email came from; a link without a broadcast, the default.
+      const links = yield* UnsubscribeLinks
+      const fromLabs = links.sign({
+        teamId: f.acme,
+        contactId: null,
+        topicId: null,
+        broadcastId: broadcast.id,
+        test: true,
+      })
+      expect((yield* unsubscribePage(fromLabs)).senderName).toBe("Acme Labs Inc")
+      const fromTeam = links.sign({ teamId: f.acme, contactId: null, topicId: null, broadcastId: null, test: true })
+      expect((yield* unsubscribePage(fromTeam)).senderName).toBe("Acme Pty Ltd")
+
+      // A form can pick the sender too; the list counts what uses each.
+      const form = yield* run["forms.create"](f.jane, { teamId: f.acme, name: "Beta", template: "blank" })
+      yield* run["forms.update"](f.jane, {
+        teamId: f.acme,
+        formId: form.id,
+        draft: { ...form.draft, senderId: labs.id },
+      })
+      const listed = yield* run["senders.list"](f.jane, { teamId: f.acme })
+      expect(listed.map((entry) => [entry.name, entry.isDefault, entry.usedBy])).toEqual([
+        ["Acme", true, { forms: 0, broadcasts: 0 }],
+        ["Acme Labs", false, { forms: 1, broadcasts: 1 }],
+      ])
+
+      // The default can't be deleted; another can, and what used it goes back to the default.
+      const isDefault = yield* run["senders.delete"](f.jane, { teamId: f.acme, senderId: acme.id }).pipe(Effect.flip)
+      expect(isDefault._tag).toBe("SenderIsDefault")
+      yield* run["senders.delete"](f.jane, { teamId: f.acme, senderId: labs.id })
+      expect((yield* run["broadcasts.get"](f.sam, { teamId: f.acme, broadcastId: broadcast.id })).senderId).toBeNull()
+      expect((yield* run["forms.get"](f.jane, { teamId: f.acme, formId: form.id })).draft.senderId).toBeNull()
+
+      // Changing the default changes who default broadcasts come from.
+      const news = yield* run["senders.create"](f.jane, {
+        teamId: f.acme,
+        name: "Acme News",
+        address: `news@${domain}` as never,
+        ...fields,
+        isDefault: true,
+      })
+      expect(news.isDefault).toBe(true)
+      const [first] = yield* run["senders.list"](f.jane, { teamId: f.acme })
+      expect(first?.id).toBe(news.id)
+      yield* run["senders.update"](f.jane, { teamId: f.acme, senderId: news.id, name: "Acme Updates" })
+      yield* run["broadcasts.testSend"](f.sam, { teamId: f.acme, broadcastId: broadcast.id })
+      expect((yield* mailer.outbox).at(-1)?.from).toBe(`Acme Updates <news@${domain}>`)
+
+      // Removing the domain leaves its senders unable to send.
       yield* run["sendingDomains.delete"](f.jane, { teamId: f.acme, sendingDomainId: added.id })
-      const after = yield* run["emailSettings.get"](f.jane, { teamId: f.acme })
-      expect(after.missing).toEqual(["verified-domain"])
+      expect((yield* run["senders.list"](f.jane, { teamId: f.acme })).every((entry) => !entry.ready)).toBe(true)
+      const notReady = yield* run["broadcasts.testSend"](f.sam, { teamId: f.acme, broadcastId: broadcast.id }).pipe(
+        Effect.flip,
+      )
+      expect(notReady).toMatchObject({ _tag: "SenderNotReady", missing: "verified-domain" })
     }).pipe(Effect.provide(CoreLive)),
   )
 

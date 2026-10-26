@@ -6,6 +6,7 @@ import {
   EmailImageId,
   EmailStyleId,
   SegmentId,
+  SenderId,
   SendingDomainId,
   TemplateId,
   TopicId,
@@ -93,19 +94,29 @@ export const SendingDomain = Schema.Struct({
 })
 export type SendingDomain = typeof SendingDomain.Type
 
-/** The team's sender and footer (R40). Every field is needed before anything can be sent. */
-export const EmailSettings = Schema.Struct({
-  senderName: Schema.NullOr(Schema.String),
-  senderAddress: Schema.NullOr(Schema.String),
+/**
+ * Who an email from the team is from, with its footer (R40, D162). A team has one or more; one is
+ * its default, used by every broadcast and form that doesn't pick another.
+ */
+export const Sender = Schema.Struct({
+  id: SenderId,
+  name: Schema.String,
+  /** The full address, on one of the team's sending domains. */
+  address: Schema.String,
+  /** Where replies go; null sends them to the address. */
   replyTo: Schema.NullOr(Schema.String),
-  legalName: Schema.NullOr(Schema.String),
-  postalAddress: Schema.NullOr(Schema.String),
-  /** What's still missing before the team can send; empty when ready. */
-  missing: Schema.Array(
-    Schema.Literals(["sender-name", "sender-address", "verified-domain", "legal-name", "postal-address"]),
-  ),
+  /** Shown in the footer, with the postal address. */
+  legalName: Schema.String,
+  postalAddress: Schema.String,
+  isDefault: Schema.Boolean,
+  /** Whether its address's domain is verified, so it can send. */
+  ready: Schema.Boolean,
+  /** How many forms and draft broadcasts send from it; the default's include those that pick none. */
+  usedBy: Schema.Struct({ forms: Schema.Number, broadcasts: Schema.Number }),
+  createdAt: Timestamp,
+  updatedAt: Timestamp,
 })
-export type EmailSettings = typeof EmailSettings.Type
+export type Sender = typeof Sender.Type
 
 export const SenderName = Schema.String.check(Schema.isTrimmed(), Schema.isMinLength(1), Schema.isMaxLength(80))
 export const LegalName = Schema.String.check(Schema.isTrimmed(), Schema.isMinLength(1), Schema.isMaxLength(160))
@@ -204,6 +215,8 @@ export const Broadcast = Schema.Struct({
   status: BroadcastStatus,
   /** The email style it uses; null means the team's default (D117). A sent broadcast keeps the look it was sent with. */
   styleId: Schema.NullOr(EmailStyleId),
+  /** Who it's from; null means the team's default sender (D162). A sent broadcast keeps the sender it was sent with. */
+  senderId: Schema.NullOr(SenderId),
   segmentId: Schema.NullOr(SegmentId),
   /** The segment's name, as it was when sent for a sent broadcast. */
   segmentName: Schema.NullOr(Schema.String),

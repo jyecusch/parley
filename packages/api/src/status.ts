@@ -59,6 +59,8 @@ export const ERROR_STATUS: { readonly [Tag in ErrorTag]: Status } = {
   BroadcastIncomplete: 422,
   SegmentHasNoRecipients: 422,
   SenderNotReady: 409,
+  SenderNotFound: 404,
+  SenderIsDefault: 409,
   TestRecipientNotMember: 422,
   SenderAddressNotOnSendingDomain: 422,
   SendingDomainTaken: 409,

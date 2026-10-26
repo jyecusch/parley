@@ -14,6 +14,7 @@ const content: FormContent = {
   fields: [{ kind: "contact", field: "email", label: "Email", required: true }],
   afterSubmit: { kind: "message", title: "Check your inbox", body: "Click the link we sent." },
   doubleOptIn: true,
+  senderId: null,
   segmentId: null,
   set: {},
   captureTracking: true,

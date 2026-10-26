@@ -19,6 +19,7 @@ import {
   BroadcastNotSending,
   SegmentHasNoRecipients,
   SegmentNotFound,
+  SenderNotFound,
   SenderNotReady,
   TemplateNotFound,
   TestRecipientNotMember,
@@ -28,7 +29,7 @@ import { ContactNotFound } from "../errors/contacts.ts"
 import { EmailErrors } from "../errors/email.ts"
 import { EmailStyleNotFound } from "../errors/email-styles.ts"
 import { RequestsTooFrequent } from "../errors/infrastructure.ts"
-import { BroadcastId, ContactId, EmailStyleId, SegmentId, TeamId, TemplateId, TopicId } from "../ids.ts"
+import { BroadcastId, ContactId, EmailStyleId, SegmentId, SenderId, TeamId, TemplateId, TopicId } from "../ids.ts"
 import { defineTeamOperation } from "../operation.ts"
 
 const InTeam = { teamId: TeamId.annotate({ description: "The team, from teams.list." }) }
@@ -52,6 +53,16 @@ const Style = {
       EmailStyleId.annotate({
         title: "Email style",
         description: "An email style's id, from emailStyles.list. Null uses the team's default style.",
+      }),
+    ),
+  ),
+}
+const FromSender = {
+  senderId: Schema.optional(
+    Schema.NullOr(
+      SenderId.annotate({
+        title: "Sender",
+        description: "Who it's from: a sender's id, from senders.list. Null uses the team's default sender.",
       }),
     ),
   ),
@@ -160,7 +171,7 @@ export const getBroadcast = defineTeamOperation({
 export const createBroadcast = defineTeamOperation({
   name: "broadcasts.create",
   description:
-    "Start a draft broadcast, empty or from a template (its content and email style are copied). Set its segment and, optionally, its topic and email style.",
+    "Start a draft broadcast, empty or from a template (its content and email style are copied). Set its segment and, optionally, its topic, email style and sender.",
   input: Schema.Struct({
     ...InTeam,
     name: ContentName.annotate({ title: "Name", description: "For your team; recipients don't see it." }),
@@ -169,9 +180,10 @@ export const createBroadcast = defineTeamOperation({
     topicId: Schema.optional(Schema.NullOr(TopicId)),
     ...Content,
     ...Style,
+    ...FromSender,
   }),
   output: Broadcast,
-  errors: [TemplateNotFound, SegmentNotFound, TopicNotFound, EmailStyleNotFound],
+  errors: [TemplateNotFound, SegmentNotFound, TopicNotFound, EmailStyleNotFound, SenderNotFound],
   http: { method: "POST", path: "/teams/:teamId/broadcasts" },
   hints: { readOnly: false, destructive: false, idempotent: false },
   permissions: ["records:read", "email:write"],
@@ -179,7 +191,8 @@ export const createBroadcast = defineTeamOperation({
 
 export const updateBroadcast = defineTeamOperation({
   name: "broadcasts.update",
-  description: "Change a draft broadcast. Null clears its segment or topic.",
+  description:
+    "Change a draft broadcast. Null clears its segment or topic, and sets the team's default style or sender.",
   input: Schema.Struct({
     ...OneBroadcast,
     name: Schema.optional(ContentName.annotate({ title: "Name" })),
@@ -187,9 +200,10 @@ export const updateBroadcast = defineTeamOperation({
     topicId: Schema.optional(Schema.NullOr(TopicId)),
     ...Content,
     ...Style,
+    ...FromSender,
   }),
   output: Broadcast,
-  errors: [BroadcastNotFound, BroadcastNotDraft, SegmentNotFound, TopicNotFound, EmailStyleNotFound],
+  errors: [BroadcastNotFound, BroadcastNotDraft, SegmentNotFound, TopicNotFound, EmailStyleNotFound, SenderNotFound],
   http: { method: "PATCH", path: "/teams/:teamId/broadcasts/:broadcastId" },
   hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: ["records:read", "email:write"],
@@ -220,10 +234,10 @@ export const duplicateBroadcast = defineTeamOperation({
 export const previewBroadcast = defineTeamOperation({
   name: "broadcasts.preview",
   description:
-    "Render a broadcast as a recipient would get it, with the footer. Pass subject, previewText or body to preview unsaved changes.",
-  input: Schema.Struct({ ...OneBroadcast, ...Content, ...Style, contactId: PreviewContact }),
+    "Render a broadcast as a recipient would get it, with the footer. Pass subject, previewText, body, styleId or senderId to preview unsaved changes.",
+  input: Schema.Struct({ ...OneBroadcast, ...Content, ...Style, ...FromSender, contactId: PreviewContact }),
   output: RenderedEmail,
-  errors: [BroadcastNotFound, ContactNotFound, EmailStyleNotFound],
+  errors: [BroadcastNotFound, ContactNotFound, EmailStyleNotFound, SenderNotFound],
   http: { method: "POST", path: "/teams/:teamId/broadcasts/:broadcastId/preview" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: ["records:read"],

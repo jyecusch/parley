@@ -16,6 +16,7 @@ import {
   formFieldKey,
   InputRejected,
   SegmentNotFound,
+  SenderNotFound,
   type StoredConsent,
   type Submission,
   type SubmissionId,
@@ -108,12 +109,12 @@ export class Forms extends Context.Service<
       target: FormInTeam<F, T>,
       input: FormUpdate,
       access: CanWriteEmail<P, T>,
-    ) => Effect.Effect<Form, InputRejected | TopicNotFound | SegmentNotFound | DatabaseUnavailable>
+    ) => Effect.Effect<Form, InputRejected | TopicNotFound | SegmentNotFound | SenderNotFound | DatabaseUnavailable>
     /** Publishes the draft, checked again: a topic, field or segment it uses may have gone since it was saved. */
     readonly publish: <P, T, F>(
       target: FormInTeam<F, T>,
       access: CanWriteEmail<P, T>,
-    ) => Effect.Effect<Form, InputRejected | TopicNotFound | SegmentNotFound | DatabaseUnavailable>
+    ) => Effect.Effect<Form, InputRejected | TopicNotFound | SegmentNotFound | SenderNotFound | DatabaseUnavailable>
     readonly delete: <P, T, F>(
       target: FormInTeam<F, T>,
       access: CanWriteEmail<P, T>,
@@ -404,6 +405,17 @@ export class Forms extends Context.Service<
                 ],
               })
             }
+          }
+          if (draft.senderId) {
+            const [sender] = yield* run(
+              db.query((d) =>
+                d
+                  .select({ id: schema.senders.id })
+                  .from(schema.senders)
+                  .where(and(eq(schema.senders.teamId, teamId), eq(schema.senders.id, draft.senderId as string))),
+              ),
+            )
+            if (!sender) return yield* new SenderNotFound({ team: teamName, senderId: draft.senderId })
           }
         })
 

@@ -234,7 +234,7 @@ export function FormDesigner(props: {
                 <FieldsPanel content={content} customFields={customFields} onChange={setContent} />
               </TabsContent>
               <TabsContent value="submit" className="p-4">
-                <AfterSubmitPanel content={content} problems={fieldProblems} onChange={setContent} />
+                <AfterSubmitPanel teamId={teamId} content={content} problems={fieldProblems} onChange={setContent} />
               </TabsContent>
               <TabsContent value="topics" className="p-4">
                 <TopicsPanel teamId={teamId} content={content} topics={topics} onChange={setContent} />

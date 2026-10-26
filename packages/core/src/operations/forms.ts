@@ -77,8 +77,8 @@ export const publish = (principal: Principal, input: OperationInput<typeof publi
       yield* proveCanReadRecords(member)
       const access = yield* proveCanWriteEmail(member)
       const target = yield* proveFormInTeam(member, form)
-      // Double opt-in emails a confirmation link, so it needs a sender before it can go live (D146).
-      if (target.found.draft.doubleOptIn) yield* sending.sender(member)
+      // Double opt-in emails a confirmation link, so it needs a ready sender before it can go live (D146, D162).
+      if (target.found.draft.doubleOptIn) yield* sending.sendAs(member, target.found.draft.senderId)
       return yield* forms.publish(target, access)
     }),
   )
