@@ -1,4 +1,11 @@
-import type { AppearanceOverride, CustomField, DatabaseUnavailable, FormContent, FormId } from "@parley/domain"
+import type {
+  AppearanceOverride,
+  CustomField,
+  DatabaseUnavailable,
+  FormAppearance,
+  FormContent,
+  FormId,
+} from "@parley/domain"
 import type { Challenge } from "altcha-lib"
 import { Context, type Effect } from "effect"
 
@@ -92,5 +99,10 @@ export class FormRuntime extends Context.Service<
       visitor: Visitor,
     ) => Effect.Effect<SubmissionOutcome, DatabaseUnavailable>
     readonly confirm: (token: string, visitor: Visitor) => Effect.Effect<ConfirmationPage, DatabaseUnavailable>
+    /**
+     * The look of the form a confirmation link is for, without confirming: the page is drawn in
+     * it before the browser confirms. Undefined for a link that isn't ours or has expired.
+     */
+    readonly look: (token: string) => Effect.Effect<FormAppearance | undefined, DatabaseUnavailable>
   }
 >()("@parley/core/FormRuntime") {}
