@@ -1,5 +1,5 @@
 export { limitBody } from "./body-limit.ts"
-export { FormRoutesLive } from "./forms.ts"
+export { FormRoutesLive, ROUTER_CONFIG } from "./forms.ts"
 export { errorBody, FailureResponsesLive, respondToFailures } from "./respond.ts"
 export {
   ApiHandlersLive,

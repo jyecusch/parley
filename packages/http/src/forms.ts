@@ -73,7 +73,13 @@ const visitorOf = (request: HttpServerRequest.HttpServerRequest, ipHeader: strin
 }
 
 const FormPath = Schema.Struct({ formId: Schema.String.check(Schema.isUUID()) })
-const ConfirmPath = Schema.Struct({ token: Schema.String.check(Schema.isMaxLength(2000)) })
+/**
+ * The router's settings. A confirmation link's token (a JWT, about 150 characters) is a path
+ * parameter, and the router turns away any longer than 100 by default: the link would 404.
+ */
+export const ROUTER_CONFIG = { maxParamLength: 2000 } as const
+
+const ConfirmPath = Schema.Struct({ token: Schema.String.check(Schema.isMaxLength(ROUTER_CONFIG.maxParamLength)) })
 const RenderQuery = Schema.Struct({
   page: Schema.optional(Schema.String),
   appearance: Schema.optional(Schema.String),
