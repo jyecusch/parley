@@ -76,6 +76,8 @@ export interface AuthConfig {
   readonly secret: string
   readonly baseURL: string
   readonly connections: ConnectionHooks
+  /** Whether an account may be made for this address (D163): its domain, an invitation, or the first account. */
+  readonly mayCreateAccount: (email: string) => Promise<boolean>
   /** Sends the link that proves someone owns their email address. */
   readonly sendVerificationEmail: (to: string, link: string) => Promise<void>
   /** Headers holding the client's address when behind a proxy, such as `cf-connecting-ip`. */
@@ -174,11 +176,13 @@ export const makeAuth = (config: AuthConfig): Auth =>
     baseURL: config.baseURL,
     basePath: BASE_PATH,
     database: drizzleAdapter(config.db, { provider: "pg", schema: config.schema }),
-    emailAndPassword: { enabled: true },
-    // Signing in doesn't wait for this, but accepting an invitation does: the invitation names an
-    // address, and only someone who proved they own it may take it.
+    // Nobody signs in before proving they own their address (D163): whether an address may have an
+    // account depends on it, and an invitation names an address only its owner may take.
+    emailAndPassword: { enabled: true, requireEmailVerification: true },
     emailVerification: {
       sendOnSignUp: true,
+      // Signing in before confirming sends a fresh link, in case the first one is lost.
+      sendOnSignIn: true,
       autoSignInAfterVerification: true,
       sendVerificationEmail: async ({ user, url }) => config.sendVerificationEmail(user.email, url),
     },
@@ -186,6 +190,23 @@ export const makeAuth = (config: AuthConfig): Auth =>
       additionalFields: {
         /** "service-account" users can never sign in with a password (D18). */
         kind: { type: "string", required: false, defaultValue: "user", input: false },
+      },
+    },
+    databaseHooks: {
+      user: {
+        create: {
+          // Service accounts are made by Parley itself, not by signing up.
+          before: async (user) => {
+            if (user.kind === "service-account" || (await config.mayCreateAccount(user.email))) return
+            // Better-Auth answers a refusal (403) as it answers an address that already has an
+            // account: as if signed up, waiting for a confirmation email that never comes. So nobody
+            // learns from the reply which addresses may sign up or already have.
+            throw new APIError("FORBIDDEN", {
+              code: "SIGN_UP_NOT_ALLOWED",
+              message: "This address can't create an account here.",
+            })
+          },
+        },
       },
     },
     disabledPaths: DISABLED_PATHS,

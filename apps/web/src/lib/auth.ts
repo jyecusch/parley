@@ -1,17 +1,15 @@
-import { type UserText, userText } from "@parley/errors"
+import { EchoedInput, type UserText, userText } from "@parley/errors"
 
 export interface Session {
   readonly user: {
     readonly id: string
     readonly name: string
     readonly email: string
-    /** Whether they've confirmed the address; pending invitations are only listed once they have (D131). */
-    readonly emailVerified: boolean
   }
 }
 
 /** Better-Auth's error codes and statuses, in our words. Its own message text is never shown (docs/02). */
-const messageForCode = (code: string | undefined, status: number): UserText => {
+const messageForCode = (code: string | undefined, status: number, email: string | undefined): UserText => {
   if (status === 429) return userText`Too many attempts in a short time. Wait a minute, then try again.`
   if (status >= 500) {
     return userText`Something went wrong on Parley's side, so you weren't signed in. Try again; if it keeps happening, the server's log says why.`
@@ -26,6 +24,11 @@ const messageForCode = (code: string | undefined, status: number): UserText => {
       return userText`Use at least 8 characters for your password.`
     case "INVALID_EMAIL":
       return userText`Enter a full email address, like jane@example.com.`
+    case "EMAIL_NOT_VERIFIED":
+      // Signing in unconfirmed sends a fresh link (D163).
+      return email
+        ? userText`Confirm your email address first. We've sent a new link to ${EchoedInput.fromRequest(email)}.`
+        : userText`Confirm your email address first. We've sent you a new link.`
     case "INVALID_ORIGIN":
       return userText`Parley is set up for a different address than the one you're using. Open it at the address in its settings, or update that address.`
     default:
@@ -49,7 +52,11 @@ const post = async (path: string, body: Record<string, unknown>): Promise<AuthOu
       body: JSON.stringify(request ? { ...body, oauth_query: request } : body),
     })
     const json = (await response.json().catch(() => ({}))) as { code?: string; redirect?: boolean; url?: string }
-    if (!response.ok) return { failure: messageForCode(json.code, response.status) }
+    if (!response.ok) {
+      return {
+        failure: messageForCode(json.code, response.status, typeof body.email === "string" ? body.email : undefined),
+      }
+    }
     return json.redirect && json.url ? { next: json.url } : {}
   } catch {
     return { failure: userText`Parley couldn't be reached. Check your connection and try again.` }
@@ -91,6 +98,9 @@ export const signIn = (email: string, password: string) =>
 export const signUp = (name: string, email: string, password: string, returnTo?: string) =>
   post("/sign-up/email", { name, email, password, ...(returnTo ? { callbackURL: returnTo } : {}) }).then(forgetSession)
 export const signOut = () => post("/sign-out", {}).then(forgetSession)
+/** Sends the email-confirmation link again (D163). `returnTo` is where it leads, as at sign-up. */
+export const resendConfirmation = (email: string, returnTo?: string) =>
+  post("/send-verification-email", { email, ...(returnTo ? { callbackURL: returnTo } : {}) })
 
 /**
  * The signed-in session, or null when nobody is signed in. A failed check (the server is busy or

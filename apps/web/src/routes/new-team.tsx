@@ -1,7 +1,7 @@
 import type { UserText } from "@parley/errors"
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router"
 import { useState } from "react"
-import { AuthForm, Field } from "../components/auth-form.tsx"
+import { AuthForm, Field, SignedInAs } from "../components/auth-form.tsx"
 import { PendingInvitations, usePendingInvitations } from "../components/pending-invitations.tsx"
 import { agentRequest, getSession, withAgentRequest } from "../lib/auth.ts"
 import { call, isApiFailure, messageOf } from "../lib/client.ts"
@@ -11,14 +11,14 @@ export const Route = createFileRoute("/new-team")({
   beforeLoad: async () => {
     const session = await getSession()
     if (!session) throw redirect({ to: "/sign-in" })
-    return { emailVerified: session.user.emailVerified }
+    return { email: session.user.email }
   },
   component: NewTeam,
 })
 
 function NewTeam() {
   const navigate = useNavigate()
-  const { emailVerified } = Route.useRouteContext()
+  const { email } = Route.useRouteContext()
   // Invitations waiting for this person: join one instead of creating a team (D131).
   const invitations = usePendingInvitations().data ?? []
   const [busy, setBusy] = useState(false)
@@ -61,11 +61,8 @@ function NewTeam() {
       busy={busy}
       error={error}
       onSubmit={submit}
-      footer={
-        emailVerified
-          ? "You'll be the team's owner."
-          : "You'll be the team's owner. Invited to a team? Open the invitation's link in your email, or confirm your email address to see your invitations here."
-      }
+      footer="You'll be the team's owner."
+      after={<SignedInAs email={email} />}
     >
       <Field label="Team name" name="name" autoComplete="organization" autoFocus />
     </AuthForm>

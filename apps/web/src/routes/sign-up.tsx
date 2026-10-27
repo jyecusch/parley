@@ -1,8 +1,11 @@
 import type { UserText } from "@parley/errors"
-import { createFileRoute, useNavigate } from "@tanstack/react-router"
+import { createFileRoute } from "@tanstack/react-router"
 import { useState } from "react"
 import { AuthForm, Field } from "../components/auth-form.tsx"
-import { agentRequest, signUp, withAgentRequest } from "../lib/auth.ts"
+import { ParleyMark } from "../components/logo.tsx"
+import { Button } from "../components/ui/index.ts"
+import { AuthHeading, AuthPage, LinkButton } from "../components/ui/public.tsx"
+import { agentRequest, resendConfirmation, signUp, withAgentRequest } from "../lib/auth.ts"
 import { safeRedirect } from "./sign-in.tsx"
 
 export const Route = createFileRoute("/sign-up")({
@@ -15,31 +18,33 @@ export const Route = createFileRoute("/sign-up")({
 })
 
 function SignUp() {
-  const navigate = useNavigate()
   const search = Route.useSearch()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<UserText>()
+  /** The address a confirmation link went to, once signed up. */
+  const [sentTo, setSentTo] = useState<string>()
+  // The confirmation link leads back to the invitation or the agent's request, else into Parley (D130).
+  const returnTo = search.redirect ?? (agentRequest() ? withAgentRequest("/new-team") : undefined)
   const submit = async (form: FormData) => {
     setBusy(true)
-    const outcome = await signUp(
-      String(form.get("name")),
-      String(form.get("email")),
-      String(form.get("password")),
-      // The confirmation email leads back to the invitation, not to "Name your team" (D130).
-      search.redirect,
-    )
+    const email = String(form.get("email"))
+    const outcome = await signUp(String(form.get("name")), email, String(form.get("password")), returnTo)
     setBusy(false)
     if (outcome.failure) return setError(outcome.failure)
-    // A new account has no team yet, so an agent's request waits until one is created.
-    if (agentRequest()) return window.location.assign(withAgentRequest("/new-team"))
-    // Signed up from an invitation: back to it, where joining the team makes a new one unnecessary.
-    if (search.redirect) return window.location.assign(search.redirect)
-    await navigate({ to: "/new-team" })
+    // Nobody is signed in until they confirm their address (D163).
+    setSentTo(email)
+  }
+  if (sentTo) {
+    return <CheckEmail email={sentTo} returnTo={returnTo} onStartOver={() => setSentTo(undefined)} />
   }
   return (
     <AuthForm
       title="Create your account"
-      intro="You'll set up your team next."
+      intro={
+        search.redirect?.startsWith("/invite/")
+          ? "Use the address your invitation went to."
+          : "Use your work email. You'll set up your team next."
+      }
       submitLabel="Create account"
       busy={busy}
       error={error}
@@ -63,5 +68,47 @@ function SignUp() {
       <Field label="Email" name="email" type="email" autoComplete="email" />
       <Field label="Password" name="password" type="password" autoComplete="new-password" />
     </AuthForm>
+  )
+}
+
+/**
+ * After signing up (D163). Worded the same whether or not the address may have an account: an
+ * address that may not is answered as if it worked, and no email comes.
+ */
+function CheckEmail(props: {
+  readonly email: string
+  readonly returnTo: string | undefined
+  readonly onStartOver: () => void
+}) {
+  const [busy, setBusy] = useState(false)
+  const [note, setNote] = useState<string>()
+  const resend = async () => {
+    setBusy(true)
+    const outcome = await resendConfirmation(props.email, props.returnTo)
+    setBusy(false)
+    setNote(outcome.failure ?? "Sent again. It can take a minute to arrive.")
+  }
+  return (
+    <AuthPage>
+      <div className="flex flex-col gap-4">
+        <ParleyMark className="h-8 self-start" />
+        <AuthHeading title="Check your email">
+          If <strong className="font-medium text-fg">{props.email}</strong> can have an account here, we've sent it a
+          link. Open it to confirm your address and finish setting up. Nothing there? Ask someone on your team to invite
+          you.
+        </AuthHeading>
+        <Button size="lg" wide disabled={busy} onClick={() => void resend()}>
+          Send it again
+        </Button>
+        {note ? (
+          <p role="status" className="m-0 text-sm text-muted">
+            {note}
+          </p>
+        ) : null}
+        <p className="m-0 text-sm text-muted">
+          Wrong address? <LinkButton onClick={props.onStartOver}>Start over</LinkButton>
+        </p>
+      </div>
+    </AuthPage>
   )
 }

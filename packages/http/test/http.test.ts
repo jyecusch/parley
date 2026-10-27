@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "@effect/vitest"
-import { BetterAuth, CoreLive } from "@parley/core"
+import { BetterAuth, CoreLive, Users } from "@parley/core"
+import type { UserId } from "@parley/domain"
 import { Effect, Layer, ManagedRuntime } from "effect"
 import { HttpRouter, HttpServer } from "effect/http"
 import { ApiRoutesLive, AuthRoutesLive, FailureResponsesLive, FileRoutesLive } from "../src/index.ts"
@@ -35,8 +36,16 @@ beforeAll(async () => {
     body: { name: "Jane Doe", email, password: "correct-horse-battery" },
   })
   expect(signUp.status).toBe(200)
-  cookie = (signUp.headers.get("set-cookie") ?? "").split(";")[0] ?? ""
   const userId = signUp.body.user.id as string
+  // Signing in needs a confirmed address (D163); the emailed link would confirm it.
+  await runtime.runPromise(
+    Effect.gen(function* () {
+      yield* (yield* Users).markEmailVerified(userId as UserId)
+    }),
+  )
+  const signIn = await call("POST", "/api/auth/sign-in/email", { body: { email, password: "correct-horse-battery" } })
+  expect(signIn.status).toBe(200)
+  cookie = (signIn.headers.get("set-cookie") ?? "").split(";")[0] ?? ""
   const seeded = await runtime.runPromise(
     Effect.gen(function* () {
       const auth = yield* BetterAuth

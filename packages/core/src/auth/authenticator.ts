@@ -29,6 +29,7 @@ import { Connections } from "../services/connections.ts"
 import { RateLimiter } from "../services/rate-limiter.ts"
 import { Users } from "../services/users.ts"
 import { type Auth, CONNECTION_CLAIM, type ConnectionHooks, issuer, makeAuth, mcpResource } from "./better-auth.ts"
+import { domainMaySignUp, signUpDomainsOf } from "./sign-up-policy.ts"
 
 /** How long the consent page has between recording a connection and the agent finishing sign-in. */
 const PENDING_FOR = "10 minutes"
@@ -42,6 +43,8 @@ export class BetterAuth extends Context.Service<BetterAuth, Auth>()("@parley/cor
       const secret = yield* Config.Redacted("BETTER_AUTH_SECRET")
       // Behind a proxy, the header carrying the visitor's address, so rate limits are per visitor.
       const ipAddressHeader = yield* Config.String("IP_ADDRESS_HEADER").pipe(Config.withDefault(""))
+      // Which addresses may sign up without an invitation (D163). Unset: none.
+      const signUpDomains = signUpDomainsOf(yield* Config.String("PARLEY_SIGNUP_DOMAINS").pipe(Config.withDefault("")))
       // Refuse to start with the example's placeholder, or anything short enough to guess.
       const secretText = Redacted.value(secret)
       if (secretText.startsWith("replace-with") || secretText.length < 32) {
@@ -100,9 +103,32 @@ export class BetterAuth extends Context.Service<BetterAuth, Auth>()("@parley/cor
           ),
         )
       }
+      /** An account may be made on its domain, for an address with a pending invitation, or as the first one. */
+      const mayCreateAccount = async (email: string) => {
+        if (domainMaySignUp(signUpDomains, email)) return true
+        const [invited] = await db
+          .select({ id: schema.invitation.id })
+          .from(schema.invitation)
+          .where(
+            and(
+              sql`lower(${schema.invitation.email}) = ${email.trim().toLowerCase()}`,
+              eq(schema.invitation.status, "pending"),
+              gt(schema.invitation.expiresAt, new Date()),
+            ),
+          )
+          .limit(1)
+        if (invited) return true
+        const [someone] = await db
+          .select({ id: schema.user.id })
+          .from(schema.user)
+          .where(eq(schema.user.kind, "user"))
+          .limit(1)
+        return someone === undefined
+      }
       return makeAuth({
         db,
         schema,
+        mayCreateAccount,
         secret: Redacted.value(secret),
         baseURL,
         connections: hooks,

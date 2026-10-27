@@ -58,6 +58,7 @@ export type { Members } from "./services/members.ts"
 export { RateLimiter } from "./services/rate-limiter.ts"
 export type { Subscriptions } from "./services/subscriptions.ts"
 export { UnsubscribeLinks } from "./services/unsubscribe-links.ts"
+export { Users } from "./services/users.ts"
 
 /** Contacts and companies both do domain matching through Affiliations. */
 const Records = Layer.mergeAll(

@@ -1,8 +1,28 @@
 import type { UserText } from "@parley/errors"
+import { useNavigate } from "@tanstack/react-router"
 import type { FormEvent, ReactNode } from "react"
+import { signOut } from "../lib/auth.ts"
 import { ParleyMark } from "./logo.tsx"
 import { Button, ErrorText, FieldLabel, Input } from "./ui/index.ts"
-import { AuthHeading, AuthPage } from "./ui/public.tsx"
+import { AuthHeading, AuthPage, LinkButton } from "./ui/public.tsx"
+
+/** Who's signed in, with a way out, so nobody gets stuck in a step under the wrong account. */
+export function SignedInAs(props: { readonly email: string }) {
+  const navigate = useNavigate()
+  return (
+    <p className="m-0 border-t border-line pt-3 text-sm text-muted">
+      Signed in as {props.email}.{" "}
+      <LinkButton
+        onClick={async () => {
+          await signOut()
+          await navigate({ to: "/sign-in" })
+        }}
+      >
+        Sign out
+      </LinkButton>
+    </p>
+  )
+}
 
 export function AuthForm(props: {
   readonly title: string
@@ -15,6 +35,8 @@ export function AuthForm(props: {
   readonly footer: ReactNode
   /** Shown between the heading and the fields, such as invitations to join instead (D131). */
   readonly before?: ReactNode
+  /** Shown last, such as who's signed in. */
+  readonly after?: ReactNode
 }) {
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -32,6 +54,7 @@ export function AuthForm(props: {
           {props.submitLabel}
         </Button>
         <p className="m-0 text-sm text-muted [&_a]:text-fg [&_a]:underline [&_a]:underline-offset-2">{props.footer}</p>
+        {props.after}
       </form>
     </AuthPage>
   )

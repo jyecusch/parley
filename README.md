@@ -45,6 +45,7 @@ docker run -p 3000:3000 \
 
 - `BETTER_AUTH_URL` is the public address people and agents use; sign-in and OAuth only work there.
 - Behind a proxy or Cloudflare, set `IP_ADDRESS_HEADER` (for example `cf-connecting-ip`) so sign-in and form rate limits apply per visitor. When it's set, it's the only header trusted for a visitor's address.
+- Sign-up is closed by default: the first account on a new server, then only invited addresses. Set `PARLEY_SIGNUP_DOMAINS` (for example `nitric.io,suga.app`) to let your own addresses sign up without an invitation. Every account confirms its email address before signing in, so set up email (`RESEND_API_KEY`, `EMAIL_FROM`) before inviting anyone; without it, confirmation links only appear in the server's log.
 - Email, file storage and the rest are optional; see `.env.example`.
 - Without Docker: `bun install`, `bun run --cwd apps/web build`, then `bun packages/db/src/migrate.ts && bun apps/web/serve.ts`.
 
