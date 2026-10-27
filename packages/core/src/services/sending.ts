@@ -398,7 +398,10 @@ export class Sending extends Context.Service<
       /**
        * A domain belongs to one team. A verified claim stands; an unverified one lapses after
        * CLAIM_DAYS, so nobody can hold a domain they can't prove is theirs (another team may then
-       * take it over). The provider's record is shared, so a takeover reuses it.
+       * take it over). The stored status can be stale (the provider checks DNS after we last
+       * asked), so the provider is asked before a takeover. A takeover never reuses the old
+       * provider record: its DKIM key is in the old team's DNS, and would verify the new team
+       * for a domain it doesn't control. It gets a fresh record and must publish its own.
        */
       const addDomain = <P, T>(access: CanManageEmail<P, T>, input: string) =>
         Effect.gen(function* () {
@@ -423,18 +426,31 @@ export class Sending extends Context.Service<
             const lapsed =
               existing.status !== "verified" && Date.now() - existing.createdAt.getTime() > CLAIM_DAYS * 86_400_000
             if (existing.teamId === teamId || !lapsed) return yield* taken()
-            const checked = existing.providerId
-              ? yield* mailer.domains.verify(existing.providerId)
-              : yield* mailer.domains.create(domain)
+            if (existing.providerId) {
+              const current = yield* mailer.domains.verify(existing.providerId)
+              if (current.status === "verified") {
+                // It was proven after all: the claim stands, and now says so.
+                yield* run(
+                  db.query((d) =>
+                    d
+                      .update(schema.sendingDomains)
+                      .set({ status: "verified", records: [...current.records], updatedAt: sql`now()` })
+                      .where(eq(schema.sendingDomains.id, existing.id)),
+                  ),
+                )
+                return yield* taken()
+              }
+            }
+            // Claimed first, so two teams taking it over at once can't both drop the old record.
             const [moved] = yield* run(
               db.query((d) =>
                 d
                   .update(schema.sendingDomains)
                   .set({
                     teamId,
-                    providerId: checked.providerId,
-                    status: checked.status,
-                    records: [...checked.records],
+                    providerId: null,
+                    status: "pending",
+                    records: [],
                     createdAt: sql`now()`,
                     updatedAt: sql`now()`,
                   })
@@ -445,7 +461,31 @@ export class Sending extends Context.Service<
                   .returning(),
               ),
             )
-            return moved ? toDomain(moved) : yield* taken()
+            if (!moved) return yield* taken()
+            // The old record is no team's now; one left behind (say, already gone) can't send for anyone.
+            if (existing.providerId) {
+              yield* mailer.domains
+                .remove(existing.providerId)
+                .pipe(Effect.catchCause((cause) => Effect.logWarning(`old record for ${domain} not removed`, cause)))
+            }
+            // A fresh record, with its own DKIM key for the new team to publish. If this fails, Check
+            // makes one (verifyDomain registers a domain that has no record).
+            const registered = yield* mailer.domains.create(domain)
+            const [fresh] = yield* run(
+              db.query((d) =>
+                d
+                  .update(schema.sendingDomains)
+                  .set({
+                    providerId: registered.providerId,
+                    status: registered.status,
+                    records: [...registered.records],
+                    updatedAt: sql`now()`,
+                  })
+                  .where(and(eq(schema.sendingDomains.id, existing.id), eq(schema.sendingDomains.teamId, teamId)))
+                  .returning(),
+              ),
+            )
+            return toDomain(fresh ?? moved)
           }
           const registered = yield* mailer.domains.create(domain)
           const id = crypto.randomUUID()

@@ -11,9 +11,53 @@ import {
   unsubscribeApply,
   unsubscribePage,
 } from "../src/index.ts"
+import type { ProviderDomain } from "../src/mail/mailer.ts"
+import { Sending } from "../src/services/sending.ts"
 import { Fixture } from "./fixture.ts"
 
 const unique = () => crypto.randomUUID().slice(0, 8)
+
+/**
+ * An email provider for sending domains, as Resend behaves: a new domain waits for DNS, and is
+ * verified only once its records are published (here, when a test says so).
+ */
+const provider = (() => {
+  const domains = new Map<string, { domain: string; verified: boolean }>()
+  const removed: Array<string> = []
+  const domainOf = (providerId: string): ProviderDomain => ({
+    providerId,
+    status: domains.get(providerId)?.verified ? "verified" : "pending",
+    records: [],
+  })
+  return {
+    removed,
+    idOf: (domain: string) => [...domains].find(([, entry]) => entry.domain === domain)?.[0],
+    verify: (domain: string) => {
+      for (const entry of domains.values()) if (entry.domain === domain) entry.verified = true
+    },
+    domains: {
+      create: (domain: string) =>
+        Effect.sync(() => {
+          const providerId = `fake-${crypto.randomUUID()}`
+          domains.set(providerId, { domain, verified: false })
+          return domainOf(providerId)
+        }),
+      verify: (providerId: string) => Effect.sync(() => domainOf(providerId)),
+      remove: (providerId: string) =>
+        Effect.sync(() => {
+          domains.delete(providerId)
+          removed.push(providerId)
+        }),
+    },
+  }
+})()
+
+const FakeProvider = Layer.succeed(Mailer)({
+  send: () => Effect.succeed({ providerId: "fake" }),
+  sendBatch: (emails) => Effect.succeed(emails.map(() => ({ providerId: "fake" }))),
+  outbox: Effect.succeed([]),
+  domains: provider.domains,
+})
 
 describe("email setup", () => {
   it.effect("rotates the unsubscribe secret: links signed with a previous one still work", () =>
@@ -314,27 +358,46 @@ describe("email setup", () => {
     }).pipe(Effect.provide(CoreLive)),
   )
 
-  it.effect("an unverified domain claim lapses, so another team can take the domain", () =>
+  it.effect("a claim lapses only if it was never proven, and a takeover gets a record of its own", () =>
     Effect.gen(function* () {
       const f = yield* Fixture
       const db = yield* Database
-      const domain = `claim-${unique()}.example.com`
-      const squatted = yield* run["sendingDomains.create"](f.bob, { teamId: f.globex, domain: domain as never })
-      const fresh = yield* run["sendingDomains.create"](f.jane, { teamId: f.acme, domain: domain as never }).pipe(
+      // Globex adds two domains, then (in the eyes of Parley's database) never verifies either.
+      const abandoned = `abandoned-${unique()}.example.com`
+      const proven = `proven-${unique()}.example.com`
+      const first = yield* run["sendingDomains.create"](f.bob, { teamId: f.globex, domain: abandoned as never })
+      const second = yield* run["sendingDomains.create"](f.bob, { teamId: f.globex, domain: proven as never })
+      const early = yield* run["sendingDomains.create"](f.jane, { teamId: f.acme, domain: abandoned as never }).pipe(
         Effect.flip,
       )
-      expect(fresh._tag).toBe("SendingDomainTaken")
-      // Pretend Globex never verified it, and added it four days ago.
+      expect(early._tag).toBe("SendingDomainTaken")
       yield* db.query((d) =>
         d.execute(
-          sql`update "sending_domains" set status = 'pending', created_at = now() - interval '4 days' where id = ${squatted.id}`,
+          sql`update "sending_domains" set status = 'pending', created_at = now() - interval '4 days' where id in (${first.id}, ${second.id})`,
         ),
       )
-      const taken = yield* run["sendingDomains.create"](f.jane, { teamId: f.acme, domain: domain as never })
-      expect(taken.domain).toBe(domain)
-      expect(yield* run["sendingDomains.list"](f.bob, { teamId: f.globex })).not.toContainEqual(
-        expect.objectContaining({ domain }),
+      // Globex did publish the second one's records: the provider verified it after Parley last asked.
+      provider.verify(proven)
+
+      // A domain proven at the provider stays Globex's, and now shows as verified.
+      const refused = yield* run["sendingDomains.create"](f.jane, { teamId: f.acme, domain: proven as never }).pipe(
+        Effect.flip,
       )
-    }).pipe(Effect.provide(CoreLive)),
+      expect(refused._tag).toBe("SendingDomainTaken")
+      expect(yield* run["sendingDomains.list"](f.bob, { teamId: f.globex })).toContainEqual(
+        expect.objectContaining({ domain: proven, status: "verified" }),
+      )
+
+      // A domain never proven can be taken, but with a new provider record (a new DKIM key), so
+      // Acme still has to publish DNS records it couldn't publish without owning the domain.
+      const oldRecord = provider.idOf(abandoned)
+      const taken = yield* run["sendingDomains.create"](f.jane, { teamId: f.acme, domain: abandoned as never })
+      expect(taken).toMatchObject({ domain: abandoned, status: "pending" })
+      expect(provider.idOf(abandoned)).not.toBe(oldRecord)
+      expect(provider.removed).toContain(oldRecord)
+      expect(yield* run["sendingDomains.list"](f.bob, { teamId: f.globex })).not.toContainEqual(
+        expect.objectContaining({ domain: abandoned }),
+      )
+    }).pipe(Effect.provide(Layer.fresh(Sending.layer).pipe(Layer.provide(FakeProvider))), Effect.provide(CoreLive)),
   )
 })
