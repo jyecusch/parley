@@ -1,6 +1,6 @@
-# Built once, built per team: making cross-team leaks a compile error
+# Built once, built per team: avoiding cross-team state
 
-*How Parley stops one team's data from reaching another, using the tier of each thing we build. Read [00 — One core, many entrypoints](./00-architecture.md) first for the vocabulary.*
+*A design for keeping shared services from retaining one team's data, and the limits of what service tiers can enforce. Read [00 — One core, many entrypoints](./00-architecture.md) first for the vocabulary.*
 
 ---
 
@@ -248,9 +248,13 @@ Tiers stop a *long-lived object* from holding the wrong team. They do nothing to
 db.select().from(contacts).where(eq(contacts.id, contactId))   // which team? any team.
 ```
 
-That's a different problem with a different answer, and it belongs to [04 — Proof, not promises](./04-authorization-proofs.md). In short: services never take a raw `TeamId`. They take a named team plus a proof about it, and every query they build is filtered by that team. A contact that exists in another team is simply `ContactNotFound`.
+That is a separate responsibility. The proof types in [04 — Proof, not promises](./04-authorization-proofs.md#sql-isolation-is-a-service-responsibility) constrain the named team and record values accepted by a service. They do not inspect SQL or automatically add predicates. Services are trusted to restrict reads, writes, joins, counts, and bulk selections to the proven team or a parent already located in it. Some internal lookup methods take raw IDs as part of implementing a prover; those queries need the same care.
 
-There's a second layer we could add underneath: **Postgres row-level security**. Each transaction sets `app.team_id`, and a policy on every tenant table only allows rows with that `team_id`. It's defense in depth: if a service bug ever forgot the `where`, the database would still refuse. It has real costs, though. Every query has to run in a transaction that sets the variable. Pooled connections need careful handling. Migrations and admin tooling need a bypass role. **Decided (D28): later.** v1 relies on proofs plus `(team_id, id)` foreign keys, and every tenant table carries `team_id`, so adding row-level security later needs policies and plumbing, not a data migration.
+Composite foreign keys protect the relationships declared with them, such as affiliations. They do not filter reads, and not every relationship in the current schema has a composite team foreign key. Some children inherit their team through their parent.
+
+**Decided (D28, D166): RLS remains deferred.** A possible future policy could restrict rows to one transaction-local team while roles and scopes stay in core. That would be a backstop against omitted predicates, conditional on correct runtime privileges, team context, and policy coverage. It would need an audit of parent-owned children, pooled connections, migrations, background work and performance. Team columns make ownership visible; they do not make RLS adoption effortless.
+
+For now the guard against SQL scoping mistakes is service review plus real Postgres regression tests. Tests deliberately put matching data in both teams and give a principal access to both, so membership denial cannot hide a missing predicate. Passing those tests is evidence for the cases exercised, not proof that every future query is safe.
 
 ## Parley's services and their tiers
 

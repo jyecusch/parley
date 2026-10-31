@@ -97,7 +97,7 @@ readonly update: <P, T, C>(
 ) => Effect.Effect<Contact, ContactEmailTaken>
 ```
 
-The shared `T` is the whole trick. The contact's proof and the permission's proof must be about **the same team**, or the call doesn't type-check. That's the bug from the top of this post, made impossible.
+The shared `T` requires the contact proof and permission proof to name **the same team**, or TypeScript rejects the call. That closes the mismatched-argument mistake from the opening example. SQL inside the prover and service remains trusted code.
 
 ## The module
 
@@ -211,7 +211,7 @@ export class Contacts extends Context.Service<Contacts, {
 
 Look at what each signature rules out.
 
-- **`list`** takes a named team and a read proof about that same team. Inside, *every* query is filtered with `where(eq(contacts.teamId, team.value))`, and deleted contacts are excluded. Because the team can only come from the named value, there's no other team id lying around to put there.
+- **`list`** takes a named team and a read proof about that same team. The service must use that team to restrict results and counts, including filtered and paged queries. The signature does not enforce the SQL predicate. Queries for child data may use parent IDs already located in the proven team.
 - **`create`**: `NewContact` has **no `teamId` field**. The team comes only from the named team that the write proof is about. A client can't sneak `"teamId": "someone-else"` into a request body, because the field doesn't exist to be read.
 - **`update` and `delete`** take a `ContactInTeam<C, T>` (which carries the named contact *and* the named team) plus a permission proof about the same `T`. `delete` is a soft delete: the contact disappears at once and its email addresses are freed, but it can be restored for 30 days.
 - **`restore`** takes a `ContactRestorable<C, T>`, a different proof from `ContactInTeam`, because it is about a *deleted* contact. It can fail with `ContactEmailTaken` if someone reused one of its addresses while it was deleted.
@@ -300,6 +300,44 @@ If the web app calls those endpoints directly:
 
 **Decided (D17):** member and team changes are **Parley operations** like any other. `members.changeRole` proves `CanManageMembers<P, T>` (plus the domain rules, like "a team always has at least one owner"), then calls Better-Auth's **server-side** API (`auth.api.*`) from inside a `Members` service whose methods demand that proof. Better-Auth's client-facing organization *mutation* endpoints are disabled (for example via Better-Auth's `disabledPaths` option; to be verified during implementation). Better-Auth keeps doing what it's best at, sessions, sign-in and storing members. It stops making authorization decisions.
 
+## SQL isolation is a service responsibility
+
+**Decided (D28, D166): service SQL is trusted, and RLS remains deferred.** The types prevent missing proofs and mixing independently named values. They do not prove that a query's predicates, joins, aggregates, or selected columns are correct.
+
+| Mechanism | What it enforces | What it leaves to trusted code |
+| --- | --- | --- |
+| Named values and proof signatures | Required proof kinds and matching names in each signature | SQL inside provers and services |
+| Runtime expiration | Named-value and proof-field reads stop after their Effect execution | Correct query construction while the execution is active |
+| Composite team foreign keys | Inserts and updates cannot create a cross-team link covered by that constraint | Reads, unrelated writes, and links without a composite team constraint |
+| Service review and Postgres tests | Evidence for the SQL paths and scenarios reviewed or exercised | Unreviewed changes and cases the tests do not exercise |
+
+The schema's composite team foreign keys cover contact emails and phones, company domains, and both sides of affiliations. Other relationships, including segment contacts and topic links, use single-ID foreign keys; their service checks are responsible for team consistency. Import parts are owned through their import rather than carrying a team column. Do not assume a team column or a foreign key establishes more than its actual definition does.
+
+Every team-scoped query needs an explainable restriction: the proven team, or a parent ID already located in that team. Check that restriction for lists and counts, every paging branch, joins, filter subqueries, exports, bulk selections, restore markers and import matching. A principal's access to two teams never permits a request naming one team to return or modify the other's records. Background work that intentionally scans several teams has a separate, explicit responsibility to carry the correct team into each piece of work; there is no ambient current-team variable.
+
+### Regression coverage
+
+[`team-isolation.test.ts`](../packages/core/test/team-isolation.test.ts) adds the cases missing from the earlier single-team and membership-denial tests. Its principal belongs to both teams. Both contain the same email addresses, company domains and matching search values, with distinguishable output values. Each scenario checks a positive own-team result as well as exclusion of the other team.
+
+| Path | Behavior exercised |
+| --- | --- |
+| Lists | Results and totals, OR filters, cursor pages and sorted offset pages |
+| Joins and matching | Domain matching, contact affiliations, company contact counts, and foreign-company filters |
+| Resource IDs | Foreign contact/company IDs refuse reads, edits and deletes; foreign records stay unchanged |
+| Exports | Full, filtered, picked-ID and dynamic-segment CSV exports exclude foreign records |
+| Segments | Dynamic segment contacts and sendable counts stay within the team |
+| Bulk changes | Matching and mixed-ID updates/deletes cannot touch the other team; foreign deletion markers cannot restore its records |
+| Imports | Equal emails, domains and company names in two teams update only the requested team's records |
+| Declared constraints | Direct cross-team affiliation inserts fail on both composite foreign keys in Postgres |
+
+Existing tests in `contacts.test.ts`, `companies.test.ts`, `notes.test.ts`, `selections.test.ts`, `segments.test.ts`, and `imports.test.ts` also exercise membership denials, foreign IDs, scope limits and selection boundaries. This is a focused regression inventory, not exhaustive coverage of every operation, relationship, worker or future query. Extend the owning tests when changing SQL that crosses one of these paths; assert returned values and that foreign data remains unchanged. A denied request alone does not exercise successful-query filtering.
+
+### What adopting RLS would require
+
+If revisited, keep role and scope decisions in core and evaluate team-only database policies as an additional safeguard. Runtime credentials must actually be subject to those policies; transaction-local team state must be set on the same connection as the work and must not survive pooled reuse. Missing context should refuse access. Parent-owned children, migrations, public form paths and workers that scan several teams need deliberate treatment. Policy coverage must be checked when tables change, and actual query plans and round-trip costs need measurement.
+
+The [PlanetScale discussion](https://planetscale.com/blog/rls-sounds-great-until-it-isnt) motivates evaluating those costs rather than adopting RLS by default. [PostgreSQL's row-security documentation](https://www.postgresql.org/docs/17/ddl-rowsecurity.html) describes the policy and privilege behavior. Existing team IDs help identify ownership; neither universal policy coverage nor a migration-free retrofit follows from their presence. No custom query abstraction is introduced to imply enforcement that an unrestricted SQL callback cannot supply.
+
 ## Stale proofs and races
 
 A proof says a fact held **when it was checked**. It doesn't say the fact still holds a millisecond later.
@@ -352,7 +390,7 @@ TypeScript isn't Haskell. `{} as CanWriteRecords<P, T>` compiles. The honest pat
 
 **`mistakes.ts`.** This is a file that's type-checked but never run. Every near-miss anyone almost made becomes one line under `// @ts-expect-error`: the five errors above, plus every new one we find. If a refactor ever makes one of those lines *compile*, the `@ts-expect-error` itself becomes an error and CI fails. It's the cheapest authorization regression test there is.
 
-**Prover tests.** A prover is the only authorization code that can be wrong at *runtime*: it can query the wrong column or compare the wrong role. So each prover gets real tests against Postgres, as a small matrix: each role × each principal kind × with/without scopes × same team/other team/nonexistent team. Derivation proofs are pure, so they're cheap to test exhaustively.
+**Prover and service tests.** Provers can query the wrong column or compare the wrong role; services can also build incorrectly scoped SQL after accepting valid proofs. Test authorization decisions across roles, principal kinds, scopes and team boundaries, and test successful service queries with records in multiple teams. Derivation proofs use in-memory permission data; their tests do not need another database query.
 
 **Entrypoints derive from operations.** Parley uses an operation registry (decision D16): each operation is defined once (name, description, input, output, error union) and every entrypoint derives its endpoint or tool from it. Taken together with this post, that means an entrypoint *has nowhere to put* authorization code. It receives a `Principal` and calls `operation(principal, input)`. That's it.
 
@@ -364,10 +402,10 @@ You could name every value and prove every fact. Don't. For Parley:
 - **One proof per permission, not per operation.** `CanWriteRecords` covers creating and editing contacts and companies, and affiliating them. Split a proof only when a function needs to know *which* rule granted access, or when the business rules diverge, for example "only admins may delete companies".
 - **Rows you return don't need names.** `list` returns plain `Contact`s. Names are for values you're about to *act on*.
 - **If a signature needs four type parameters, back off.** `affiliate` is the ceiling.
-- **Let the database enforce what it can, and keep the proof anyway.** Composite foreign keys keep cross-team links out of the data. Proofs keep cross-team code paths out of the codebase.
+- **Let the database enforce what it can, and keep the proof anyway.** Composite foreign keys prevent cross-team links only where declared. Proofs constrain callers' arguments. Services still own SQL scoping; neither mechanism proves arbitrary queries safe.
 
 ## Open questions
 
-Resolved: D16–D19, D27 (permissions are explicit), D28 (row-level security later; proofs plus `(team_id, id)` foreign keys for v1), D35 (no existence oracle for teams), D36 (transactional re-check for authorization changes) and D37 (other teams' records are always "not found") in the [decisions log](./decisions.md). Still open:
+Resolved: D16–D19, D27 (permissions are explicit), D28 and D166 (RLS deferred; service SQL explicitly trusted, with declared constraints and cross-team regressions), D35 (no existence oracle for teams), D36 (transactional re-check for authorization changes) and D37 (other teams' records are always "not found") in the [decisions log](./decisions.md). Still open:
 
 1. **Restoring a live record.** Should restoring a contact that isn't deleted succeed quietly (idempotent, which agents prefer, and consistent with affiliating in D43), or fail with `ContactNotDeleted`?

@@ -113,7 +113,7 @@ Every user manages their own API keys; that needs no permission beyond being a m
 
 ## The records (v1)
 
-Every tenant table carries `team_id`, and every foreign key between tenant tables includes it, as `(team_id, id)`. So a row can only ever point at a row in the same team.
+Team-owned records carry a team ID; some children, such as import parts, inherit their team through a parent. Composite foreign keys on contact emails and phones, company domains, and affiliations enforce that those links stay inside one team. This is not universal: segment contacts, topic links, and several email relationships use single-ID foreign keys and rely on service checks for team consistency.
 
 - **Contact.** An optional first name and last name. The display name is derived from them and falls back to the primary email. A contact has any number of email addresses, exactly one of which is the **primary email**, and each address belongs to at most one contact in a team. It also has any number of phone numbers, each with a label (work, mobile, …), stored in E.164 format; phone numbers don't have to be unique.
 - **Company.** A name and any number of domains (`acme.com`, `acme.co.uk`). Each domain belongs to at most one company in a team.
@@ -121,7 +121,7 @@ Every tenant table carries `team_id`, and every foreign key between tenant table
 - **Custom field.** A field a team defines on contacts or on companies. The types are text, number, date, checkbox, single select, multi select, URL, email and phone. There is deliberately no type that references another record. Creating, editing or deleting a custom field needs `fields:manage`.
 - **Delete.** Deleting a record hides it immediately and frees its email addresses and domains for reuse. It can be **restored** for 30 days, after which it is **purged**, meaning permanently removed.
 
-Postgres row-level security is deferred (D28). Proofs plus `(team_id, id)` foreign keys are the v1 design, and the `team_id` column on every tenant table keeps RLS a cheap addition later.
+Postgres row-level security remains deferred (D28, D166). **Service SQL is explicitly trusted to enforce team isolation.** Proofs constrain the values supplied to a service; they do not prove that its queries contain the correct predicates. Composite foreign keys protect only the relationships declared with them. Cross-team regression tests exercise this trust boundary. Existing team IDs help a possible RLS implementation, but safe adoption still needs work on runtime database privileges, transaction-local team context, child-table ownership, workers, migrations, and performance. See [SQL isolation](./04-authorization-proofs.md#sql-isolation-is-a-service-responsibility).
 
 ## One request, all the way down
 
@@ -163,7 +163,7 @@ export const update = Effect.fn("contacts.update")(function* (
 });
 ```
 
-**4. The service demands proof.** `contacts.update` will not accept a raw `ContactId`. It wants a contact proven to belong to team `T` (which needed read access to find), plus a write proof about the same `T`. Hand it a proof about a different team and it's a compile error, not a data breach.
+**4. The service demands proof.** `contacts.update` will not accept a raw `ContactId`. It wants a contact proven to belong to team `T` (which needed read access to find), plus a write proof about the same `T`. Hand it a proof about a different named team and TypeScript rejects the call. The service still has to build the correct SQL.
 
 **5. Errors come back as data.** Every error above is its own class with a `userMessage` written in our words. The entrypoint maps each one to its format, so you get a 403 over HTTP and an `isError` tool result over MCP. A new error class doesn't compile until **every** entrypoint has decided what to do with it. See [01 — Errors are data](./01-errors-are-data.md).
 
@@ -181,7 +181,7 @@ export const update = Effect.fn("contacts.update")(function* (
 | 00  | **One core, many entrypoints** (this one)                           | Packages, vocabulary, and the request lifecycle                                           |
 | 01  | [Errors are data](./01-errors-are-data.md)                          | One class per error, `PublicError` is the only way out, every entrypoint maps every tag |
 | 02  | [The friend who picks up the phone](./02-writing-error-messages.md) | How we write `userMessage`: what happened, what's safe, who can fix it, a way out         |
-| 03  | [Built once, built per team](./03-tiers.md)                         | Making cross-team leaks a compile error                                                   |
+| 03  | [Built once, built per team](./03-tiers.md)                         | Service lifetimes, retained team state, and SQL isolation                                                   |
 | 04  | [Proof, not promises](./04-authorization-proofs.md)                 | Authorization as proofs the compiler demands                                            |
 | 05  | [The product you feel](./05-ux-principles.md)                       | What Linear's redesign teaches us about building Parley's UI                              |
 
