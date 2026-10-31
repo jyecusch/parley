@@ -43,7 +43,7 @@ That difference is not about copywriting. It's about architecture. This post is 
 | Title | None. The `_tag` *is* the title. | A second string would drift out of sync. The UI decides how to present a tag. |
 | User text | A single `userMessage: UserText` that everyone sees. | It names who can fix the problem ("a team admin can…"), so it works for every reader. |
 | Remedy | In `userMessage` if a user can act on it. In `message` (logs) if only an operator can. | No separate remedy field to keep in sync. |
-| Retry | `isRetryable: boolean` means "the same request, sent again unchanged, might succeed". Add `retryAfter: Duration` only when we actually know how long. | Matches Effect's own convention. The error knows whether a retry *can* help, but only the caller knows its time budget. |
+| Retry | `isRetryable: boolean` means "the same request, sent again unchanged, might succeed". Add `retryAfter: Duration` only when we actually know how long. | Matches Effect's own convention. An error that explicitly represents unconfirmed acceptance is not retryable. The flag is not an operation-wide idempotency guarantee; callers still consider operation semantics and their time budget. |
 | Severity | `[ErrorReporter.severity]` is required: `"Info"` for an expected refusal, `"Warn"` for an error outside our control. | Logs and alerts need it, and forgetting it should be impossible. Bugs are never `DomainError`s, so there is no `"Error"` level here. |
 | Cause | `cause: Schema.Defect()` only on classes that wrap something we didn't originate (Postgres, Better-Auth, network). | Keeps the original for logs without pretending it has a schema. It is never public. |
 | Leaving the core | `toPublicError(error)` is the only way an error leaves the core. | The class's own schema includes `message` and `cause`. Encoding the class directly would leak both. |
@@ -470,3 +470,5 @@ Resolved: D24, D25, D26, D35, D38, D43, D44, D45 and D46 in the [decisions log](
 1. **Restoring a live record.** Should restoring a record that isn't deleted succeed quietly, like affiliating (D43), or fail with `ContactNotDeleted` / `CompanyNotDeleted`?
 2. **Custom field names.** Must custom field names be unique per record type in a team (`CustomFieldNameTaken`)?
 3. **Resend error classes (v2, deferred to v2 design).** Is the four-class split above right, and should user text ever name the email provider? The proposal is never to name it.
+
+An email whose acceptance is unconfirmed returns `EmailDeliveryUnconfirmed` with `isRetryable: false`, even if the underlying network outage is transient. A pre-dispatch pacing outage remains `EmailServiceUnavailable` and is retryable. The broadcast worker can reconcile an unconfirmed acceptance using its persisted request and idempotency key inside the provider retention window; callers of foreground email operations do not possess that guarantee. Do not infer safe replay from the HTTP status alone.

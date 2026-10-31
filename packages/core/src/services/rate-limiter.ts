@@ -51,25 +51,12 @@ export class RateLimiter extends Context.Service<
           // consume rejects with a RateLimiterRes when the limit is used up. A database outage falls
           // back to the in-memory limiter instead, so any other rejection is a bug: a defect.
           Effect.tryPromise({
-            try: () =>
-              limiterFor(limit, window)
-                .consume(key)
-                .then(
-                  () => undefined,
-                  (refused: unknown) => {
-                    if (refused instanceof RateLimiterRes) return refused
-                    throw refused
-                  },
-                ),
-            catch: (cause) => new DatabaseUnavailable({ cause }),
-          }).pipe(
-            Effect.orDie,
-            Effect.flatMap((refused) =>
-              refused
-                ? Effect.fail(new RequestsTooFrequent({ retryAfter: Duration.millis(refused.msBeforeNext) }))
-                : Effect.void,
-            ),
-          ),
+            try: () => limiterFor(limit, window).consume(key),
+            catch: (cause) =>
+              cause instanceof RateLimiterRes
+                ? new RequestsTooFrequent({ retryAfter: Duration.millis(cause.msBeforeNext) })
+                : new DatabaseUnavailable({ cause }),
+          }).pipe(Effect.asVoid, Effect.catchTag("DatabaseUnavailable", Effect.die)),
       }
     }),
   )

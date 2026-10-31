@@ -3,7 +3,7 @@ import { Schema } from "effect"
 import * as ErrorReporter from "effect/ErrorReporter"
 
 /**
- * The email service couldn't be reached or failed on its side. Acceptance may be unknown; retry only with a durable idempotency key.
+ * The email service couldn't be reached or failed on its side. This error does not represent an unconfirmed email acceptance.
  * User messages never name the provider (Q-E8): self-hosters may use a different one.
  */
 export class EmailServiceUnavailable
@@ -16,7 +16,22 @@ export class EmailServiceUnavailable
     return "email service unavailable"
   }
   get userMessage() {
-    return userText`Parley couldn't confirm whether its email service accepted this email. Check its status before sending again.`
+    return userText`Parley's email service is unavailable. Try again in a few minutes.`
+  }
+}
+
+/** EmailDeliveryUnconfirmed retains diagnostics when the provider may already have accepted an email. */
+export class EmailDeliveryUnconfirmed
+  extends Schema.TaggedError<EmailDeliveryUnconfirmed>()("EmailDeliveryUnconfirmed", { cause: Schema.Defect() })
+  implements DomainError
+{
+  readonly isRetryable = false
+  override readonly [ErrorReporter.severity] = "Warn" as const
+  override get message() {
+    return "email acceptance unconfirmed"
+  }
+  get userMessage() {
+    return userText`Parley couldn't confirm whether its email service accepted this email. Check its status before sending again to avoid sending it twice.`
   }
 }
 
@@ -80,5 +95,16 @@ export class EmailBatchReplayUnsafe
   }
 }
 
-export const EmailErrors = [EmailServiceUnavailable, EmailRejected, EmailSendingTooFast, EmailNotConfigured] as const
-export type EmailError = EmailServiceUnavailable | EmailRejected | EmailSendingTooFast | EmailNotConfigured
+export const EmailErrors = [
+  EmailServiceUnavailable,
+  EmailDeliveryUnconfirmed,
+  EmailRejected,
+  EmailSendingTooFast,
+  EmailNotConfigured,
+] as const
+export type EmailError =
+  | EmailServiceUnavailable
+  | EmailDeliveryUnconfirmed
+  | EmailRejected
+  | EmailSendingTooFast
+  | EmailNotConfigured

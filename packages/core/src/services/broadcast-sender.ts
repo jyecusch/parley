@@ -1,29 +1,56 @@
 import { Database, schema } from "@parley/db"
-import type { BroadcastId, ContactId, TeamId, TopicId } from "@parley/domain"
-import { and, asc, eq, sql } from "drizzle-orm"
-import { Context, Duration, Effect, Layer, Ref } from "effect"
+import {
+  type BroadcastId,
+  type ContactId,
+  type DatabaseUnavailable,
+  EmailIdempotencyKey,
+  type TeamId,
+  type TopicId,
+} from "@parley/domain"
+import { and, asc, eq, inArray, sql } from "drizzle-orm"
+import { Context, Duration, Effect, Layer, Ref, Schema } from "effect"
 import { type MergeValues, renderEmail } from "../email/render.ts"
 import { Mailer, type OutgoingEmail, type SentEmail } from "../mail/mailer.ts"
 import { styleSentWith } from "./broadcasts.ts"
 import type { SendAs } from "./sending.ts"
+import { classifySqlError } from "./sql-errors.ts"
 import { UnsubscribeLinks } from "./unsubscribe-links.ts"
 
 type Batch = typeof schema.broadcastBatches.$inferSelect
 type ClaimedBatch = Batch & { readonly claimToken: string }
 type BatchOutcome =
-  | { readonly status: "sent"; readonly sent: ReadonlyArray<SentEmail> }
+  | { readonly status: "sent"; readonly accepted: ReadonlyArray<AcceptedRecipient> }
   | { readonly status: "failed" | "unknown" | "canceled"; readonly message: string | null }
+interface AcceptedRecipient {
+  readonly recipientId: string
+  readonly providerId: string
+}
+
+const parseBatchAcceptance = (
+  recipients: ReadonlyArray<{ readonly id: string }>,
+  sent: ReadonlyArray<SentEmail>,
+): ReadonlyArray<AcceptedRecipient> | undefined => {
+  if (sent.length !== recipients.length || recipients.length === 0) return undefined
+  const accepted: AcceptedRecipient[] = []
+  const providerIds = new Set<string>()
+  for (const [index, recipient] of recipients.entries()) {
+    const providerId = sent[index]?.providerId
+    if (typeof providerId !== "string" || !providerId || providerIds.has(providerId)) return undefined
+    providerIds.add(providerId)
+    accepted.push({ recipientId: recipient.id, providerId })
+  }
+  return accepted
+}
+
 const UNKNOWN = "The email service may have accepted this email. Automatic retries stopped to avoid sending it twice."
 const RETRY_WINDOW_MS = (24 * 60 - 5) * 60_000
-const rowsOf = <A>(result: unknown): ReadonlyArray<A> =>
-  Array.isArray(result) ? (result as ReadonlyArray<A>) : ((result as { readonly rows?: ReadonlyArray<A> }).rows ?? [])
 
 /** Durable broadcast delivery. Leases fence database writes; provider keys protect network retries. */
 export class BroadcastSender extends Context.Service<
   BroadcastSender,
   {
     readonly sendBatch: Effect.Effect<number>
-    readonly drain: Effect.Effect<number>
+    readonly drain: Effect.Effect<number, DatabaseUnavailable>
   }
 >()("@parley/core/BroadcastSender") {
   static readonly layer = Layer.effect(
@@ -33,12 +60,12 @@ export class BroadcastSender extends Context.Service<
       const mailer = yield* Mailer
       const links = yield* UnsubscribeLinks
       const lastTeam = yield* Ref.make("")
-      const b = schema.broadcastBatches
-      const r = schema.broadcastRecipients
-      const c = schema.broadcasts
-      const nextTeam = Effect.gen(function* () {
+      const batchesTable = schema.broadcastBatches
+      const recipientsTable = schema.broadcastRecipients
+      const broadcastsTable = schema.broadcasts
+      const eligibleTeams = Effect.gen(function* () {
         const rows = yield* db.query((d) =>
-          d.execute(sql`
+          d.execute<{ team_id: string }>(sql`
         select team_id from broadcast_batches where status = 'pending' and next_attempt_at <= now()
           and (lease_until is null or lease_until <= now())
         union
@@ -49,11 +76,10 @@ export class BroadcastSender extends Context.Service<
           and not exists (select 1 from broadcast_recipients r where r.broadcast_id = c.id and r.status = 'queued')
         order by team_id`),
         )
-        const teams = rowsOf<{ team_id: string }>(rows).map((row) => row.team_id)
+        const teams = rows.rows.map((row) => row.team_id)
         const last = yield* Ref.get(lastTeam)
-        const next = teams.find((team) => team > last) ?? teams[0]
-        if (next) yield* Ref.set(lastTeam, next)
-        return next
+        const after = teams.findIndex((team) => team > last)
+        return after < 0 ? teams : [...teams.slice(after), ...teams.slice(0, after)]
       })
 
       const claim = (teamId: string) =>
@@ -62,16 +88,16 @@ export class BroadcastSender extends Context.Service<
             const [batch] = yield* db.query((d) =>
               d
                 .select()
-                .from(b)
+                .from(batchesTable)
                 .where(
                   and(
-                    eq(b.teamId, teamId),
-                    eq(b.status, "pending"),
-                    sql`${b.nextAttemptAt} <= now()`,
-                    sql`(${b.leaseUntil} is null or ${b.leaseUntil} <= now())`,
+                    eq(batchesTable.teamId, teamId),
+                    eq(batchesTable.status, "pending"),
+                    sql`${batchesTable.nextAttemptAt} <= now()`,
+                    sql`(${batchesTable.leaseUntil} is null or ${batchesTable.leaseUntil} <= now())`,
                   ),
                 )
-                .orderBy(asc(b.nextAttemptAt))
+                .orderBy(asc(batchesTable.nextAttemptAt))
                 .limit(1)
                 .for("update", { skipLocked: true }),
             )
@@ -79,9 +105,9 @@ export class BroadcastSender extends Context.Service<
             const claimToken = crypto.randomUUID()
             const [claimed] = yield* db.query((d) =>
               d
-                .update(b)
+                .update(batchesTable)
                 .set({ claimToken, leaseUntil: sql`now() + interval '10 minutes'` })
-                .where(eq(b.id, batch.id))
+                .where(eq(batchesTable.id, batch.id))
                 .returning(),
             )
             return claimed ? { ...claimed, claimToken } : undefined
@@ -94,15 +120,15 @@ export class BroadcastSender extends Context.Service<
             const [broadcast] = yield* db.query((d) =>
               d
                 .select()
-                .from(c)
+                .from(broadcastsTable)
                 .where(
                   and(
-                    eq(c.teamId, teamId),
-                    eq(c.status, "sending"),
-                    sql`exists (select 1 from broadcast_recipients r where r.broadcast_id = ${c.id} and r.status = 'queued' and r.batch_id is null)`,
+                    eq(broadcastsTable.teamId, teamId),
+                    eq(broadcastsTable.status, "sending"),
+                    sql`exists (select 1 from broadcast_recipients recipientsTable where recipientsTable.broadcast_id = ${broadcastsTable.id} and recipientsTable.status = 'queued' and recipientsTable.batch_id is null)`,
                   ),
                 )
-                .orderBy(asc(c.createdAt))
+                .orderBy(asc(broadcastsTable.createdAt))
                 .limit(1)
                 .for("update", { skipLocked: true }),
             )
@@ -110,40 +136,40 @@ export class BroadcastSender extends Context.Service<
             const recipients = yield* db.query((d) =>
               d
                 .select()
-                .from(r)
-                .where(and(eq(r.broadcastId, broadcast.id), eq(r.status, "queued"), sql`${r.batchId} is null`))
-                .orderBy(asc(r.createdAt), asc(r.id))
+                .from(recipientsTable)
+                .where(
+                  and(
+                    eq(recipientsTable.broadcastId, broadcast.id),
+                    eq(recipientsTable.status, "queued"),
+                    sql`${recipientsTable.batchId} is null`,
+                  ),
+                )
+                .orderBy(asc(recipientsTable.createdAt), asc(recipientsTable.id))
                 .limit(100)
                 .for("update"),
             )
             const sender = broadcast.sentAs as SendAs | null
-            const emails: OutgoingEmail[] = []
-            const ready: typeof recipients = []
+            const ready: Array<{ recipient: (typeof recipients)[number]; email: OutgoingEmail }> = []
+            const failedIds: string[] = []
             for (const recipient of recipients) {
-              const row = { ...recipient, contact_id: recipient.contactId }
-              if (!sender || !row.address) {
-                yield* db.query((d) =>
-                  d
-                    .update(r)
-                    .set({ status: "failed", error: "This broadcast couldn't be prepared for sending." })
-                    .where(eq(r.id, row.id)),
-                )
+              if (!sender || !recipient.address) {
+                failedIds.push(recipient.id)
                 continue
               }
               const token = links.sign({
                 teamId: broadcast.teamId as TeamId,
-                contactId: row.contact_id as ContactId | null,
+                contactId: recipient.contactId as ContactId | null,
                 topicId: broadcast.topicId as TopicId | null,
                 broadcastId: broadcast.id as BroadcastId,
                 test: false,
               })
               const urls = links.urls(token)
-              const merge = row.merge
+              const merge = recipient.merge
               const values: MergeValues = {
                 first_name: merge.first_name ?? "",
                 last_name: merge.last_name ?? "",
                 name: [merge.first_name, merge.last_name].filter(Boolean).join(" "),
-                email: merge.email ?? row.address,
+                email: merge.email ?? recipient.address,
                 company: merge.company ?? "",
               }
               const rendered = renderEmail(
@@ -157,41 +183,50 @@ export class BroadcastSender extends Context.Service<
                 },
                 styleSentWith(broadcast.sentAs),
               )
-              emails.push({
-                to: row.address,
-                from: sender.from,
-                ...(sender.replyTo ? { replyTo: sender.replyTo } : {}),
-                subject: rendered.subject,
-                html: rendered.html,
-                text: rendered.text,
-                // RFC 8058: mail apps can unsubscribe in one click, without opening anything.
-                headers: {
-                  "List-Unsubscribe": `<${urls.oneClick}>`,
-                  "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+              ready.push({
+                recipient,
+                email: {
+                  to: recipient.address,
+                  from: sender.from,
+                  ...(sender.replyTo ? { replyTo: sender.replyTo } : {}),
+                  subject: rendered.subject,
+                  html: rendered.html,
+                  text: rendered.text,
+                  // RFC 8058: mail apps can unsubscribe in one click, without opening anything.
+                  headers: {
+                    "List-Unsubscribe": `<${urls.oneClick}>`,
+                    "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+                  },
                 },
               })
-              ready.push(recipient)
             }
-            if (ready.length === 0) return undefined
-            const prepared = yield* mailer.prepareBatch(emails).pipe(Effect.result)
+            if (failedIds.length > 0)
+              yield* db.query((d) =>
+                d
+                  .update(recipientsTable)
+                  .set({ status: "failed", error: "This broadcast couldn't be prepared for sending." })
+                  .where(inArray(recipientsTable.id, failedIds)),
+              )
+            if (ready.length === 0) return { handled: recipients.length }
+            const prepared = yield* mailer.prepareBatch(ready.map((entry) => entry.email)).pipe(Effect.result)
             if (prepared._tag === "Failure") {
               yield* db.query((d) =>
                 d
-                  .update(r)
+                  .update(recipientsTable)
                   .set({ status: "failed", error: prepared.failure.userMessage })
                   .where(
-                    sql`${r.id} in (${sql.join(
-                      ready.map((row) => sql`${row.id}`),
-                      sql`,`,
-                    )})`,
+                    inArray(
+                      recipientsTable.id,
+                      ready.map((entry) => entry.recipient.id),
+                    ),
                   ),
               )
-              return undefined
+              return { handled: recipients.length }
             }
             const claimToken = crypto.randomUUID()
             const [batch] = yield* db.query((d) =>
               d
-                .insert(b)
+                .insert(batchesTable)
                 .values({
                   id: crypto.randomUUID(),
                   teamId,
@@ -202,27 +237,37 @@ export class BroadcastSender extends Context.Service<
                 })
                 .returning(),
             )
-            if (!batch) return undefined
-            for (const [position, recipient] of ready.entries())
-              yield* db.query((d) =>
-                d.update(r).set({ batchId: batch.id, batchPosition: position }).where(eq(r.id, recipient.id)),
-              )
-            return { ...batch, claimToken }
+            if (!batch) return yield* Effect.die("Preparing a broadcast batch returned no row")
+            const positions = sql.join(
+              ready.map((entry, position) => sql`(${entry.recipient.id}::uuid, ${position}::integer)`),
+              sql`, `,
+            )
+            yield* db.query((d) =>
+              d.execute(sql`update broadcast_recipients r
+              set batch_id = ${batch.id}, batch_position = selected.position
+              from (values ${positions}) as selected(id, position)
+              where r.id = selected.id and r.broadcast_id = ${broadcast.id} and r.team_id = ${teamId}`),
+            )
+            return { batch: { ...batch, claimToken }, handled: recipients.length }
           }),
         )
 
       const owned = (batch: ClaimedBatch) =>
         and(
-          eq(b.id, batch.id),
-          eq(b.status, "pending"),
-          eq(b.claimToken, batch.claimToken),
-          sql`${b.leaseUntil} > clock_timestamp()`,
+          eq(batchesTable.id, batch.id),
+          eq(batchesTable.status, "pending"),
+          eq(batchesTable.claimToken, batch.claimToken),
+          sql`${batchesTable.leaseUntil} > clock_timestamp()`,
         )
 
       const finish = (teamId: string) =>
         db.query((d) =>
-          d.execute(sql`update broadcasts c set status = 'sent', finished_at = now(), updated_at = now()
-      where c.team_id = ${teamId} and c.status = 'sending' and not exists (select 1 from broadcast_recipients r where r.broadcast_id = c.id and r.status = 'queued')`),
+          d.execute(sql`with finished as (
+        select c.id from broadcasts c where c.team_id = ${teamId} and c.status = 'sending'
+          and not exists (select 1 from broadcast_recipients r where r.broadcast_id = c.id and r.status = 'queued')
+        for update of c skip locked
+      ) update broadcasts set status = 'sent', finished_at = now(), updated_at = now()
+        where id in (select id from finished)`),
         )
 
       const settle = (batch: ClaimedBatch, outcome: BatchOutcome) =>
@@ -232,57 +277,51 @@ export class BroadcastSender extends Context.Service<
             const message = outcome.status === "sent" ? null : outcome.message
             const [changed] = yield* db.query((d) =>
               d
-                .update(b)
+                .update(batchesTable)
                 .set({ status, claimToken: null, leaseUntil: null, updatedAt: sql`now()` })
                 .where(owned(batch))
                 .returning(),
             )
             if (!changed) return
-            const recipients = yield* db.query((d) =>
-              d.select().from(r).where(eq(r.batchId, batch.id)).orderBy(asc(r.batchPosition)),
-            )
-            const [broadcast] = yield* db.query((d) => d.select().from(c).where(eq(c.id, batch.broadcastId)))
-            if (outcome.status === "sent" && outcome.sent.length !== recipients.length)
-              return yield* Effect.die("Batch completion does not match its recipients")
-            for (const [index, recipient] of recipients.entries()) {
-              const providerId = outcome.status === "sent" ? outcome.sent[index]?.providerId : null
-              if (outcome.status === "sent" && !providerId)
-                return yield* Effect.die("Batch completion is missing a provider ID")
+            if (outcome.status !== "sent") {
               yield* db.query((d) =>
                 d
-                  .update(r)
-                  .set({
-                    status,
-                    error: message,
-                    nextAttemptAt: null,
-                    ...(providerId ? { providerId, sentAt: sql`now()` } : {}),
-                    updatedAt: sql`now()`,
-                  })
-                  .where(and(eq(r.id, recipient.id), eq(r.status, "queued"))),
+                  .update(recipientsTable)
+                  .set({ status, error: message, nextAttemptAt: null, updatedAt: sql`now()` })
+                  .where(and(eq(recipientsTable.batchId, batch.id), eq(recipientsTable.status, "queued"))),
               )
-              if (status === "sent" && recipient.contactId && broadcast)
-                yield* db.query((d) =>
-                  d.insert(schema.activity).values({
-                    id: crypto.randomUUID(),
-                    teamId: batch.teamId,
-                    recordType: "contact",
-                    recordId: recipient.contactId as string,
-                    kind: "emailed",
-                    changedFields: [],
-                    relatedRecordType: "broadcast",
-                    relatedRecordId: broadcast.id,
-                    relatedName: broadcast.name,
-                    actorUserId: broadcast.sentByUserId,
-                    actorName: broadcast.sentByName ?? "Parley",
-                  }),
-                )
+              return
             }
+            const deliveries = sql.join(
+              outcome.accepted.map(({ recipientId, providerId }) => sql`(${recipientId}::uuid, ${providerId}::text)`),
+              sql`, `,
+            )
+            yield* db.query((d) =>
+              d.execute(sql`with delivered as (
+              update broadcast_recipients r set status = 'sent', error = null, next_attempt_at = null,
+                provider_id = delivery.provider_id, sent_at = now(), updated_at = now()
+              from (values ${deliveries}) as delivery(id, provider_id)
+              where r.id = delivery.id and r.batch_id = ${batch.id} and r.status = 'queued'
+              returning r.contact_id
+            ) insert into activity (id, team_id, record_type, record_id, kind, changed_fields,
+                related_record_type, related_record_id, related_name, actor_user_id, actor_name)
+              select gen_random_uuid(), c.team_id, 'contact', delivered.contact_id, 'emailed', array[]::text[],
+                'broadcast', c.id, c.name, c.sent_by_user_id, coalesce(c.sent_by_name, 'Parley')
+              from delivered join broadcasts c on c.id = ${batch.broadcastId}
+              where delivered.contact_id is not null`),
+            )
           }),
         )
 
       const dispatch = (batch: ClaimedBatch) =>
         Effect.gen(function* () {
-          const recipients = yield* db.query((d) => d.select({ id: r.id }).from(r).where(eq(r.batchId, batch.id)))
+          const recipients = yield* db.query((d) =>
+            d
+              .select({ id: recipientsTable.id })
+              .from(recipientsTable)
+              .where(eq(recipientsTable.batchId, batch.id))
+              .orderBy(asc(recipientsTable.batchPosition)),
+          )
           if (batch.firstAttemptAt && batch.firstAttemptAt.getTime() + RETRY_WINDOW_MS <= Date.now()) {
             yield* settle(batch, { status: "unknown", message: UNKNOWN })
             return recipients.length
@@ -291,7 +330,11 @@ export class BroadcastSender extends Context.Service<
           const attempt = yield* db.transaction(
             Effect.gen(function* () {
               const [broadcast] = yield* db.query((d) =>
-                d.select({ status: c.status }).from(c).where(eq(c.id, batch.broadcastId)).for("update"),
+                d
+                  .select({ status: broadcastsTable.status })
+                  .from(broadcastsTable)
+                  .where(eq(broadcastsTable.id, batch.broadcastId))
+                  .for("update"),
               )
               if (!batch.firstAttemptAt && broadcast?.status !== "sending") {
                 yield* settle(batch, { status: "canceled", message: null })
@@ -299,10 +342,10 @@ export class BroadcastSender extends Context.Service<
               }
               const [started] = yield* db.query((d) =>
                 d
-                  .update(b)
+                  .update(batchesTable)
                   .set({
-                    firstAttemptAt: sql`coalesce(${b.firstAttemptAt}, now())`,
-                    attempts: sql`${b.attempts} + 1`,
+                    firstAttemptAt: sql`coalesce(${batchesTable.firstAttemptAt}, now())`,
+                    attempts: sql`${batchesTable.attempts} + 1`,
                     updatedAt: sql`now()`,
                   })
                   .where(owned(batch))
@@ -316,16 +359,17 @@ export class BroadcastSender extends Context.Service<
             .deliverBatch({
               payload: attempt.payload,
               providerIdentity: attempt.providerIdentity,
-              idempotencyKey: attempt.id,
+              idempotencyKey: Schema.decodeUnknownSync(EmailIdempotencyKey)(attempt.id),
               count: recipients.length,
               retryUntil: new Date(attempt.firstAttemptAt.getTime() + RETRY_WINDOW_MS),
             })
             .pipe(Effect.result)
           if (outcome._tag === "Success") {
-            if (outcome.success.length !== recipients.length || outcome.success.some((email) => !email.providerId)) {
+            const accepted = parseBatchAcceptance(recipients, outcome.success)
+            if (!accepted) {
               yield* Effect.logWarning("broadcast provider response did not match the batch")
               yield* retry(attempt, Duration.minutes(2))
-            } else yield* settle(attempt, { status: "sent", sent: outcome.success })
+            } else yield* settle(attempt, { status: "sent", accepted })
           } else {
             const error = outcome.failure
             yield* Effect.logWarning("broadcast provider request failed", error)
@@ -334,6 +378,7 @@ export class BroadcastSender extends Context.Service<
                 yield* retry(attempt, error.retryAfter)
                 break
               case "EmailServiceUnavailable":
+              case "EmailDeliveryUnconfirmed":
                 yield* retry(attempt, Duration.minutes(Math.min(30, 2 ** Math.min(attempt.attempts, 5))))
                 break
               case "EmailBatchReplayUnsafe":
@@ -352,7 +397,7 @@ export class BroadcastSender extends Context.Service<
       const retry = (batch: ClaimedBatch, after: Duration.Duration) =>
         db.query((d) =>
           d
-            .update(b)
+            .update(batchesTable)
             .set({
               nextAttemptAt: sql`now() + make_interval(secs => ${Math.max(1, Math.ceil(Duration.toSeconds(after)))})`,
               claimToken: null,
@@ -362,25 +407,36 @@ export class BroadcastSender extends Context.Service<
             .where(owned(batch)),
         )
 
-      const sendBatch = Effect.gen(function* () {
-        const teamId = yield* nextTeam
-        if (!teamId) return 0
-        const batch = (yield* claim(teamId)) ?? (yield* prepare(teamId))
-        const handled = batch ? yield* dispatch(batch) : 0
-        yield* finish(teamId)
-        return handled
-      }).pipe(
+      const sendNext = Effect.gen(function* () {
+        const teams = yield* eligibleTeams
+        for (const teamId of teams) {
+          yield* Ref.set(lastTeam, teamId)
+          const claimed = yield* claim(teamId)
+          if (claimed) {
+            const handled = yield* dispatch(claimed)
+            yield* finish(teamId)
+            return handled
+          }
+          const prepared = yield* prepare(teamId)
+          if (prepared?.batch) yield* dispatch(prepared.batch)
+          yield* finish(teamId)
+          if (prepared) return prepared.handled
+        }
+        return undefined
+      }).pipe(Effect.withSpan("BroadcastSender.sendBatch"))
+      const sendBatch = sendNext.pipe(
+        Effect.map((handled) => handled ?? 0),
         Effect.catchTag("SqlError", (error) => Effect.logWarning("broadcast sending failed", error).pipe(Effect.as(0))),
-        Effect.withSpan("BroadcastSender.sendBatch"),
       )
       const drain = Effect.gen(function* () {
         let total = 0
         for (;;) {
-          const handled = yield* sendBatch
-          if (handled === 0) return total
+          const handled = yield* sendNext
+          if (handled === undefined) return total
           total += handled
         }
-      })
+      }).pipe(Effect.catchTag("SqlError", classifySqlError))
+
       return { sendBatch, drain }
     }),
   )

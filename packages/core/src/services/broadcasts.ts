@@ -35,10 +35,6 @@ import { type ContentInput, type StyleChoice, styleColumnOf } from "./templates.
 
 type Row = typeof schema.broadcasts.$inferSelect
 
-/** Rows from a raw query, however the driver shapes the result. */
-const rowsOf = <A>(result: unknown): ReadonlyArray<A> =>
-  Array.isArray(result) ? (result as ReadonlyArray<A>) : ((result as { readonly rows?: ReadonlyArray<A> }).rows ?? [])
-
 const ZERO: BroadcastCounts = {
   recipients: 0,
   queued: 0,
@@ -349,11 +345,11 @@ export class Broadcasts extends Context.Service<
                 // Two people pressing Send at once: the second finds it's no longer a draft.
                 const [locked] = yield* db
                   .query((d) =>
-                    d.execute(
+                    d.execute<{ status: string }>(
                       sql`select status from "broadcasts" where id = ${broadcastId} and team_id = ${teamId} for update`,
                     ),
                   )
-                  .pipe(Effect.map((result) => rowsOf<{ status: string }>(result)))
+                  .pipe(Effect.map((result) => result.rows))
                 if (locked?.status !== "draft") return 0
                 // Who isn't on the topic: opt-out topics, those who left it; opt-in topics, everyone
                 // who hasn't joined it (D149).
@@ -406,7 +402,6 @@ export class Broadcasts extends Context.Service<
                       and(
                         eq(schema.broadcastRecipients.broadcastId, broadcastId),
                         eq(schema.broadcastRecipients.status, "queued"),
-                        sql`(${schema.broadcastRecipients.batchId} is null or exists (select 1 from broadcast_batches b where b.id = ${schema.broadcastRecipients.batchId} and b.status = 'canceled'))`,
                       ),
                     ),
                 )

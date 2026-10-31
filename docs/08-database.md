@@ -10,7 +10,7 @@ Parley uses Drizzle ORM and Kit `1.0.0-rc.5`, with Effect, `@effect/sql-pg`, and
 
 Query logging is disabled and `paramsInErrors` is explicitly false for both Drizzle clients. This prevents Drizzle from adding parameter values to its error messages; it does not redact arbitrary provider diagnostics or PostgreSQL error details. The public-error conversion remains responsible for what leaves the server.
 
-`Database.transaction` delegates to Effect's `SqlClient.withTransaction`. Native Drizzle queries use the current fiber's transaction connection, including nested savepoints. The callback retains its own error and service requirements. Tests exercise rollback on domain errors, nested rollback, and interruption while PostgreSQL is actively executing a statement.
+`Database.transaction` delegates to the `withTransaction` of Drizzle's own `$client`, so queries and transactions cannot be wired to different clients. Native Drizzle queries use the current fiber's transaction connection, including nested savepoints. The callback retains its own error and service requirements. Tests exercise rollback on domain errors, nested rollback, and interruption while PostgreSQL is actively executing a statement.
 
 Authentication relation definitions use Drizzle's `defineRelations` API. Better-Auth keeps its Promise-based Drizzle client because that is the API its database integration expects; domain services use the native Effect client.
 
@@ -23,7 +23,7 @@ There are two process-wide connection capabilities, both built by `DatabaseLive`
 
 Effect's native PostgreSQL pool is not a `pg.Pool`. Injecting a compatible capability is necessary; pretending these clients are interchangeable would only hide another adapter. `NodePgPool` exposes the actual library capability, not a parallel query abstraction.
 
-Only database infrastructure resolves `DATABASE_URL`, configures connections, handles idle pool errors, and closes pools. Core services receive the relevant capability through Effect's environment. The node-postgres pool is capped at five connections; both capabilities apply `DATABASE_STATEMENT_TIMEOUT_MS` (default 30 seconds). The production migration process owns its separate, short-lived single-connection pool.
+Only database infrastructure resolves `DATABASE_URL`, configures connections, handles idle pool errors, and closes pools. Core services receive the relevant capability through Effect's environment. The node-postgres pool is capped at five connections. Both capabilities apply `DATABASE_STATEMENT_TIMEOUT_MS` (default 30 seconds), `DATABASE_CONNECTION_TIMEOUT_MS` (default 5 seconds, including pool acquisition), and `DATABASE_QUERY_TIMEOUT_MS` (default 31 seconds, covering stalled client-side queries). Connection and query deadlines must be positive. Native query deadlines retain the typed `SqlError` timeout contract. The production migration process owns its separate, short-lived single-connection pool. Its startup readiness check bounds each connection/query attempt to five seconds and the overall retry budget to two minutes.
 
 Resource ownership and rate-limit policy are separate. `ProviderPacing` still stops requests if Postgres is unavailable. `RateLimiter` still falls back to bounded in-memory counts. Sharing a connection capability does not require these services to share their outage policy.
 

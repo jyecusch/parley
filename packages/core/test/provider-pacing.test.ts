@@ -9,8 +9,11 @@ describe("shared provider pacing", () => {
     Effect.gen(function* () {
       const db = yield* Database
       yield* db.query((d) => d.execute(sql`delete from rate_limits where key = 'resend-account:requests'`))
-      const first = Context.get(yield* Layer.build(Layer.fresh(ProviderPacing.layer)), ProviderPacing)
-      const second = Context.get(yield* Layer.build(Layer.fresh(ProviderPacing.layer)), ProviderPacing)
+      const pacingLayer = ProviderPacing.layer.pipe(
+        Layer.provide(ConfigProvider.layer(ConfigProvider.fromUnknown({ EMAIL_BATCHES_PER_SECOND: "2" }))),
+      )
+      const first = Context.get(yield* Layer.build(Layer.fresh(pacingLayer)), ProviderPacing)
+      const second = Context.get(yield* Layer.build(Layer.fresh(pacingLayer)), ProviderPacing)
       const start = Date.now()
       yield* first.wait
       yield* second.wait

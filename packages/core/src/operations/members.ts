@@ -58,9 +58,7 @@ export const remove = (principal: Principal, input: OperationInput<typeof remove
       return yield* changes.inTeam(input.teamId, (transaction) =>
         Effect.gen(function* () {
           const member = yield* proveMemberOf(principal, transaction.team)
-          const leaving = input.userId === principal.value.userId
-          const canManage = leaving ? undefined : yield* proveCanManageMembers(member)
-          const target = yield* proveMemberRemovable(member, canManage, user)
+          const target = yield* proveMemberRemovable(member, user)
           return yield* members.remove(transaction, target)
         }),
       )

@@ -1,6 +1,7 @@
 // Type-checked, never run. Every line under @ts-expect-error is a mistake the compiler must reject.
 import type { ContactFields, ContactId, TeamId, UserId } from "@parley/domain"
 import { Effect } from "effect"
+import { Mailer } from "../src/mail/mailer.ts"
 import type { Principal } from "../src/principal.ts"
 import { proveContactInTeam } from "../src/proofs/contact-in-team.ts"
 import { proveMemberChangeable, proveMemberRemovable } from "../src/proofs/member-changes.ts"
@@ -92,7 +93,7 @@ export const memberChangeMistakes = named(principal, teamA, userId, (principal, 
         const serviceAccess = yield* proveCanManageServiceAccounts(freshMember)
         // @ts-expect-error a service account cannot be created with the owner role
         yield* serviceAccounts.create(transaction, { name: "Import bot", role: "owner" }, serviceAccess)
-        const removable = yield* proveMemberRemovable(freshMember, freshAccess, user)
+        const removable = yield* proveMemberRemovable(freshMember, user)
         // @ts-expect-error permission to remove a member does not authorize changing their role
         yield* members.changeRole(transaction, removable)
         // @ts-expect-error the new role comes from the proof and cannot be replaced at the write
@@ -102,3 +103,15 @@ export const memberChangeMistakes = named(principal, teamA, userId, (principal, 
     )
   }),
 )
+
+export const unsafeEmailBatch = Effect.gen(function* () {
+  const mailer = yield* Mailer
+  return yield* mailer.deliverBatch({
+    payload: "[]",
+    providerIdentity: "outbox",
+    count: 1,
+    retryUntil: new Date(),
+    // @ts-expect-error sending a batch requires a parsed idempotency key
+    idempotencyKey: "",
+  })
+})

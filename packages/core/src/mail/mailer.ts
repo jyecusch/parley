@@ -2,7 +2,9 @@ import { createHash } from "node:crypto"
 import type { DnsRecord } from "@parley/domain"
 import {
   EmailBatchReplayUnsafe,
+  EmailDeliveryUnconfirmed,
   type EmailError,
+  EmailIdempotencyKey,
   EmailNotConfigured,
   EmailRejected,
   EmailSendingTooFast,
@@ -10,6 +12,7 @@ import {
 } from "@parley/domain"
 import { Config, Context, Duration, Effect, Layer, Option, Redacted, Ref, Schema } from "effect"
 
+import { FetchHttpClient } from "effect/http"
 import { ProviderPacing } from "../services/provider-pacing.ts"
 
 /** One email. The sender comes from configuration unless given. */
@@ -43,7 +46,7 @@ export interface PreparedBatch {
 }
 
 export interface DeliverBatchInput extends PreparedBatch {
-  readonly idempotencyKey: string
+  readonly idempotencyKey: EmailIdempotencyKey
   readonly count: number
   readonly retryUntil: Date
 }
@@ -84,7 +87,7 @@ export class Mailer extends Context.Service<
         const record = (email: OutgoingEmail) =>
           Effect.gen(function* () {
             yield* Ref.update(outbox, (sent) => [...sent, email])
-            yield* Effect.logInfo(`email (not sent, no RESEND_API_KEY) to ${email.to}: ${email.subject}`)
+            yield* Effect.logInfo("email recorded in development outbox")
             return { providerId: `log-${crypto.randomUUID()}` }
           })
         const verified = (providerId: string): ProviderDomain => ({ providerId, status: "verified", records: [] })
@@ -93,7 +96,12 @@ export class Mailer extends Context.Service<
           prepareBatch: (emails) => Effect.succeed({ payload: JSON.stringify(emails), providerIdentity: "outbox" }),
           deliverBatch: (input) =>
             Effect.gen(function* () {
-              if (input.providerIdentity !== "outbox" || input.retryUntil.getTime() <= Date.now())
+              if (
+                !Schema.is(EmailIdempotencyKey)(input.idempotencyKey) ||
+                input.providerIdentity !== "outbox" ||
+                !Number.isFinite(input.retryUntil.getTime()) ||
+                input.retryUntil.getTime() <= Date.now()
+              )
                 return yield* new EmailBatchReplayUnsafe()
               const prior = sent.get(input.idempotencyKey)
               if (prior) return prior
@@ -113,6 +121,7 @@ export class Mailer extends Context.Service<
       }
 
       const pacing = yield* ProviderPacing
+      const fetch = yield* FetchHttpClient.Fetch
       const key = Redacted.value(apiKey.value)
       const providerIdentity = createHash("sha256").update(key).digest("hex")
       const sender = (email: OutgoingEmail) => email.from ?? Option.getOrUndefined(from)
@@ -138,21 +147,21 @@ export class Mailer extends Context.Service<
         ...(email.headers ? { headers: email.headers } : {}),
       })
 
-      const request = (method: string, path: string, body?: string, idempotencyKey?: string, retryUntil?: Date) =>
+      interface ProviderRequest {
+        readonly method: "GET" | "POST" | "DELETE"
+        readonly path: string
+        readonly body?: string
+        readonly headers?: Readonly<Record<string, string>>
+      }
+      const request = (input: ProviderRequest) =>
         Effect.gen(function* () {
-          yield* pacing.wait
-          if (retryUntil && retryUntil.getTime() <= Date.now()) return yield* new EmailBatchReplayUnsafe()
           const response = yield* Effect.tryPromise({
             try: async (signal) => {
-              const response = await fetch(`https://api.resend.com${path}`, {
-                method,
+              const response = await fetch(`https://api.resend.com${input.path}`, {
+                method: input.method,
                 signal: AbortSignal.any([signal, AbortSignal.timeout(30_000)]),
-                headers: {
-                  authorization: `Bearer ${key}`,
-                  "content-type": "application/json",
-                  ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
-                },
-                ...(body === undefined ? {} : { body }),
+                headers: { authorization: `Bearer ${key}`, "content-type": "application/json", ...input.headers },
+                ...(input.body === undefined ? {} : { body: input.body }),
               })
               return {
                 ok: response.ok,
@@ -169,83 +178,103 @@ export class Mailer extends Context.Service<
             catch: (cause) => new EmailServiceUnavailable({ cause }),
           })
         })
-
-      const post = (path: string, body: unknown) =>
-        request("POST", path, JSON.stringify(body)).pipe(Effect.catchTag("EmailBatchReplayUnsafe", Effect.die))
-      const ordinaryRequest = (method: string, path: string) =>
-        request(method, path).pipe(Effect.catchTag("EmailBatchReplayUnsafe", Effect.die))
-
-      interface ResendDomain {
-        readonly id?: string
-        readonly status?: string
-        readonly records?: ReadonlyArray<{
-          readonly type?: string
-          readonly name?: string
-          readonly value?: string
-          readonly priority?: number
-          readonly status?: string
-        }>
-      }
-      const statusOf = (status: string | undefined): ProviderDomain["status"] =>
+      const acceptance = <A>(effect: Effect.Effect<A, EmailError>) =>
+        effect.pipe(
+          Effect.catchTag("EmailServiceUnavailable", (cause) => Effect.fail(new EmailDeliveryUnconfirmed({ cause }))),
+        )
+      const ordinaryRequest = (input: ProviderRequest) => pacing.wait.pipe(Effect.andThen(request(input)))
+      const statusOf = (status: string): ProviderDomain["status"] =>
         status === "verified" ? "verified" : status === "failed" ? "failed" : "pending"
-      const toDomain = (domain: ResendDomain): ProviderDomain => ({
-        providerId: domain.id ?? "",
-        status: statusOf(domain.status),
-        records: (domain.records ?? []).map((record) => ({
-          type: record.type ?? "",
-          name: record.name ?? "",
-          value: record.value ?? "",
-          priority: record.priority ?? null,
-          status: statusOf(record.status),
-        })),
+      const DomainResponse = Schema.Struct({
+        id: Schema.NonEmptyString,
+        status: Schema.optional(Schema.String),
+        records: Schema.optional(
+          Schema.Array(
+            Schema.Struct({
+              type: Schema.NonEmptyString,
+              name: Schema.NonEmptyString,
+              value: Schema.NonEmptyString,
+              priority: Schema.optional(Schema.Number),
+              status: Schema.String,
+            }),
+          ),
+        ),
       })
+      const domainResponse = (input: ProviderRequest) =>
+        Effect.gen(function* () {
+          const domain = yield* Schema.decodeUnknownEffect(DomainResponse)(yield* ordinaryRequest(input)).pipe(
+            Effect.mapError((cause) => new EmailServiceUnavailable({ cause })),
+          )
+          return {
+            providerId: domain.id,
+            status: statusOf(domain.status ?? "pending"),
+            records: (domain.records ?? []).map((record) => ({
+              ...record,
+              priority: record.priority ?? null,
+              status: statusOf(record.status),
+            })),
+          } satisfies ProviderDomain
+        })
       const domains = {
         create: (domain: string) =>
-          Effect.map(post("/domains", { name: domain }), (result) => toDomain(result as ResendDomain)),
+          domainResponse({ method: "POST", path: "/domains", body: JSON.stringify({ name: domain }) }),
         verify: (providerId: string) =>
           Effect.gen(function* () {
             const path = `/domains/${encodeURIComponent(providerId)}`
-            const current = toDomain((yield* ordinaryRequest("GET", path)) as ResendDomain)
-            // Asking Resend to verify starts a fresh DNS check, which puts a verified domain back
-            // to pending until it finishes, so a verified domain is left alone.
+            const current = yield* domainResponse({ method: "GET", path })
             if (current.status === "verified") return current
-            yield* post(`${path}/verify`, {})
-            return toDomain((yield* ordinaryRequest("GET", path)) as ResendDomain)
+            yield* ordinaryRequest({ method: "POST", path: `${path}/verify`, body: "{}" })
+            return yield* domainResponse({ method: "GET", path })
           }),
         remove: (providerId: string) =>
-          ordinaryRequest("DELETE", `/domains/${encodeURIComponent(providerId)}`).pipe(Effect.asVoid),
+          ordinaryRequest({ method: "DELETE", path: `/domains/${encodeURIComponent(providerId)}` }).pipe(Effect.asVoid),
       }
-
       const requireSender = (emails: ReadonlyArray<OutgoingEmail>) =>
         emails.every((email) => sender(email)) ? Effect.void : Effect.fail(new EmailNotConfigured())
-
       const send = (email: OutgoingEmail) =>
         Effect.gen(function* () {
           yield* requireSender([email])
-          const result = yield* Schema.decodeUnknownEffect(Schema.Struct({ id: Schema.NonEmptyString }))(
-            yield* post("/emails", payload(email)),
-          ).pipe(Effect.mapError((cause) => new EmailServiceUnavailable({ cause })))
+          yield* pacing.wait
+          const result = yield* acceptance(
+            Effect.gen(function* () {
+              const result = yield* request({ method: "POST", path: "/emails", body: JSON.stringify(payload(email)) })
+              return yield* Schema.decodeUnknownEffect(Schema.Struct({ id: Schema.NonEmptyString }))(result).pipe(
+                Effect.mapError((cause) => new EmailServiceUnavailable({ cause })),
+              )
+            }),
+          )
           return { providerId: result.id }
         }).pipe(Effect.withSpan("Mailer.send"))
-
       const prepareBatch = (emails: ReadonlyArray<OutgoingEmail>) =>
-        Effect.gen(function* () {
-          yield* requireSender(emails)
-          return { payload: JSON.stringify(emails.map(payload)), providerIdentity }
-        })
+        requireSender(emails).pipe(Effect.as({ payload: JSON.stringify(emails.map(payload)), providerIdentity }))
       const deliverBatch = (input: DeliverBatchInput) =>
         Effect.gen(function* () {
-          if (input.providerIdentity !== providerIdentity) return yield* new EmailBatchReplayUnsafe()
-          const result = yield* request("POST", "/emails/batch", input.payload, input.idempotencyKey, input.retryUntil)
-          const decoded = yield* Schema.decodeUnknownEffect(
-            Schema.Struct({ data: Schema.Array(Schema.Struct({ id: Schema.NonEmptyString })) }),
-          )(result).pipe(Effect.mapError((cause) => new EmailServiceUnavailable({ cause })))
-          if (
-            decoded.data.length !== input.count ||
-            new Set(decoded.data.map((email) => email.id)).size !== input.count
+          if (!Schema.is(EmailIdempotencyKey)(input.idempotencyKey) || input.providerIdentity !== providerIdentity)
+            return yield* new EmailBatchReplayUnsafe()
+          yield* pacing.wait
+          if (!Number.isFinite(input.retryUntil.getTime()) || input.retryUntil.getTime() <= Date.now())
+            return yield* new EmailBatchReplayUnsafe()
+          return yield* acceptance(
+            Effect.gen(function* () {
+              const result = yield* request({
+                method: "POST",
+                path: "/emails/batch",
+                body: input.payload,
+                headers: { "Idempotency-Key": input.idempotencyKey },
+              })
+              const decoded = yield* Schema.decodeUnknownEffect(
+                Schema.Struct({ data: Schema.Array(Schema.Struct({ id: Schema.NonEmptyString })) }),
+              )(result).pipe(Effect.mapError((cause) => new EmailServiceUnavailable({ cause })))
+              if (
+                decoded.data.length !== input.count ||
+                new Set(decoded.data.map((email) => email.id)).size !== input.count
+              )
+                return yield* new EmailServiceUnavailable({
+                  cause: "Provider must return one distinct email ID per recipient",
+                })
+              return decoded.data.map(({ id }) => ({ providerId: id }))
+            }),
           )
-            return yield* new EmailServiceUnavailable({ cause: "Provider returned the wrong number of email IDs" })
-          return decoded.data.map(({ id }) => ({ providerId: id }))
         }).pipe(Effect.withSpan("Mailer.deliverBatch"))
       const sendBatch = (emails: ReadonlyArray<OutgoingEmail>) =>
         Effect.gen(function* () {
@@ -254,7 +283,7 @@ export class Mailer extends Context.Service<
           return yield* deliverBatch({
             ...prepared,
             count: emails.length,
-            idempotencyKey: crypto.randomUUID(),
+            idempotencyKey: Schema.decodeUnknownSync(EmailIdempotencyKey)(crypto.randomUUID()),
             retryUntil: new Date(Date.now() + 60_000),
           }).pipe(
             Effect.catchTag("EmailBatchReplayUnsafe", () =>
@@ -262,6 +291,7 @@ export class Mailer extends Context.Service<
             ),
           )
         })
+
       return { send, sendBatch, prepareBatch, deliverBatch, outbox: Effect.succeed([]), domains }
     }),
   )

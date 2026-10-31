@@ -54,8 +54,8 @@ describe("Database", () => {
       const [after] = yield* db.query((d) => d.select().from(schema.contacts).where(eq(schema.contacts.id, id)))
       expect(after?.firstName).toBe("Sam")
 
-      const unique = yield* db.query((d) => d.execute(sql`select 1/0`)).pipe(Effect.flip)
-      expect(unique._tag).toBe("SqlError")
+      const divisionByZero = yield* db.query((d) => d.execute(sql`select 1/0`)).pipe(Effect.flip)
+      expect(divisionByZero._tag).toBe("SqlError")
       yield* db.query((d) => d.delete(schema.organization).where(eq(schema.organization.id, teamId)))
     }).pipe(Effect.scoped, Effect.provide(DatabaseLive)),
   )

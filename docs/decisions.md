@@ -176,6 +176,8 @@ What we decided, who decided it, and what's still open. Nothing becomes "decided
 
 | D168 | Native Drizzle Effect integration | Adopt Drizzle ORM and Kit `1.0.0-rc.5`, align Effect packages at `4.1.1`, and replace the Promise bridge with `drizzle-orm/effect-postgres`. Keep `Database.query` for spans and native SQL error classification. Convert relation definitions and migration metadata with the supported v1 APIs; preserve historical SQL. Database infrastructure owns the native Effect pool and an injected `NodePgPool` shared by Better-Auth and the two Postgres limiters. Core services do not read database connection configuration or own pools. Preserve strict provider pacing and application limiter fallback. Details and upgrade checks in [08](./08-database.md) | Owner | 2026-10-31 |
 
+| D169 | Review hardening and simplification | Require validated email idempotency keys; distinguish non-retryable unconfirmed acceptance from retryable pre-dispatch outages. Parse provider domain responses and inject Effect's fetch capability. Bulk broadcast writes stay inside the claim-fenced transaction, and draining scans all eligible teams before stopping. Bind transactions to Drizzle's own client and bound connection/query waits. Remove obsolete driver-shape compatibility code and duplicated member-removal branching | Owner | 2026-10-31 |
+
 ## Implementation choices made during milestones 1 and 2 (Claude; low-stakes, open to veto)
 
 | # | Choice | Why |

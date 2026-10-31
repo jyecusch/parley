@@ -1,5 +1,5 @@
 import { NodePgPool } from "@parley/db"
-import { EmailServiceUnavailable } from "@parley/domain"
+import { EmailSendingTooFast, EmailServiceUnavailable } from "@parley/domain"
 import { Config, Context, Duration, Effect, Layer } from "effect"
 import { RateLimiterPostgres, RateLimiterRes } from "rate-limiter-flexible"
 
@@ -22,23 +22,18 @@ export class ProviderPacing extends Context.Service<
         duration: 1,
         clearExpiredByTimeout: false,
       })
-      const wait = Effect.gen(function* () {
-        for (;;) {
-          const refused = yield* Effect.tryPromise({
-            try: () =>
-              limiter.consume("requests").then(
-                () => undefined,
-                (cause: unknown) => {
-                  if (cause instanceof RateLimiterRes) return cause
-                  throw cause
-                },
-              ),
-            catch: (cause) => new EmailServiceUnavailable({ cause }),
-          })
-          if (!refused) return
-          yield* Effect.sleep(Duration.millis(Math.max(1, refused.msBeforeNext)))
-        }
-      })
+      const wait: Effect.Effect<void, EmailServiceUnavailable> = Effect.tryPromise({
+        try: () => limiter.consume("requests"),
+        catch: (cause) =>
+          cause instanceof RateLimiterRes
+            ? new EmailSendingTooFast({ retryAfter: Duration.millis(Math.max(1, cause.msBeforeNext)) })
+            : new EmailServiceUnavailable({ cause }),
+      }).pipe(
+        Effect.asVoid,
+        Effect.catchTag("EmailSendingTooFast", (error) =>
+          Effect.sleep(error.retryAfter).pipe(Effect.andThen(() => wait)),
+        ),
+      )
       return { wait }
     }),
   )

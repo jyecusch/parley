@@ -1,8 +1,8 @@
 import { PgClient } from "@effect/sql-pg"
 import type { EffectDrizzleQueryError } from "drizzle-orm/effect-core/errors"
 import * as PgDrizzle from "drizzle-orm/effect-postgres"
-import { Cause, Config, Context, Effect, Layer, Option } from "effect"
-import { SqlClient, SqlError } from "effect/sql"
+import { Cause, Config, Context, Duration, Effect, Layer, Option, Schema } from "effect"
+import { SqlError } from "effect/sql"
 import { NodePgPool } from "./node-pg-pool.ts"
 import { authRelations } from "./schema/auth.ts"
 
@@ -21,7 +21,10 @@ export class Database extends Context.Service<
   static readonly layer = Layer.effect(
     Database,
     Effect.gen(function* () {
-      const sql = yield* SqlClient.SqlClient
+      const queryTimeout = yield* Config.withDefault(
+        Config.schema(Schema.Int.check(Schema.isGreaterThan(0)), "DATABASE_QUERY_TIMEOUT_MS"),
+        31_000,
+      ).pipe(Effect.orDie)
       const db = yield* PgDrizzle.makeWithDefaults({ relations: authRelations, paramsInErrors: false })
       const query = <A>(build: (db: Db) => Effect.Effect<A, EffectDrizzleQueryError>) =>
         Effect.suspend(() => build(db)).pipe(
@@ -31,16 +34,35 @@ export class Database extends Context.Service<
               ? Effect.fail(failure.value)
               : Effect.die(error)
           }),
+          Effect.timeoutOrElse({
+            duration: Duration.millis(queryTimeout),
+            orElse: () =>
+              Effect.fail(
+                new SqlError.SqlError({
+                  reason: new SqlError.StatementTimeoutError({
+                    cause: new Error("Database query deadline exceeded"),
+                    operation: "query",
+                  }),
+                }),
+              ),
+          }),
           Effect.withSpan("Database.query"),
         )
-      return { query, transaction: sql.withTransaction }
+      return { query, transaction: db.$client.withTransaction }
     }),
   )
 }
 
-/** PgLive owns the native Effect PostgreSQL pool and its statement timeout. */
+const connectionTimeout = Config.withDefault(
+  Config.schema(Schema.Int.check(Schema.isGreaterThan(0)), "DATABASE_CONNECTION_TIMEOUT_MS"),
+  5_000,
+).pipe(Config.map(Duration.millis))
+
+/** PgLive owns the native Effect PostgreSQL pool and its connection and statement deadlines. */
 export const PgLive = PgClient.layerConfig({
   url: Config.Redacted("DATABASE_URL"),
+  connectTimeout: connectionTimeout,
+  acquireTimeout: connectionTimeout,
   startupParameters: Config.withDefault(Config.Int("DATABASE_STATEMENT_TIMEOUT_MS"), 30_000).pipe(
     Config.map((ms) => ({ statement_timeout: String(ms) })),
   ),

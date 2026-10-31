@@ -78,6 +78,7 @@ export const ERROR_STATUS: { readonly [Tag in ErrorTag]: Status } = {
   InvitationForAnotherEmail: 403,
   ServiceAccountCannotBeOwner: 422,
   EmailServiceUnavailable: 502,
+  EmailDeliveryUnconfirmed: 502,
   EmailRejected: 502,
   EmailSendingTooFast: 429,
   EmailNotConfigured: 503,

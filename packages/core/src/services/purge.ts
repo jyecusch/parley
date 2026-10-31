@@ -39,30 +39,24 @@ export class Purge extends Context.Service<Purge, { readonly run: Effect.Effect<
                 yield* db.query((d) => d.execute(sql`delete from "form_submissions" where contact_id in (${expired})`))
               }
               const removed = yield* db.query((d) =>
-                d.execute(sql`delete from ${sql.raw(`"${table}"`)} where id in (${expired}) returning id`),
+                d.execute(sql`delete from ${sql.raw(`"${table}"`)} where id in (${expired})`),
               )
-              return (
-                (removed as unknown as { readonly rows?: ReadonlyArray<unknown> }).rows?.length ??
-                (Array.isArray(removed) ? removed.length : 0)
-              )
+              return removed.rowCount
             }),
           )
           .pipe(Effect.orDie)
-      const count = (result: unknown) =>
-        (result as { readonly rows?: ReadonlyArray<unknown> }).rows?.length ??
-        (Array.isArray(result) ? result.length : 0)
       const purgeForms = Effect.gen(function* () {
         const spam = yield* db.query((d) =>
           d.execute(sql`delete from "form_submissions"
-            where status = 'spam' and created_at < now() - make_interval(days => 30) returning id`),
+            where status = 'spam' and created_at < now() - make_interval(days => 30)`),
         )
         // Unconfirmed after the link's 7 days: never a contact, so their answers go too (D146).
         const expired = yield* db.query((d) =>
           d.execute(sql`update "form_submissions" set status = 'expired', values = '{}'::jsonb
-            where status = 'waiting' and waiting_since < now() - make_interval(days => 7) returning id`),
+            where status = 'waiting' and waiting_since < now() - make_interval(days => 7)`),
         )
         yield* db.query((d) => d.execute(sql`delete from "form_token_uses" where expires_at < now()`))
-        return { spam: count(spam), expired: count(expired) }
+        return { spam: spam.rowCount, expired: expired.rowCount }
       }).pipe(Effect.orDie)
       const run = Effect.gen(function* () {
         const contacts = yield* purgeTable("contacts", "contact")

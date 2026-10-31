@@ -71,3 +71,6 @@ export type SubmissionId = typeof SubmissionId.Type
 
 /** Whether a string is a uuid, as every Parley record id is: anything else can't be one, so needn't reach a query. */
 export const isUuid = Schema.is(Schema.String.check(Schema.isUUID()))
+
+export const EmailIdempotencyKey = Schema.String.check(Schema.isUUID()).pipe(Schema.brand("EmailIdempotencyKey"))
+export type EmailIdempotencyKey = typeof EmailIdempotencyKey.Type

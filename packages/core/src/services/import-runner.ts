@@ -46,10 +46,6 @@ type PartFailure =
   | Effect.Error<ReturnType<typeof importContactRows>>
   | Effect.Error<ReturnType<typeof importCompanyRows>>
 
-/** Rows from a raw query, however the driver shapes the result. */
-const rowsOf = <A>(result: unknown): ReadonlyArray<A> =>
-  Array.isArray(result) ? (result as ReadonlyArray<A>) : ((result as { readonly rows?: ReadonlyArray<A> }).rows ?? [])
-
 /** Failures that mean whoever started the import can't add records to the team any more. */
 const ACCESS_LOST: ReadonlySet<string> = new Set([
   "NotATeamMember",
@@ -88,8 +84,8 @@ export class ImportRunner extends Context.Service<
       const services: ContextType.Context<OperationServices> = yield* Effect.context<OperationServices>()
       const run = <A>(effect: Effect.Effect<A, SqlError.SqlError>) =>
         effect.pipe(Effect.catchTag("SqlError", classifySqlError))
-      const execute = <A>(query: ReturnType<typeof sql>) =>
-        run(db.query((d) => d.execute(query))).pipe(Effect.map((result) => rowsOf<A>(result)))
+      const execute = <A extends object>(query: ReturnType<typeof sql>) =>
+        run(db.query((d) => d.execute<A>(query, "objects")))
 
       const claim = execute<Claimed>(sql`
         update imports set claimed_at = now(),
@@ -165,9 +161,9 @@ export class ImportRunner extends Context.Service<
         run(
           db.transaction(
             Effect.gen(function* () {
-              const [after] = rowsOf<{ status: string }>(
-                yield* db.query((d) =>
-                  d.execute(sql`update imports set
+              const [after] = yield* db.query((d) =>
+                d.execute<{ status: string }>(
+                  sql`update imports set
                     processed_rows = processed_rows + ${outcome.created + outcome.updated + outcome.failed.length},
                     created = created + ${outcome.created},
                     updated = updated + ${outcome.updated},
@@ -176,7 +172,8 @@ export class ImportRunner extends Context.Service<
                     failed = ${appended("failed", outcome.failed)},
                     warnings = ${appended("warnings", outcome.warnings)},
                     claimed_at = now()
-                    where id = ${claimed.id} returning status`),
+                    where id = ${claimed.id} returning status`,
+                  "objects",
                 ),
               )
               yield* db.query((d) => d.execute(sql`delete from import_parts where id = ${partId}`))

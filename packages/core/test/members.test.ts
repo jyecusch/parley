@@ -241,6 +241,24 @@ describe("members and invitations", () => {
     }).pipe(Effect.provide(CoreLive)),
   )
 
+  it.effect("checks removal permissions before looking up another member, while signed-in members may leave", () =>
+    Effect.gen(function* () {
+      const f = yield* Fixture
+      const byMember = yield* run["members.remove"](f.sam, { teamId: f.acme, userId: f.bob.userId }).pipe(Effect.flip)
+      expect(byMember).toMatchObject({ _tag: "RoleLacksPermission", needed: "members:manage" })
+      const byKey = yield* run["members.remove"](f.janeReadOnlyKey, { teamId: f.acme, userId: f.bob.userId }).pipe(
+        Effect.flip,
+      )
+      expect(byKey).toMatchObject({ _tag: "ApiKeyScopeExcludes", needed: "members:manage" })
+      const byOwner = yield* run["members.remove"](f.jane, { teamId: f.acme, userId: f.bob.userId }).pipe(Effect.flip)
+      expect(byOwner._tag).toBe("MemberNotFound")
+      const left = yield* run["members.remove"](f.sam, { teamId: f.acme, userId: f.sam.userId })
+      expect(left.userId).toBe(f.sam.userId)
+      const remaining = yield* run["members.list"](f.jane, { teamId: f.acme })
+      expect(remaining.some((member) => member.userId === f.sam.userId)).toBe(false)
+    }).pipe(Effect.provide(CoreLive)),
+  )
+
   it.effect("an API key or agent can't make its person leave, or revoke their other credentials", () =>
     Effect.gen(function* () {
       const f = yield* Fixture

@@ -72,7 +72,7 @@ So the split is:
 | --- | --- | --- |
 | `userMessage` | Users, **and** agents reasoning in natural language | Understanding, explaining to a user, choosing a fix |
 | `_tag` | Code (our UI, agent frameworks, scripts) | Branching: "if `ContactEmailTaken`, offer to merge" |
-| `isRetryable` | Code | "Would the exact same request, sent again, possibly work?" |
+| `isRetryable` | Code | "Could retrying the same request help? Unconfirmed acceptance must say false." |
 | `retryAfterMillis` | Code | How long the other side asked us to wait |
 
 Decisions live in the typed fields; explanation lives in the sentence. An agent should never have to parse our prose to decide whether to retry, and a user should never have to read a `_tag`.

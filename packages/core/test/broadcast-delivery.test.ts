@@ -2,8 +2,8 @@ import { readFileSync } from "node:fs"
 import { describe, expect, it } from "@effect/vitest"
 import { Database, schema } from "@parley/db"
 import { EmailRejected, EmailServiceUnavailable } from "@parley/domain"
-import { and, eq, sql } from "drizzle-orm"
-import { Deferred, Effect, Fiber, Layer } from "effect"
+import { and, asc, eq, inArray, sql } from "drizzle-orm"
+import { Deferred, Duration, Effect, Fiber, Layer } from "effect"
 import { SqlClient, Statement } from "effect/sql"
 import { BroadcastSender, CoreLive, Mailer, implementations as run } from "../src/index.ts"
 import type { DeliverBatchInput } from "../src/mail/mailer.ts"
@@ -306,6 +306,214 @@ describe("durable broadcast delivery", () => {
     }).pipe(withBroadcastQueue, Effect.provide(CoreLive)),
   )
 
+  it.effect("drains another queued team after finishing a cleanup-only team", () =>
+    Effect.gen(function* () {
+      const first = yield* seed
+      const second = yield* seed
+      const db = yield* Database
+      const ordered = yield* db.query((d) =>
+        d
+          .select({ id: schema.broadcasts.id })
+          .from(schema.broadcasts)
+          .where(inArray(schema.broadcasts.id, [first.id, second.id]))
+          .orderBy(asc(schema.broadcasts.teamId)),
+      )
+      const cleanup = ordered[0]?.id
+      const queued = ordered[1]?.id
+      if (!cleanup || !queued) return yield* Effect.die("Expected two delivery fixtures")
+      yield* db.query((d) =>
+        d.delete(schema.broadcastRecipients).where(eq(schema.broadcastRecipients.broadcastId, cleanup)),
+      )
+      const calls: DeliverBatchInput[] = []
+      const sender = yield* worker((input) => {
+        calls.push(input)
+        return Effect.succeed(accepted(input))
+      })
+      expect(yield* sender.drain).toBe(1)
+      expect(calls).toHaveLength(1)
+      const [finished] = yield* db.query((d) =>
+        d.select({ status: schema.broadcasts.status }).from(schema.broadcasts).where(eq(schema.broadcasts.id, cleanup)),
+      )
+      expect(finished?.status).toBe("sent")
+      expect((yield* state(queued)).recipients[0]?.status).toBe("sent")
+    }).pipe(withBroadcastQueue, Effect.provide(CoreLive)),
+  )
+
+  for (const cleanupOnly of [false, true])
+    it.live(
+      `drains available work while the first team's ${cleanupOnly ? "cleanup-only" : "queued"} broadcast is locked`,
+      () =>
+        Effect.gen(function* () {
+          const first = yield* seed
+          const second = yield* seed
+          const db = yield* Database
+          const ordered = yield* db.query((d) =>
+            d
+              .select({ id: schema.broadcasts.id })
+              .from(schema.broadcasts)
+              .where(inArray(schema.broadcasts.id, [first.id, second.id]))
+              .orderBy(asc(schema.broadcasts.teamId)),
+          )
+          const locked = ordered[0]?.id
+          const available = ordered[1]?.id
+          if (!locked || !available) return yield* Effect.die("Expected two delivery fixtures")
+          if (cleanupOnly)
+            yield* db.query((d) =>
+              d.delete(schema.broadcastRecipients).where(eq(schema.broadcastRecipients.broadcastId, locked)),
+            )
+          const acquired = yield* Deferred.make<void>()
+          const release = yield* Deferred.make<void>()
+          const blocker = yield* Effect.forkScoped(
+            db.transaction(
+              Effect.gen(function* () {
+                yield* db.query((d) =>
+                  d
+                    .select({ id: schema.broadcasts.id })
+                    .from(schema.broadcasts)
+                    .where(eq(schema.broadcasts.id, locked))
+                    .for("update"),
+                )
+                yield* Deferred.succeed(acquired, undefined)
+                yield* Deferred.await(release)
+              }),
+            ),
+          )
+          yield* Deferred.await(acquired)
+          const calls: DeliverBatchInput[] = []
+          const sender = yield* worker((input) => {
+            calls.push(input)
+            return Effect.succeed(accepted(input))
+          })
+          const handled = yield* sender.drain.pipe(
+            Effect.timeout(Duration.seconds(3)),
+            Effect.ensuring(Deferred.succeed(release, undefined)),
+          )
+          yield* Fiber.join(blocker)
+          expect(handled).toBe(1)
+          expect((yield* state(available)).recipients[0]?.status).toBe("sent")
+          const [remainingBroadcast] = yield* db.query((d) =>
+            d
+              .select({ status: schema.broadcasts.status })
+              .from(schema.broadcasts)
+              .where(eq(schema.broadcasts.id, locked)),
+          )
+          expect(remainingBroadcast?.status).toBe("sending")
+          if (!cleanupOnly) expect((yield* state(locked)).recipients[0]?.status).toBe("queued")
+          expect(yield* sender.drain).toBe(cleanupOnly ? 0 : 1)
+          expect(calls).toHaveLength(cleanupOnly ? 1 : 2)
+          const [finished] = yield* db.query((d) =>
+            d
+              .select({ status: schema.broadcasts.status })
+              .from(schema.broadcasts)
+              .where(eq(schema.broadcasts.id, locked)),
+          )
+          expect(finished?.status).toBe("sent")
+          if (!cleanupOnly) expect((yield* state(locked)).recipients[0]?.status).toBe("sent")
+        }).pipe(withBroadcastQueue, Effect.provide(CoreLive)),
+    )
+
+  it.effect("continues past more than 100 invalid recipients to the remaining valid recipient", () =>
+    Effect.gen(function* () {
+      const f = yield* seed
+      const db = yield* Database
+      yield* db.query((d) =>
+        d.insert(schema.broadcastRecipients).values(
+          Array.from({ length: 101 }, (_, index) => ({
+            id: crypto.randomUUID(),
+            teamId: f.acme,
+            broadcastId: f.id,
+            address: null,
+            name: `Invalid recipient ${index}`,
+            status: "queued" as const,
+            createdAt: new Date(0),
+          })),
+        ),
+      )
+      const calls: DeliverBatchInput[] = []
+      const sender = yield* worker((input) => {
+        calls.push(input)
+        return Effect.succeed(accepted(input))
+      })
+      expect(yield* sender.drain).toBe(102)
+      expect(calls.map((input) => input.count)).toEqual([1])
+      const result = yield* state(f.id)
+      expect(result.recipients.filter((recipient) => recipient.status === "failed")).toHaveLength(101)
+      expect(result.recipients.find((recipient) => recipient.contactId === f.contactId)?.status).toBe("sent")
+      expect(result.batches).toHaveLength(1)
+      expect(result.activity).toHaveLength(1)
+    }).pipe(withBroadcastQueue, Effect.provide(CoreLive)),
+  )
+
+  it.effect("completes 100 contacted recipients with bounded statements and correctly paired provider IDs", () =>
+    Effect.gen(function* () {
+      const f = yield* seed
+      const db = yield* Database
+      const contacts = Array.from({ length: 99 }, (_, index) => ({
+        id: crypto.randomUUID(),
+        teamId: f.acme,
+        firstName: `Person ${index}`,
+      }))
+      yield* db.query((d) => d.insert(schema.contacts).values(contacts))
+      yield* db.query((d) =>
+        d.insert(schema.broadcastRecipients).values(
+          contacts.map((contact, index) => ({
+            id: crypto.randomUUID(),
+            teamId: f.acme,
+            broadcastId: f.id,
+            contactId: contact.id,
+            address: `person-${index}@example.com`,
+            name: contact.firstName,
+            merge: { first_name: contact.firstName },
+            status: "queued" as const,
+            createdAt: new Date(0),
+          })),
+        ),
+      )
+      let calls = 0
+      const expectedIds = new Map<string, string>()
+      const sender = yield* worker((input) =>
+        Effect.sync(() => {
+          calls++
+          const emails = JSON.parse(input.payload) as ReadonlyArray<{ to: string | ReadonlyArray<string> }>
+          return emails.map((email, index) => {
+            const address = typeof email.to === "string" ? email.to : email.to[0]
+            if (!address) throw new Error("Expected one address per provider payload")
+            const providerId = `accepted-${index}`
+            expectedIds.set(address, providerId)
+            return { providerId }
+          })
+        }),
+      )
+      const statements: string[] = []
+      expect(
+        yield* sender.sendBatch.pipe(
+          Effect.provideService(Statement.CurrentTransformer, (statement) =>
+            Effect.sync(() => {
+              const [text] = statement.compile()
+              if (!/^(begin|commit|rollback|savepoint|release)\b/i.test(text)) statements.push(text)
+              return statement
+            }),
+          ),
+        ),
+      ).toBe(100)
+      expect(statements.length).toBeLessThanOrEqual(20)
+      expect(yield* sender.drain).toBe(0)
+      expect(yield* sender.sendBatch).toBe(0)
+      expect(calls).toBe(1)
+      expect(expectedIds.size).toBe(100)
+      const result = yield* state(f.id)
+      expect(result.recipients).toHaveLength(100)
+      expect(result.activity).toHaveLength(100)
+      expect(new Set(result.activity.map((entry) => entry.recordId)).size).toBe(100)
+      for (const recipient of result.recipients) {
+        expect(recipient.status).toBe("sent")
+        expect(recipient.providerId).toBe(expectedIds.get(recipient.address ?? ""))
+        expect(result.activity.filter((entry) => entry.recordId === recipient.contactId)).toHaveLength(1)
+      }
+      expect(result.batches[0]).toMatchObject({ status: "sent", attempts: 1 })
+    }).pipe(withBroadcastQueue, Effect.provide(CoreLive)),
+  )
+
   it.effect("splits new recipients into batches of at most 100", () =>
     Effect.gen(function* () {
       const f = yield* seed
@@ -403,4 +611,37 @@ describe("durable broadcast delivery", () => {
       expect(result.activity).toHaveLength(0)
     }).pipe(withBroadcastQueue, Effect.provide(CoreLive)),
   )
+  for (const receipt of ["sparse", "null", "duplicate"] as const)
+    it.effect(`does not mark an invalid ${receipt} provider receipt as sent`, () =>
+      Effect.gen(function* () {
+        const f = yield* seed
+        if (receipt === "duplicate") {
+          const db = yield* Database
+          yield* db.query((d) =>
+            d.insert(schema.broadcastRecipients).values({
+              id: crypto.randomUUID(),
+              teamId: f.acme,
+              broadcastId: f.id,
+              address: "duplicate@example.com",
+              name: "Duplicate",
+              status: "queued",
+            }),
+          )
+        }
+        const sender = yield* worker((input) =>
+          Effect.succeed(
+            receipt === "sparse"
+              ? new Array<{ providerId: string }>(input.count)
+              : receipt === "duplicate"
+                ? Array.from({ length: input.count }, () => ({ providerId: "duplicate-id" }))
+                : (JSON.parse("[null]") as Array<{ providerId: string }>),
+          ),
+        )
+        yield* sender.sendBatch
+        const result = yield* state(f.id)
+        expect(result.recipients[0]).toMatchObject({ status: "queued", providerId: null })
+        expect(result.batches[0]?.status).toBe("pending")
+        expect(result.activity).toHaveLength(0)
+      }).pipe(withBroadcastQueue, Effect.provide(CoreLive)),
+    )
 })

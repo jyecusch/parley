@@ -14,7 +14,7 @@ import { Effect } from "effect"
 import { Members } from "../services/members.ts"
 import { Users } from "../services/users.ts"
 import type { MemberOf } from "./member-of.ts"
-import type { CanManageMembers } from "./permissions.ts"
+import { type CanManageMembers, type PermissionError, proveCanManageMembers } from "./permissions.ts"
 import { defineProof, type Named, type Proof } from "./proof.ts"
 
 const MemberChangeableProver = defineProof("MemberChangeable")
@@ -76,23 +76,22 @@ export const proveMemberChangeable = <P, T, U>(
     })
   })
 
-/** proveMemberRemovable checks access to remove user; leaving requires the member's signed-in session. */
+/** proveMemberRemovable checks whether member may remove user; leaving requires member's signed-in session. */
 export const proveMemberRemovable = <P, T, U>(
   member: MemberOf<P, T>,
-  access: CanManageMembers<P, T> | undefined,
   user: Named<U, UserId>,
 ): Effect.Effect<
   MemberRemovable<P, T, U>,
-  MemberNotFound | OwnerChangeNeedsOwner | SignInRequired | DatabaseUnavailable,
+  MemberNotFound | OwnerChangeNeedsOwner | SignInRequired | PermissionError | DatabaseUnavailable,
   Members
 > =>
   Effect.gen(function* () {
     const leaving = user.value === member.principal.value.userId
-    if (leaving && member.principal.value._tag !== "UserSession") {
-      return yield* new SignInRequired({ action: "leave a team" })
-    }
+    if (leaving) {
+      if (member.principal.value._tag !== "UserSession") return yield* new SignInRequired({ action: "leave a team" })
+    } else yield* proveCanManageMembers(member)
     const found = yield* locate(member, user)
-    if (!leaving && (!access || (found.role === "owner" && !isOwner(member)))) {
+    if (!leaving && found.role === "owner" && !isOwner(member)) {
       return yield* new OwnerChangeNeedsOwner({ team: member.teamName })
     }
     return MemberRemovableProver.prove([member.principal, member.team, user], {
