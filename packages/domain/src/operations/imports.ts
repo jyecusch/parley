@@ -33,7 +33,6 @@ export const startImport = defineTeamOperation({
   }),
   output: Import,
   errors: [],
-  http: { method: "POST", path: "/teams/:teamId/imports" },
   hints: { readOnly: false, destructive: true, idempotent: false },
   permissions: ["records:read", "records:write"],
 })
@@ -45,7 +44,6 @@ export const getImport = defineTeamOperation({
   input: Schema.Struct(OneImport),
   output: Import,
   errors: [ImportNotFound],
-  http: { method: "GET", path: "/teams/:teamId/imports/:importId" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: ["records:read"],
 })
@@ -56,7 +54,6 @@ export const listImports = defineTeamOperation({
   input: Schema.Struct({ ...InTeam, recordType: Schema.optional(RecordType) }),
   output: Schema.Array(Import),
   errors: [],
-  http: { method: "GET", path: "/teams/:teamId/imports" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: ["records:read"],
 })
@@ -68,7 +65,6 @@ export const cancelImport = defineTeamOperation({
   input: Schema.Struct(OneImport),
   output: Import,
   errors: [ImportNotFound],
-  http: { method: "POST", path: "/teams/:teamId/imports/:importId/cancel" },
   hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: ["records:read", "records:write"],
 })

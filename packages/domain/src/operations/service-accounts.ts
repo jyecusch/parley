@@ -11,7 +11,6 @@ export const listServiceAccounts = defineTeamOperation({
   input: Schema.Struct(InTeam),
   output: Schema.Array(ServiceAccount),
   errors: [],
-  http: { method: "GET", path: "/teams/:teamId/service-accounts" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: [],
 })
@@ -32,7 +31,6 @@ export const createServiceAccount = defineTeamOperation({
   }),
   output: ServiceAccount,
   errors: [],
-  http: { method: "POST", path: "/teams/:teamId/service-accounts" },
   hints: { readOnly: false, destructive: false, idempotent: false },
   permissions: ["service-accounts:manage"],
 })

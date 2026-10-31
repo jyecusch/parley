@@ -22,7 +22,6 @@ export const setContactAvatar = defineTeamOperation({
   input: Schema.Struct({ ...OneContact, image: Image }),
   output: Contact,
   errors: [ContactNotFound, ImageUnreadable, ImageTooLarge],
-  http: { method: "POST", path: "/teams/:teamId/contacts/:contactId/avatar" },
   hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: ["records:read", "records:write"],
 })
@@ -33,7 +32,6 @@ export const removeContactAvatar = defineTeamOperation({
   input: Schema.Struct(OneContact),
   output: Contact,
   errors: [ContactNotFound],
-  http: { method: "DELETE", path: "/teams/:teamId/contacts/:contactId/avatar" },
   hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: ["records:read", "records:write"],
 })
@@ -44,7 +42,6 @@ export const setCompanyLogo = defineTeamOperation({
   input: Schema.Struct({ ...OneCompany, image: Image }),
   output: Company,
   errors: [CompanyNotFound, ImageUnreadable, ImageTooLarge],
-  http: { method: "POST", path: "/teams/:teamId/companies/:companyId/logo" },
   hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: ["records:read", "records:write"],
 })
@@ -55,7 +52,6 @@ export const removeCompanyLogo = defineTeamOperation({
   input: Schema.Struct(OneCompany),
   output: Company,
   errors: [CompanyNotFound],
-  http: { method: "DELETE", path: "/teams/:teamId/companies/:companyId/logo" },
   hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: ["records:read", "records:write"],
 })

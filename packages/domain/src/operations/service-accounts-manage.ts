@@ -23,7 +23,6 @@ export const updateServiceAccount = defineTeamOperation({
   }),
   output: ServiceAccount,
   errors: [ServiceAccountNotFound],
-  http: { method: "PATCH", path: "/teams/:teamId/service-accounts/:serviceAccountId" },
   hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: ["service-accounts:manage"],
 })
@@ -35,7 +34,6 @@ export const deleteServiceAccount = defineTeamOperation({
   input: Schema.Struct(OneServiceAccount),
   output: ServiceAccount,
   errors: [ServiceAccountNotFound],
-  http: { method: "DELETE", path: "/teams/:teamId/service-accounts/:serviceAccountId" },
   hints: { readOnly: false, destructive: true, idempotent: false },
   permissions: ["service-accounts:manage"],
 })

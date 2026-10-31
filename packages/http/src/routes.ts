@@ -19,8 +19,8 @@ import {
 import {
   type DatabaseUnavailable,
   type FileNotFound,
-  type OperationName,
-  operations,
+  type HttpOperationName,
+  httpOperationNames,
   UnsubscribeChange,
   type UnsubscribeLinkInvalid,
   type UnsubscribePage,
@@ -53,7 +53,7 @@ const headersOf = (request: HttpServerRequest.HttpServerRequest) => {
 
 /** The entire HTTP entrypoint for an operation: authenticate, merge the decoded input, run. */
 const handlerFor =
-  (name: OperationName): Handler =>
+  (name: HttpOperationName): Handler =>
   ({ params, query, payload, request }) =>
     Effect.gen(function* () {
       const authenticator = yield* Authenticator
@@ -67,13 +67,13 @@ const handlerFor =
     }).pipe(Effect.mapError((error: AnyOperationError) => errorBody(error, name)))
 
 /**
- * Every operation, served under /api/v1, derived from the registry (D16). The builder can't see
+ * Explicitly included HTTP operations, served under /api/v1 (D16). The builder can't see
  * that a loop handles every endpoint, so this is cast; `implementations` is what guarantees
  * every operation has a handler.
  */
 export const ApiHandlersLive = HttpApiBuilder.group(ParleyApi, "v1", (handlers) => {
   let registry = handlers as unknown as RegistryHandlers
-  for (const name of Object.keys(operations) as Array<OperationName>) {
+  for (const name of httpOperationNames) {
     registry = registry.handle(name, handlerFor(name))
   }
   return registry as never

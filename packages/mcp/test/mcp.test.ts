@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "@effect/vitest"
 import { BetterAuth, CoreLive } from "@parley/core"
+import { mcpOperationNames } from "@parley/domain"
 import { Effect, Layer, ManagedRuntime } from "effect"
 import { HttpRouter, HttpServer } from "effect/http"
 import { McpRoutesLive } from "../src/index.ts"
@@ -96,13 +97,16 @@ afterAll(async () => {
 })
 
 describe("MCP entrypoint", () => {
-  it("exposes every operation as a tool with its description and hints", async () => {
+  it("exposes explicitly included operations as tools with their descriptions and hints", async () => {
     const { json } = await rpc(writeKey, "tools/list")
     const tools = json.result.tools as Array<{
       name: string
       description: string
       annotations: { readOnlyHint: boolean }
     }>
+    expect(tools.map((tool) => tool.name).sort()).toEqual(
+      mcpOperationNames.map((name) => name.replaceAll(".", "_")).sort(),
+    )
     expect(tools.map((tool) => tool.name).sort()).toEqual([
       "affiliations_create",
       "affiliations_createMany",

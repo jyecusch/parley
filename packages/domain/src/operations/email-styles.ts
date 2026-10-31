@@ -52,7 +52,6 @@ export const listEmailStyles = defineTeamOperation({
   input: Schema.Struct(InTeam),
   output: Schema.Array(EmailStyle),
   errors: [],
-  http: { method: "GET", path: "/teams/:teamId/email-styles" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: ["email:write"],
 })
@@ -63,7 +62,6 @@ export const getEmailStyle = defineTeamOperation({
   input: Schema.Struct(OneStyle),
   output: EmailStyle,
   errors: [EmailStyleNotFound],
-  http: { method: "GET", path: "/teams/:teamId/email-styles/:styleId" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: ["email:write"],
 })
@@ -75,7 +73,6 @@ export const createEmailStyle = defineTeamOperation({
   input: Schema.Struct({ ...InTeam, name: EmailStyleName.annotate({ title: "Name" }), ...StyleFields }),
   output: EmailStyle,
   errors: [CustomHtmlMissingContent, ImageUnreadable, ImageTooLarge],
-  http: { method: "POST", path: "/teams/:teamId/email-styles" },
   hints: { readOnly: false, destructive: false, idempotent: false },
   permissions: ["email:manage"],
 })
@@ -91,7 +88,6 @@ export const updateEmailStyle = defineTeamOperation({
   }),
   output: EmailStyle,
   errors: [EmailStyleNotFound, CustomHtmlMissingContent, ImageUnreadable, ImageTooLarge],
-  http: { method: "PATCH", path: "/teams/:teamId/email-styles/:styleId" },
   hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: ["email:manage"],
 })
@@ -102,7 +98,6 @@ export const setDefaultEmailStyle = defineTeamOperation({
   input: Schema.Struct(OneStyle),
   output: EmailStyle,
   errors: [EmailStyleNotFound],
-  http: { method: "POST", path: "/teams/:teamId/email-styles/:styleId/default" },
   // It changes how every template and draft broadcast without a style of its own looks.
   hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: ["email:manage"],
@@ -115,7 +110,6 @@ export const deleteEmailStyle = defineTeamOperation({
   input: Schema.Struct(OneStyle),
   output: EmailStyle,
   errors: [EmailStyleNotFound, EmailStyleIsDefault, EmailStyleInUse],
-  http: { method: "DELETE", path: "/teams/:teamId/email-styles/:styleId" },
   hints: { readOnly: false, destructive: true, idempotent: false },
   permissions: ["email:manage"],
 })
@@ -138,7 +132,6 @@ export const previewEmailStyle = defineTeamOperation({
   }),
   output: RenderedEmail,
   errors: [EmailStyleNotFound, CustomHtmlMissingContent],
-  http: { method: "POST", path: "/teams/:teamId/email-styles/preview" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: ["email:write"],
 })
@@ -156,7 +149,6 @@ export const uploadEmailImage = defineTeamOperation({
   }),
   output: EmailImage,
   errors: [ImageUnreadable, ImageTooLarge],
-  http: { method: "POST", path: "/teams/:teamId/email-images" },
   hints: { readOnly: false, destructive: false, idempotent: false },
   permissions: ["email:write"],
 })
@@ -174,7 +166,6 @@ export const importEmailImage = defineTeamOperation({
   }),
   output: EmailImage,
   errors: [ImageUrlUnreachable, ImageUnreadable, ImageTooLarge],
-  http: { method: "POST", path: "/teams/:teamId/email-images/import" },
   hints: { readOnly: false, destructive: false, idempotent: false },
   permissions: ["email:write"],
 })

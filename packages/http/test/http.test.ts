@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "@effect/vitest"
 import { BetterAuth, CoreLive, Users } from "@parley/core"
-import type { UserId } from "@parley/domain"
+import { httpOperationNames, operationExposures, type UserId } from "@parley/domain"
 import { Effect, Layer, ManagedRuntime } from "effect"
 import { HttpRouter, HttpServer } from "effect/http"
 import { ApiRoutesLive, AuthRoutesLive, FailureResponsesLive, FileRoutesLive } from "../src/index.ts"
@@ -176,7 +176,14 @@ describe("HTTP entrypoint", () => {
   it("serves an OpenAPI document generated from the operations", async () => {
     const response = await call("GET", "/api/v1/openapi.json")
     expect(response.status).toBe(200)
-    expect(Object.keys(response.body.paths)).toContain("/api/v1/teams/{teamId}/contacts/{contactId}")
+    const published = Object.entries(response.body.paths).flatMap(([path, methods]) =>
+      Object.keys(methods as object).map((method) => `${method.toUpperCase()} ${path}`),
+    )
+    const expected = httpOperationNames.map((name) => {
+      const route = operationExposures[name].http
+      return `${route.method} /api/v1${route.path.replace(/:([^/]+)/g, "{$1}")}`
+    })
+    expect(published.sort()).toEqual(expected.sort())
   })
 })
 

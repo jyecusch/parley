@@ -19,7 +19,6 @@ export const listSavedViews = defineTeamOperation({
   input: Schema.Struct({ ...InTeam, recordType: Schema.optional(RecordType) }),
   output: Schema.Array(SavedView),
   errors: [],
-  http: { method: "GET", path: "/teams/:teamId/saved-views" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: ["records:read"],
 })
@@ -39,7 +38,6 @@ export const createSavedView = defineTeamOperation({
   }),
   output: SavedView,
   errors: [],
-  http: { method: "POST", path: "/teams/:teamId/saved-views" },
   hints: { readOnly: false, destructive: false, idempotent: false },
   permissions: ["records:read"],
 })
@@ -57,7 +55,6 @@ export const updateSavedView = defineTeamOperation({
   }),
   output: SavedView,
   errors: [SavedViewNotFound],
-  http: { method: "PATCH", path: "/teams/:teamId/saved-views/:viewId" },
   hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: ["records:read"],
 })
@@ -68,7 +65,6 @@ export const deleteSavedView = defineTeamOperation({
   input: Schema.Struct(OneView),
   output: SavedView,
   errors: [SavedViewNotFound],
-  http: { method: "DELETE", path: "/teams/:teamId/saved-views/:viewId" },
   hints: { readOnly: false, destructive: true, idempotent: false },
   permissions: ["records:read"],
 })

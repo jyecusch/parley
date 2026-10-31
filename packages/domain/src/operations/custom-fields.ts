@@ -19,7 +19,6 @@ export const listFields = defineTeamOperation({
   input: Schema.Struct({ ...InTeam, recordType: Schema.optional(RecordType) }),
   output: Schema.Array(CustomField),
   errors: [],
-  http: { method: "GET", path: "/teams/:teamId/fields" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: ["records:read"],
 })
@@ -37,7 +36,6 @@ export const createField = defineTeamOperation({
   }),
   output: CustomField,
   errors: [CustomFieldNameTaken],
-  http: { method: "POST", path: "/teams/:teamId/fields" },
   hints: { readOnly: false, destructive: false, idempotent: false },
   permissions: ["fields:manage"],
 })
@@ -54,7 +52,6 @@ export const updateField = defineTeamOperation({
   }),
   output: CustomField,
   errors: [CustomFieldNotFound, CustomFieldNameTaken],
-  http: { method: "PATCH", path: "/teams/:teamId/fields/:fieldId" },
   hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: ["fields:manage"],
 })
@@ -65,7 +62,6 @@ export const deleteField = defineTeamOperation({
   input: Schema.Struct(OneField),
   output: CustomField,
   errors: [CustomFieldNotFound],
-  http: { method: "DELETE", path: "/teams/:teamId/fields/:fieldId" },
   hints: { readOnly: false, destructive: true, idempotent: false },
   permissions: ["fields:manage"],
 })

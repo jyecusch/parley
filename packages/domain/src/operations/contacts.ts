@@ -35,7 +35,6 @@ export const listContacts = defineTeamOperation({
   }),
   output: ContactPage,
   errors: [],
-  http: { method: "GET", path: "/teams/:teamId/contacts" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: ["records:read"],
 })
@@ -46,7 +45,6 @@ export const getContact = defineTeamOperation({
   input: Schema.Struct(OneContact),
   output: Contact,
   errors: [ContactNotFound],
-  http: { method: "GET", path: "/teams/:teamId/contacts/:contactId" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: ["records:read"],
 })
@@ -58,7 +56,6 @@ export const createContact = defineTeamOperation({
   input: Schema.Struct({ ...InTeam, ...ContactFields.fields }),
   output: Contact,
   errors: [ContactEmailTaken, MemberNotFound],
-  http: { method: "POST", path: "/teams/:teamId/contacts" },
   hints: { readOnly: false, destructive: false, idempotent: false },
   permissions: ["records:write"],
 })
@@ -70,7 +67,6 @@ export const updateContact = defineTeamOperation({
   input: Schema.Struct({ ...OneContact, ...ContactFields.fields }),
   output: Contact,
   errors: [ContactNotFound, ContactEmailTaken, MemberNotFound],
-  http: { method: "PATCH", path: "/teams/:teamId/contacts/:contactId" },
   hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: ["records:read", "records:write"],
 })
@@ -82,7 +78,6 @@ export const deleteContact = defineTeamOperation({
   input: Schema.Struct(OneContact),
   output: Contact,
   errors: [ContactNotFound],
-  http: { method: "DELETE", path: "/teams/:teamId/contacts/:contactId" },
   hints: { readOnly: false, destructive: true, idempotent: false },
   permissions: ["records:read", "records:delete"],
 })
@@ -94,7 +89,6 @@ export const restoreContact = defineTeamOperation({
   input: Schema.Struct(OneContact),
   output: Contact,
   errors: [ContactNotFound, ContactEmailTaken],
-  http: { method: "POST", path: "/teams/:teamId/contacts/:contactId/restore" },
   hints: { readOnly: false, destructive: false, idempotent: true },
   permissions: ["records:read", "records:delete"],
 })
@@ -105,7 +99,6 @@ export const contactActivity = defineTeamOperation({
   input: Schema.Struct(OneContact),
   output: Schema.Array(ActivityEntry),
   errors: [ContactNotFound],
-  http: { method: "GET", path: "/teams/:teamId/contacts/:contactId/activity" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: ["records:read"],
 })
@@ -129,7 +122,6 @@ export const updateManyContacts = defineTeamOperation({
   }),
   output: SelectionResult,
   errors: [MemberNotFound],
-  http: { method: "POST", path: "/teams/:teamId/contacts/update-many" },
   hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: ["records:read", "records:write"],
 })
@@ -141,7 +133,6 @@ export const deleteManyContacts = defineTeamOperation({
   input: Schema.Struct(contactSelection),
   output: DeletedSelection,
   errors: [],
-  http: { method: "POST", path: "/teams/:teamId/contacts/delete-many" },
   hints: { readOnly: false, destructive: true, idempotent: false },
   permissions: ["records:read", "records:delete"],
 })
@@ -156,7 +147,6 @@ export const restoreManyContacts = defineTeamOperation({
   }),
   output: SelectionResult,
   errors: [],
-  http: { method: "POST", path: "/teams/:teamId/contacts/restore-many" },
   hints: { readOnly: false, destructive: false, idempotent: true },
   permissions: ["records:read", "records:delete"],
 })

@@ -21,7 +21,6 @@ export const listAffiliations = defineTeamOperation({
   input: Schema.Struct({ ...InTeam, companyId: CompanyId.annotate({ description: "The company's id." }) }),
   output: Schema.Array(Affiliation),
   errors: [CompanyNotFound],
-  http: { method: "GET", path: "/teams/:teamId/companies/:companyId/affiliations" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: ["records:read"],
 })
@@ -38,7 +37,6 @@ export const createAffiliation = defineTeamOperation({
   }),
   output: Affiliation,
   errors: [ContactNotFound, CompanyNotFound],
-  http: { method: "POST", path: "/teams/:teamId/affiliations" },
   hints: { readOnly: false, destructive: false, idempotent: true },
   permissions: ["records:read", "records:write"],
 })
@@ -49,7 +47,6 @@ export const updateAffiliation = defineTeamOperation({
   input: Schema.Struct({ ...OneAffiliation, title: Schema.NullOr(Title.annotate({ title: "Title" })) }),
   output: Affiliation,
   errors: [AffiliationNotFound],
-  http: { method: "PATCH", path: "/teams/:teamId/affiliations/:affiliationId" },
   hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: ["records:read", "records:write"],
 })
@@ -61,7 +58,6 @@ export const deleteAffiliation = defineTeamOperation({
   input: Schema.Struct(OneAffiliation),
   output: Affiliation,
   errors: [AffiliationNotFound],
-  http: { method: "DELETE", path: "/teams/:teamId/affiliations/:affiliationId" },
   hints: { readOnly: false, destructive: true, idempotent: false },
   permissions: ["records:read", "records:write"],
 })
@@ -81,7 +77,6 @@ export const createManyAffiliations = defineTeamOperation({
   }),
   output: SelectionResult,
   errors: [CompanyNotFound],
-  http: { method: "POST", path: "/teams/:teamId/affiliations/create-many" },
   hints: { readOnly: false, destructive: false, idempotent: true },
   permissions: ["records:read", "records:write"],
 })

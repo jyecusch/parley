@@ -90,7 +90,6 @@ export const exportContacts = defineTeamOperation({
   }),
   output: ExportResult,
   errors: [SegmentNotFound],
-  http: { method: "POST", path: "/teams/:teamId/contacts/export" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: ["records:read"],
 })
@@ -102,7 +101,6 @@ export const importContacts = defineTeamOperation({
   input: importInput,
   output: ImportResult,
   errors: [],
-  http: { method: "POST", path: "/teams/:teamId/contacts/import" },
   hints: { readOnly: false, destructive: true, idempotent: false },
   permissions: ["records:read", "records:write"],
 })
@@ -113,7 +111,6 @@ export const exportCompanies = defineTeamOperation({
   input: exportInput,
   output: ExportResult,
   errors: [],
-  http: { method: "POST", path: "/teams/:teamId/companies/export" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: ["records:read"],
 })
@@ -125,7 +122,6 @@ export const importCompanies = defineTeamOperation({
   input: importInput,
   output: ImportResult,
   errors: [],
-  http: { method: "POST", path: "/teams/:teamId/companies/import" },
   hints: { readOnly: false, destructive: true, idempotent: false },
   permissions: ["records:read", "records:write"],
 })

@@ -1,4 +1,10 @@
-import { type Operation, type OperationName, operations } from "@parley/domain"
+import {
+  type HttpOperationName,
+  httpOperationNames,
+  type Operation,
+  operationExposures,
+  operations,
+} from "@parley/domain"
 import { Schema } from "effect"
 import { API_PREFIX, pathParamsOf } from "./api.ts"
 
@@ -9,7 +15,7 @@ import { API_PREFIX, pathParamsOf } from "./api.ts"
  * request right without looking anything up.
  */
 export interface ExpectedInput {
-  readonly operation: OperationName
+  readonly operation: HttpOperationName
   readonly description: string
   readonly method: string
   /** With `{name}` for each path parameter, OpenAPI style. */
@@ -53,25 +59,26 @@ const schemaOf = (fields: Schema.Struct.Fields) => {
   return tidy(Object.keys(definitions).length > 0 ? { ...document.schema, $defs: definitions } : document.schema)
 }
 
-const build = (name: OperationName): ExpectedInput => {
+const build = (name: HttpOperationName): ExpectedInput => {
   const op = operations[name] as Operation
-  const pathParameters = pathParamsOf(op.http.path)
+  const route = operationExposures[name].http
+  const pathParameters = pathParamsOf(route.path)
   const rest = Object.fromEntries(Object.entries(op.input.fields).filter(([key]) => !pathParameters.includes(key)))
-  const hasBody = op.http.method === "POST" || op.http.method === "PATCH"
+  const hasBody = route.method === "POST" || route.method === "PATCH"
   return {
     operation: name,
     description: op.description,
-    method: op.http.method,
-    path: `${API_PREFIX}${op.http.path.replace(/:([^/]+)/g, "{$1}")}`,
+    method: route.method,
+    path: `${API_PREFIX}${route.path.replace(/:([^/]+)/g, "{$1}")}`,
     pathParameters,
     ...(Object.keys(rest).length === 0 ? {} : hasBody ? { body: schemaOf(rest) } : { query: schemaOf(rest) }),
   }
 }
 
-const cache = new Map<OperationName, ExpectedInput>()
+const cache = new Map<HttpOperationName, ExpectedInput>()
 
 /** An operation's expected input, generated once. */
-export const expectedInputOf = (name: OperationName): ExpectedInput => {
+export const expectedInputOf = (name: HttpOperationName): ExpectedInput => {
   let found = cache.get(name)
   if (!found) {
     found = build(name)
@@ -80,15 +87,18 @@ export const expectedInputOf = (name: OperationName): ExpectedInput => {
   return found
 }
 
-const routes = Object.values(operations).map((op) => ({
-  name: op.name as OperationName,
-  method: op.http.method as string,
-  pattern: new RegExp(`^${API_PREFIX}${op.http.path.replace(/:[^/]+/g, "[^/]+")}/?$`),
-}))
+const routes = httpOperationNames.map((name) => {
+  const route = operationExposures[name].http
+  return {
+    name,
+    method: route.method as string,
+    pattern: new RegExp(`^${API_PREFIX}${route.path.replace(/:[^/]+/g, "[^/]+")}/?$`),
+  }
+})
 
 /** The operations a path under /api/v1 belongs to, whatever the method. */
 export const operationsAt = (pathname: string) => routes.filter((route) => route.pattern.test(pathname))
 
 /** The operation a request is for, if any. */
-export const operationFor = (method: string, pathname: string): OperationName | undefined =>
+export const operationFor = (method: string, pathname: string): HttpOperationName | undefined =>
   operationsAt(pathname).find((route) => route.method === method)?.name

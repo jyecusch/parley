@@ -38,7 +38,6 @@ export const listForms = defineTeamOperation({
   input: Schema.Struct(InTeam),
   output: Schema.Array(Form),
   errors: [],
-  http: { method: "GET", path: "/teams/:teamId/forms" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: ["records:read"],
 })
@@ -49,7 +48,6 @@ export const getForm = defineTeamOperation({
   input: Schema.Struct(OneForm),
   output: Form,
   errors: [FormNotFound],
-  http: { method: "GET", path: "/teams/:teamId/forms/:formId" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: ["records:read"],
 })
@@ -61,7 +59,6 @@ export const createForm = defineTeamOperation({
   input: Schema.Struct({ ...InTeam, name: FormName.annotate({ title: "Name" }), template: FormTemplate }),
   output: Form,
   errors: [],
-  http: { method: "POST", path: "/teams/:teamId/forms" },
   hints: { readOnly: false, destructive: false, idempotent: false },
   permissions: ["records:read", "email:write"],
 })
@@ -78,7 +75,6 @@ export const updateForm = defineTeamOperation({
   }),
   output: Form,
   errors: [FormNotFound, TopicNotFound, SegmentNotFound, SenderNotFound],
-  http: { method: "PATCH", path: "/teams/:teamId/forms/:formId" },
   hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: ["records:read", "email:write"],
 })
@@ -90,7 +86,6 @@ export const publishForm = defineTeamOperation({
   input: Schema.Struct(OneForm),
   output: Form,
   errors: [FormNotFound, SenderNotReady, TopicNotFound, SegmentNotFound, SenderNotFound],
-  http: { method: "POST", path: "/teams/:teamId/forms/:formId/publish" },
   hints: { readOnly: false, destructive: true, idempotent: false },
   permissions: ["records:read", "email:write"],
 })
@@ -102,7 +97,6 @@ export const deleteForm = defineTeamOperation({
   input: Schema.Struct(OneForm),
   output: Form,
   errors: [FormNotFound],
-  http: { method: "DELETE", path: "/teams/:teamId/forms/:formId" },
   hints: { readOnly: false, destructive: true, idempotent: false },
   permissions: ["records:read", "email:write"],
 })
@@ -114,7 +108,6 @@ export const formAnalytics = defineTeamOperation({
   input: Schema.Struct(OneForm),
   output: FormAnalytics,
   errors: [FormNotFound],
-  http: { method: "GET", path: "/teams/:teamId/forms/:formId/analytics" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: ["records:read"],
 })
@@ -131,7 +124,6 @@ export const listSubmissions = defineTeamOperation({
   }),
   output: SubmissionPage,
   errors: [FormNotFound],
-  http: { method: "GET", path: "/teams/:teamId/forms/:formId/submissions" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: ["records:read"],
 })
@@ -142,7 +134,6 @@ export const releaseSubmission = defineTeamOperation({
   input: Schema.Struct({ ...OneForm, submissionId: SubmissionId }),
   output: Submission,
   errors: [FormNotFound, SubmissionNotFound],
-  http: { method: "POST", path: "/teams/:teamId/forms/:formId/submissions/:submissionId/release" },
   hints: { readOnly: false, destructive: false, idempotent: true },
   permissions: ["records:read", "records:write"],
 })
@@ -154,7 +145,6 @@ export const getFormSettings = defineTeamOperation({
   input: Schema.Struct(InTeam),
   output: FormSettings,
   errors: [],
-  http: { method: "GET", path: "/teams/:teamId/form-settings" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: ["records:read"],
 })
@@ -185,7 +175,6 @@ export const updateFormSettings = defineTeamOperation({
   }),
   output: FormSettings,
   errors: [],
-  http: { method: "PATCH", path: "/teams/:teamId/form-settings" },
   hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: ["email:manage"],
 })

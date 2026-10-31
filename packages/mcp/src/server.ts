@@ -8,7 +8,7 @@ import {
   type Principal,
   PublicUrl,
 } from "@parley/core"
-import { type Operation, type OperationName, operations } from "@parley/domain"
+import { mcpOperationNames, type Operation, operations } from "@parley/domain"
 import { defectPublicError, type PublicError, ReferenceId, toPublicError } from "@parley/errors"
 import { Context, Effect, Layer, Option, Schema } from "effect"
 import { McpProtocol, McpSchema, McpServer } from "effect/ai"
@@ -52,12 +52,12 @@ const headersOf = (request: HttpServerRequest.HttpServerRequest) => {
   return headers
 }
 
-/** Registers one MCP tool per operation, derived from the registry (D16, D83). */
+/** Registers a tool for each explicit MCP inclusion in the exposure manifest (D16, D83). */
 const ToolsLive = Layer.effectDiscard(
   Effect.gen(function* () {
     const server = yield* McpServer.McpServer
     const services = yield* Effect.context<OperationServices>()
-    for (const name of Object.keys(operations) as Array<OperationName>) {
+    for (const name of mcpOperationNames) {
       const op = operations[name] as Operation
       const run = implementations[name] as (
         principal: Principal,
