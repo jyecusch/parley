@@ -47,7 +47,7 @@ export const proveNoteEditable = <P, T, N>(
     if (found.authorUserId !== write.member.principal.value.userId) {
       return yield* new NotNoteAuthor({ author: DisplayName.fromRecord(found.authorName) })
     }
-    return { ...NoteEditableProver.prove(write.member.principal, team, note), team, note, found }
+    return NoteEditableProver.prove([write.member.principal, team, note], { team, note, found })
   })
 
 export const proveNoteDeletable = <P, T, N>(
@@ -66,5 +66,5 @@ export const proveNoteDeletable = <P, T, N>(
     if (!isAuthor && !isAdmin) {
       return yield* new CannotDeleteOthersNote({ author: DisplayName.fromRecord(found.authorName) })
     }
-    return { ...NoteDeletableProver.prove(member.principal, team, note), team, note, found }
+    return NoteDeletableProver.prove([member.principal, team, note], { team, note, found })
   })

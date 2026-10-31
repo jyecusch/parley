@@ -37,5 +37,5 @@ export const proveRecordInTeam = <P, T>(
     } else {
       yield* named(recordId as CompanyId, (company) => Effect.asVoid(proveCompanyInTeam(team, company, read)))
     }
-    return { ...RecordInTeamProver.prove(team), team, recordType, recordId }
+    return RecordInTeamProver.prove([team], { team, recordType, recordId })
   })

@@ -27,5 +27,5 @@ export const proveSendingDomainInTeam = <P, T, D>(
     const sending = yield* Sending
     const found = yield* sending.locateDomain(member.team.value, domain.value)
     if (!found) return yield* new SendingDomainNotFound({ team: member.teamName, sendingDomainId: domain.value })
-    return { ...SendingDomainInTeamProver.prove(domain, member.team), team: member.team, domain, found }
+    return SendingDomainInTeamProver.prove([domain, member.team], { team: member.team, domain, found })
   })

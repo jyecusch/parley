@@ -42,7 +42,7 @@ We are **not** using the `gdp-ts` library. We're writing our own Effect-native v
 - **`core/src/proofs/`** is the *only* directory that decides authorization. Each file checks one fact and mints a proof of it.
 - **Services** (the code that touches the database) take proofs as arguments. They never perform checks. They just refuse to compile without the proof.
 
-Everything else in this post is how we make the compiler enforce that sentence.
+The type checker enforces the required kinds and names; runtime checks enforce when named values and proof fields may be read.
 
 ## Three ideas, in order
 
@@ -54,16 +54,17 @@ So we give values a **name**, a type that exists only at compile time and is dif
 
 ```ts
 named(principal, input.teamId, input.contactId, (principal, team, contact) =>
-  // in here: principal is Named<P, Principal>
-  //          team      is Named<T, TeamId>
-  //          contact   is Named<C, ContactId>
-  // P, T and C are fresh, unique types that nothing else can produce
+  Effect.sync(() => ({
+    userId: principal.value.userId,
+    teamId: team.value,
+    contactId: contact.value,
+  })),
 )
 ```
 
-At runtime `named` does almost nothing. It wraps each value in a frozen `{ value }` and calls the callback. All the work happens in the type checker: because the callback is *generic* (`<P, T, C>(…) => …`), TypeScript must treat `P`, `T` and `C` as opaque, distinct types. Two calls to `named`, or two values in one call, can never be confused.
+`named` returns an `Effect`. Each execution creates fresh, frozen named values and invokes the callback, which must return an `Effect`. The generic callback keeps the names distinct in the type checker. A private field makes `Named` opaque: spreading it into `{ ...team, value: anotherTeamId }` loses the private identity and cannot satisfy a service signature.
 
-The callback returns an `Effect`, so naming slots straight into Effect code.
+At runtime `.value` is a getter over the original value. It refuses reads after the callback's Effect finishes, including failure, defects and interruption. Re-running the same Effect creates a new execution; it never reactivates old named values. Nested executions expire independently.
 
 ### 2. Prove facts about names
 
@@ -72,15 +73,17 @@ A proof is a value of type `Proof<Kind, About>`. For example, `CanWriteRecords<P
 ```ts
 // core/src/proofs/can-write-records.ts
 const CanWriteRecords = defineProof("CanWriteRecords")           // NOT exported
-export interface CanWriteRecords<P, T> extends Proof<"CanWriteRecords", [P, T]> {}
+export interface CanWriteRecords<P, T> extends Proof<"CanWriteRecords", [P, T]> {
+  readonly member: MemberOf<P, T>
+}
 
 export const proveCanWriteRecords = <P, T>(member: MemberOf<P, T>) =>
   requirePermission(member, "records:write").pipe(               // fails: RoleLacksPermission | ApiKeyScopeExcludes
-    Effect.as(CanWriteRecords.prove(member.principal, member.team)),
+    Effect.map(() => CanWriteRecords.prove([member.principal, member.team], { member })),
   )
 ```
 
-At runtime a proof is a frozen `{ kind: "CanWriteRecords" }` object. It's a ghost: it carries no data that matters. Its value is entirely in its *type*, which records which names it is about.
+A proof records its kind, the named values it is about, and any fields the check discovered. Provers supply those fields to `.prove([namedValues], fields)`; they never assemble proofs with object spread. Proofs have a private identity and frozen properties, so a copied membership proof with different permissions is rejected by TypeScript. Reading a proof's kind or carried fields also checks that its named values are still usable.
 
 ### 3. Demand proofs
 
@@ -98,52 +101,17 @@ The shared `T` is the whole trick. The contact's proof and the permission's proo
 
 ## The module
 
-This is the whole thing. It lives in `@parley/core` at `core/src/proofs/proof.ts`, and I've compiled every snippet in this post against Effect 4.0.5 with `tsc --strict`:
+The implementation lives in [`packages/core/src/proofs/proof.ts`](../packages/core/src/proofs/proof.ts). The trusted constructors stay private; other files import only the `Named` and `Proof` types, `named`, and `defineProof`.
 
-```ts
-declare const NAME: unique symbol
-declare const ABOUT: unique symbol
+Two separate checks protect callers:
 
-/** A value of type A with a compile-time-only name N. */
-export interface Named<in out N, out A> {
-  readonly value: A
-  readonly [NAME]: (n: N) => N          // phantom; never assigned
-}
+**Value identity, checked by TypeScript.** Invariance (`in out` and the phantom function fields) prevents substituting a different name. Private fields prevent object spread from preserving the identity while replacing a value or checked fact. A service takes its IDs from the named values or proofs supplied to it.
 
-export function named<A, R>(a: A, k: <N>(a: Named<N, A>) => R): R
-export function named<A, B, R>(a: A, b: B, k: <N, M>(a: Named<N, A>, b: Named<M, B>) => R): R
-export function named<A, B, C, R>(
-  a: A, b: B, c: C,
-  k: <N, M, L>(a: Named<N, A>, b: Named<M, B>, c: Named<L, C>) => R,
-): R
-export function named(...args: Array<unknown>): unknown {
-  const k = args.pop() as (...xs: Array<unknown>) => unknown
-  return k(...args.map((value) => Object.freeze({ value })))
-}
+**Execution lifetime, checked at runtime.** TypeScript rejects directly returning a named value with its name erased to `unknown`, but it cannot prevent returning a closure that captures one. A closure or delayed Effect can outlive the callback without exposing a named type in its signature. `named` therefore expires access to named values and proof fields when its Effect finishes. Misuse raises a defect, which the entrypoint logs and turns into a safe public error.
 
-/** Proof that fact Kind holds about the names in About. */
-export interface Proof<in out Kind extends string, in out About extends ReadonlyArray<unknown>> {
-  readonly kind: Kind
-  readonly [ABOUT]: (about: About, kind: Kind) => About   // phantom; never assigned
-}
+This is not general memory confinement. Ordinary IDs, records, and permission snapshots read during execution remain ordinary values afterward. Services must consume named values and proof fields during the Effect that performs the work; a check cannot revoke data already read or an external request already sent. Proofs record facts checked at a point in time, not a database lock or a promise that authorization will stay unchanged.
 
-export interface Prover<Kind extends string> {
-  readonly kind: Kind
-  prove<S extends Array<Named<any, any>>>(...about: S): Proof<Kind, NamesOf<S>>
-}
-
-export function defineProof<const Kind extends string>(kind: Kind): Prover<Kind> {
-  const proof = Object.freeze({ kind })
-  // The only type assertion in the authorization system. Everything downstream is honest.
-  return Object.freeze({ kind, prove: () => proof as unknown as Proof<Kind, any> })
-}
-```
-
-Two type-system details make this sound. You don't need to understand them to use it, but here they are in plain words.
-
-**Variance (`in out`).** By default TypeScript allows some substitutions between related types: a `Named<never, X>` might be accepted where a `Named<P, X>` is wanted. `in out` says "this type parameter must match *exactly*". Without it a name could be faked with `never` or `unknown`. The phantom `(n: N) => N` field makes the type's *structure* enforce the same rule, because TypeScript sometimes ignores annotations and compares shapes instead. (`gdp-ts` explains this in detail.)
-
-**No escape.** A name only means something inside its callback. If you try to return a `Named` or a proof *out* of `named(…)`, TypeScript would have to give the result type `Named<unknown, …>`. Invariance forbids that, so it's a compile error. This is what keeps proofs **request-scoped**: you can't stash one away and reuse it in the next request.
+The constructors freeze their own properties, not the entire object graph. Fields such as permission sets are exposed through readonly types; arbitrary assertions, reflection, and mutation through an independently held alias remain outside the type guarantee. The proof module is trusted code, not a sandbox for hostile JavaScript.
 
 ## Parley's proof catalog (v1 proposal)
 
@@ -208,26 +176,7 @@ type Principal =
 
 A naive design writes three authorization paths. We write one. `proveMemberOf` is the **only** function that knows principals come in kinds, and it reduces all three to two questions: *which member row?* and *which scope ceiling?*
 
-```ts
-// core/src/proofs/member-of.ts
-export const proveMemberOf = <P, T>(principal: Named<P, Principal>, team: Named<T, TeamId>) =>
-  Effect.gen(function* () {
-    const p = principal.value
-    if (p._tag === "UserApiKey" && p.teamId !== undefined && p.teamId !== team.value) {
-      return yield* new ApiKeyNotValidForTeam()                      // an API key created for Acme can't touch Side Project
-    }
-    const member = yield* members.find(subjectOf(p), team.value)  // UserSession/UserApiKey: the user's id; ServiceAccountApiKey: the service account's id
-    if (!member) return yield* new NotATeamMember()                 // also when the team doesn't exist
-    const proof: MemberOf<P, T> = {
-      ...MemberOfProver.prove(principal, team),
-      principal, team,
-      role: member.role,
-      rolePermissions: expand(ROLE_PERMISSIONS[member.role]),
-      scopes: p._tag === "UserSession" ? "unrestricted" : expand(p.scopes),
-    }
-    return proof
-  })
-```
+The implementation is [`proveMemberOf`](../packages/core/src/proofs/member-of.ts). It checks the principal's team restriction, loads their current role, and, for a service-account connection, also checks the user who connected the agent. It then passes those checked fields to `MemberOfProver.prove([principal, team], fields)`. The returned proof carries the named principal and team, the role permissions, and the API key or connection scope ceiling.
 
 From here on, nothing in the codebase knows or cares whether a user or an agent is acting. The web entrypoint, the HTTP entrypoint and the MCP entrypoint all produce a `Principal` and hand it to the same operation. **No entrypoint has authorization code, because no entrypoint can.**
 
@@ -322,7 +271,17 @@ yield* contacts.list(a, query, writeA)
 
 const escaped = named(teamA, (team) => Effect.succeed(team))
 // error TS2375: Type 'Effect<Named<N, …TeamId>>' is not assignable to type 'Effect<Named<unknown, …TeamId>>'.
-//   → names (and proofs) can't leave the request that created them.
+//   → a named value cannot escape directly with its type-level name.
+
+yield* contacts.list({ ...a, value: teamB }, query, readA)
+// error: the copy has no private Named identity.
+
+yield* proveCanWriteRecords({ ...memberOfA, rolePermissions: new Set(["records:write"]) })
+// error: the copy has no private Proof identity.
+
+const retained = named(teamA, (team) => Effect.succeed(() => team.value))
+// This compiles: a closure hides the named type. Reading through it after
+// retained completes raises a defect at runtime.
 ```
 
 TypeScript prints names by their declared letter (`N`, `M`, `L`), not by which variable they came from. So read *"`<N, M>` is not assignable to `<N, L>`"* as *"the proof is about a different value than the one you're passing."*
@@ -345,7 +304,7 @@ If the web app calls those endpoints directly:
 
 A proof says a fact held **when it was checked**. It doesn't say the fact still holds a millisecond later.
 
-For most of Parley this is fine, because proofs live for one request. `named` guarantees that structurally. The risk only appears if someone keeps a proof longer: puts it in a `Ref`, a cache, or a module-level variable, or captures it while building a `Layer`. That's the captive-dependency problem from [03 — Built once, built per team](./03-tiers.md), and the lint rules below ban it.
+A short execution reduces this window; it does not eliminate it. `named` checks access to named values and proof fields at runtime after the Effect finishes. TypeScript alone cannot prevent retaining them in closures. Storage rules described below are proposed additional checks, not the mechanism that enforces expiration. Background work stores ordinary IDs and rechecks authorization in a new execution; it never treats a retained proof as fresh authorization.
 
 There's one place where milliseconds matter: **operations that change authorization state itself.** Picture two admins demoting each other at the same moment, or the last owner being removed while they transfer ownership. **Decided (D36):** for that small set (role changes, member removal, team deletion), the operation re-reads the member row `FOR UPDATE` inside the same transaction as the write, and enforces invariants like "at least one owner" there too. Ordinary record edits don't need this.
 

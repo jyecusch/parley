@@ -21,7 +21,7 @@ export const proveSenderInTeam = <P, T, S>(
     const sending = yield* Sending
     const found = yield* sending.locateSender(member.team.value, sender.value)
     if (!found) return yield* new SenderNotFound({ team: member.teamName, senderId: sender.value })
-    return { ...SenderInTeamProver.prove(sender, member.team), team: member.team, sender, found }
+    return SenderInTeamProver.prove([sender, member.team], { team: member.team, sender, found })
   })
 
 const SenderOfTeamProver = defineProof("SenderOfTeam")
@@ -40,7 +40,7 @@ export const proveSenderOfTeam = <P, T>(
     const sending = yield* Sending
     const found = yield* sending.locateSender(member.team.value, senderId)
     if (!found) return yield* new SenderNotFound({ team: member.teamName, senderId })
-    return { ...SenderOfTeamProver.prove(member.team), team: member.team, found }
+    return SenderOfTeamProver.prove([member.team], { team: member.team, found })
   })
 
 /**

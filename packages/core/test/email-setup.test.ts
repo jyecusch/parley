@@ -398,6 +398,6 @@ describe("email setup", () => {
       expect(yield* run["sendingDomains.list"](f.bob, { teamId: f.globex })).not.toContainEqual(
         expect.objectContaining({ domain: abandoned }),
       )
-    }).pipe(Effect.provide(Layer.fresh(Sending.layer).pipe(Layer.provide(FakeProvider))), Effect.provide(CoreLive)),
+    }).pipe(Effect.provide(Layer.fresh(Sending.layer).pipe(Layer.provide(FakeProvider), Layer.provideMerge(CoreLive)))),
   )
 })

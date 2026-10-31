@@ -28,5 +28,5 @@ export const proveCustomFieldInTeam = <P, T, F>(
     const fields = yield* CustomFields
     const found = yield* fields.locate(team, field.value, read)
     if (!found) return yield* new CustomFieldNotFound({ team: read.member.teamName, fieldId: field.value })
-    return { ...CustomFieldInTeamProver.prove(field, team), team, field, found }
+    return CustomFieldInTeamProver.prove([field, team], { team, field, found })
   })

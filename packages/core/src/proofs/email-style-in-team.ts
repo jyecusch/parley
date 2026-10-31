@@ -27,7 +27,7 @@ export const proveEmailStyleInTeam = <P, T, S>(
     const styles = yield* EmailStyles
     const found = yield* styles.locate(member.team.value, style.value)
     if (!found) return yield* new EmailStyleNotFound({ team: member.teamName, styleId: style.value })
-    return { ...EmailStyleInTeamProver.prove(style, member.team), team: member.team, style, found }
+    return EmailStyleInTeamProver.prove([style, member.team], { team: member.team, style, found })
   })
 
 const EmailStyleOfTeamProver = defineProof("EmailStyleOfTeam")
@@ -46,7 +46,7 @@ export const proveEmailStyleOfTeam = <P, T>(
     const styles = yield* EmailStyles
     const found = yield* styles.locate(member.team.value, styleId)
     if (!found) return yield* new EmailStyleNotFound({ team: member.teamName, styleId })
-    return { ...EmailStyleOfTeamProver.prove(member.team), team: member.team, found }
+    return EmailStyleOfTeamProver.prove([member.team], { team: member.team, found })
   })
 
 /**

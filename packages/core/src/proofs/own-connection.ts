@@ -22,5 +22,5 @@ export const proveOwnConnection = <P, T, C>(
     const connections = yield* Connections
     const found = yield* connections.locateOwn(member, connection.value)
     if (!found) return yield* new ConnectionNotFound({ connectionId: connection.value })
-    return { ...OwnConnectionProver.prove(member.principal, member.team, connection), member, connection, found }
+    return OwnConnectionProver.prove([member.principal, member.team, connection], { member, connection, found })
   })

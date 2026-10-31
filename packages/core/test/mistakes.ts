@@ -5,7 +5,7 @@ import type { Principal } from "../src/principal.ts"
 import { proveContactInTeam } from "../src/proofs/contact-in-team.ts"
 import { proveMemberOf } from "../src/proofs/member-of.ts"
 import { proveCanReadRecords, proveCanWriteRecords } from "../src/proofs/permissions.ts"
-import { named } from "../src/proofs/proof.ts"
+import { type Named, named } from "../src/proofs/proof.ts"
 import { Contacts } from "../src/services/contacts.ts"
 
 declare const principal: Principal
@@ -20,6 +20,13 @@ export const mistakes = named(principal, teamA, teamB, (principal, a, b) =>
     const memberOfA = yield* proveMemberOf(principal, a)
     const readA = yield* proveCanReadRecords(memberOfA)
     const writeA = yield* proveCanWriteRecords(memberOfA)
+
+    // @ts-expect-error a copied named value cannot replace its proven team id
+    yield* contacts.list({ ...a, value: teamB }, {}, readA)
+    // @ts-expect-error copying a proof cannot replace its permission
+    yield* contacts.create(a, fields, { ...readA, kind: "CanWriteRecords" as const })
+    // @ts-expect-error copying a membership proof cannot replace its permissions
+    yield* proveCanWriteRecords({ ...memberOfA, rolePermissions: new Set(["records:write"]) })
 
     // @ts-expect-error a read proof about team A cannot list team B
     yield* contacts.list(b, {}, readA)
@@ -45,5 +52,5 @@ export const mistakes = named(principal, teamA, teamB, (principal, a, b) =>
   }),
 )
 
-// @ts-expect-error names and proofs cannot escape the callback that created them
-export const escaped = named(teamA, (team) => Effect.succeed(team))
+// @ts-expect-error a named value cannot escape directly with its type-level name
+export const escaped = named<TeamId, Named<unknown, TeamId>, never, never>(teamA, (team) => Effect.succeed(team))

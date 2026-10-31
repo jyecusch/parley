@@ -21,7 +21,7 @@ export const proveTemplateInTeam = <P, T, K>(
     const templates = yield* Templates
     const found = yield* templates.locate(member.team.value, template.value)
     if (!found) return yield* new TemplateNotFound({ team: member.teamName, templateId: template.value })
-    return { ...TemplateInTeamProver.prove(template, member.team), team: member.team, template, found }
+    return TemplateInTeamProver.prove([template, member.team], { team: member.team, template, found })
   })
 
 const TemplateOfTeamProver = defineProof("TemplateOfTeam")
@@ -40,5 +40,5 @@ export const proveTemplateOfTeam = <P, T>(
     const templates = yield* Templates
     const found = yield* templates.locate(member.team.value, templateId)
     if (!found) return yield* new TemplateNotFound({ team: member.teamName, templateId })
-    return { ...TemplateOfTeamProver.prove(member.team), team: member.team, found }
+    return TemplateOfTeamProver.prove([member.team], { team: member.team, found })
   })

@@ -22,10 +22,9 @@ export const proveServiceAccountInTeam = <P, T, S>(
     const serviceAccounts = yield* ServiceAccounts
     const found = yield* serviceAccounts.locate(member, serviceAccount.value)
     if (!found) return yield* new ServiceAccountNotFound({ serviceAccountId: serviceAccount.value })
-    return {
-      ...ServiceAccountInTeamProver.prove(member.principal, member.team, serviceAccount),
+    return ServiceAccountInTeamProver.prove([member.principal, member.team, serviceAccount], {
       member,
       serviceAccount,
       found,
-    }
+    })
   })

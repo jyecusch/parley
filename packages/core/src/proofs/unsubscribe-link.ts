@@ -20,5 +20,5 @@ export const proveUnsubscribeLinkValid = <L>(
     const links = yield* UnsubscribeLinks
     const facts = links.read(link.value)
     if (!facts) return yield* new UnsubscribeLinkInvalid()
-    return { ...UnsubscribeLinkValidProver.prove(link), facts }
+    return UnsubscribeLinkValidProver.prove([link], { facts })
   })

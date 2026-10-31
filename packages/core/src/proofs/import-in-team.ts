@@ -21,5 +21,5 @@ export const proveImportInTeam = <P, T, I>(
     const imports = yield* Imports
     const found = yield* imports.locate(member.team.value, target.value)
     if (!found) return yield* new ImportNotFound({ team: member.teamName, importId: target.value })
-    return { ...ImportInTeamProver.prove(target, member.team), team: member.team, import: target, found }
+    return ImportInTeamProver.prove([target, member.team], { team: member.team, import: target, found })
   })

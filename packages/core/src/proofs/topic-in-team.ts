@@ -22,7 +22,7 @@ export const proveTopicInTeam = <P, T, K>(
     const topics = yield* Topics
     const found = yield* topics.locate(member.team.value, topic.value)
     if (!found) return yield* new TopicNotFound({ team: member.teamName, topicId: topic.value })
-    return { ...TopicInTeamProver.prove(topic, member.team), team: member.team, topic, found }
+    return TopicInTeamProver.prove([topic, member.team], { team: member.team, topic, found })
   })
 
 const TopicsInTeamProver = defineProof("TopicsInTeam")
@@ -46,5 +46,5 @@ export const proveTopicsInTeam = <P, T>(
       if (!topic) return yield* new TopicNotFound({ team: member.teamName, topicId: id })
       found.push(topic)
     }
-    return { ...TopicsInTeamProver.prove(member.team), team: member.team, found }
+    return TopicsInTeamProver.prove([member.team], { team: member.team, found })
   })

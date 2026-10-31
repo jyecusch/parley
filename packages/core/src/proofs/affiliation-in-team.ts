@@ -33,11 +33,10 @@ export const proveAffiliationInTeam = <P, T, A>(
     if (!found) {
       return yield* new AffiliationNotFound({ team: read.member.teamName, affiliationId: affiliation.value })
     }
-    return {
-      ...AffiliationInTeamProver.prove(affiliation, team),
+    return AffiliationInTeamProver.prove([affiliation, team], {
       affiliation,
       team,
       teamName: read.member.teamName,
       found,
-    }
+    })
   })

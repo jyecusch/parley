@@ -223,7 +223,7 @@ Be clear-eyed about this. The tier check looks at a layer's **requirements**. It
 | A process-tier layer requires a team-tier service | ✅ | `processLayer` |
 | A `Ref` or `Map` inside a process-tier service caches one team's data on first use | ❌ | The "caches are keyed by `TeamId`" review-checklist item (D42) |
 | Module-level `let` / `new Map()` in `core/src/services/` | ❌ | Lint |
-| A proof or `Named` stored in a `Ref`, a layer or module state, so it outlives its request | ❌ by tiers | The `named(...)` callback ([04](./04-authorization-proofs.md)), plus lint |
+| A proof or `Named` stored in a `Ref`, a layer or module state, so it outlives its request | ❌ by tiers | Runtime getters refuse named-value and proof-field reads after the `named` Effect finishes ([04](./04-authorization-proofs.md)); storage lint remains proposed |
 | Closing over ambient "current team" state (a `FiberRef`, `AsyncLocalStorage`) | ❌ | Don't have any. There is no "current team" in Parley; the team is an argument. |
 | `as any` / `as Layer.Layer<…>` to get past the check | ❌ | Lint bans assertions in `core/` |
 

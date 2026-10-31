@@ -46,20 +46,16 @@ export const proveContactInTeam = <P, T, C>(
   contact: Named<C, ContactId>,
   read: CanReadRecords<P, T>,
 ): Effect.Effect<ContactInTeam<C, T>, ContactNotFound | DatabaseUnavailable, Contacts> =>
-  Effect.map(locate(team, contact, "live", read), (located) => ({
-    ...ContactInTeamProver.prove(contact, team),
-    ...located,
-  }))
+  Effect.map(locate(team, contact, "live", read), (located) => ContactInTeamProver.prove([contact, team], located))
 
 export const proveContactRestorable = <P, T, C>(
   team: Named<T, TeamId>,
   contact: Named<C, ContactId>,
   read: CanReadRecords<P, T>,
 ): Effect.Effect<ContactRestorable<C, T>, ContactNotFound | DatabaseUnavailable, Contacts> =>
-  Effect.map(locate(team, contact, "restorable", read), (located) => ({
-    ...ContactRestorableProver.prove(contact, team),
-    ...located,
-  }))
+  Effect.map(locate(team, contact, "restorable", read), (located) =>
+    ContactRestorableProver.prove([contact, team], located),
+  )
 
 const ContactsInTeamProver = defineProof("ContactsInTeam")
 
@@ -79,7 +75,7 @@ export const proveContactsInTeam = <P, T>(
     const found = yield* contacts.locateMany(team, contactIds, read)
     const missing = contactIds.find((id) => !found.has(id))
     if (missing) return yield* new ContactNotFound({ team: read.member.teamName, contactId: missing })
-    return { ...ContactsInTeamProver.prove(team), team, contactIds: [...new Set(contactIds)] }
+    return ContactsInTeamProver.prove([team], { team, contactIds: [...new Set(contactIds)] })
   })
 
 /**
@@ -101,7 +97,7 @@ export const forEachSelectedContact = <P, T, E, R>(
       const contactIds = yield* contacts.selectChunk(selected, after)
       after = contactIds[contactIds.length - 1]
       if (after === undefined) return total
-      total += yield* each({ ...ContactsInTeamProver.prove(team), team, contactIds })
+      total += yield* each(ContactsInTeamProver.prove([team], { team, contactIds }))
       if (contactIds.length < SELECTION_CHUNK) return total
     }
   })

@@ -23,7 +23,7 @@ export const proveRecordOwner = <P, T>(
     const members = yield* Members
     const found = yield* members.lookup(member.team.value, userId)
     if (found._tag !== "Member") return yield* new MemberNotFound({ team: member.teamName, userId })
-    return { ...RecordOwnerProver.prove(member.team), team: member.team, userId }
+    return RecordOwnerProver.prove([member.team], { team: member.team, userId })
   })
 
 /** What a create or update does with the record owner: leave it (undefined), clear it (null), or set it. */

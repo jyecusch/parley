@@ -33,14 +33,14 @@ export const proveBroadcastInTeam = <P, T, C>(
     const broadcasts = yield* Broadcasts
     const found = yield* broadcasts.locate(member.team.value, broadcast.value)
     if (!found) return yield* new BroadcastNotFound({ team: member.teamName, broadcastId: broadcast.value })
-    return { ...BroadcastInTeamProver.prove(broadcast, member.team), team: member.team, broadcast, found }
+    return BroadcastInTeamProver.prove([broadcast, member.team], { team: member.team, broadcast, found })
   })
 
 export const proveBroadcastIsDraft = <C, T>(
   target: BroadcastInTeam<C, T>,
 ): Effect.Effect<BroadcastIsDraft<C>, BroadcastNotDraft> =>
   target.found.status === "draft"
-    ? Effect.succeed(BroadcastIsDraftProver.prove(target.broadcast))
+    ? Effect.succeed(BroadcastIsDraftProver.prove([target.broadcast]))
     : Effect.fail(
         new BroadcastNotDraft({ broadcast: DisplayName.fromRecord(target.found.name), status: target.found.status }),
       )

@@ -30,7 +30,7 @@ export const proveFormInTeam = <P, T, F>(
     const forms = yield* Forms
     const found = yield* forms.locate(member.team.value, form.value)
     if (!found) return yield* new FormNotFound({ team: member.teamName, formId: form.value })
-    return { ...FormInTeamProver.prove(form, member.team), team: member.team, form, found }
+    return FormInTeamProver.prove([form, member.team], { team: member.team, form, found })
   })
 
 const SubmissionOfFormProver = defineProof("SubmissionOfForm")
@@ -50,5 +50,5 @@ export const proveSubmissionOfForm = <P, T, F, S>(
     const forms = yield* Forms
     const found = yield* forms.locateSubmission(form.form.value, submission.value)
     if (!found) return yield* new SubmissionNotFound({ team: member.teamName, submissionId: submission.value })
-    return { ...SubmissionOfFormProver.prove(submission, form.form), submission, found }
+    return SubmissionOfFormProver.prove([submission, form.form], { submission, found })
   })

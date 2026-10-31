@@ -61,7 +61,7 @@ export const proveMemberChangeable = <P, T, U>(
     if (newRole === "owner" && (yield* (yield* Users).find(user.value))?.kind === "service-account") {
       return yield* new ServiceAccountCannotBeOwner()
     }
-    return { ...MemberInTeamProver.prove(member.team, user), team: member.team, user, teamName: member.teamName, found }
+    return MemberInTeamProver.prove([member.team, user], { team: member.team, user, teamName: member.teamName, found })
   })
 
 /** For removal: members:manage (owner to remove an owner), or the principal leaving the team themselves. */
@@ -78,5 +78,5 @@ export const proveMemberRemovable = <P, T, U>(
         return yield* new OwnerChangeNeedsOwner({ team: member.teamName })
       }
     }
-    return { ...MemberInTeamProver.prove(member.team, user), team: member.team, user, teamName: member.teamName, found }
+    return MemberInTeamProver.prove([member.team, user], { team: member.team, user, teamName: member.teamName, found })
   })

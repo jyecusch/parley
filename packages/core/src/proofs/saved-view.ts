@@ -41,12 +41,11 @@ export const proveSavedViewEditable = <P, T, V>(
     const owned = found.ownerUserId === member.principal.value.userId
     // Someone else's shared view: only with records:write, and that's the error if they lack it.
     if (found.shared && !owned && !canWrite) yield* requirePermission(member, "records:write")
-    return {
-      ...SavedViewEditableProver.prove(member.principal, member.team, view),
+    return SavedViewEditableProver.prove([member.principal, member.team, view], {
       team: member.team,
       view,
       found,
       recordType: found.recordType,
       canShare: canWrite,
-    }
+    })
   })

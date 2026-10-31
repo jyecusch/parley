@@ -86,8 +86,7 @@ export const proveMemberOf = <P, T>(
       }
       connectedBy = { role: connector.role, rolePermissions: ROLE_PERMISSIONS[connector.role] }
     }
-    const proof: MemberOf<P, T> = {
-      ...MemberOfProver.prove(principal, team),
+    const proof: MemberOf<P, T> = MemberOfProver.prove([principal, team], {
       principal,
       team,
       teamName: DisplayName.fromRecord(found.teamName),
@@ -95,6 +94,6 @@ export const proveMemberOf = <P, T>(
       rolePermissions: ROLE_PERMISSIONS[found.role],
       connectedBy,
       ceiling: ceilingOf(p),
-    }
+    })
     return proof
   })

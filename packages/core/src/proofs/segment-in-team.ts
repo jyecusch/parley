@@ -33,14 +33,14 @@ export const proveSegmentInTeam = <P, T, K>(
     const segments = yield* Segments
     const found = yield* segments.locate(member.team.value, segment.value)
     if (!found) return yield* new SegmentNotFound({ team: member.teamName, segmentId: segment.value })
-    return { ...SegmentInTeamProver.prove(segment, member.team), team: member.team, segment, found }
+    return SegmentInTeamProver.prove([segment, member.team], { team: member.team, segment, found })
   })
 
 export const proveSegmentIsFixed = <K, T>(
   target: SegmentInTeam<K, T>,
 ): Effect.Effect<SegmentIsFixed<K>, SegmentIsDynamic> =>
   target.found.kind === "fixed"
-    ? Effect.succeed(SegmentIsFixedProver.prove(target.segment))
+    ? Effect.succeed(SegmentIsFixedProver.prove([target.segment]))
     : Effect.fail(new SegmentIsDynamic({ segment: DisplayName.fromRecord(target.found.name) }))
 
 const SegmentOfTeamProver = defineProof("SegmentOfTeam")
@@ -59,5 +59,5 @@ export const proveSegmentOfTeam = <P, T>(
     const segments = yield* Segments
     const found = yield* segments.locate(member.team.value, segmentId)
     if (!found) return yield* new SegmentNotFound({ team: member.teamName, segmentId })
-    return { ...SegmentOfTeamProver.prove(member.team), team: member.team, found }
+    return SegmentOfTeamProver.prove([member.team], { team: member.team, found })
   })

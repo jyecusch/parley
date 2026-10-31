@@ -22,5 +22,5 @@ export const proveOwnApiKey = <P, T, K>(
     const keys = yield* ApiKeys
     const found = yield* keys.locateOwn(member, apiKey.value)
     if (!found) return yield* new ApiKeyNotFound({ apiKeyId: apiKey.value })
-    return { ...OwnApiKeyProver.prove(member.principal, member.team, apiKey), member, apiKey, found }
+    return OwnApiKeyProver.prove([member.principal, member.team, apiKey], { member, apiKey, found })
   })

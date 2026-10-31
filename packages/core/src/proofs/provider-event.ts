@@ -18,6 +18,6 @@ export const proveProviderEventSigned = <E>(
     const events = yield* DeliveryEvents
     const event = events.verify(headers, body.value)
     if (event === undefined || event === "ignored") return event
-    const signed: ProviderEventSigned<E> = { ...ProviderEventSignedProver.prove(body), event }
+    const signed: ProviderEventSigned<E> = ProviderEventSignedProver.prove([body], { event })
     return signed
   })

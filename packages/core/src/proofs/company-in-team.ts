@@ -47,20 +47,16 @@ export const proveCompanyInTeam = <P, T, C>(
   company: Named<C, CompanyId>,
   read: CanReadRecords<P, T>,
 ): Effect.Effect<CompanyInTeam<C, T>, CompanyNotFound | DatabaseUnavailable, Companies> =>
-  Effect.map(locate(team, company, "live", read), (located) => ({
-    ...CompanyInTeamProver.prove(company, team),
-    ...located,
-  }))
+  Effect.map(locate(team, company, "live", read), (located) => CompanyInTeamProver.prove([company, team], located))
 
 export const proveCompanyRestorable = <P, T, C>(
   team: Named<T, TeamId>,
   company: Named<C, CompanyId>,
   read: CanReadRecords<P, T>,
 ): Effect.Effect<CompanyRestorable<C, T>, CompanyNotFound | DatabaseUnavailable, Companies> =>
-  Effect.map(locate(team, company, "restorable", read), (located) => ({
-    ...CompanyRestorableProver.prove(company, team),
-    ...located,
-  }))
+  Effect.map(locate(team, company, "restorable", read), (located) =>
+    CompanyRestorableProver.prove([company, team], located),
+  )
 
 const CompaniesInTeamProver = defineProof("CompaniesInTeam")
 
@@ -89,7 +85,7 @@ export const forEachSelectedCompany = <P, T, E, R>(
       const companyIds = yield* companies.selectChunk(selected, after)
       after = companyIds[companyIds.length - 1]
       if (after === undefined) return total
-      total += yield* each({ ...CompaniesInTeamProver.prove(team), team, companyIds })
+      total += yield* each(CompaniesInTeamProver.prove([team], { team, companyIds }))
       if (companyIds.length < SELECTION_CHUNK) return total
     }
   })

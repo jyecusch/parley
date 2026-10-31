@@ -81,26 +81,26 @@ export interface CanDeleteRecords<P, T> extends Proof<"CanDeleteRecords", [P, T]
 export const proveCanReadRecords = <P, T>(
   member: MemberOf<P, T>,
 ): Effect.Effect<CanReadRecords<P, T>, PermissionError> =>
-  Effect.as(requirePermission(member, "records:read"), {
-    ...CanReadRecordsProver.prove(member.principal, member.team),
-    member,
-  })
+  Effect.as(
+    requirePermission(member, "records:read"),
+    CanReadRecordsProver.prove([member.principal, member.team], { member }),
+  )
 
 export const proveCanWriteRecords = <P, T>(
   member: MemberOf<P, T>,
 ): Effect.Effect<CanWriteRecords<P, T>, PermissionError> =>
-  Effect.as(requirePermission(member, "records:write"), {
-    ...CanWriteRecordsProver.prove(member.principal, member.team),
-    member,
-  })
+  Effect.as(
+    requirePermission(member, "records:write"),
+    CanWriteRecordsProver.prove([member.principal, member.team], { member }),
+  )
 
 export const proveCanDeleteRecords = <P, T>(
   member: MemberOf<P, T>,
 ): Effect.Effect<CanDeleteRecords<P, T>, PermissionError> =>
-  Effect.as(requirePermission(member, "records:delete"), {
-    ...CanDeleteRecordsProver.prove(member.principal, member.team),
-    member,
-  })
+  Effect.as(
+    requirePermission(member, "records:delete"),
+    CanDeleteRecordsProver.prove([member.principal, member.team], { member }),
+  )
 
 /** P may create and change service accounts in team T. */
 export interface CanManageServiceAccounts<P, T> extends Proof<"CanManageServiceAccounts", [P, T]> {
@@ -110,10 +110,10 @@ export interface CanManageServiceAccounts<P, T> extends Proof<"CanManageServiceA
 export const proveCanManageServiceAccounts = <P, T>(
   member: MemberOf<P, T>,
 ): Effect.Effect<CanManageServiceAccounts<P, T>, PermissionError> =>
-  Effect.as(requirePermission(member, "service-accounts:manage"), {
-    ...CanManageServiceAccountsProver.prove(member.principal, member.team),
-    member,
-  })
+  Effect.as(
+    requirePermission(member, "service-accounts:manage"),
+    CanManageServiceAccountsProver.prove([member.principal, member.team], { member }),
+  )
 
 /** P may define custom fields in team T (D32). */
 export interface CanManageFields<P, T> extends Proof<"CanManageFields", [P, T]> {
@@ -123,10 +123,10 @@ export interface CanManageFields<P, T> extends Proof<"CanManageFields", [P, T]> 
 export const proveCanManageFields = <P, T>(
   member: MemberOf<P, T>,
 ): Effect.Effect<CanManageFields<P, T>, PermissionError> =>
-  Effect.as(requirePermission(member, "fields:manage"), {
-    ...CanManageFieldsProver.prove(member.principal, member.team),
-    member,
-  })
+  Effect.as(
+    requirePermission(member, "fields:manage"),
+    CanManageFieldsProver.prove([member.principal, member.team], { member }),
+  )
 
 /** P may invite, change and remove members of team T. */
 export interface CanManageMembers<P, T> extends Proof<"CanManageMembers", [P, T]> {
@@ -136,10 +136,10 @@ export interface CanManageMembers<P, T> extends Proof<"CanManageMembers", [P, T]
 export const proveCanManageMembers = <P, T>(
   member: MemberOf<P, T>,
 ): Effect.Effect<CanManageMembers<P, T>, PermissionError> =>
-  Effect.as(requirePermission(member, "members:manage"), {
-    ...CanManageMembersProver.prove(member.principal, member.team),
-    member,
-  })
+  Effect.as(
+    requirePermission(member, "members:manage"),
+    CanManageMembersProver.prove([member.principal, member.team], { member }),
+  )
 
 /** P may rename team T and change its settings. */
 export interface CanManageTeam<P, T> extends Proof<"CanManageTeam", [P, T]> {
@@ -147,10 +147,10 @@ export interface CanManageTeam<P, T> extends Proof<"CanManageTeam", [P, T]> {
 }
 
 export const proveCanManageTeam = <P, T>(member: MemberOf<P, T>): Effect.Effect<CanManageTeam<P, T>, PermissionError> =>
-  Effect.as(requirePermission(member, "team:manage"), {
-    ...CanManageTeamProver.prove(member.principal, member.team),
-    member,
-  })
+  Effect.as(
+    requirePermission(member, "team:manage"),
+    CanManageTeamProver.prove([member.principal, member.team], { member }),
+  )
 
 const CanWriteEmailProver = defineProof("CanWriteEmail")
 const CanSendEmailProver = defineProof("CanSendEmail")
@@ -172,21 +172,21 @@ export interface CanManageEmail<P, T> extends Proof<"CanManageEmail", [P, T]> {
 }
 
 export const proveCanWriteEmail = <P, T>(member: MemberOf<P, T>): Effect.Effect<CanWriteEmail<P, T>, PermissionError> =>
-  Effect.as(requirePermission(member, "email:write"), {
-    ...CanWriteEmailProver.prove(member.principal, member.team),
-    member,
-  })
+  Effect.as(
+    requirePermission(member, "email:write"),
+    CanWriteEmailProver.prove([member.principal, member.team], { member }),
+  )
 
 export const proveCanSendEmail = <P, T>(member: MemberOf<P, T>): Effect.Effect<CanSendEmail<P, T>, PermissionError> =>
-  Effect.as(requirePermission(member, "email:send"), {
-    ...CanSendEmailProver.prove(member.principal, member.team),
-    member,
-  })
+  Effect.as(
+    requirePermission(member, "email:send"),
+    CanSendEmailProver.prove([member.principal, member.team], { member }),
+  )
 
 export const proveCanManageEmail = <P, T>(
   member: MemberOf<P, T>,
 ): Effect.Effect<CanManageEmail<P, T>, PermissionError> =>
-  Effect.as(requirePermission(member, "email:manage"), {
-    ...CanManageEmailProver.prove(member.principal, member.team),
-    member,
-  })
+  Effect.as(
+    requirePermission(member, "email:manage"),
+    CanManageEmailProver.prove([member.principal, member.team], { member }),
+  )
