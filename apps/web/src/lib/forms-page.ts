@@ -27,7 +27,15 @@ export const embedContextOf = (search: string): EmbedContext => {
     // they'd come from the visitor's own address, with no site to have chosen it.
     else if (Object.hasOwn(CLICK_ID_PARAMETERS, key) && isEmbedded()) clickIds[key] = value.slice(0, 500)
   }
-  return { page: (query.get("page") ?? "").slice(0, 2000), appearance: query.get("appearance"), utm, clickIds }
+  return {
+    page: (query.get("page") ?? "").slice(0, 2000),
+    // Only from embed.js, set by the site the form is on (D148). On the hosted page it would come
+    // from whoever wrote the link: one could hide the fine print or a consent box's wording on
+    // Parley's own address, while the consent record says they were shown.
+    appearance: isEmbedded() ? query.get("appearance") : null,
+    utm,
+    clickIds,
+  }
 }
 
 /** Problems with the answers by field key, worded as the server words them: it's the same check. */
