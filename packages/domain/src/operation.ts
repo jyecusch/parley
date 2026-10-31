@@ -13,8 +13,8 @@ const BaseErrors = [...AuthenticationErrors, InputRejected, ...InfrastructureErr
 const TeamErrors = [...MembershipErrors, ...PermissionErrors] as const
 
 /**
- * One action a principal can take. Defined once here, browser-safe, and every entrypoint
- * (HTTP API, MCP, web) is derived from it (D16).
+ * Operation defines one action a principal can take, with browser-safe schemas.
+ * The exposure manifest determines which entrypoints publish its contract (D16, D171).
  */
 export interface Operation<
   Name extends string = string,

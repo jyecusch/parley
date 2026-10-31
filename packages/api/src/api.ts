@@ -69,7 +69,7 @@ const endpointFor = (name: HttpOperationName) => {
 const endpoints = httpOperationNames.map(endpointFor)
 const [first, ...others] = endpoints
 
-const group = HttpApiGroup.make("v1")
+if (!first) throw new Error("The exposure manifest must include at least one HTTP operation")
 
 /** The public HTTP API. Its OpenAPI document is served at /api/v1/openapi.json. */
-export const ParleyApi = HttpApi.make("parley").add(first ? group.add(first, ...others) : group)
+export const ParleyApi = HttpApi.make("parley").add(HttpApiGroup.make("v1").add(first, ...others))

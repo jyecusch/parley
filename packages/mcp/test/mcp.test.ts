@@ -1,6 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "@effect/vitest"
 import { BetterAuth, CoreLive } from "@parley/core"
-import { mcpOperationNames } from "@parley/domain"
 import { Effect, Layer, ManagedRuntime } from "effect"
 import { HttpRouter, HttpServer } from "effect/http"
 import { McpRoutesLive } from "../src/index.ts"
@@ -104,9 +103,6 @@ describe("MCP entrypoint", () => {
       description: string
       annotations: { readOnlyHint: boolean }
     }>
-    expect(tools.map((tool) => tool.name).sort()).toEqual(
-      mcpOperationNames.map((name) => name.replaceAll(".", "_")).sort(),
-    )
     expect(tools.map((tool) => tool.name).sort()).toEqual([
       "affiliations_create",
       "affiliations_createMany",

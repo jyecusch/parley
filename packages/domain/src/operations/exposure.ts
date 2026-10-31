@@ -1,5 +1,5 @@
 import { type CheckedExposureManifest, type ExposureManifest, includedOperationNames } from "../exposure.ts"
-import type { OperationName } from "./index.ts"
+import type { OperationName, Operations } from "./index.ts"
 
 const declarations = {
   "teams.list": {
@@ -533,7 +533,7 @@ const declarations = {
 } as const satisfies ExposureManifest<OperationName>
 
 /** operationExposures requires an explicit HTTP and MCP decision for every registered operation. */
-export const operationExposures = declarations satisfies CheckedExposureManifest<typeof declarations>
+export const operationExposures = declarations satisfies CheckedExposureManifest<typeof declarations, Operations>
 
 export const httpOperationNames = includedOperationNames(operationExposures, "http")
 export type HttpOperationName = (typeof httpOperationNames)[number]

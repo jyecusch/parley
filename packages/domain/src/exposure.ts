@@ -1,3 +1,5 @@
+import type { Trim } from "effect/String"
+
 export type HttpMethod = "GET" | "POST" | "PATCH" | "DELETE"
 
 export interface HttpRoute {
@@ -24,14 +26,21 @@ export type ExposureManifest<Name extends string> = { readonly [N in Name]: Oper
 
 type Entrypoint = "http" | "mcp"
 
-export type IncludedOperationName<Manifest extends ExposureManifest<string>, Protocol extends Entrypoint> = {
-  [Name in keyof Manifest & string]: Manifest[Name][Protocol] extends { readonly kind: "included" } ? Name : never
-}[keyof Manifest & string]
+export type IncludedOperationName<
+  Manifest extends ExposureManifest<string>,
+  Entry extends Entrypoint,
+> = Entry extends Entrypoint
+  ? {
+      [Name in keyof Manifest & string]: Manifest[Name][Entry] extends { readonly kind: "included" } ? Name : never
+    }[keyof Manifest & string]
+  : never
 
 type WithReason<Policy> = Policy extends { readonly reason: infer Reason extends string }
-  ? Reason extends ""
+  ? string extends Reason
     ? never
-    : Policy
+    : "" extends Trim<Reason>
+      ? never
+      : Policy
   : Policy
 
 type CheckedMcp<Policy, Direct extends string> = Policy extends {
@@ -43,19 +52,37 @@ type CheckedMcp<Policy, Direct extends string> = Policy extends {
     : never
   : WithReason<Policy>
 
-/** CheckedExposureManifest rejects empty reasons and MCP analogues without a directly published target. */
-export type CheckedExposureManifest<Manifest extends ExposureManifest<string>> = {
+type PathParameters<Path extends string> = Path extends `${infer Segment}/${infer Rest}`
+  ? PathParameters<Segment> | PathParameters<Rest>
+  : Path extends `:${infer Name}`
+    ? Name
+    : never
+
+type CheckedHttp<Policy, Fields extends PropertyKey> = Policy extends {
+  readonly kind: "included"
+  readonly path: infer Path extends string
+}
+  ? Exclude<PathParameters<Path>, Fields> extends never
+    ? Policy
+    : never
+  : WithReason<Policy>
+
+/** CheckedExposureManifest requires literal reasons, valid input path parameters, and directly published MCP targets. */
+export type CheckedExposureManifest<
+  Manifest extends ExposureManifest<string>,
+  Registry extends { readonly [Name in keyof Manifest]: { readonly input: { readonly fields: object } } },
+> = {
   readonly [Name in keyof Manifest]: {
-    readonly http: WithReason<Manifest[Name]["http"]>
+    readonly http: CheckedHttp<Manifest[Name]["http"], keyof Registry[Name]["input"]["fields"]>
     readonly mcp: CheckedMcp<Manifest[Name]["mcp"], IncludedOperationName<Manifest, "mcp">>
   }
 }
 
-/** includedOperationNames selects only explicit inclusions; exclusions and analogues do not register endpoints. */
-export const includedOperationNames = <const Manifest extends ExposureManifest<string>, Protocol extends Entrypoint>(
+/** includedOperationNames selects only explicit inclusions; exclusions and analogous operations do not register endpoints. */
+export const includedOperationNames = <const Manifest extends ExposureManifest<string>, Entry extends Entrypoint>(
   manifest: Manifest,
-  protocol: Protocol,
-): ReadonlyArray<IncludedOperationName<Manifest, Protocol>> =>
-  Object.keys(manifest).filter((name) => manifest[name]?.[protocol].kind === "included") as Array<
-    IncludedOperationName<Manifest, Protocol>
-  >
+  entrypoint: Entry,
+): ReadonlyArray<IncludedOperationName<Manifest, Entry>> =>
+  Object.entries(manifest).flatMap(([name, exposure]) =>
+    exposure[entrypoint].kind === "included" ? [name] : [],
+  ) as Array<IncludedOperationName<Manifest, Entry>>

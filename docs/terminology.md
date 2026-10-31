@@ -66,8 +66,8 @@ How to pick a name: choose the most common name for the concept. Reject anything
 | Term | Meaning | Banned synonyms |
 | --- | --- | --- |
 | **Entrypoint** | A way into the core: the web UI, the HTTP API, the MCP server, and one day the CLI. Entrypoints authenticate, decode input, call an operation, and encode the result. | door, adapter, interface, frontend, boundary, layer (for this meaning) |
-| **Operation** | One action a principal can take, such as `contacts.update`. It is defined once in the **operation registry**, and every entrypoint is derived from it. | action, command, use case, handler, mutation |
-| **Exposure manifest** | The exhaustive HTTP and MCP publication decisions for the operation registry. Each protocol explicitly includes or intentionally excludes each operation; MCP may instead name a directly published analogous operation. Code: `operationExposures`. | publication registry, exposure defaults |
+| **Operation** | One action a principal can take, such as `contacts.update`. It is defined once in the **operation registry**. Entrypoints publish its contract according to the **exposure manifest**. | action, command, use case, handler, mutation |
+| **Exposure manifest** | The exhaustive HTTP and MCP publication decisions for the operation registry. Each entrypoint explicitly includes or intentionally excludes each operation; MCP may instead name a directly published analogous operation. Code: `operationExposures`. | publication registry, exposure defaults |
 | **Endpoint** | An HTTP API route derived from an operation. Used only when talking about HTTP. | route (for the API) |
 | **Tool** | An MCP tool derived from an operation. Used only when talking about MCP. | function, command |
 | **Service** | An Effect `Context.Service` in `@parley/core` that performs IO. Services demand proofs. | repository, repo, DAO, store, manager, provider |
