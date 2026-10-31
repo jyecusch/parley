@@ -8,7 +8,7 @@ import {
   type TopicId,
 } from "@parley/domain"
 import { and, asc, eq, inArray, sql } from "drizzle-orm"
-import { Context, Duration, Effect, Layer, Ref, Schema } from "effect"
+import { Cause, Context, Duration, Effect, Layer, Ref, Schema } from "effect"
 import { type MergeValues, renderEmail } from "../email/render.ts"
 import { Mailer, type OutgoingEmail, type SentEmail } from "../mail/mailer.ts"
 import { styleSentWith } from "./broadcasts.ts"
@@ -426,7 +426,9 @@ export class BroadcastSender extends Context.Service<
       }).pipe(Effect.withSpan("BroadcastSender.sendBatch"))
       const sendBatch = sendNext.pipe(
         Effect.map((handled) => handled ?? 0),
-        Effect.catchTag("SqlError", (error) => Effect.logWarning("broadcast sending failed", error).pipe(Effect.as(0))),
+        Effect.catchTag("SqlError", (error) =>
+          Effect.logWarning("broadcast worker database operation failed", Cause.fail(error)).pipe(Effect.as(0)),
+        ),
       )
       const drain = Effect.gen(function* () {
         let total = 0

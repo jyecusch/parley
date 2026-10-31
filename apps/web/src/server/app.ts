@@ -15,6 +15,7 @@ import {
 import { McpRoutesLive } from "@parley/mcp"
 import { Layer } from "effect"
 import { HttpRouter, HttpServer } from "effect/http"
+import { Logging } from "./logging.ts"
 
 /**
  * The whole server as one Effect web handler: /api/v1 (operations), /api/auth (Better-Auth)
@@ -30,7 +31,11 @@ const AppLive = Layer.mergeAll(
   McpRoutesLive,
   FailureResponsesLive,
   BackgroundLive,
-).pipe(Layer.provide(CoreLive), Layer.provide(HttpServer.layerServices))
+).pipe(
+  Layer.provide(CoreLive),
+  Layer.provide(HttpServer.layerServices),
+  Layer.provideMerge(import.meta.env.PROD ? Logging.layer : Layer.empty),
+)
 
 const makeApp = () => HttpRouter.toWebHandler(AppLive, { routerConfig: ROUTER_CONFIG })
 type App = ReturnType<typeof makeApp>
