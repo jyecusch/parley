@@ -178,6 +178,8 @@ What we decided, who decided it, and what's still open. Nothing becomes "decided
 
 | D169 | Review hardening and simplification | Require validated email idempotency keys; distinguish non-retryable unconfirmed acceptance from retryable pre-dispatch outages. Parse provider domain responses and inject Effect's fetch capability. Bulk broadcast writes stay inside the claim-fenced transaction, and draining scans all eligible teams before stopping. Bind transactions to Drizzle's own client and bound connection/query waits. Remove obsolete driver-shape compatibility code and duplicated member-removal branching | Owner | 2026-10-31 |
 
+| D170 | Links and DMARC match the sending domain | Every sending domain gets a link subdomain, `links` (Resend's tracking subdomain, a CNAME: `links.acme.com`) with click tracking on and open tracking off, so the links in every email go through the sending domain (Resend's "link URLs match sending domain"). This reverses R47 for clicks only: Resend sees each click as it redirects, and Parley doesn't record clicks yet. If a step after adding the domain fails, it's still stored and the next verify finishes it; a check never makes a verified domain stop sending. Each domain's DNS records also list a DMARC record: one already published, on the domain or its organizational domain, is shown as found and never replaced; otherwise we suggest `v=DMARC1; p=quarantine;` (owner's call over the gentler `p=none`; the risk is that other mail sent from the domain without SPF or DKIM lands in spam). Existing domains pick both up the next time someone verifies them | Owner | 2026-11-01 |
+
 ## Implementation choices made during milestones 1 and 2 (Claude; low-stakes, open to veto)
 
 | # | Choice | Why |
@@ -220,7 +222,7 @@ v2, milestones 9–12 (marketing email; choices in `docs/review.md` R36–R60):
 
 Also: the full record view for contacts and companies at their own URLs (D55), opened from the panel's expand button. The command menu reaches the email screens and every Settings page.
 
-Not yet: paging in the contacts table beyond loading everything, scheduling, and open or click tracking (R47, R48).
+Not yet: paging in the contacts table beyond loading everything, scheduling, open tracking and recording clicks (R47, R48, D170).
 
 ## Proposed (awaiting the owner)
 

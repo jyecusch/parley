@@ -14,6 +14,10 @@ import { Config, Context, Duration, Effect, Layer, Option, Redacted, Ref, Schema
 
 import { FetchHttpClient } from "effect/http"
 import { ProviderPacing } from "../services/provider-pacing.ts"
+import { dmarcRecord } from "./dmarc.ts"
+
+/** The link subdomain: links.acme.com for acme.com (D170). */
+const TRACKING_SUBDOMAIN = "links"
 
 /** One email. The sender comes from configuration unless given. */
 export interface OutgoingEmail {
@@ -148,7 +152,7 @@ export class Mailer extends Context.Service<
       })
 
       interface ProviderRequest {
-        readonly method: "GET" | "POST" | "DELETE"
+        readonly method: "GET" | "POST" | "PATCH" | "DELETE"
         readonly path: string
         readonly body?: string
         readonly headers?: Readonly<Record<string, string>>
@@ -187,7 +191,10 @@ export class Mailer extends Context.Service<
         status === "verified" ? "verified" : status === "failed" ? "failed" : "pending"
       const DomainResponse = Schema.Struct({
         id: Schema.NonEmptyString,
+        name: Schema.optional(Schema.String),
         status: Schema.optional(Schema.String),
+        tracking_subdomain: Schema.optional(Schema.NullOr(Schema.String)),
+        click_tracking: Schema.optional(Schema.NullOr(Schema.Boolean)),
         records: Schema.optional(
           Schema.Array(
             Schema.Struct({
@@ -200,34 +207,88 @@ export class Mailer extends Context.Service<
           ),
         ),
       })
+      /** A domain as Resend returns it. */
       const domainResponse = (input: ProviderRequest) =>
         Effect.gen(function* () {
           const domain = yield* Schema.decodeUnknownEffect(DomainResponse)(yield* ordinaryRequest(input)).pipe(
             Effect.mapError((cause) => new EmailServiceUnavailable({ cause })),
           )
+          const status = statusOf(domain.status ?? "pending")
+          const records = (domain.records ?? []).map((record) => ({
+            ...record,
+            priority: record.priority ?? null,
+            status: statusOf(record.status),
+          }))
           return {
-            providerId: domain.id,
-            status: statusOf(domain.status ?? "pending"),
-            records: (domain.records ?? []).map((record) => ({
-              ...record,
-              priority: record.priority ?? null,
-              status: statusOf(record.status),
-            })),
-          } satisfies ProviderDomain
+            tracked: domain.tracking_subdomain === TRACKING_SUBDOMAIN && domain.click_tracking === true,
+            /** Resend has seen every DNS record it asked for. The domain can be verified before its link subdomain is. */
+            settled: status === "verified" && records.every((record) => record.status === "verified"),
+            domain: {
+              providerId: domain.id,
+              status,
+              records,
+            } satisfies ProviderDomain,
+            name: domain.name,
+          }
+        })
+      /** The domain with its DMARC record, which Resend doesn't list (D170). */
+      const withDmarc = (domain: ProviderDomain, name: string | undefined) =>
+        name
+          ? dmarcRecord(name).pipe(
+              Effect.map((dmarc): ProviderDomain => ({ ...domain, records: [...domain.records, dmarc] })),
+            )
+          : Effect.succeed(domain)
+      const domainPath = (providerId: string) => `/domains/${encodeURIComponent(providerId)}`
+      /**
+       * Links in the email go through the sending domain's link subdomain, so they match it (D170).
+       * Resend calls it a tracking subdomain, and click tracking is what turns the rewriting on;
+       * opens aren't tracked.
+       */
+      const track = (providerId: string) =>
+        ordinaryRequest({
+          method: "PATCH",
+          path: domainPath(providerId),
+          body: JSON.stringify({ tracking_subdomain: TRACKING_SUBDOMAIN, click_tracking: true, open_tracking: false }),
         })
       const domains = {
         create: (domain: string) =>
-          domainResponse({ method: "POST", path: "/domains", body: JSON.stringify({ name: domain }) }),
+          Effect.gen(function* () {
+            const created = yield* domainResponse({
+              method: "POST",
+              path: "/domains",
+              body: JSON.stringify({ name: domain }),
+            })
+            // Resend has the domain now, so it's returned (and stored) even if a later step fails;
+            // verifying it later finishes the job.
+            const tracked = yield* track(created.domain.providerId).pipe(
+              Effect.andThen(domainResponse({ method: "GET", path: domainPath(created.domain.providerId) })),
+              Effect.map((response) => response.domain),
+              Effect.catch((error) =>
+                Effect.logWarning("sending domain added without its link subdomain", error._tag).pipe(
+                  Effect.as(created.domain),
+                ),
+              ),
+            )
+            return yield* withDmarc(tracked, domain)
+          }),
         verify: (providerId: string) =>
           Effect.gen(function* () {
-            const path = `/domains/${encodeURIComponent(providerId)}`
+            const path = domainPath(providerId)
             const current = yield* domainResponse({ method: "GET", path })
-            if (current.status === "verified") return current
+            if (!current.tracked)
+              yield* track(providerId).pipe(
+                Effect.catch((error) => Effect.logWarning("link subdomain not turned on", error._tag)),
+              )
+            else if (current.settled) return yield* withDmarc(current.domain, current.name)
             yield* ordinaryRequest({ method: "POST", path: `${path}/verify`, body: "{}" })
-            return yield* domainResponse({ method: "GET", path })
+            const checked = yield* domainResponse({ method: "GET", path })
+            // Resend checks again in the background, so right after asking, a verified domain can
+            // read as pending. Checking its new DNS records never stops it sending.
+            const status = current.domain.status === "verified" ? "verified" : checked.domain.status
+            return yield* withDmarc({ ...checked.domain, status }, checked.name ?? current.name)
           }),
         remove: (providerId: string) =>
-          ordinaryRequest({ method: "DELETE", path: `/domains/${encodeURIComponent(providerId)}` }).pipe(Effect.asVoid),
+          ordinaryRequest({ method: "DELETE", path: domainPath(providerId) }).pipe(Effect.asVoid),
       }
       const requireSender = (emails: ReadonlyArray<OutgoingEmail>) =>
         emails.every((email) => sender(email)) ? Effect.void : Effect.fail(new EmailNotConfigured())

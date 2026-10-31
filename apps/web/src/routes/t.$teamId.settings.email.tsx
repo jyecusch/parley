@@ -212,9 +212,11 @@ function Domains(props: {
                         teamId: props.teamId,
                         sendingDomainId: domain.id,
                       })
-                      return checked.status === "verified"
-                        ? `${checked.domain} is verified.`
-                        : `${checked.domain} isn't verified yet. DNS changes can take a while to be seen.`
+                      if (checked.status !== "verified")
+                        return `${checked.domain} isn't verified yet. DNS changes can take a while to be seen.`
+                      if (!needsCheck(checked)) return `${checked.domain} is verified.`
+                      setOpen(checked.id)
+                      return `${checked.domain} is verified and can send. Some of its DNS records aren't showing yet: add them, then verify again.`
                     })
                   }
                   onConfirm={() => setConfirming(domain.id)}
@@ -266,6 +268,16 @@ function Domains(props: {
   )
 }
 
+/**
+ * Whether a domain has DNS left to check: not verified yet, a DNS record not seen yet (such as its
+ * link subdomain or DMARC record), or added before those were listed (D170). Without an email
+ * provider, domains have no DNS records and count as verified at once (R44).
+ */
+const needsCheck = (domain: SendingDomain) =>
+  domain.status !== "verified" ||
+  domain.records.some((record) => record.status !== "verified") ||
+  (domain.records.length > 0 && !domain.records.some((record) => record.name.startsWith("_dmarc")))
+
 function DomainRow(props: {
   readonly domain: SendingDomain
   readonly canManage: boolean
@@ -311,7 +323,7 @@ function DomainRow(props: {
                   DNS records
                 </Button>
               ) : null}
-              {props.canManage && domain.status !== "verified" ? (
+              {props.canManage && needsCheck(domain) ? (
                 <Button size="sm" disabled={props.busy} onClick={props.onVerify}>
                   Verify
                 </Button>
@@ -328,7 +340,11 @@ function DomainRow(props: {
       {props.open && domain.records.length > 0 ? (
         <tr>
           <td colSpan={3} className="border-b border-line/55 bg-hover px-3.5 pt-1 pb-4">
-            <Hint>Add these at your DNS host, then verify. It can take a while for DNS to update.</Hint>
+            <Hint>
+              Add these at your DNS host, then verify. It can take a while for DNS to update. The links DNS record makes
+              the links in your emails use your own domain. The DMARC DNS record tells inboxes what to do with email
+              that fails these checks.
+            </Hint>
             <table className="mt-2 w-full table-fixed border-collapse">
               <thead>
                 <tr className="[&>th]:px-2 [&>th]:py-1 [&>th]:text-left [&>th]:font-medium [&>th]:text-subtle">

@@ -152,6 +152,8 @@ How to pick a name: choose the most common name for the concept. Reject anything
 | **Sender** | Who an email from the team is from: a name and an address on a sending domain, a reply-to, and the legal name and postal address its footer shows. A team has one or more; each broadcast and form picks one (D162). | from, sender identity, mailbox, brand |
 | **Default sender** | The sender new broadcasts and forms start with, and the one that takes over when a sender is deleted (D162). | primary sender, main sender |
 | **Sending domain** | A domain the team has verified with DNS records so Parley can send email from it. Not a company's domain. | email domain (here), verified domain, DKIM domain |
+| **Link subdomain** | The subdomain of a sending domain that the links in its emails go through, such as `links.acme.com`, so they match the domain the email is from (D170). Resend's API calls it a tracking subdomain. | tracking domain, tracking subdomain (except for Resend's API), link domain, click domain |
+| **DNS record** | A record added at a domain's DNS host. Always written in full, since a record alone means a contact or a company. Includes the DMARC DNS record (D170). | record (alone, for DNS) |
 
 ## Changelog
 
@@ -183,3 +185,4 @@ How to pick a name: choose the most common name for the concept. Reject anything
 | 2026-10-24 | Added **info tip** (D155). |
 | 2026-10-25 | Added the form terms the review found missing: submission statuses, double opt-in, confirmation link, consent box, consent record, kept value, spam list, render token, opt-in and opt-out topics, hosted page, embed snippet, fine print, form settings. "Sign-up" is banned in every meaning (owner's call). Appearance no longer says "design tokens". |
 | 2026-10-26 | **Subscriber** replaces topic "member", which clashed with **Member** (owner's call). The API's `memberCount` is now `subscriberCount`. |
+| 2026-11-01 | Added **link subdomain** and **DNS record** (D170). |

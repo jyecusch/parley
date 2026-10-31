@@ -2,24 +2,64 @@ import { describe, expect, it } from "@effect/vitest"
 import { EmailIdempotencyKey, EmailServiceUnavailable } from "@parley/domain"
 import { ConfigProvider, Effect, Layer, Schema } from "effect"
 import { FetchHttpClient } from "effect/http"
+import { TxtLookup } from "../src/mail/dmarc.ts"
 import { Mailer } from "../src/mail/mailer.ts"
 import { ProviderPacing } from "../src/services/provider-pacing.ts"
 
-/** A fake Resend that answers domain requests with `status` and records what was asked. */
-const fakeResend = (status: string) => {
+/**
+ * A fake Resend that answers domain requests for acme.com with `status` and records what was
+ * asked. Its links go through the link subdomain when `tracked`; a PATCH turns that on, and
+ * `failPatch` makes it fail. Asking for a check moves the domain to `afterCheck`.
+ */
+const fakeResend = (
+  initial: string,
+  options: { tracked?: boolean; linkStatus?: string; afterCheck?: string; failPatch?: boolean } = {},
+) => {
   const calls: Array<string> = []
+  let status = initial
+  let tracked = options.tracked ?? true
   const fetch = async (input: string | URL | Request, init?: RequestInit) => {
     const url = new URL(String(input))
     calls.push(`${init?.method ?? "GET"} ${url.pathname}`)
-    return new Response(JSON.stringify({ id: "d_1", status, records: [] }), { status: 200 })
+    if (init?.method === "PATCH") {
+      if (options.failPatch) return new Response("unavailable", { status: 503 })
+      expect(JSON.parse(String(init.body))).toEqual({
+        tracking_subdomain: "links",
+        click_tracking: true,
+        open_tracking: false,
+      })
+      tracked = true
+    }
+    if (url.pathname.endsWith("/verify")) status = options.afterCheck ?? status
+    const link = { record: "Tracking", type: "CNAME", name: "links.acme.com", value: "links1.resend-dns.com" }
+    return new Response(
+      JSON.stringify({
+        id: "d_1",
+        name: "acme.com",
+        status,
+        tracking_subdomain: tracked ? "links" : null,
+        click_tracking: tracked,
+        records: tracked ? [{ ...link, status: options.linkStatus ?? status }] : [],
+      }),
+      { status: 200 },
+    )
   }
   return { calls, fetch }
 }
+
+/** TXT DNS records by name, in place of real DNS. */
+const fakeDns = (records: Readonly<Record<string, ReadonlyArray<string>>> = {}) =>
+  Effect.provideService(TxtLookup, async (name) => {
+    const found = records[name]
+    if (!found) throw new Error(`no TXT records for ${name}`)
+    return found
+  })
 
 const useProvider = <A, E, R>(
   fetch: (input: string | URL | Request, init?: RequestInit) => Promise<Response>,
   effect: Effect.Effect<A, E, R>,
   wait: Effect.Effect<void, EmailServiceUnavailable> = Effect.void,
+  dns: Readonly<Record<string, ReadonlyArray<string>>> = {},
 ) =>
   effect.pipe(
     Effect.provide(
@@ -33,7 +73,20 @@ const useProvider = <A, E, R>(
       ),
     ),
     Effect.provideService(FetchHttpClient.Fetch, fetch as typeof globalThis.fetch),
+    fakeDns(dns),
   )
+
+const verifyDomain = Effect.gen(function* () {
+  return yield* (yield* Mailer).domains.verify("d_1")
+})
+
+const suggested = {
+  type: "TXT",
+  name: "_dmarc.acme.com",
+  value: "v=DMARC1; p=quarantine;",
+  priority: null,
+  status: "pending",
+}
 
 describe("Mailer with Resend", () => {
   it.effect("leaves a verified sending domain alone instead of starting a new DNS check", () => {
@@ -47,6 +100,85 @@ describe("Mailer with Resend", () => {
       }),
     )
   })
+  it.effect("keeps checking a verified domain until its link subdomain is seen, and it stays verified", () => {
+    // Right after a check is asked for, Resend can report a verified domain as pending.
+    const resend = fakeResend("verified", { linkStatus: "pending", afterCheck: "pending" })
+    return useProvider(
+      resend.fetch,
+      Effect.gen(function* () {
+        const domain = yield* (yield* Mailer).domains.verify("d_1")
+        expect(resend.calls).toEqual(["GET /domains/d_1", "POST /domains/d_1/verify", "GET /domains/d_1"])
+        expect(domain.status).toBe("verified")
+      }),
+    )
+  })
+  it.effect("sends links through the link subdomain of a domain added before it (D170)", () => {
+    const resend = fakeResend("verified", { tracked: false })
+    return useProvider(
+      resend.fetch,
+      Effect.gen(function* () {
+        const domain = yield* (yield* Mailer).domains.verify("d_1")
+        expect(resend.calls).toEqual([
+          "GET /domains/d_1",
+          "PATCH /domains/d_1",
+          "POST /domains/d_1/verify",
+          "GET /domains/d_1",
+        ])
+        expect(domain.records.map((record) => record.name)).toEqual(["links.acme.com", "_dmarc.acme.com"])
+      }),
+    )
+  })
+  it.effect("adds a domain with its link subdomain, and suggests a DMARC record (D170)", () => {
+    const resend = fakeResend("pending", { tracked: false })
+    return useProvider(
+      resend.fetch,
+      Effect.gen(function* () {
+        const domain = yield* (yield* Mailer).domains.create("acme.com")
+        expect(resend.calls).toEqual(["POST /domains", "PATCH /domains/d_1", "GET /domains/d_1"])
+        expect(domain.records.at(-1)).toEqual(suggested)
+      }),
+    )
+  })
+  it.effect("returns a domain Resend added even if turning on its link subdomain fails", () => {
+    const resend = fakeResend("pending", { tracked: false, failPatch: true })
+    return useProvider(
+      resend.fetch,
+      Effect.gen(function* () {
+        const domain = yield* (yield* Mailer).domains.create("acme.com")
+        expect(domain.providerId).toBe("d_1")
+        expect(domain.records).toEqual([suggested])
+      }),
+    )
+  })
+  it.effect("shows a published DMARC record, the domain's own or its organization's, instead of ours", () =>
+    Effect.gen(function* () {
+      const own = fakeResend("verified")
+      const ownDomain = yield* useProvider(own.fetch, verifyDomain, Effect.void, {
+        "_dmarc.acme.com": ["v=DMARC1; p=reject;"],
+      })
+      expect(ownDomain.records.at(-1)).toMatchObject({
+        name: "_dmarc.acme.com",
+        value: "v=DMARC1; p=reject;",
+        status: "verified",
+      })
+      const subdomain = fakeResend("verified")
+      const inherited = yield* useProvider(
+        async (input, init) => {
+          const response = await subdomain.fetch(input, init)
+          const body = (await response.json()) as Record<string, unknown>
+          return new Response(JSON.stringify({ ...body, name: "mail.acme.com" }))
+        },
+        verifyDomain,
+        Effect.void,
+        { "_dmarc.acme.com": ["v=spf1 nothing", "v=DMARC1; p=none;"] },
+      )
+      expect(inherited.records.at(-1)).toMatchObject({
+        name: "_dmarc.acme.com",
+        value: "v=DMARC1; p=none;",
+        status: "verified",
+      })
+    }),
+  )
   it.effect("asks Resend to check the DNS records of a domain that isn't verified yet", () => {
     const resend = fakeResend("pending")
     return useProvider(
