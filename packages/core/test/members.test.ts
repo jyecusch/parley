@@ -2,6 +2,7 @@ import { describe, expect, it } from "@effect/vitest"
 import type { InvitationId, UserId } from "@parley/domain"
 import { DisplayName } from "@parley/errors"
 import { Effect } from "effect"
+import { Statement } from "effect/sql"
 import { BetterAuth, CoreLive, Mailer, type Principal, implementations as run } from "../src/index.ts"
 import { Fixture } from "./fixture.ts"
 
@@ -30,6 +31,40 @@ const signUp = (name: string, email: string, verify = true) =>
   })
 
 describe("members and invitations", () => {
+  for (const operation of ["members.update", "members.remove"] as const) {
+    it.effect(`${operation} avoids unnecessary database round trips`, () =>
+      Effect.gen(function* () {
+        const f = yield* Fixture
+        const before = (yield* run["members.list"](f.jane, { teamId: f.acme })).find(
+          (member) => member.userId === f.sam.userId,
+        )
+        expect(before).toBeDefined()
+        const statements: Array<string> = []
+        const changed = yield* Effect.gen(function* () {
+          if (operation === "members.update") {
+            return yield* run["members.update"](f.jane, { teamId: f.acme, userId: f.sam.userId, role: "admin" })
+          }
+          return yield* run["members.remove"](f.jane, { teamId: f.acme, userId: f.sam.userId })
+        }).pipe(
+          Effect.provideService(Statement.CurrentTransformer, (statement) =>
+            Effect.sync(() => {
+              const [text] = statement.compile()
+              if (!/^(begin|commit|rollback|savepoint|release)\b/i.test(text)) statements.push(text)
+              return statement
+            }),
+          ),
+        )
+        expect(changed).toEqual({ ...before, role: operation === "members.update" ? "admin" : "member" })
+        expect(statements.some((text) => /^(update|delete)\b/i.test(text))).toBe(true)
+        expect(statements.length).toBeLessThanOrEqual(operation === "members.update" ? 5 : 7)
+        const after = (yield* run["members.list"](f.jane, { teamId: f.acme })).find(
+          (member) => member.userId === f.sam.userId,
+        )
+        expect(after).toEqual(operation === "members.update" ? changed : undefined)
+      }).pipe(Effect.provide(CoreLive)),
+    )
+  }
+
   it.effect("invites by email, accepts, changes roles, and always keeps an owner", () =>
     Effect.gen(function* () {
       const f = yield* Fixture

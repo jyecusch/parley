@@ -1,6 +1,6 @@
 import { Database, schema } from "@parley/db"
 import { type DatabaseUnavailable, LastOwner, type Member, type Role, type TeamId, type UserId } from "@parley/domain"
-import { and, asc, eq, ne, sql } from "drizzle-orm"
+import { and, asc, count, eq, ne, sql } from "drizzle-orm"
 import { Context, Effect, Layer } from "effect"
 import type { SqlError } from "effect/sql"
 import type { MemberChangeable, MemberRemovable } from "../proofs/member-changes.ts"
@@ -152,44 +152,50 @@ export class Members extends Context.Service<
       const people = <P, T>(member: MemberOf<P, T>) => peopleWhere(member.team.value)
       const person = (teamId: TeamId, userId: UserId) => Effect.map(peopleWhere(teamId, userId), ([found]) => found)
 
-      const ownersOf = (teamId: TeamId) =>
+      const ownerCount = (teamId: TeamId) =>
         run(
           db.query((d) =>
             d
-              .select({ userId: schema.member.userId })
+              .select({ count: count() })
               .from(schema.member)
               .where(and(eq(schema.member.organizationId, teamId), eq(schema.member.role, "owner"))),
           ),
-        )
+        ).pipe(Effect.map(([row]) => row?.count ?? 0))
 
       const changeRole = <P, T, U>(transaction: MemberTransaction<T>, target: MemberChangeable<P, T, U>) =>
         Effect.gen(function* () {
           const teamId = transaction.team.value
           const userId = target.user.value
           const role = target.newRole
-          const owners = yield* ownersOf(teamId)
-          if (role !== "owner" && owners.length === 1 && owners[0]?.userId === userId) {
+          const removesOwner = target.found.role === "owner" && role !== "owner"
+          if (removesOwner && (yield* ownerCount(teamId)) < 2) {
             return yield* new LastOwner({ team: target.teamName })
           }
-          yield* run(
+          const [updated] = yield* run(
             db.query((d) =>
               d
                 .update(schema.member)
                 .set({ role })
-                .where(and(eq(schema.member.organizationId, teamId), eq(schema.member.userId, userId))),
+                .from(schema.user)
+                .where(
+                  and(
+                    eq(schema.member.organizationId, teamId),
+                    eq(schema.member.userId, userId),
+                    eq(schema.user.id, schema.member.userId),
+                  ),
+                )
+                .returning({ name: schema.user.name, email: schema.user.email, joinedAt: schema.member.createdAt }),
             ),
           )
-          const updated = yield* person(teamId, userId)
           if (!updated) return yield* Effect.die("member vanished during a role change")
-          return updated
+          return { userId, name: updated.name, email: updated.email, role, joinedAt: updated.joinedAt.toISOString() }
         }).pipe(Effect.withSpan("Members.changeRole"))
 
       const remove = <P, T, U>(transaction: MemberTransaction<T>, target: MemberRemovable<P, T, U>) =>
         Effect.gen(function* () {
           const teamId = transaction.team.value
           const userId = target.user.value
-          const owners = yield* ownersOf(teamId)
-          if (owners.length === 1 && owners[0]?.userId === userId)
+          if (target.found.role === "owner" && (yield* ownerCount(teamId)) < 2)
             return yield* new LastOwner({ team: target.teamName })
           yield* run(
             db.query((d) =>

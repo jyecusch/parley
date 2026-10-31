@@ -327,7 +327,9 @@ The stable team row is the common lock for role changes, removals, and service-a
 
 `MemberChangeable<P, T, U>` carries the exact `newRole` checked by the prover. `Members.changeRole` takes that role from the proof rather than accepting another role argument. Removal requires a distinct `MemberRemovable<P, T, U>` proof, which includes the signed-in-user restriction when leaving. Both facts name the principal as well as the team and target, so the operation checked is the operation performed. `MemberInvitable<P, T>` carries the permitted invitation role; an ordinary member-management proof cannot be used to invite an owner.
 
-The team lock stays held through the last-owner check, all database writes, and the result read. A typed error or defect rolls back the work. There is no owner-only lock set whose membership can change between requests. Teams proceed independently. Ordinary record edits keep their existing behavior; this mechanism serializes member and invitation changes, not every operation in a team.
+The team lock stays held through the last-owner check, all database writes, and the returned result. A typed error or defect rolls back the work. There is no owner-only lock set whose membership can change between requests. Teams proceed independently. Ordinary record edits keep their existing behavior; this mechanism serializes member and invitation changes, not every operation in a team.
+
+Permission proofs derive from the membership lookup in memory. The target's role, read under the team lock, determines whether an owner count is needed: only demoting or removing an owner queries that invariant. Role updates join the user's details and return the result with `UPDATE … FROM … RETURNING`, avoiding a separate result query. These reductions keep every authorization read inside the transaction.
 
 Invitation email is prepared during the transaction and sent after commit. Provider latency does not hold the team lock. If delivery fails, the invitation remains pending and inviting the address again refreshes it and retries delivery. This is not atomic email delivery; a durable email outbox would be a separate guarantee.
 
