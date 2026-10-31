@@ -2,13 +2,11 @@ import { Database, schema } from "@parley/db"
 import {
   AlreadyAMember,
   type DatabaseUnavailable,
-  type EmailError,
   type Invitation,
   InvitationExpired,
   InvitationForAnotherEmail,
   type InvitationId,
   InvitationNotFound,
-  type Role,
   type Team,
   type TeamId,
   type UserId,
@@ -18,9 +16,11 @@ import { and, desc, eq, sql } from "drizzle-orm"
 import { Context, Effect, Layer } from "effect"
 import type { SqlError } from "effect/sql"
 import { PublicUrl } from "../config/public-url.ts"
-import { Mailer } from "../mail/mailer.ts"
+import type { OutgoingEmail } from "../mail/mailer.ts"
 import { renderInvitation } from "../mail/templates.ts"
+import type { MemberInvitable } from "../proofs/member-changes.ts"
 import type { CanManageMembers } from "../proofs/permissions.ts"
+import { MemberChanges, type MemberTransaction } from "./member-changes.ts"
 import { isRole } from "./members.ts"
 import { classifySqlError } from "./sql-errors.ts"
 
@@ -61,11 +61,15 @@ export class Invitations extends Context.Service<
       access: CanManageMembers<P, T>,
     ) => Effect.Effect<ReadonlyArray<Invitation>, DatabaseUnavailable>
     readonly create: <P, T>(
-      access: CanManageMembers<P, T>,
+      transaction: MemberTransaction<T>,
+      access: MemberInvitable<P, T>,
       email: string,
-      role: Role,
-    ) => Effect.Effect<Invitation, AlreadyAMember | EmailError | DatabaseUnavailable>
+    ) => Effect.Effect<
+      { readonly invitation: Invitation; readonly email: OutgoingEmail },
+      AlreadyAMember | DatabaseUnavailable
+    >
     readonly revoke: <P, T>(
+      transaction: MemberTransaction<T>,
       access: CanManageMembers<P, T>,
       invitationId: InvitationId,
     ) => Effect.Effect<Invitation, InvitationNotFound | DatabaseUnavailable>
@@ -91,7 +95,7 @@ export class Invitations extends Context.Service<
     Invitations,
     Effect.gen(function* () {
       const db = yield* Database
-      const mailer = yield* Mailer
+      const changes = yield* MemberChanges
       const baseURL = yield* PublicUrl.pipe(Effect.orDie)
       const run = <A>(effect: Effect.Effect<A, SqlError.SqlError>) =>
         effect.pipe(Effect.catchTag("SqlError", classifySqlError))
@@ -129,10 +133,11 @@ export class Invitations extends Context.Service<
           (rows) => rows.map(summarize).filter((invitation) => invitation.status === "pending"),
         )
 
-      const create = <P, T>(access: CanManageMembers<P, T>, rawEmail: string, role: Role) =>
+      const create = <P, T>(transaction: MemberTransaction<T>, access: MemberInvitable<P, T>, rawEmail: string) =>
         Effect.gen(function* () {
+          const role = access.role
           const email = rawEmail.trim().toLowerCase()
-          const teamId: TeamId = access.member.team.value
+          const teamId = transaction.team.value
           const [existingMember] = yield* run(
             db.query((d) =>
               d
@@ -172,15 +177,18 @@ export class Invitations extends Context.Service<
             link: `${baseURL}/invite/${id}`,
             validDays: VALID_DAYS,
           })
-          yield* mailer.send({ to: email, ...message })
-          return invitation
+          return { invitation, email: { to: email, ...message } }
         }).pipe(Effect.withSpan("Invitations.create"))
 
-      const revoke = <P, T>(access: CanManageMembers<P, T>, invitationId: InvitationId) =>
+      const revoke = <P, T>(
+        transaction: MemberTransaction<T>,
+        _access: CanManageMembers<P, T>,
+        invitationId: InvitationId,
+      ) =>
         Effect.gen(function* () {
           const [row] = yield* select(
             and(
-              eq(schema.invitation.organizationId, access.member.team.value),
+              eq(schema.invitation.organizationId, transaction.team.value),
               sql`${schema.invitation.id} = ${invitationId}`,
             ),
           )
@@ -193,7 +201,7 @@ export class Invitations extends Context.Service<
           return summarize(yield* byId(invitationId))
         })
 
-      const forRecipient = (invitationId: InvitationId, email: string) =>
+      const forRecipientRow = (invitationId: InvitationId, email: string) =>
         Effect.gen(function* () {
           const [row] = yield* select(and(sql`${schema.invitation.id} = ${invitationId}`))
           if (!row || row.invitation.status === "revoked" || row.invitation.status === "canceled") {
@@ -202,8 +210,11 @@ export class Invitations extends Context.Service<
           if (row.invitation.email.toLowerCase() !== email.toLowerCase()) {
             return yield* new InvitationForAnotherEmail()
           }
-          return summarize(row)
+          return row
         })
+
+      const forRecipient = (invitationId: InvitationId, email: string) =>
+        Effect.map(forRecipientRow(invitationId, email), summarize)
 
       const pendingFor = (email: string) =>
         Effect.map(
@@ -218,35 +229,42 @@ export class Invitations extends Context.Service<
 
       const decline = (invitationId: InvitationId, email: string) =>
         Effect.gen(function* () {
-          const invitation = yield* forRecipient(invitationId, email)
-          if (invitation.status !== "pending") return yield* new InvitationNotFound({ invitationId })
-          yield* run(
-            db.query((d) =>
-              d.update(schema.invitation).set({ status: "rejected" }).where(eq(schema.invitation.id, invitationId)),
-            ),
+          const routing = yield* forRecipientRow(invitationId, email)
+          return yield* changes.inTeam(routing.invitation.organizationId as TeamId, () =>
+            Effect.gen(function* () {
+              const invitation = yield* forRecipient(invitationId, email)
+              if (invitation.status !== "pending") return yield* new InvitationNotFound({ invitationId })
+              yield* run(
+                db.query((d) =>
+                  d.update(schema.invitation).set({ status: "rejected" }).where(eq(schema.invitation.id, invitationId)),
+                ),
+              )
+              return summarize(yield* byId(invitationId))
+            }),
           )
-          return summarize(yield* byId(invitationId))
         })
 
       const accept = (invitationId: InvitationId, user: { readonly id: UserId; readonly email: string }) =>
         Effect.gen(function* () {
-          const invitation = yield* forRecipient(invitationId, user.email)
-          if (invitation.status !== "pending") {
-            return yield* new InvitationExpired({ used: invitation.status === "accepted" })
-          }
-          const [row] = yield* select(and(sql`${schema.invitation.id} = ${invitationId}`))
-          const teamId = row?.invitation.organizationId ?? ""
-          yield* run(
-            db.transaction(
-              Effect.gen(function* () {
-                const [already] = yield* db.query((d) =>
+          const routing = yield* forRecipientRow(invitationId, user.email)
+          return yield* changes.inTeam(routing.invitation.organizationId as TeamId, (transaction) =>
+            Effect.gen(function* () {
+              const invitation = yield* forRecipient(invitationId, user.email)
+              if (invitation.status !== "pending") {
+                return yield* new InvitationExpired({ used: invitation.status === "accepted" })
+              }
+              const teamId = transaction.team.value
+              const [already] = yield* run(
+                db.query((d) =>
                   d
                     .select({ id: schema.member.id })
                     .from(schema.member)
                     .where(and(eq(schema.member.organizationId, teamId), eq(schema.member.userId, user.id))),
-                )
-                if (!already) {
-                  yield* db.query((d) =>
+                ),
+              )
+              if (!already) {
+                yield* run(
+                  db.query((d) =>
                     d.insert(schema.member).values({
                       id: crypto.randomUUID(),
                       organizationId: teamId,
@@ -254,23 +272,25 @@ export class Invitations extends Context.Service<
                       role: invitation.role,
                       createdAt: new Date(),
                     }),
-                  )
-                }
-                yield* db.query((d) =>
-                  d.update(schema.invitation).set({ status: "accepted" }).where(eq(schema.invitation.id, invitationId)),
+                  ),
                 )
-              }),
-            ),
+              }
+              yield* run(
+                db.query((d) =>
+                  d.update(schema.invitation).set({ status: "accepted" }).where(eq(schema.invitation.id, invitationId)),
+                ),
+              )
+              const [settings] = yield* run(
+                db.query((d) => d.select().from(schema.teamSettings).where(eq(schema.teamSettings.teamId, teamId))),
+              )
+              return {
+                id: teamId,
+                name: invitation.teamName,
+                role: invitation.role,
+                gravatar: settings?.gravatar ?? false,
+              } satisfies Team
+            }),
           )
-          const [settings] = yield* run(
-            db.query((d) => d.select().from(schema.teamSettings).where(eq(schema.teamSettings.teamId, teamId))),
-          )
-          return {
-            id: teamId as TeamId,
-            name: invitation.teamName,
-            role: invitation.role,
-            gravatar: settings?.gravatar ?? false,
-          } satisfies Team
         }).pipe(Effect.withSpan("Invitations.accept"))
 
       return { list, create, revoke, forRecipient, pendingFor, decline, accept }

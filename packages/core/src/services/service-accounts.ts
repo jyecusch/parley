@@ -5,8 +5,8 @@ import { alias } from "drizzle-orm/pg-core"
 import { Context, Effect, Layer } from "effect"
 import type { MemberOf } from "../proofs/member-of.ts"
 import type { CanManageServiceAccounts } from "../proofs/permissions.ts"
-import type { Named } from "../proofs/proof.ts"
 import type { ServiceAccountInTeam } from "../proofs/service-account-in-team.ts"
+import type { MemberTransaction } from "./member-changes.ts"
 import { classifySqlError } from "./sql-errors.ts"
 
 const isRole = (role: string): role is Role => role === "owner" || role === "admin" || role === "member"
@@ -27,17 +27,19 @@ export class ServiceAccounts extends Context.Service<
       serviceAccountId: UserId,
     ) => Effect.Effect<ServiceAccount | undefined, DatabaseUnavailable>
     readonly create: <P, T>(
-      team: Named<T, TeamId>,
-      input: { readonly name: string; readonly role: Role },
+      transaction: MemberTransaction<T>,
+      input: { readonly name: string; readonly role: Exclude<Role, "owner"> },
       access: CanManageServiceAccounts<P, T>,
     ) => Effect.Effect<ServiceAccount, DatabaseUnavailable>
     readonly update: <P, T, S>(
+      transaction: MemberTransaction<T>,
       target: ServiceAccountInTeam<P, T, S>,
       changes: { readonly name?: string | undefined; readonly role?: "admin" | "member" | undefined },
       access: CanManageServiceAccounts<P, T>,
     ) => Effect.Effect<ServiceAccount, DatabaseUnavailable>
     /** Deletes the account, its API keys and its connections. Its activity and notes keep its name. */
     readonly delete: <P, T, S>(
+      transaction: MemberTransaction<T>,
       target: ServiceAccountInTeam<P, T, S>,
       access: CanManageServiceAccounts<P, T>,
     ) => Effect.Effect<ServiceAccount, DatabaseUnavailable>
@@ -114,97 +116,83 @@ export class ServiceAccounts extends Context.Service<
         )
 
       const create = <P, T>(
-        team: Named<T, TeamId>,
-        input: { readonly name: string; readonly role: Role },
+        transaction: MemberTransaction<T>,
+        input: { readonly name: string; readonly role: Exclude<Role, "owner"> },
         access: CanManageServiceAccounts<P, T>,
       ) =>
         Effect.gen(function* () {
+          const team = transaction.team
           const creatorId = access.member.principal.value.userId
           const id = crypto.randomUUID()
           const now = new Date()
-          yield* db
-            .transaction(
-              Effect.gen(function* () {
-                yield* db.query((d) =>
-                  d.insert(schema.user).values({
-                    id,
-                    name: input.name,
-                    // Never deliverable, never used to sign in: service accounts have no password (D18).
-                    email: `${id}@service-accounts.parley.invalid`,
-                    emailVerified: false,
-                    kind: "service-account",
-                    createdAt: now,
-                    updatedAt: now,
-                  }),
-                )
-                yield* db.query((d) =>
-                  d.insert(schema.member).values({
-                    id: crypto.randomUUID(),
-                    organizationId: team.value,
-                    userId: id,
-                    role: input.role,
-                    createdAt: now,
-                  }),
-                )
-                yield* db.query((d) =>
-                  d
-                    .insert(schema.serviceAccounts)
-                    .values({ userId: id, teamId: team.value, createdByUserId: creatorId }),
-                )
-              }),
-            )
-            .pipe(Effect.catchTag("SqlError", classifySqlError))
+          yield* db.query((d) =>
+            d.insert(schema.user).values({
+              id,
+              name: input.name,
+              // Never deliverable, never used to sign in: service accounts have no password (D18).
+              email: `${id}@service-accounts.parley.invalid`,
+              emailVerified: false,
+              kind: "service-account",
+              createdAt: now,
+              updatedAt: now,
+            }),
+          )
+          yield* db.query((d) =>
+            d.insert(schema.member).values({
+              id: crypto.randomUUID(),
+              organizationId: team.value,
+              userId: id,
+              role: input.role,
+              createdAt: now,
+            }),
+          )
+          yield* db.query((d) =>
+            d.insert(schema.serviceAccounts).values({ userId: id, teamId: team.value, createdByUserId: creatorId }),
+          )
           const [created] = yield* select(team.value, id as UserId)
           if (!created) return yield* Effect.die(`service account ${id} vanished after creation`)
           return created
-        }).pipe(Effect.withSpan("ServiceAccounts.create"))
+        }).pipe(Effect.catchTag("SqlError", classifySqlError), Effect.withSpan("ServiceAccounts.create"))
 
       const update = <P, T, S>(
+        transaction: MemberTransaction<T>,
         target: ServiceAccountInTeam<P, T, S>,
         changes: { readonly name?: string | undefined; readonly role?: "admin" | "member" | undefined },
         _access: CanManageServiceAccounts<P, T>,
       ) =>
         Effect.gen(function* () {
           const id = target.serviceAccount.value
-          const teamId = target.member.team.value
-          yield* db
-            .transaction(
-              Effect.gen(function* () {
-                if (changes.name !== undefined) {
-                  const name = changes.name
-                  yield* db.query((d) => d.update(schema.user).set({ name }).where(eq(schema.user.id, id)))
-                }
-                if (changes.role !== undefined) {
-                  const role = changes.role
-                  yield* db.query((d) =>
-                    d
-                      .update(schema.member)
-                      .set({ role })
-                      .where(and(eq(schema.member.organizationId, teamId), eq(schema.member.userId, id))),
-                  )
-                }
-              }),
+          const teamId = transaction.team.value
+          if (changes.name !== undefined) {
+            const name = changes.name
+            yield* db.query((d) => d.update(schema.user).set({ name }).where(eq(schema.user.id, id)))
+          }
+          if (changes.role !== undefined) {
+            const role = changes.role
+            yield* db.query((d) =>
+              d
+                .update(schema.member)
+                .set({ role })
+                .where(and(eq(schema.member.organizationId, teamId), eq(schema.member.userId, id))),
             )
-            .pipe(Effect.catchTag("SqlError", classifySqlError))
+          }
           const [updated] = yield* select(teamId, id)
           if (!updated) return yield* Effect.die(`service account ${id} vanished`)
           return updated
-        }).pipe(Effect.withSpan("ServiceAccounts.update"))
+        }).pipe(Effect.catchTag("SqlError", classifySqlError), Effect.withSpan("ServiceAccounts.update"))
 
-      const remove = <P, T, S>(target: ServiceAccountInTeam<P, T, S>, _access: CanManageServiceAccounts<P, T>) =>
+      const remove = <P, T, S>(
+        _transaction: MemberTransaction<T>,
+        target: ServiceAccountInTeam<P, T, S>,
+        _access: CanManageServiceAccounts<P, T>,
+      ) =>
         Effect.gen(function* () {
           const id = target.serviceAccount.value
-          yield* db
-            .transaction(
-              Effect.gen(function* () {
-                // API keys name their owner without a foreign key, so they go first; the rest cascades.
-                yield* db.query((d) => d.delete(schema.apikey).where(eq(schema.apikey.referenceId, id)))
-                yield* db.query((d) => d.delete(schema.user).where(eq(schema.user.id, id)))
-              }),
-            )
-            .pipe(Effect.catchTag("SqlError", classifySqlError))
+          // API keys name their owner without a foreign key, so they go first; the rest cascades.
+          yield* db.query((d) => d.delete(schema.apikey).where(eq(schema.apikey.referenceId, id)))
+          yield* db.query((d) => d.delete(schema.user).where(eq(schema.user.id, id)))
           return target.found
-        }).pipe(Effect.withSpan("ServiceAccounts.delete"))
+        }).pipe(Effect.catchTag("SqlError", classifySqlError), Effect.withSpan("ServiceAccounts.delete"))
 
       return { list, locate, create, update, delete: remove }
     }),

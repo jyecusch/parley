@@ -73,7 +73,7 @@ We're not starting from zero. Effect's `Layer` and `Context.Service` already do 
 
 **Requirements are visible.** A `Layer.Layer<BroadcastSender, never, Mailer | TeamSendingSettings>` says in its type what it needs to be built. That's why our story's diff *did* make the compiler speak up. The `R` channel is the "needs list" that the write-up this post is based on had to invent by hand.
 
-**Service methods take arguments, not ambient context.** Our convention, from Effect's own guidance, is that service methods have `R = never`. Whatever a method needs per call, it takes as a parameter. That's the habit that makes everything later in this post work.
+**Service methods take arguments, not ambient context.** Our convention, from Effect's own guidance, is that service methods have `R = never`. Whatever a method needs per call, it takes as a parameter. That's the habit that makes everything later in this post work. Transaction combinators are an explicit exception: `MemberChanges.inTeam`, like `Database.transaction`, preserves its callback's requirements while executing it. It never stores that callback or its request context for later work.
 
 ### Where Effect stops
 

@@ -3,8 +3,9 @@ import { type DatabaseUnavailable, LastOwner, type Member, type Role, type TeamI
 import { and, asc, eq, ne, sql } from "drizzle-orm"
 import { Context, Effect, Layer } from "effect"
 import type { SqlError } from "effect/sql"
-import type { MemberInTeam } from "../proofs/member-in-team.ts"
-import type { CanManageMembers, MemberOf } from "../proofs/permissions.ts"
+import type { MemberChangeable, MemberRemovable } from "../proofs/member-changes.ts"
+import type { MemberOf } from "../proofs/permissions.ts"
+import type { MemberTransaction } from "./member-changes.ts"
 import { classifySqlError } from "./sql-errors.ts"
 
 export type MemberLookup =
@@ -31,7 +32,7 @@ export class Members extends Context.Service<
     >
     /** The people in a team (not service accounts), owners first. */
     readonly people: <P, T>(member: MemberOf<P, T>) => Effect.Effect<ReadonlyArray<Member>, DatabaseUnavailable>
-    /** Used only by the MemberInTeam prover. */
+    /** person returns the current user and role for member-change proofs. */
     readonly person: (teamId: TeamId, userId: UserId) => Effect.Effect<Member | undefined, DatabaseUnavailable>
     /** Everyone in the team, people and service accounts, for matching a name or email to a member. */
     readonly everyone: (
@@ -41,12 +42,14 @@ export class Members extends Context.Service<
       DatabaseUnavailable
     >
     readonly changeRole: <P, T, U>(
-      target: MemberInTeam<T, U>,
-      role: Role,
-      access: CanManageMembers<P, T>,
+      transaction: MemberTransaction<T>,
+      target: MemberChangeable<P, T, U>,
     ) => Effect.Effect<Member, LastOwner | DatabaseUnavailable>
     /** Removes a member; the proof is either members:manage or the member leaving themselves. */
-    readonly remove: <T, U>(target: MemberInTeam<T, U>) => Effect.Effect<Member, LastOwner | DatabaseUnavailable>
+    readonly remove: <P, T, U>(
+      transaction: MemberTransaction<T>,
+      target: MemberRemovable<P, T, U>,
+    ) => Effect.Effect<Member, LastOwner | DatabaseUnavailable>
   }
 >()("@parley/core/Members") {
   static readonly layer = Layer.effect(
@@ -149,78 +152,69 @@ export class Members extends Context.Service<
       const people = <P, T>(member: MemberOf<P, T>) => peopleWhere(member.team.value)
       const person = (teamId: TeamId, userId: UserId) => Effect.map(peopleWhere(teamId, userId), ([found]) => found)
 
-      /**
-       * Re-reads the team's owners under a row lock inside the write, so two concurrent changes can't
-       * both remove the last owner (D36).
-       */
-      const ownersLocked = (teamId: TeamId) =>
-        db.query((d) =>
-          d
-            .select({ userId: schema.member.userId })
-            .from(schema.member)
-            .where(and(eq(schema.member.organizationId, teamId), eq(schema.member.role, "owner")))
-            .for("update"),
+      const ownersOf = (teamId: TeamId) =>
+        run(
+          db.query((d) =>
+            d
+              .select({ userId: schema.member.userId })
+              .from(schema.member)
+              .where(and(eq(schema.member.organizationId, teamId), eq(schema.member.role, "owner"))),
+          ),
         )
 
-      const changeRole = <P, T, U>(target: MemberInTeam<T, U>, role: Role, _access: CanManageMembers<P, T>) =>
+      const changeRole = <P, T, U>(transaction: MemberTransaction<T>, target: MemberChangeable<P, T, U>) =>
         Effect.gen(function* () {
-          const teamId = target.team.value
+          const teamId = transaction.team.value
           const userId = target.user.value
-          const outcome = yield* run(
-            db.transaction(
-              Effect.gen(function* () {
-                const owners = yield* ownersLocked(teamId)
-                const isOwner = owners.some((owner) => owner.userId === userId)
-                if (isOwner && role !== "owner" && owners.length === 1) return "last-owner" as const
-                yield* db.query((d) =>
-                  d
-                    .update(schema.member)
-                    .set({ role })
-                    .where(and(eq(schema.member.organizationId, teamId), eq(schema.member.userId, userId))),
-                )
-                return "done" as const
-              }),
+          const role = target.newRole
+          const owners = yield* ownersOf(teamId)
+          if (role !== "owner" && owners.length === 1 && owners[0]?.userId === userId) {
+            return yield* new LastOwner({ team: target.teamName })
+          }
+          yield* run(
+            db.query((d) =>
+              d
+                .update(schema.member)
+                .set({ role })
+                .where(and(eq(schema.member.organizationId, teamId), eq(schema.member.userId, userId))),
             ),
           )
-          if (outcome === "last-owner") return yield* new LastOwner({ team: target.teamName })
           const updated = yield* person(teamId, userId)
-          if (!updated) return yield* Effect.die("member vanished after a role change")
+          if (!updated) return yield* Effect.die("member vanished during a role change")
           return updated
         }).pipe(Effect.withSpan("Members.changeRole"))
 
-      const remove = <T, U>(target: MemberInTeam<T, U>) =>
+      const remove = <P, T, U>(transaction: MemberTransaction<T>, target: MemberRemovable<P, T, U>) =>
         Effect.gen(function* () {
-          const teamId = target.team.value
+          const teamId = transaction.team.value
           const userId = target.user.value
-          const outcome = yield* run(
-            db.transaction(
-              Effect.gen(function* () {
-                const owners = yield* ownersLocked(teamId)
-                if (owners.length === 1 && owners[0]?.userId === userId) return "last-owner" as const
-                yield* db.query((d) =>
-                  d
-                    .delete(schema.member)
-                    .where(and(eq(schema.member.organizationId, teamId), eq(schema.member.userId, userId))),
-                )
-                // Their records in this team no longer have an owner (D123). The foreign key only
-                // clears it when the user is deleted, not when they leave a team.
-                yield* db.query((d) =>
-                  d
-                    .update(schema.contacts)
-                    .set({ ownerId: null, updatedAt: sql`now()` })
-                    .where(and(eq(schema.contacts.teamId, teamId), eq(schema.contacts.ownerId, userId))),
-                )
-                yield* db.query((d) =>
-                  d
-                    .update(schema.companies)
-                    .set({ ownerId: null, updatedAt: sql`now()` })
-                    .where(and(eq(schema.companies.teamId, teamId), eq(schema.companies.ownerId, userId))),
-                )
-                return "done" as const
-              }),
+          const owners = yield* ownersOf(teamId)
+          if (owners.length === 1 && owners[0]?.userId === userId)
+            return yield* new LastOwner({ team: target.teamName })
+          yield* run(
+            db.query((d) =>
+              d
+                .delete(schema.member)
+                .where(and(eq(schema.member.organizationId, teamId), eq(schema.member.userId, userId))),
             ),
           )
-          if (outcome === "last-owner") return yield* new LastOwner({ team: target.teamName })
+          // Record-owner foreign keys target users, so leaving a team needs to clear these explicitly.
+          yield* run(
+            db.query((d) =>
+              d
+                .update(schema.contacts)
+                .set({ ownerId: null, updatedAt: sql`now()` })
+                .where(and(eq(schema.contacts.teamId, teamId), eq(schema.contacts.ownerId, userId))),
+            ),
+          )
+          yield* run(
+            db.query((d) =>
+              d
+                .update(schema.companies)
+                .set({ ownerId: null, updatedAt: sql`now()` })
+                .where(and(eq(schema.companies.teamId, teamId), eq(schema.companies.ownerId, userId))),
+            ),
+          )
           return target.found
         }).pipe(Effect.withSpan("Members.remove"))
 

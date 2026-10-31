@@ -124,6 +124,23 @@ describe("members and invitations", () => {
     }).pipe(Effect.provide(CoreLive)),
   )
 
+  it.effect("only an owner can authorize an owner invitation", () =>
+    Effect.gen(function* () {
+      const f = yield* Fixture
+      yield* run["members.update"](f.jane, { teamId: f.acme, userId: f.sam.userId, role: "admin" })
+      const email = `owner-${crypto.randomUUID()}@example.com`
+      const refused = yield* run["invitations.create"](f.sam, {
+        teamId: f.acme,
+        email: email as never,
+        role: "owner",
+      }).pipe(Effect.flip)
+      expect(refused._tag).toBe("OwnerChangeNeedsOwner")
+      expect(yield* run["invitations.list"](f.jane, { teamId: f.acme })).toEqual([])
+      const invited = yield* run["invitations.create"](f.jane, { teamId: f.acme, email: email as never, role: "owner" })
+      expect(invited).toMatchObject({ email, role: "owner", status: "pending" })
+    }).pipe(Effect.provide(CoreLive)),
+  )
+
   it.effect("team settings and service accounts", () =>
     Effect.gen(function* () {
       const f = yield* Fixture

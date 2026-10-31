@@ -22,6 +22,7 @@ import { Forms } from "./services/forms.ts"
 import { ImportRunner } from "./services/import-runner.ts"
 import { Imports } from "./services/imports.ts"
 import { Invitations } from "./services/invitations.ts"
+import { MemberChanges } from "./services/member-changes.ts"
 import { Members } from "./services/members.ts"
 import { Notes } from "./services/notes.ts"
 import { Purge } from "./services/purge.ts"
@@ -92,7 +93,7 @@ const Services = Layer.mergeAll(
   BroadcastSender.layer,
   DeliveryEvents.layer,
   Imports.layer,
-).pipe(Layer.provideMerge(Layer.mergeAll(UnsubscribeLinks.layer, RateLimiter.layer)))
+).pipe(Layer.provideMerge(Layer.mergeAll(UnsubscribeLinks.layer, RateLimiter.layer, MemberChanges.layer)))
 
 /** Forms (D144–D150), built on the services: their submissions write contacts as any change does. */
 const formsLive = (outside: Layer.Layer<Turnstile | EmailChecks>) =>

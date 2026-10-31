@@ -40,7 +40,7 @@ We are **not** using the `gdp-ts` library. We're writing our own Effect-native v
 
 - An **entrypoint** (web, HTTP, MCP, CLI) turns a session cookie or an API key into a `Principal`, which says *who is knocking*. That's all it does. It contains no `if (role === …)` and no permission names. It couldn't use them anyway.
 - **`core/src/proofs/`** is the *only* directory that decides authorization. Each file checks one fact and mints a proof of it.
-- **Services** (the code that touches the database) take proofs as arguments. They never perform checks. They just refuse to compile without the proof.
+- **Services** (the code that touches the database) take proofs as arguments. Provers decide authorization; services enforce database invariants such as keeping a last owner inside the same transaction as the write.
 
 The type checker enforces the required kinds and names; runtime checks enforce when named values and proof fields may be read.
 
@@ -306,7 +306,32 @@ A proof says a fact held **when it was checked**. It doesn't say the fact still 
 
 A short execution reduces this window; it does not eliminate it. `named` checks access to named values and proof fields at runtime after the Effect finishes. TypeScript alone cannot prevent retaining them in closures. Storage rules described below are proposed additional checks, not the mechanism that enforces expiration. Background work stores ordinary IDs and rechecks authorization in a new execution; it never treats a retained proof as fresh authorization.
 
-There's one place where milliseconds matter: **operations that change authorization state itself.** Picture two admins demoting each other at the same moment, or the last owner being removed while they transfer ownership. **Decided (D36):** for that small set (role changes, member removal, team deletion), the operation re-reads the member row `FOR UPDATE` inside the same transaction as the write, and enforces invariants like "at least one owner" there too. Ordinary record edits don't need this.
+**Operations that change authorization state itself must check and write atomically.** Two admins must not both act on permissions one has just removed from the other. An admin must not change a target who became an owner while the request waited. Two owners must not both give up ownership.
+
+**Implemented (D36, D165):** [`MemberChanges.inTeam`](../packages/core/src/services/member-changes.ts) starts a `READ COMMITTED` database transaction and locks the team's row `FOR UPDATE`. After acquiring the lock, it creates a fresh named team and supplies an opaque `MemberTransaction<T>` to the callback. The operation then proves the principal's current role, permission ceiling, and target's current role and performs the write. The write methods require both this member transaction and proofs about its fresh team name. A proof made before acquiring the lock cannot satisfy that signature, even when the raw team ID is the same.
+
+```ts
+return yield* changes.inTeam(input.teamId, (transaction) =>
+  Effect.gen(function* () {
+    const member = yield* proveMemberOf(principal, transaction.team)
+    const access = yield* proveCanManageMembers(member)
+    const target = yield* proveMemberChangeable(access, user, input.role)
+    return yield* members.changeRole(transaction, target)
+  }),
+)
+```
+
+The stable team row is the common lock for role changes, removals, and service-account creation, changes and deletion. Invitation creation, refresh, revocation, acceptance and decline use it too; recipient operations re-read the invitation after locking. Creating a new team establishes its first owner through Better-Auth before that team is available to other requests. Team deletion is not implemented and must use the same lock if introduced.
+
+`READ COMMITTED` is set explicitly before the lock query. Subsequent proof queries therefore see commits made while that query waited, even if the server's default isolation level differs. `inTeam` owns the outer transaction; call it before other transactional work. Its callback runs on that transaction's connection. Services cannot replace the connection or move a protected write to a detached fiber. As with other named values, retaining the transaction does not retain usable access after its callback finishes.
+
+`MemberChangeable<P, T, U>` carries the exact `newRole` checked by the prover. `Members.changeRole` takes that role from the proof rather than accepting another role argument. Removal requires a distinct `MemberRemovable<P, T, U>` proof, which includes the signed-in-user restriction when leaving. Both facts name the principal as well as the team and target, so the operation checked is the operation performed. `MemberInvitable<P, T>` carries the permitted invitation role; an ordinary member-management proof cannot be used to invite an owner.
+
+The team lock stays held through the last-owner check, all database writes, and the result read. A typed error or defect rolls back the work. There is no owner-only lock set whose membership can change between requests. Teams proceed independently. Ordinary record edits keep their existing behavior; this mechanism serializes member and invitation changes, not every operation in a team.
+
+Invitation email is prepared during the transaction and sent after commit. Provider latency does not hold the team lock. If delivery fails, the invitation remains pending and inviting the address again refreshes it and retries delivery. This is not atomic email delivery; a durable email outbox would be a separate guarantee.
+
+The SQL predicates and the use of the transaction connection remain trusted service code. The fresh name proves where authorization was built; it does not make arbitrary SQL correct. Concurrency regressions use real Postgres locks to commit a role change or removal while another request waits, and verify that the waiting request is refused with the appropriate typed error.
 
 ## Keeping everyone honest
 

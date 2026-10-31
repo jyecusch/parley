@@ -14,6 +14,7 @@ import type { EmailStyles } from "../services/email-styles.ts"
 import type { Forms } from "../services/forms.ts"
 import type { Imports } from "../services/imports.ts"
 import type { Invitations } from "../services/invitations.ts"
+import type { MemberChanges } from "../services/member-changes.ts"
 import type { Members } from "../services/members.ts"
 import type { Notes } from "../services/notes.ts"
 import type { RateLimiter } from "../services/rate-limiter.ts"
@@ -55,6 +56,7 @@ export type OperationServices =
   | CustomFields
   | Affiliations
   | Members
+  | MemberChanges
   | Invitations
   | Users
   | Notes

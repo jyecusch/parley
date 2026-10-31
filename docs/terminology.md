@@ -73,6 +73,7 @@ How to pick a name: choose the most common name for the concept. Reject anything
 | **Proof** | An opaque, frozen value recording a fact checked about specific named values, such as `CanWriteRecords<P, T>`. Minted only in `core/src/proofs/`. Its kind and fields can be read only while those named values remain usable; the fact itself can become stale during execution. | evidence, witness, token, guard, assertion |
 | **Prover** | A function in `core/src/proofs/` that checks a fact and returns a proof, or fails with a typed error. | checker, guard, policy, authorizer |
 | **Named value** | An opaque, frozen value given a type-level name by `named(...)`, so proofs can refer to that exact value. Its original value can be read only during the Effect execution that created it. | branded value (brands are a different thing) |
+| **Member transaction** | A database transaction that locks one team before building fresh authorization proofs for member changes. `MemberChanges.inTeam` supplies its opaque `MemberTransaction<T>` only inside the locked callback. | — |
 | **Tier** | How long something lives: **process** (built once), **team** (built per team) or **request**. | scope, lifetime, level |
 | **Package** | A workspace package such as `@parley/core`. | module (for this meaning), lib |
 

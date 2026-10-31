@@ -7,19 +7,20 @@ import {
   type listMembers,
   type myInvitations,
   type OperationInput,
-  OwnerChangeNeedsOwner,
   type removeMember,
   type revokeInvitation,
   SignInRequired,
   type updateMember,
 } from "@parley/domain"
 import { Effect } from "effect"
+import { Mailer } from "../mail/mailer.ts"
 import type { Principal } from "../principal.ts"
-import { isOwner, proveMemberChangeable, proveMemberRemovable } from "../proofs/member-in-team.ts"
+import { proveMemberChangeable, proveMemberInvitable, proveMemberRemovable } from "../proofs/member-changes.ts"
 import { proveMemberOf } from "../proofs/member-of.ts"
 import { proveCanManageMembers } from "../proofs/permissions.ts"
 import { named } from "../proofs/proof.ts"
 import { Invitations } from "../services/invitations.ts"
+import { MemberChanges } from "../services/member-changes.ts"
 import { Members } from "../services/members.ts"
 import { Users } from "../services/users.ts"
 
@@ -33,31 +34,36 @@ export const list = (principal: Principal, input: OperationInput<typeof listMemb
   )
 
 export const update = (principal: Principal, input: OperationInput<typeof updateMember>) =>
-  named(principal, input.teamId, input.userId, (principal, team, user) =>
+  named(principal, input.userId, (principal, user) =>
     Effect.gen(function* () {
+      const changes = yield* MemberChanges
       const members = yield* Members
-      const member = yield* proveMemberOf(principal, team)
-      const canManage = yield* proveCanManageMembers(member)
-      const target = yield* proveMemberChangeable(canManage, user, input.role)
-      return yield* members.changeRole(target, input.role, canManage)
+      return yield* changes.inTeam(input.teamId, (transaction) =>
+        Effect.gen(function* () {
+          const member = yield* proveMemberOf(principal, transaction.team)
+          const canManage = yield* proveCanManageMembers(member)
+          const target = yield* proveMemberChangeable(canManage, user, input.role)
+          return yield* members.changeRole(transaction, target)
+        }),
+      )
     }),
   )
 
-/**
- * Removing someone else needs members:manage. Leaving needs only membership, but only the person,
- * signed in: never an API key or agent acting for them, which could be talked into it.
- */
+/** remove allows a signed-in user to leave; removing another member requires members:manage. */
 export const remove = (principal: Principal, input: OperationInput<typeof removeMember>) =>
-  named(principal, input.teamId, input.userId, (principal, team, user) =>
+  named(principal, input.userId, (principal, user) =>
     Effect.gen(function* () {
+      const changes = yield* MemberChanges
       const members = yield* Members
-      const member = yield* proveMemberOf(principal, team)
-      const leaving = input.userId === principal.value.userId
-      if (leaving && principal.value._tag !== "UserSession")
-        return yield* new SignInRequired({ action: "leave a team" })
-      const canManage = leaving ? undefined : yield* proveCanManageMembers(member)
-      const target = yield* proveMemberRemovable(member, canManage, user)
-      return yield* members.remove(target)
+      return yield* changes.inTeam(input.teamId, (transaction) =>
+        Effect.gen(function* () {
+          const member = yield* proveMemberOf(principal, transaction.team)
+          const leaving = input.userId === principal.value.userId
+          const canManage = leaving ? undefined : yield* proveCanManageMembers(member)
+          const target = yield* proveMemberRemovable(member, canManage, user)
+          return yield* members.remove(transaction, target)
+        }),
+      )
     }),
   )
 
@@ -72,26 +78,36 @@ export const listPending = (principal: Principal, input: OperationInput<typeof l
   )
 
 export const invite = (principal: Principal, input: OperationInput<typeof createInvitation>) =>
-  named(principal, input.teamId, (principal, team) =>
+  named(principal, (principal) =>
     Effect.gen(function* () {
+      const changes = yield* MemberChanges
       const invitations = yield* Invitations
-      const member = yield* proveMemberOf(principal, team)
-      const canManage = yield* proveCanManageMembers(member)
-      const role = input.role ?? "member"
-      if (role === "owner" && !isOwner(member)) {
-        return yield* new OwnerChangeNeedsOwner({ team: member.teamName })
-      }
-      return yield* invitations.create(canManage, input.email, role)
+      const mailer = yield* Mailer
+      const created = yield* changes.inTeam(input.teamId, (transaction) =>
+        Effect.gen(function* () {
+          const member = yield* proveMemberOf(principal, transaction.team)
+          const canManage = yield* proveCanManageMembers(member)
+          const invitation = yield* proveMemberInvitable(canManage, input.role ?? "member")
+          return yield* invitations.create(transaction, invitation, input.email)
+        }),
+      )
+      yield* mailer.send(created.email)
+      return created.invitation
     }),
   )
 
 export const revoke = (principal: Principal, input: OperationInput<typeof revokeInvitation>) =>
-  named(principal, input.teamId, (principal, team) =>
+  named(principal, (principal) =>
     Effect.gen(function* () {
+      const changes = yield* MemberChanges
       const invitations = yield* Invitations
-      const member = yield* proveMemberOf(principal, team)
-      const canManage = yield* proveCanManageMembers(member)
-      return yield* invitations.revoke(canManage, input.invitationId)
+      return yield* changes.inTeam(input.teamId, (transaction) =>
+        Effect.gen(function* () {
+          const member = yield* proveMemberOf(principal, transaction.team)
+          const canManage = yield* proveCanManageMembers(member)
+          return yield* invitations.revoke(transaction, canManage, input.invitationId)
+        }),
+      )
     }),
   )
 

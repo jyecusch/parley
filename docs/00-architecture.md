@@ -109,7 +109,7 @@ Every user manages their own API keys; that needs no permission beyond being a m
 
 **Operation**: one action a principal can take, such as `contacts.update`. It has a name, a description, an input schema, an output schema, an error union, and a body. It is defined once in the **operation registry**, and every entrypoint is derived from it (decision D16). **Every entrypoint exposes the same operations.**
 
-**Proof**: a compile-time value showing that a fact was checked about _these exact values_. For example, `CanWriteRecords<P, T>` means "principal P may write records in team T". A proof can carry what the check found: `MemberOf<P, T>` carries the role and effective permissions. Named values and proofs are opaque, frozen objects; TypeScript rejects copies that replace their contents. Runtime getters refuse access after the `named` Effect execution finishes. A proof records a past check, not a guarantee against concurrent changes. See [04](./04-authorization-proofs.md).
+**Proof**: a compile-time value showing that a fact was checked about _these exact values_. For example, `CanWriteRecords<P, T>` means "principal P may write records in team T". A proof can carry what the check found: `MemberOf<P, T>` carries the role and effective permissions. Named values and proofs are opaque, frozen objects; TypeScript rejects copies that replace their contents. Runtime getters refuse access after the `named` Effect execution finishes. A proof records a past check, not a guarantee against concurrent changes. Member and invitation changes acquire a team lock in a database transaction before building fresh proofs and keep it through the write. See [04](./04-authorization-proofs.md).
 
 ## The records (v1)
 
