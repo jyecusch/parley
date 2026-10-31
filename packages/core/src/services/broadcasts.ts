@@ -46,6 +46,7 @@ const ZERO: BroadcastCounts = {
   delivered: 0,
   skipped: 0,
   failed: 0,
+  unknown: 0,
   bounced: 0,
   markedAsSpam: 0,
   canceled: 0,
@@ -73,6 +74,7 @@ const COUNT_KEY: Readonly<Record<RecipientStatus, keyof BroadcastCounts>> = {
   delivered: "delivered",
   skipped: "skipped",
   failed: "failed",
+  unknown: "unknown",
   bounced: "bounced",
   "marked-as-spam": "markedAsSpam",
   canceled: "canceled",
@@ -404,6 +406,7 @@ export class Broadcasts extends Context.Service<
                       and(
                         eq(schema.broadcastRecipients.broadcastId, broadcastId),
                         eq(schema.broadcastRecipients.status, "queued"),
+                        sql`(${schema.broadcastRecipients.batchId} is null or exists (select 1 from broadcast_batches b where b.id = ${schema.broadcastRecipients.batchId} and b.status = 'canceled'))`,
                       ),
                     ),
                 )
@@ -459,12 +462,25 @@ export class Broadcasts extends Context.Service<
                 if (updated.length === 0) return false
                 yield* db.query((d) =>
                   d
+                    .update(schema.broadcastBatches)
+                    .set({ status: "canceled", claimToken: null, leaseUntil: null, updatedAt: sql`now()` })
+                    .where(
+                      and(
+                        eq(schema.broadcastBatches.broadcastId, broadcastId),
+                        eq(schema.broadcastBatches.status, "pending"),
+                        sql`${schema.broadcastBatches.firstAttemptAt} is null`,
+                      ),
+                    ),
+                )
+                yield* db.query((d) =>
+                  d
                     .update(schema.broadcastRecipients)
                     .set({ status: "canceled", updatedAt: sql`now()` })
                     .where(
                       and(
                         eq(schema.broadcastRecipients.broadcastId, broadcastId),
                         eq(schema.broadcastRecipients.status, "queued"),
+                        sql`(${schema.broadcastRecipients.batchId} is null or exists (select 1 from broadcast_batches b where b.id = ${schema.broadcastRecipients.batchId} and b.status = 'canceled'))`,
                       ),
                     ),
                 )

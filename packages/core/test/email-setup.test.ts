@@ -55,6 +55,8 @@ const provider = (() => {
 const FakeProvider = Layer.succeed(Mailer)({
   send: () => Effect.succeed({ providerId: "fake" }),
   sendBatch: (emails) => Effect.succeed(emails.map(() => ({ providerId: "fake" }))),
+  prepareBatch: () => Effect.succeed({ payload: "[]", providerIdentity: "fake" }),
+  deliverBatch: (input) => Effect.succeed(Array.from({ length: input.count }, () => ({ providerId: "fake" }))),
   outbox: Effect.succeed([]),
   domains: provider.domains,
 })

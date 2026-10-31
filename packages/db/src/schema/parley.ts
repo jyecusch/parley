@@ -612,7 +612,34 @@ export const broadcasts = pgTable(
     finishedAt: timestamp("finished_at", { withTimezone: true }),
     ...timestamps,
   },
-  (t) => [index("broadcasts_team_idx").on(t.teamId, t.updatedAt)],
+  (t) => [
+    index("broadcasts_team_idx").on(t.teamId, t.updatedAt),
+    index("broadcasts_sending_idx").on(t.teamId).where(sql`${t.status} = 'sending'`),
+  ],
+)
+
+/** A durable provider request. Retrying a batch must preserve its payload and idempotency key. */
+export const broadcastBatches = pgTable(
+  "broadcast_batches",
+  {
+    id: uuid("id").primaryKey(),
+    teamId: teamId(),
+    broadcastId: uuid("broadcast_id")
+      .notNull()
+      .references(() => broadcasts.id, { onDelete: "cascade" }),
+    payload: text("payload").notNull(),
+    providerIdentity: text("provider_identity").notNull(),
+    status: text("status", { enum: ["pending", "sent", "failed", "unknown", "canceled"] })
+      .notNull()
+      .default("pending"),
+    claimToken: uuid("claim_token"),
+    leaseUntil: timestamp("lease_until", { withTimezone: true }),
+    firstAttemptAt: timestamp("first_attempt_at", { withTimezone: true }),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).notNull().defaultNow(),
+    attempts: integer("attempts").notNull().default(0),
+    ...timestamps,
+  },
+  (t) => [index("broadcast_batches_due_idx").on(t.status, t.nextAttemptAt)],
 )
 
 /** A contact a broadcast is sent to, and what happened (R42, R46). */
@@ -631,11 +658,13 @@ export const broadcastRecipients = pgTable(
     /** Merge tag values, taken when the broadcast was queued. */
     merge: jsonb("merge").$type<Record<string, string>>().notNull().default({}),
     status: text("status", {
-      enum: ["queued", "sent", "delivered", "skipped", "failed", "bounced", "marked-as-spam", "canceled"],
+      enum: ["queued", "sent", "delivered", "skipped", "failed", "unknown", "bounced", "marked-as-spam", "canceled"],
     }).notNull(),
     skipReason: text("skip_reason", {
       enum: ["no-email", "unsubscribed", "unsubscribed-from-topic", "bounced", "marked-as-spam"],
     }),
+    batchId: uuid("batch_id").references(() => broadcastBatches.id, { onDelete: "cascade" }),
+    batchPosition: integer("batch_position"),
     providerId: text("provider_id"),
     error: text("error"),
     attempts: integer("attempts").notNull().default(0),
@@ -647,6 +676,7 @@ export const broadcastRecipients = pgTable(
     unique("broadcast_recipients_key").on(t.broadcastId, t.contactId),
     index("broadcast_recipients_queue_idx").on(t.status, t.teamId, t.createdAt),
     index("broadcast_recipients_provider_idx").on(t.providerId),
+    unique("broadcast_recipients_batch_position_key").on(t.batchId, t.batchPosition),
   ],
 )
 

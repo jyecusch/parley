@@ -548,7 +548,10 @@ function SendDialog(props: {
           These people agreed to get email from us. <span className="text-subtle">Anti-spam laws require consent.</span>
         </span>
       </Option>
-      <Hint>Sending starts at once and can't be undone, though you can cancel what hasn't gone yet.</Hint>
+      <Hint>
+        Sending starts at once and can't be undone, though you can cancel recipients whose sending hasn't started.
+        In-flight batches may still arrive.
+      </Hint>
       {error ? <ErrorText>{error}</ErrorText> : null}
     </Dialog>
   )
@@ -560,6 +563,7 @@ const RECIPIENT_LABELS: Readonly<Record<RecipientStatus, string>> = {
   delivered: "Delivered",
   skipped: "Skipped",
   failed: "Failed",
+  unknown: "Outcome unknown",
   bounced: "Bounced",
   "marked-as-spam": "Marked as spam",
   canceled: "Canceled",
@@ -625,6 +629,9 @@ function Report(props: { readonly teamId: TeamId; readonly broadcast: Broadcast;
         },
         ...(counts.queued > 0 ? [{ label: "Queued", value: counts.queued, status: "queued" as const }] : []),
         ...(counts.skipped > 0 ? [{ label: "Skipped", value: counts.skipped, status: "skipped" as const }] : []),
+        ...(counts.unknown > 0
+          ? [{ label: "Outcome unknown", value: counts.unknown, status: "unknown" as const }]
+          : []),
         ...(counts.failed > 0 ? [{ label: "Failed", value: counts.failed, status: "failed" as const }] : []),
         { label: "Bounced", value: counts.bounced, status: "bounced" as const },
         { label: "Marked as spam", value: counts.markedAsSpam, status: "marked-as-spam" as const },

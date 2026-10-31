@@ -12,6 +12,7 @@ import {
   UnsubscribeLinks,
   unsubscribeApply,
 } from "../src/index.ts"
+import { withBroadcastQueue } from "./broadcast-queue.ts"
 import { Fixture } from "./fixture.ts"
 
 const unique = () => crypto.randomUUID().slice(0, 8)
@@ -259,6 +260,6 @@ describe("email styles", () => {
         Bo: "topic",
         Cy: null,
       })
-    }).pipe(Effect.provide(CoreLive)),
+    }).pipe(withBroadcastQueue, Effect.provide(CoreLive)),
   )
 })

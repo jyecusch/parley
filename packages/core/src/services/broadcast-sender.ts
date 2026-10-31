@@ -1,43 +1,28 @@
 import { Database, schema } from "@parley/db"
-import type { BroadcastId, ContactId, EmailError, TeamId, TopicId } from "@parley/domain"
-import { eq, inArray, sql } from "drizzle-orm"
-import { Config, Context, Duration, Effect, Layer, Ref } from "effect"
+import type { BroadcastId, ContactId, TeamId, TopicId } from "@parley/domain"
+import { and, asc, eq, sql } from "drizzle-orm"
+import { Context, Duration, Effect, Layer, Ref } from "effect"
 import { type MergeValues, renderEmail } from "../email/render.ts"
-import { Mailer, type OutgoingEmail } from "../mail/mailer.ts"
+import { Mailer, type OutgoingEmail, type SentEmail } from "../mail/mailer.ts"
 import { styleSentWith } from "./broadcasts.ts"
 import type { SendAs } from "./sending.ts"
 import { UnsubscribeLinks } from "./unsubscribe-links.ts"
 
-const BATCH = 100
-/** How long a claimed batch is held before another server may try it again. */
-const LEASE_MINUTES = 10
-const MAX_ATTEMPTS = 5
-
-interface Claimed {
-  readonly id: string
-  readonly broadcast_id: string
-  readonly contact_id: string | null
-  readonly address: string | null
-  readonly name: string
-  readonly merge: Record<string, string>
-  readonly attempts: number
-}
-
-/** Rows from a raw query, however the driver shapes the result. */
+type Batch = typeof schema.broadcastBatches.$inferSelect
+type ClaimedBatch = Batch & { readonly claimToken: string }
+type BatchOutcome =
+  | { readonly status: "sent"; readonly sent: ReadonlyArray<SentEmail> }
+  | { readonly status: "failed" | "unknown" | "canceled"; readonly message: string | null }
+const UNKNOWN = "The email service may have accepted this email. Automatic retries stopped to avoid sending it twice."
+const RETRY_WINDOW_MS = (24 * 60 - 5) * 60_000
 const rowsOf = <A>(result: unknown): ReadonlyArray<A> =>
   Array.isArray(result) ? (result as ReadonlyArray<A>) : ((result as { readonly rows?: ReadonlyArray<A> }).rows ?? [])
 
-/**
- * Sends queued broadcast email in the background (R43). Process tier: shared by every team, so it
- * holds no team's data. Each message carries its own team's sender and footer, copied onto the
- * broadcast when it started (03-tiers). Postgres is the queue, so several servers can share it.
- */
+/** Durable broadcast delivery. Leases fence database writes; provider keys protect network retries. */
 export class BroadcastSender extends Context.Service<
   BroadcastSender,
   {
-    /** Sends one batch for the next team in turn, if any is due. How many recipients it handled. */
     readonly sendBatch: Effect.Effect<number>
-    /** Sends until nothing is due. For tests and for draining on demand. */
     readonly drain: Effect.Effect<number>
   }
 >()("@parley/core/BroadcastSender") {
@@ -47,19 +32,24 @@ export class BroadcastSender extends Context.Service<
       const db = yield* Database
       const mailer = yield* Mailer
       const links = yield* UnsubscribeLinks
-      // Teams take turns, a batch each, so one big broadcast doesn't hold up everyone else's.
       const lastTeam = yield* Ref.make("")
-
+      const b = schema.broadcastBatches
+      const r = schema.broadcastRecipients
+      const c = schema.broadcasts
       const nextTeam = Effect.gen(function* () {
-        const teams = rowsOf<{ team_id: string }>(
-          yield* db.query((d) =>
-            d.execute(sql`select distinct r.team_id from "broadcast_recipients" r
-              join "broadcasts" c on c.id = r.broadcast_id
-              where r.status = 'queued' and c.status = 'sending'
-                and (r.next_attempt_at is null or r.next_attempt_at <= now())
-              order by r.team_id`),
-          ),
-        ).map((row) => row.team_id)
+        const rows = yield* db.query((d) =>
+          d.execute(sql`
+        select team_id from broadcast_batches where status = 'pending' and next_attempt_at <= now()
+          and (lease_until is null or lease_until <= now())
+        union
+        select r.team_id from broadcast_recipients r join broadcasts c on c.id = r.broadcast_id
+          where r.status = 'queued' and r.batch_id is null and c.status = 'sending'
+        union
+        select c.team_id from broadcasts c where c.status = 'sending'
+          and not exists (select 1 from broadcast_recipients r where r.broadcast_id = c.id and r.status = 'queued')
+        order by team_id`),
+        )
+        const teams = rowsOf<{ team_id: string }>(rows).map((row) => row.team_id)
         const last = yield* Ref.get(lastTeam)
         const next = teams.find((team) => team > last) ?? teams[0]
         if (next) yield* Ref.set(lastTeam, next)
@@ -67,191 +57,322 @@ export class BroadcastSender extends Context.Service<
       })
 
       const claim = (teamId: string) =>
-        db
-          .query((d) =>
-            d.execute(sql`update "broadcast_recipients"
-              set next_attempt_at = now() + make_interval(mins => ${LEASE_MINUTES}),
-                attempts = attempts + 1, updated_at = now()
-              where id in (
-                select r.id from "broadcast_recipients" r join "broadcasts" c on c.id = r.broadcast_id
-                where r.team_id = ${teamId} and r.status = 'queued' and c.status = 'sending'
-                  and (r.next_attempt_at is null or r.next_attempt_at <= now())
-                order by r.created_at limit ${BATCH}
-                for update of r skip locked)
-              returning id, broadcast_id, contact_id, address, name, merge, attempts`),
-          )
-          .pipe(Effect.map(rowsOf<Claimed>))
-
-      const markSent = (claimed: Claimed, providerId: string) =>
-        db.query((d) =>
-          d
-            .update(schema.broadcastRecipients)
-            .set({
-              status: "sent",
-              providerId: providerId || null,
-              sentAt: sql`now()`,
-              nextAttemptAt: null,
-              error: null,
-              updatedAt: sql`now()`,
-            })
-            .where(eq(schema.broadcastRecipients.id, claimed.id)),
+        db.transaction(
+          Effect.gen(function* () {
+            const [batch] = yield* db.query((d) =>
+              d
+                .select()
+                .from(b)
+                .where(
+                  and(
+                    eq(b.teamId, teamId),
+                    eq(b.status, "pending"),
+                    sql`${b.nextAttemptAt} <= now()`,
+                    sql`(${b.leaseUntil} is null or ${b.leaseUntil} <= now())`,
+                  ),
+                )
+                .orderBy(asc(b.nextAttemptAt))
+                .limit(1)
+                .for("update", { skipLocked: true }),
+            )
+            if (!batch) return undefined
+            const claimToken = crypto.randomUUID()
+            const [claimed] = yield* db.query((d) =>
+              d
+                .update(b)
+                .set({ claimToken, leaseUntil: sql`now() + interval '10 minutes'` })
+                .where(eq(b.id, batch.id))
+                .returning(),
+            )
+            return claimed ? { ...claimed, claimToken } : undefined
+          }),
         )
 
-      const markFailed = (ids: ReadonlyArray<string>, error: string) =>
-        db.query((d) =>
-          d
-            .update(schema.broadcastRecipients)
-            .set({ status: "failed", error, nextAttemptAt: null, updatedAt: sql`now()` })
-            .where(inArray(schema.broadcastRecipients.id, [...ids])),
-        )
-
-      const retryLater = (ids: ReadonlyArray<string>, after: Duration.Duration) =>
-        db.query((d) =>
-          d
-            .update(schema.broadcastRecipients)
-            .set({
-              nextAttemptAt: sql`now() + make_interval(secs => ${Math.ceil(Duration.toSeconds(after))})`,
-              updatedAt: sql`now()`,
-            })
-            .where(inArray(schema.broadcastRecipients.id, [...ids])),
-        )
-
-      /** What happens to a batch the provider didn't take: wait and retry, or give up in our words. */
-      const handleFailure = (claimed: ReadonlyArray<Claimed>, error: EmailError) =>
-        Effect.gen(function* () {
-          const ids = claimed.map((row) => row.id)
-          switch (error._tag) {
-            case "EmailSendingTooFast":
-              return yield* retryLater(ids, error.retryAfter ?? Duration.minutes(1))
-            case "EmailServiceUnavailable": {
-              const exhausted = claimed.filter((row) => row.attempts >= MAX_ATTEMPTS).map((row) => row.id)
-              const again = claimed.filter((row) => row.attempts < MAX_ATTEMPTS)
-              if (exhausted.length > 0) yield* markFailed(exhausted, error.userMessage)
-              for (const row of again) yield* retryLater([row.id], Duration.minutes(2 ** row.attempts))
-              return
+      const prepare = (teamId: string) =>
+        db.transaction(
+          Effect.gen(function* () {
+            const [broadcast] = yield* db.query((d) =>
+              d
+                .select()
+                .from(c)
+                .where(
+                  and(
+                    eq(c.teamId, teamId),
+                    eq(c.status, "sending"),
+                    sql`exists (select 1 from broadcast_recipients r where r.broadcast_id = ${c.id} and r.status = 'queued' and r.batch_id is null)`,
+                  ),
+                )
+                .orderBy(asc(c.createdAt))
+                .limit(1)
+                .for("update", { skipLocked: true }),
+            )
+            if (!broadcast) return undefined
+            const recipients = yield* db.query((d) =>
+              d
+                .select()
+                .from(r)
+                .where(and(eq(r.broadcastId, broadcast.id), eq(r.status, "queued"), sql`${r.batchId} is null`))
+                .orderBy(asc(r.createdAt), asc(r.id))
+                .limit(100)
+                .for("update"),
+            )
+            const sender = broadcast.sentAs as SendAs | null
+            const emails: OutgoingEmail[] = []
+            const ready: typeof recipients = []
+            for (const recipient of recipients) {
+              const row = { ...recipient, contact_id: recipient.contactId }
+              if (!sender || !row.address) {
+                yield* db.query((d) =>
+                  d
+                    .update(r)
+                    .set({ status: "failed", error: "This broadcast couldn't be prepared for sending." })
+                    .where(eq(r.id, row.id)),
+                )
+                continue
+              }
+              const token = links.sign({
+                teamId: broadcast.teamId as TeamId,
+                contactId: row.contact_id as ContactId | null,
+                topicId: broadcast.topicId as TopicId | null,
+                broadcastId: broadcast.id as BroadcastId,
+                test: false,
+              })
+              const urls = links.urls(token)
+              const merge = row.merge
+              const values: MergeValues = {
+                first_name: merge.first_name ?? "",
+                last_name: merge.last_name ?? "",
+                name: [merge.first_name, merge.last_name].filter(Boolean).join(" "),
+                email: merge.email ?? row.address,
+                company: merge.company ?? "",
+              }
+              const rendered = renderEmail(
+                broadcast,
+                values,
+                {
+                  legalName: sender.legalName,
+                  postalAddress: sender.postalAddress,
+                  topicName: broadcast.topicName,
+                  unsubscribeUrl: urls.page,
+                },
+                styleSentWith(broadcast.sentAs),
+              )
+              emails.push({
+                to: row.address,
+                from: sender.from,
+                ...(sender.replyTo ? { replyTo: sender.replyTo } : {}),
+                subject: rendered.subject,
+                html: rendered.html,
+                text: rendered.text,
+                // RFC 8058: mail apps can unsubscribe in one click, without opening anything.
+                headers: {
+                  "List-Unsubscribe": `<${urls.oneClick}>`,
+                  "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+                },
+              })
+              ready.push(recipient)
             }
-            default:
-              return yield* markFailed(ids, error.userMessage)
+            if (ready.length === 0) return undefined
+            const prepared = yield* mailer.prepareBatch(emails).pipe(Effect.result)
+            if (prepared._tag === "Failure") {
+              yield* db.query((d) =>
+                d
+                  .update(r)
+                  .set({ status: "failed", error: prepared.failure.userMessage })
+                  .where(
+                    sql`${r.id} in (${sql.join(
+                      ready.map((row) => sql`${row.id}`),
+                      sql`,`,
+                    )})`,
+                  ),
+              )
+              return undefined
+            }
+            const claimToken = crypto.randomUUID()
+            const [batch] = yield* db.query((d) =>
+              d
+                .insert(b)
+                .values({
+                  id: crypto.randomUUID(),
+                  teamId,
+                  broadcastId: broadcast.id,
+                  ...prepared.success,
+                  claimToken,
+                  leaseUntil: sql`now() + interval '10 minutes'`,
+                })
+                .returning(),
+            )
+            if (!batch) return undefined
+            for (const [position, recipient] of ready.entries())
+              yield* db.query((d) =>
+                d.update(r).set({ batchId: batch.id, batchPosition: position }).where(eq(r.id, recipient.id)),
+              )
+            return { ...batch, claimToken }
+          }),
+        )
+
+      const owned = (batch: ClaimedBatch) =>
+        and(
+          eq(b.id, batch.id),
+          eq(b.status, "pending"),
+          eq(b.claimToken, batch.claimToken),
+          sql`${b.leaseUntil} > clock_timestamp()`,
+        )
+
+      const finish = (teamId: string) =>
+        db.query((d) =>
+          d.execute(sql`update broadcasts c set status = 'sent', finished_at = now(), updated_at = now()
+      where c.team_id = ${teamId} and c.status = 'sending' and not exists (select 1 from broadcast_recipients r where r.broadcast_id = c.id and r.status = 'queued')`),
+        )
+
+      const settle = (batch: ClaimedBatch, outcome: BatchOutcome) =>
+        db.transaction(
+          Effect.gen(function* () {
+            const { status } = outcome
+            const message = outcome.status === "sent" ? null : outcome.message
+            const [changed] = yield* db.query((d) =>
+              d
+                .update(b)
+                .set({ status, claimToken: null, leaseUntil: null, updatedAt: sql`now()` })
+                .where(owned(batch))
+                .returning(),
+            )
+            if (!changed) return
+            const recipients = yield* db.query((d) =>
+              d.select().from(r).where(eq(r.batchId, batch.id)).orderBy(asc(r.batchPosition)),
+            )
+            const [broadcast] = yield* db.query((d) => d.select().from(c).where(eq(c.id, batch.broadcastId)))
+            if (outcome.status === "sent" && outcome.sent.length !== recipients.length)
+              return yield* Effect.die("Batch completion does not match its recipients")
+            for (const [index, recipient] of recipients.entries()) {
+              const providerId = outcome.status === "sent" ? outcome.sent[index]?.providerId : null
+              if (outcome.status === "sent" && !providerId)
+                return yield* Effect.die("Batch completion is missing a provider ID")
+              yield* db.query((d) =>
+                d
+                  .update(r)
+                  .set({
+                    status,
+                    error: message,
+                    nextAttemptAt: null,
+                    ...(providerId ? { providerId, sentAt: sql`now()` } : {}),
+                    updatedAt: sql`now()`,
+                  })
+                  .where(and(eq(r.id, recipient.id), eq(r.status, "queued"))),
+              )
+              if (status === "sent" && recipient.contactId && broadcast)
+                yield* db.query((d) =>
+                  d.insert(schema.activity).values({
+                    id: crypto.randomUUID(),
+                    teamId: batch.teamId,
+                    recordType: "contact",
+                    recordId: recipient.contactId as string,
+                    kind: "emailed",
+                    changedFields: [],
+                    relatedRecordType: "broadcast",
+                    relatedRecordId: broadcast.id,
+                    relatedName: broadcast.name,
+                    actorUserId: broadcast.sentByUserId,
+                    actorName: broadcast.sentByName ?? "Parley",
+                  }),
+                )
+            }
+          }),
+        )
+
+      const dispatch = (batch: ClaimedBatch) =>
+        Effect.gen(function* () {
+          const recipients = yield* db.query((d) => d.select({ id: r.id }).from(r).where(eq(r.batchId, batch.id)))
+          if (batch.firstAttemptAt && batch.firstAttemptAt.getTime() + RETRY_WINDOW_MS <= Date.now()) {
+            yield* settle(batch, { status: "unknown", message: UNKNOWN })
+            return recipients.length
           }
+          // Cancellation and the first possible dispatch serialize on the broadcast row.
+          const attempt = yield* db.transaction(
+            Effect.gen(function* () {
+              const [broadcast] = yield* db.query((d) =>
+                d.select({ status: c.status }).from(c).where(eq(c.id, batch.broadcastId)).for("update"),
+              )
+              if (!batch.firstAttemptAt && broadcast?.status !== "sending") {
+                yield* settle(batch, { status: "canceled", message: null })
+                return undefined
+              }
+              const [started] = yield* db.query((d) =>
+                d
+                  .update(b)
+                  .set({
+                    firstAttemptAt: sql`coalesce(${b.firstAttemptAt}, now())`,
+                    attempts: sql`${b.attempts} + 1`,
+                    updatedAt: sql`now()`,
+                  })
+                  .where(owned(batch))
+                  .returning(),
+              )
+              return started ? { ...started, claimToken: batch.claimToken } : undefined
+            }),
+          )
+          if (!attempt?.firstAttemptAt) return recipients.length
+          const outcome = yield* mailer
+            .deliverBatch({
+              payload: attempt.payload,
+              providerIdentity: attempt.providerIdentity,
+              idempotencyKey: attempt.id,
+              count: recipients.length,
+              retryUntil: new Date(attempt.firstAttemptAt.getTime() + RETRY_WINDOW_MS),
+            })
+            .pipe(Effect.result)
+          if (outcome._tag === "Success") {
+            if (outcome.success.length !== recipients.length || outcome.success.some((email) => !email.providerId)) {
+              yield* Effect.logWarning("broadcast provider response did not match the batch")
+              yield* retry(attempt, Duration.minutes(2))
+            } else yield* settle(attempt, { status: "sent", sent: outcome.success })
+          } else {
+            const error = outcome.failure
+            yield* Effect.logWarning("broadcast provider request failed", error)
+            switch (error._tag) {
+              case "EmailSendingTooFast":
+                yield* retry(attempt, error.retryAfter)
+                break
+              case "EmailServiceUnavailable":
+                yield* retry(attempt, Duration.minutes(Math.min(30, 2 ** Math.min(attempt.attempts, 5))))
+                break
+              case "EmailBatchReplayUnsafe":
+                yield* settle(attempt, { status: "unknown", message: UNKNOWN })
+                break
+              default:
+                yield* settle(attempt, {
+                  status: attempt.attempts > 1 ? "unknown" : "failed",
+                  message: attempt.attempts > 1 ? UNKNOWN : error.userMessage,
+                })
+            }
+          }
+          return recipients.length
         })
 
-      /** A broadcast with nothing left queued is sent. */
-      const finish = (broadcastIds: ReadonlyArray<string>) =>
-        Effect.forEach(broadcastIds, (broadcastId) =>
-          db.query((d) =>
-            d.execute(sql`update "broadcasts" set status = 'sent', finished_at = now(), updated_at = now()
-              where id = ${broadcastId} and status = 'sending'
-                and not exists (select 1 from "broadcast_recipients" r
-                  where r.broadcast_id = ${broadcastId} and r.status = 'queued')`),
-          ),
+      const retry = (batch: ClaimedBatch, after: Duration.Duration) =>
+        db.query((d) =>
+          d
+            .update(b)
+            .set({
+              nextAttemptAt: sql`now() + make_interval(secs => ${Math.max(1, Math.ceil(Duration.toSeconds(after)))})`,
+              claimToken: null,
+              leaseUntil: null,
+              updatedAt: sql`now()`,
+            })
+            .where(owned(batch)),
         )
 
       const sendBatch = Effect.gen(function* () {
         const teamId = yield* nextTeam
         if (!teamId) return 0
-        const claimed = yield* claim(teamId)
-        if (claimed.length === 0) return 0
-        const broadcastIds = [...new Set(claimed.map((row) => row.broadcast_id))]
-        const broadcasts = yield* db.query((d) =>
-          d.select().from(schema.broadcasts).where(inArray(schema.broadcasts.id, broadcastIds)),
-        )
-        const byId = new Map(broadcasts.map((broadcast) => [broadcast.id, broadcast]))
-
-        const ready: Array<{ readonly row: Claimed; readonly email: OutgoingEmail }> = []
-        for (const row of claimed) {
-          const broadcast = byId.get(row.broadcast_id)
-          const sender = broadcast?.sentAs as SendAs | null | undefined
-          if (!broadcast || !sender || !row.address) {
-            yield* markFailed([row.id], "This broadcast couldn't be prepared for sending.")
-            continue
-          }
-          const token = links.sign({
-            teamId: broadcast.teamId as TeamId,
-            contactId: row.contact_id as ContactId | null,
-            topicId: broadcast.topicId as TopicId | null,
-            broadcastId: broadcast.id as BroadcastId,
-            test: false,
-          })
-          const urls = links.urls(token)
-          const merge = row.merge
-          const values: MergeValues = {
-            first_name: merge.first_name ?? "",
-            last_name: merge.last_name ?? "",
-            name: [merge.first_name, merge.last_name].filter(Boolean).join(" "),
-            email: merge.email ?? row.address,
-            company: merge.company ?? "",
-          }
-          const rendered = renderEmail(
-            broadcast,
-            values,
-            {
-              legalName: sender.legalName,
-              postalAddress: sender.postalAddress,
-              topicName: broadcast.topicName,
-              unsubscribeUrl: urls.page,
-            },
-            styleSentWith(broadcast.sentAs),
-          )
-          ready.push({
-            row,
-            email: {
-              to: row.address,
-              from: sender.from,
-              ...(sender.replyTo ? { replyTo: sender.replyTo } : {}),
-              subject: rendered.subject,
-              html: rendered.html,
-              text: rendered.text,
-              // RFC 8058: mail apps can unsubscribe in one click, without opening anything.
-              headers: {
-                "List-Unsubscribe": `<${urls.oneClick}>`,
-                "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
-              },
-            },
-          })
-        }
-
-        if (ready.length > 0) {
-          const outcome = yield* Effect.result(mailer.sendBatch(ready.map((entry) => entry.email)))
-          if (outcome._tag === "Failure") {
-            yield* handleFailure(
-              ready.map((entry) => entry.row),
-              outcome.failure,
-            )
-          } else {
-            yield* db.transaction(
-              Effect.forEach(ready, (entry, index) =>
-                Effect.gen(function* () {
-                  yield* markSent(entry.row, outcome.success[index]?.providerId ?? "")
-                  const broadcast = byId.get(entry.row.broadcast_id)
-                  if (!broadcast || !entry.row.contact_id) return
-                  // Credited to whoever pressed Send (R49).
-                  yield* db.query((d) =>
-                    d.insert(schema.activity).values({
-                      id: crypto.randomUUID(),
-                      teamId: broadcast.teamId,
-                      recordType: "contact",
-                      recordId: entry.row.contact_id as string,
-                      kind: "emailed",
-                      changedFields: [],
-                      relatedRecordType: "broadcast",
-                      relatedRecordId: broadcast.id,
-                      relatedName: broadcast.name,
-                      actorUserId: broadcast.sentByUserId,
-                      actorName: broadcast.sentByName ?? "Parley",
-                    }),
-                  )
-                }),
-              ),
-            )
-          }
-        }
-        yield* finish(broadcastIds)
-        return claimed.length
+        const batch = (yield* claim(teamId)) ?? (yield* prepare(teamId))
+        const handled = batch ? yield* dispatch(batch) : 0
+        yield* finish(teamId)
+        return handled
       }).pipe(
         Effect.catchTag("SqlError", (error) => Effect.logWarning("broadcast sending failed", error).pipe(Effect.as(0))),
         Effect.withSpan("BroadcastSender.sendBatch"),
       )
-
       const drain = Effect.gen(function* () {
         let total = 0
         for (;;) {
@@ -260,21 +381,17 @@ export class BroadcastSender extends Context.Service<
           total += handled
         }
       })
-
       return { sendBatch, drain }
     }),
   )
 
-  /** Keeps sending: paced to EMAIL_BATCHES_PER_SECOND (default 2, Resend's limit), idle checks every 2s. */
   static readonly schedule = Layer.effectDiscard(
     Effect.gen(function* () {
       const sender = yield* BroadcastSender
-      const perSecond = yield* Config.withDefault(Config.Number("EMAIL_BATCHES_PER_SECOND"), 2).pipe(Effect.orDie)
-      const pause = Duration.millis(Math.ceil(1000 / Math.max(perSecond, 0.1)))
       yield* Effect.forkScoped(
         Effect.forever(
           sender.sendBatch.pipe(
-            Effect.flatMap((handled) => Effect.sleep(handled > 0 ? pause : Duration.seconds(2))),
+            Effect.flatMap((handled) => (handled > 0 ? Effect.void : Effect.sleep(Duration.seconds(2)))),
             Effect.catchCause((cause) =>
               Effect.logWarning("broadcast sender failed", cause).pipe(
                 Effect.andThen(Effect.sleep(Duration.seconds(5))),

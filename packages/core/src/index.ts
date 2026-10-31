@@ -3,6 +3,7 @@ import { Layer } from "effect"
 import { Authenticator, BetterAuth } from "./auth/authenticator.ts"
 import { EmailChecks, FormTokens, Turnstile } from "./forms/protection.ts"
 import { Mailer } from "./mail/mailer.ts"
+import { ProviderPacing } from "./mail/provider-pacing.ts"
 import { Affiliations } from "./services/affiliations.ts"
 import { ApiKeys } from "./services/api-keys.ts"
 import { BroadcastSender } from "./services/broadcast-sender.ts"
@@ -113,7 +114,7 @@ export const coreLiveWith = (outside: Layer.Layer<Turnstile | EmailChecks>) =>
     Layer.provideMerge(formsLive(outside)),
     Layer.provideMerge(Services),
     Layer.provideMerge(BetterAuth.layer),
-    Layer.provideMerge(Mailer.layer),
+    Layer.provideMerge(Mailer.layer.pipe(Layer.provide(ProviderPacing.layer))),
     Layer.provideMerge(DatabaseLive),
   )
 

@@ -17,6 +17,7 @@ import {
   implementations as run,
   Turnstile,
 } from "../src/index.ts"
+import { withBroadcastQueue } from "./broadcast-queue.ts"
 import { Fixture } from "./fixture.ts"
 
 // One PBKDF2 iteration per try instead of 5,000, so solving takes milliseconds; verifying is unchanged.
@@ -652,6 +653,7 @@ describe("forms (D144–D150)", () => {
   it.effect("sends a broadcast with an opt-in topic only to its subscribers", () =>
     Effect.gen(function* () {
       const f = yield* Fixture
+      const db = yield* Database
       yield* setUpSending(f.jane, f.acme)
       const tag = unique()
       const topic = yield* run["topics.create"](f.jane, { teamId: f.acme, name: `Opt in ${tag}`, mode: "opt-in" })
@@ -696,6 +698,9 @@ describe("forms (D144–D150)", () => {
         subject: "Hi",
         body: "News.",
       })
+      yield* Effect.addFinalizer(() =>
+        db.query((d) => d.delete(schema.broadcasts).where(eq(schema.broadcasts.id, broadcast.id))).pipe(Effect.orDie),
+      )
       const sending = yield* run["broadcasts.send"](f.jane, { teamId: f.acme, broadcastId: broadcast.id })
       expect(sending.counts).toMatchObject({ recipients: 2, queued: 1, skipped: 1 })
       const recipients = yield* run["broadcasts.recipients"](f.jane, { teamId: f.acme, broadcastId: broadcast.id })
@@ -706,7 +711,7 @@ describe("forms (D144–D150)", () => {
       // Switching it to opt-out keeps who joined, and everyone else is in again.
       const optOut = yield* run["topics.update"](f.jane, { teamId: f.acme, topicId: topic.id, mode: "opt-out" })
       expect(optOut.mode).toBe("opt-out")
-    }).pipe(Effect.provide(TestLive)),
+    }).pipe(withBroadcastQueue, Effect.provide(TestLive)),
   )
 
   it.effect("someone who left an opt-in topic is back only by confirming, even without double opt-in", () =>

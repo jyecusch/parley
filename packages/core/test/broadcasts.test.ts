@@ -10,6 +10,7 @@ import {
   receiveDeliveryEvent,
   implementations as run,
 } from "../src/index.ts"
+import { withBroadcastQueue } from "./broadcast-queue.ts"
 import { Fixture } from "./fixture.ts"
 
 const unique = () => crypto.randomUUID().slice(0, 8)
@@ -94,7 +95,7 @@ describe("templates and broadcasts", () => {
         userIds: [f.bob.userId],
       }).pipe(Effect.flip)
       expect(outsider._tag).toBe("TestRecipientNotMember")
-    }).pipe(Effect.provide(CoreLive)),
+    }).pipe(withBroadcastQueue, Effect.provide(CoreLive)),
   )
 
   it.effect("sends to a segment's subscribed contacts, skips the rest, and records what happened", () =>
@@ -188,7 +189,7 @@ describe("templates and broadcasts", () => {
 
       const copy = yield* run["broadcasts.duplicate"](f.jane, { teamId: f.acme, broadcastId: broadcast.id })
       expect(copy).toMatchObject({ status: "draft", name: "Launch (copy)", subject: "We launched, {{first_name}}" })
-    }).pipe(Effect.provide(CoreLive)),
+    }).pipe(withBroadcastQueue, Effect.provide(CoreLive)),
   )
 
   it.effect("cancels the rest of a sending, and refuses a segment nobody can be sent", () =>
@@ -227,6 +228,6 @@ describe("templates and broadcasts", () => {
         Effect.flip,
       )
       expect(kept._tag).toBe("BroadcastNotDraft")
-    }).pipe(Effect.provide(CoreLive)),
+    }).pipe(withBroadcastQueue, Effect.provide(CoreLive)),
   )
 })

@@ -18,7 +18,7 @@ No test failed. Nobody's review comment said "this leaks". Every type checked.
 
 ### How it got in
 
-Sending mail at volume needs one thing per process: a sender that batches messages and keeps within Resend's rate limit. You don't want one of those per request. Many senders would each think they own the whole rate limit. So `BroadcastSender` is built once, at boot, and shared. That's correct.
+Sending mail at volume needs a long-running sender. `BroadcastSender` is built once per process, at boot. That tier prevents rebuilding a worker per request, but it cannot coordinate different servers. The implementation persists batches and claim tokens in Postgres, and `ProviderPacing` shares the provider account's allowance across processes. See [background delivery](./07-background-delivery.md) for the retry protocol and its limits; the simplified example below concerns team data, not delivery reliability.
 
 Some weeks later, someone needs to add the compliance footer to each message. The footer comes from the team's sending settings. There's already a service for that, `TeamSendingSettings`, which holds one team's legal name, postal address, verified Resend sending domain and unsubscribe base URL. So they reach for it:
 
@@ -270,7 +270,7 @@ For now the guard against SQL scoping mistakes is service review plus real Postg
 | `Members`, `ApiKeys`, `ServiceAccounts` | process | Same |
 | `Activity` | process | Each entry carries its own team and principal |
 | `Mailer`: a pluggable interface; the default implementation wraps the Resend client (D50) | process | One client, one Resend credential for our Resend account. Per-team things (verified sending domain, footer legal name and address) are team **data**, looked up per call, never held here |
-| `BroadcastSender` (batching, Resend rate limit) | process | Resend's rate limit applies to our account, not per team |
+| `BroadcastSender` and `ProviderPacing` | process, coordinated through Postgres | Durable batches and a shared account allowance across servers (D167) |
 | `Imports`, `ImportRunner` (D135) | process | Each import row carries its own team and the principal who started it; the runner rebuilds that principal for every part and checks their membership and permissions again, so nothing is held between parts |
 | `TeamSendingSettings` | process | A lookup by named team, not a holder of one team's settings |
 | `Templates`, `Drafts`, and the v2 contact-set services (names not yet defined) | process | Team passed per call |
