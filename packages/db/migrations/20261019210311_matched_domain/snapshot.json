@@ -1,0 +1,47 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "254b670b-13a6-45d0-8e7a-260cbe5a1d3a",
+  "prevIds": [
+    "fbf49d71-c963-4226-9d4c-497df4897571"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "activity",
+        "matched_domain"
+      ],
+      "writes": [
+        "s|col|public.activity.matched_domain",
+        "n|col|public.activity.matched_domain",
+        "e|col|public.activity.matched_domain"
+      ],
+      "reads": [
+        "n|tbl|public.activity",
+        "n|sch|public"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "activity",
+        "name": "matched_domain",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    }
+  ]
+}

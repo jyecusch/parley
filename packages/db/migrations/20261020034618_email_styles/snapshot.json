@@ -1,0 +1,787 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "412e9c4e-f1f5-4cb2-872c-73a34ed2519a",
+  "prevIds": [
+    "9515fd48-cfb9-4ccf-b29f-152304700470"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "email_images"
+      ],
+      "writes": [
+        "s|tbl|public.email_images",
+        "n|tbl|public.email_images",
+        "e|tbl|public.email_images",
+        "n|rel|public.email_images",
+        "n|type|public.email_images",
+        "n|rel|public.email_images_pkey"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "email_styles"
+      ],
+      "writes": [
+        "s|tbl|public.email_styles",
+        "n|tbl|public.email_styles",
+        "e|tbl|public.email_styles",
+        "n|rel|public.email_styles",
+        "n|type|public.email_styles",
+        "n|rel|public.email_styles_pkey"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "campaigns",
+        "style_id"
+      ],
+      "writes": [
+        "s|col|public.campaigns.style_id",
+        "n|col|public.campaigns.style_id",
+        "e|col|public.campaigns.style_id"
+      ],
+      "reads": [
+        "n|tbl|public.campaigns",
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "templates",
+        "style_id"
+      ],
+      "writes": [
+        "s|col|public.templates.style_id",
+        "n|col|public.templates.style_id",
+        "e|col|public.templates.style_id"
+      ],
+      "reads": [
+        "n|tbl|public.templates",
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "email_images",
+        "email_images_team_idx"
+      ],
+      "writes": [
+        "s|idx|public.email_images_team_idx",
+        "n|idx|public.email_images_team_idx",
+        "e|idx|public.email_images_team_idx",
+        "n|rel|public.email_images_team_idx"
+      ],
+      "reads": [
+        "n|tbl|public.email_images",
+        "n|sch|public",
+        "n|col|public.email_images.team_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "email_styles",
+        "email_styles_team_idx"
+      ],
+      "writes": [
+        "s|idx|public.email_styles_team_idx",
+        "n|idx|public.email_styles_team_idx",
+        "e|idx|public.email_styles_team_idx",
+        "n|rel|public.email_styles_team_idx"
+      ],
+      "reads": [
+        "n|tbl|public.email_styles",
+        "n|sch|public",
+        "n|col|public.email_styles.team_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "email_styles",
+        "email_styles_default_key"
+      ],
+      "writes": [
+        "s|idx|public.email_styles_default_key",
+        "n|idx|public.email_styles_default_key",
+        "e|idx|public.email_styles_default_key",
+        "n|rel|public.email_styles_default_key"
+      ],
+      "reads": [
+        "n|tbl|public.email_styles",
+        "n|sch|public",
+        "n|col|public.email_styles.team_id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "campaigns"
+      ],
+      "writes": [
+        "s|fk|public.campaigns.campaigns_style_id_email_styles_id_fk",
+        "n|fk|public.campaigns.campaigns_style_id_email_styles_id_fk",
+        "e|fk|public.campaigns.campaigns_style_id_email_styles_id_fk",
+        "n|con|public.campaigns.campaigns_style_id_email_styles_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.campaigns",
+        "n|sch|public",
+        "n|tbl|public.email_styles",
+        "n|sch|public",
+        "n|col|public.campaigns.style_id",
+        "n|col|public.email_styles.id",
+        "e|uniqueness|public.email_styles.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "email_images"
+      ],
+      "writes": [
+        "s|fk|public.email_images.email_images_team_id_organization_id_fk",
+        "n|fk|public.email_images.email_images_team_id_organization_id_fk",
+        "e|fk|public.email_images.email_images_team_id_organization_id_fk",
+        "n|con|public.email_images.email_images_team_id_organization_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.email_images",
+        "n|sch|public",
+        "n|tbl|public.organization",
+        "n|sch|public",
+        "n|col|public.email_images.team_id",
+        "n|col|public.organization.id",
+        "e|uniqueness|public.organization.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "email_styles"
+      ],
+      "writes": [
+        "s|fk|public.email_styles.email_styles_team_id_organization_id_fk",
+        "n|fk|public.email_styles.email_styles_team_id_organization_id_fk",
+        "e|fk|public.email_styles.email_styles_team_id_organization_id_fk",
+        "n|con|public.email_styles.email_styles_team_id_organization_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.email_styles",
+        "n|sch|public",
+        "n|tbl|public.organization",
+        "n|sch|public",
+        "n|col|public.email_styles.team_id",
+        "n|col|public.organization.id",
+        "e|uniqueness|public.organization.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "templates"
+      ],
+      "writes": [
+        "s|fk|public.templates.templates_style_id_email_styles_id_fk",
+        "n|fk|public.templates.templates_style_id_email_styles_id_fk",
+        "e|fk|public.templates.templates_style_id_email_styles_id_fk",
+        "n|con|public.templates.templates_style_id_email_styles_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.templates",
+        "n|sch|public",
+        "n|tbl|public.email_styles",
+        "n|sch|public",
+        "n|col|public.templates.style_id",
+        "n|col|public.email_styles.id",
+        "e|uniqueness|public.email_styles.id"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "email_images",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "email_styles",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "style_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "email_images",
+        "name": "id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "email_images",
+        "name": "team_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "email_images",
+        "name": "file_key",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "email_images",
+        "name": "width",
+        "type": "integer",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "email_images",
+        "name": "height",
+        "type": "integer",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "email_images",
+        "name": "source_url",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "email_images",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "email_styles",
+        "name": "id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "email_styles",
+        "name": "team_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "email_styles",
+        "name": "name",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "email_styles",
+        "name": "is_default",
+        "type": "boolean",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "false",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "email_styles",
+        "name": "layout",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "'plain'",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "email_styles",
+        "name": "logo_key",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "email_styles",
+        "name": "logo_align",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "'left'",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "email_styles",
+        "name": "header_text",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "email_styles",
+        "name": "colors",
+        "type": "jsonb",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "email_styles",
+        "name": "font",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "'default'",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "email_styles",
+        "name": "custom_html",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "email_styles",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "email_styles",
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "templates",
+        "name": "style_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "email_images",
+        "name": "email_images_team_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "team_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "email_styles",
+        "name": "email_styles_team_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "team_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "email_styles",
+        "name": "email_styles_default_key",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "team_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": true,
+        "where": "\"email_styles\".\"is_default\"",
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "campaigns_style_id_email_styles_id_fk",
+        "nameExplicit": false,
+        "columns": [
+          "style_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "email_styles",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "SET NULL",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "email_images",
+        "name": "email_images_team_id_organization_id_fk",
+        "nameExplicit": false,
+        "columns": [
+          "team_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "organization",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "email_styles",
+        "name": "email_styles_team_id_organization_id_fk",
+        "nameExplicit": false,
+        "columns": [
+          "team_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "organization",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "templates",
+        "name": "templates_style_id_email_styles_id_fk",
+        "nameExplicit": false,
+        "columns": [
+          "style_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "email_styles",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "SET NULL",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "email_images",
+        "name": "email_images_pkey",
+        "columns": [
+          "id"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "email_styles",
+        "name": "email_styles_pkey",
+        "columns": [
+          "id"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    }
+  ]
+}

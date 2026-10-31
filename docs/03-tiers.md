@@ -263,7 +263,8 @@ For now the guard against SQL scoping mistakes is service review plus real Postg
 | Service | Tier | Why |
 | --- | --- | --- |
 | `AppConfig` | process | Read once from the environment |
-| `SqlClient` (Drizzle + pool) | process | One pool for everyone |
+| `SqlClient` (native Effect pool and Drizzle) | process | Domain queries share the current fiber's transaction (D168) |
+| `NodePgPool` | process | Shared node-postgres capability for Better-Auth and the Postgres limiters; configured and closed by database infrastructure |
 | `Auth` (Better-Auth instance) | process | Stateless with respect to teams; sessions are looked up per request |
 | `PrincipalResolver` | process | Turns a session cookie or API key into a `Principal`; holds nothing per team |
 | `Contacts`, `Companies` | process | Take a named, proven team on every call |

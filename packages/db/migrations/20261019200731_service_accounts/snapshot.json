@@ -1,0 +1,231 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "f66a4ba0-25b0-4e6a-92b1-400b7e1a8a1e",
+  "prevIds": [
+    "148386d3-30cc-47af-bfab-a7ff8abab1e6"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "service_accounts"
+      ],
+      "writes": [
+        "s|tbl|public.service_accounts",
+        "n|tbl|public.service_accounts",
+        "e|tbl|public.service_accounts",
+        "n|rel|public.service_accounts",
+        "n|type|public.service_accounts",
+        "n|rel|public.service_accounts_pkey"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "service_accounts"
+      ],
+      "writes": [
+        "s|fk|public.service_accounts.service_accounts_user_id_user_id_fk",
+        "n|fk|public.service_accounts.service_accounts_user_id_user_id_fk",
+        "e|fk|public.service_accounts.service_accounts_user_id_user_id_fk",
+        "n|con|public.service_accounts.service_accounts_user_id_user_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.service_accounts",
+        "n|sch|public",
+        "n|tbl|public.user",
+        "n|sch|public",
+        "n|col|public.service_accounts.user_id",
+        "n|col|public.user.id",
+        "e|uniqueness|public.user.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "service_accounts"
+      ],
+      "writes": [
+        "s|fk|public.service_accounts.service_accounts_team_id_organization_id_fk",
+        "n|fk|public.service_accounts.service_accounts_team_id_organization_id_fk",
+        "e|fk|public.service_accounts.service_accounts_team_id_organization_id_fk",
+        "n|con|public.service_accounts.service_accounts_team_id_organization_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.service_accounts",
+        "n|sch|public",
+        "n|tbl|public.organization",
+        "n|sch|public",
+        "n|col|public.service_accounts.team_id",
+        "n|col|public.organization.id",
+        "e|uniqueness|public.organization.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "service_accounts"
+      ],
+      "writes": [
+        "s|fk|public.service_accounts.service_accounts_created_by_user_id_user_id_fk",
+        "n|fk|public.service_accounts.service_accounts_created_by_user_id_user_id_fk",
+        "e|fk|public.service_accounts.service_accounts_created_by_user_id_user_id_fk",
+        "n|con|public.service_accounts.service_accounts_created_by_user_id_user_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.service_accounts",
+        "n|sch|public",
+        "n|tbl|public.user",
+        "n|sch|public",
+        "n|col|public.service_accounts.created_by_user_id",
+        "n|col|public.user.id",
+        "e|uniqueness|public.user.id"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "service_accounts",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "service_accounts",
+        "name": "user_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "service_accounts",
+        "name": "team_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "service_accounts",
+        "name": "created_by_user_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "service_accounts",
+        "name": "service_accounts_user_id_user_id_fk",
+        "nameExplicit": false,
+        "columns": [
+          "user_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "user",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "service_accounts",
+        "name": "service_accounts_team_id_organization_id_fk",
+        "nameExplicit": false,
+        "columns": [
+          "team_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "organization",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "service_accounts",
+        "name": "service_accounts_created_by_user_id_user_id_fk",
+        "nameExplicit": false,
+        "columns": [
+          "created_by_user_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "user",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "SET NULL",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "service_accounts",
+        "name": "service_accounts_pkey",
+        "columns": [
+          "user_id"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    }
+  ]
+}

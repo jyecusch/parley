@@ -1,0 +1,129 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "a9377139-8153-4227-98a4-47bc016a9823",
+  "prevIds": [
+    "3684dacd-c80f-4729-8fc5-44fae44d7689"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "team_settings"
+      ],
+      "writes": [
+        "s|tbl|public.team_settings",
+        "n|tbl|public.team_settings",
+        "e|tbl|public.team_settings",
+        "n|rel|public.team_settings",
+        "n|type|public.team_settings",
+        "n|rel|public.team_settings_pkey"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "team_settings"
+      ],
+      "writes": [
+        "s|fk|public.team_settings.team_settings_team_id_organization_id_fk",
+        "n|fk|public.team_settings.team_settings_team_id_organization_id_fk",
+        "e|fk|public.team_settings.team_settings_team_id_organization_id_fk",
+        "n|con|public.team_settings.team_settings_team_id_organization_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.team_settings",
+        "n|sch|public",
+        "n|tbl|public.organization",
+        "n|sch|public",
+        "n|col|public.team_settings.team_id",
+        "n|col|public.organization.id",
+        "e|uniqueness|public.organization.id"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "team_settings",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "team_settings",
+        "name": "team_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "team_settings",
+        "name": "gravatar",
+        "type": "boolean",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "false",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "team_settings",
+        "name": "team_settings_team_id_organization_id_fk",
+        "nameExplicit": false,
+        "columns": [
+          "team_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "organization",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "team_settings",
+        "name": "team_settings_pkey",
+        "columns": [
+          "team_id"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    }
+  ]
+}

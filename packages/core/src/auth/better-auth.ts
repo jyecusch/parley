@@ -1,5 +1,6 @@
 import { apiKey } from "@better-auth/api-key"
 import { mcp } from "@better-auth/mcp"
+import type { schema } from "@parley/db"
 import { betterAuth } from "better-auth"
 import { drizzleAdapter } from "better-auth/adapters/drizzle"
 import { APIError, createAuthMiddleware, getSessionFromCtx } from "better-auth/api"
@@ -71,7 +72,7 @@ export interface ConnectionHooks {
 }
 
 export interface AuthConfig {
-  readonly db: NodePgDatabase<Record<string, unknown>>
+  readonly db: NodePgDatabase<typeof schema.authRelations>
   readonly schema: Record<string, unknown>
   readonly secret: string
   readonly baseURL: string

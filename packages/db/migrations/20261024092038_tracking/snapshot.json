@@ -1,0 +1,81 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "af96afda-3854-4fed-8f04-c39cf517ef2f",
+  "prevIds": [
+    "15995029-ec85-48ce-835b-05f1686d8c90"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "activity",
+        "tracking"
+      ],
+      "writes": [
+        "s|col|public.activity.tracking",
+        "n|col|public.activity.tracking",
+        "e|col|public.activity.tracking"
+      ],
+      "reads": [
+        "n|tbl|public.activity",
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "form_submissions",
+        "click_ids"
+      ],
+      "writes": [
+        "s|col|public.form_submissions.click_ids",
+        "n|col|public.form_submissions.click_ids",
+        "e|col|public.form_submissions.click_ids"
+      ],
+      "reads": [
+        "n|tbl|public.form_submissions",
+        "n|sch|public"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "activity",
+        "name": "tracking",
+        "type": "jsonb",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "form_submissions",
+        "name": "click_ids",
+        "type": "jsonb",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "'{}'",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    }
+  ]
+}

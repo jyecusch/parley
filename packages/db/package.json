@@ -12,15 +12,15 @@
     "migrate": "drizzle-kit migrate"
   },
   "dependencies": {
-    "@effect/sql-pg": "4.0.5",
+    "@effect/sql-pg": "4.1.1",
     "@parley/domain": "workspace:*",
     "@parley/errors": "workspace:*",
-    "drizzle-orm": "0.45.4",
-    "effect": "4.0.5",
+    "drizzle-orm": "1.0.0-rc.5",
+    "effect": "4.1.1",
     "pg": "8.23.1"
   },
   "devDependencies": {
     "@types/pg": "8.23.1",
-    "drizzle-kit": "0.31.11"
+    "drizzle-kit": "1.0.0-rc.5"
   }
 }

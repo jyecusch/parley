@@ -13,6 +13,8 @@ These posts explain how Parley is built and why. They're written to be read in o
 7. [Forms](./06-forms.md): public submissions, consent, and bot protection
 8. [Background delivery](./07-background-delivery.md): durable batches, provider idempotency, fenced leases, and honest unknown outcomes
 
+9. [Database capabilities](./08-database.md): native Drizzle Effects, connection ownership, and migration compatibility
+
 [Terminology](./terminology.md): one name for every concept; synonyms are banned.
 
 [Decisions log](./decisions.md): decided, proposed, and open.

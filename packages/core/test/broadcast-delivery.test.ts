@@ -378,7 +378,10 @@ describe("durable broadcast delivery", () => {
           status: "queued",
         }),
       )
-      const migration = readFileSync(new URL("../../db/migrations/0030_broadcast_batches.sql", import.meta.url), "utf8")
+      const migration = readFileSync(
+        new URL("../../db/migrations/20261031033107_broadcast_batches/migration.sql", import.meta.url),
+        "utf8",
+      )
       yield* db.query((d) => d.execute(sql.raw(migration.slice(migration.indexOf('UPDATE "broadcast_recipients"')))))
       const result = yield* state(f.id)
       expect(result.recipients.find((row) => row.id === unattempted)?.status).toBe("queued")

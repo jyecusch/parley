@@ -28,7 +28,7 @@ Once the replay window expires, or the provider credential changes, automatic re
 
 ## Pacing belongs to the provider account
 
-`ProviderPacing` uses `rate-limiter-flexible` with Postgres and no memory fallback. Every Resend request passes through it, including foreground email and domain checks. All servers share the installation's allowance, configured by `EMAIL_BATCHES_PER_SECOND` (default 2 requests per second). A database outage stops provider requests; allowing each server an independent fallback would multiply the allowance.
+`ProviderPacing` uses `rate-limiter-flexible` with an injected `NodePgPool` and no memory fallback. Database infrastructure owns connection configuration and lifecycle (D168). Every Resend request passes through it, including foreground email and domain checks. All servers share the installation's allowance, configured by `EMAIL_BATCHES_PER_SECOND` (default 2 requests per second). A database outage stops provider requests; allowing each server an independent fallback would multiply the allowance.
 
 The regular application `RateLimiter` keeps its existing memory fallback. Provider pacing has a different failure policy and a separate key prefix in `rate_limits`. Requests from other applications using the same provider account are outside this coordination; provider rate-limit responses still apply.
 
@@ -40,7 +40,7 @@ A broadcast becomes `sent` when no recipients remain queued; this means processi
 
 ## Upgrading and retaining delivery records
 
-Stop all old broadcast workers before applying migration `0030_broadcast_batches`, and restart only workers using this protocol. Old code cannot participate in claim-token fencing. Queued recipients whose old `attempts` is greater than zero become unknown: they may already have been accepted without a durable key. Never replay them automatically during the upgrade. Unattempted queued recipients remain eligible for preparation.
+Stop all old broadcast workers before applying migration `20261031033107_broadcast_batches` (formerly `0030_broadcast_batches`), and restart only workers using this protocol. Old code cannot participate in claim-token fencing. Queued recipients whose old `attempts` is greater than zero become unknown: they may already have been accepted without a durable key. Never replay them automatically during the upgrade. Unattempted queued recipients remain eligible for preparation.
 
 Payloads contain recipient information and rendered content. They remain in Postgres with the broadcast and are deleted when it is deleted; they must receive the same access, backup, and retention treatment as recipient snapshots. Do not log payloads or provider credentials.
 

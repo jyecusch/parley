@@ -1,0 +1,47 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "0e09c0ca-de84-4e12-be58-2b68e403c06b",
+  "prevIds": [
+    "f250bad7-6472-44a3-99ae-60ef1e202468"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "segments",
+        "description"
+      ],
+      "writes": [
+        "s|col|public.segments.description",
+        "n|col|public.segments.description",
+        "e|col|public.segments.description"
+      ],
+      "reads": [
+        "n|tbl|public.segments",
+        "n|sch|public"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "segments",
+        "name": "description",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    }
+  ]
+}

@@ -1,0 +1,2928 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "9515fd48-cfb9-4ccf-b29f-152304700470",
+  "prevIds": [
+    "d64ba1d0-8ecc-4e27-b2ee-ae5fd21c0a21"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "campaign_recipients"
+      ],
+      "writes": [
+        "s|tbl|public.campaign_recipients",
+        "n|tbl|public.campaign_recipients",
+        "e|tbl|public.campaign_recipients",
+        "n|rel|public.campaign_recipients",
+        "n|type|public.campaign_recipients",
+        "n|rel|public.campaign_recipients_pkey",
+        "n|rel|public.campaign_recipients_key"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "campaigns"
+      ],
+      "writes": [
+        "s|tbl|public.campaigns",
+        "n|tbl|public.campaigns",
+        "e|tbl|public.campaigns",
+        "n|rel|public.campaigns",
+        "n|type|public.campaigns",
+        "n|rel|public.campaigns_pkey"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "email_settings"
+      ],
+      "writes": [
+        "s|tbl|public.email_settings",
+        "n|tbl|public.email_settings",
+        "e|tbl|public.email_settings",
+        "n|rel|public.email_settings",
+        "n|type|public.email_settings",
+        "n|rel|public.email_settings_pkey"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "segment_contacts"
+      ],
+      "writes": [
+        "s|tbl|public.segment_contacts",
+        "n|tbl|public.segment_contacts",
+        "e|tbl|public.segment_contacts",
+        "n|rel|public.segment_contacts",
+        "n|type|public.segment_contacts",
+        "n|rel|public.segment_contacts_key"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "segments"
+      ],
+      "writes": [
+        "s|tbl|public.segments",
+        "n|tbl|public.segments",
+        "e|tbl|public.segments",
+        "n|rel|public.segments",
+        "n|type|public.segments",
+        "n|rel|public.segments_pkey"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "sending_domains"
+      ],
+      "writes": [
+        "s|tbl|public.sending_domains",
+        "n|tbl|public.sending_domains",
+        "e|tbl|public.sending_domains",
+        "n|rel|public.sending_domains",
+        "n|type|public.sending_domains",
+        "n|rel|public.sending_domains_pkey"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "templates"
+      ],
+      "writes": [
+        "s|tbl|public.templates",
+        "n|tbl|public.templates",
+        "e|tbl|public.templates",
+        "n|rel|public.templates",
+        "n|type|public.templates",
+        "n|rel|public.templates_pkey"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "topic_unsubscribes"
+      ],
+      "writes": [
+        "s|tbl|public.topic_unsubscribes",
+        "n|tbl|public.topic_unsubscribes",
+        "e|tbl|public.topic_unsubscribes",
+        "n|rel|public.topic_unsubscribes",
+        "n|type|public.topic_unsubscribes",
+        "n|rel|public.topic_unsubscribes_key"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "topics"
+      ],
+      "writes": [
+        "s|tbl|public.topics",
+        "n|tbl|public.topics",
+        "e|tbl|public.topics",
+        "n|rel|public.topics",
+        "n|type|public.topics",
+        "n|rel|public.topics_pkey"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "activity",
+        "topic_name"
+      ],
+      "writes": [
+        "s|col|public.activity.topic_name",
+        "n|col|public.activity.topic_name",
+        "e|col|public.activity.topic_name"
+      ],
+      "reads": [
+        "n|tbl|public.activity",
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "contacts",
+        "subscription_status"
+      ],
+      "writes": [
+        "s|col|public.contacts.subscription_status",
+        "n|col|public.contacts.subscription_status",
+        "e|col|public.contacts.subscription_status"
+      ],
+      "reads": [
+        "n|tbl|public.contacts",
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "campaign_recipients",
+        "campaign_recipients_queue_idx"
+      ],
+      "writes": [
+        "s|idx|public.campaign_recipients_queue_idx",
+        "n|idx|public.campaign_recipients_queue_idx",
+        "e|idx|public.campaign_recipients_queue_idx",
+        "n|rel|public.campaign_recipients_queue_idx"
+      ],
+      "reads": [
+        "n|tbl|public.campaign_recipients",
+        "n|sch|public",
+        "n|col|public.campaign_recipients.status",
+        "n|col|public.campaign_recipients.team_id",
+        "n|col|public.campaign_recipients.created_at"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "campaign_recipients",
+        "campaign_recipients_provider_idx"
+      ],
+      "writes": [
+        "s|idx|public.campaign_recipients_provider_idx",
+        "n|idx|public.campaign_recipients_provider_idx",
+        "e|idx|public.campaign_recipients_provider_idx",
+        "n|rel|public.campaign_recipients_provider_idx"
+      ],
+      "reads": [
+        "n|tbl|public.campaign_recipients",
+        "n|sch|public",
+        "n|col|public.campaign_recipients.provider_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "campaigns",
+        "campaigns_team_idx"
+      ],
+      "writes": [
+        "s|idx|public.campaigns_team_idx",
+        "n|idx|public.campaigns_team_idx",
+        "e|idx|public.campaigns_team_idx",
+        "n|rel|public.campaigns_team_idx"
+      ],
+      "reads": [
+        "n|tbl|public.campaigns",
+        "n|sch|public",
+        "n|col|public.campaigns.team_id",
+        "n|col|public.campaigns.updated_at"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "segment_contacts",
+        "segment_contacts_contact_idx"
+      ],
+      "writes": [
+        "s|idx|public.segment_contacts_contact_idx",
+        "n|idx|public.segment_contacts_contact_idx",
+        "e|idx|public.segment_contacts_contact_idx",
+        "n|rel|public.segment_contacts_contact_idx"
+      ],
+      "reads": [
+        "n|tbl|public.segment_contacts",
+        "n|sch|public",
+        "n|col|public.segment_contacts.contact_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "segments",
+        "segments_team_idx"
+      ],
+      "writes": [
+        "s|idx|public.segments_team_idx",
+        "n|idx|public.segments_team_idx",
+        "e|idx|public.segments_team_idx",
+        "n|rel|public.segments_team_idx"
+      ],
+      "reads": [
+        "n|tbl|public.segments",
+        "n|sch|public",
+        "n|col|public.segments.team_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "sending_domains",
+        "sending_domains_domain_key"
+      ],
+      "writes": [
+        "s|idx|public.sending_domains_domain_key",
+        "n|idx|public.sending_domains_domain_key",
+        "e|idx|public.sending_domains_domain_key",
+        "n|rel|public.sending_domains_domain_key"
+      ],
+      "reads": [
+        "n|tbl|public.sending_domains",
+        "n|sch|public",
+        "n|col|public.sending_domains.domain"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "sending_domains",
+        "sending_domains_team_idx"
+      ],
+      "writes": [
+        "s|idx|public.sending_domains_team_idx",
+        "n|idx|public.sending_domains_team_idx",
+        "e|idx|public.sending_domains_team_idx",
+        "n|rel|public.sending_domains_team_idx"
+      ],
+      "reads": [
+        "n|tbl|public.sending_domains",
+        "n|sch|public",
+        "n|col|public.sending_domains.team_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "templates",
+        "templates_team_idx"
+      ],
+      "writes": [
+        "s|idx|public.templates_team_idx",
+        "n|idx|public.templates_team_idx",
+        "e|idx|public.templates_team_idx",
+        "n|rel|public.templates_team_idx"
+      ],
+      "reads": [
+        "n|tbl|public.templates",
+        "n|sch|public",
+        "n|col|public.templates.team_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "topics",
+        "topics_team_idx"
+      ],
+      "writes": [
+        "s|idx|public.topics_team_idx",
+        "n|idx|public.topics_team_idx",
+        "e|idx|public.topics_team_idx",
+        "n|rel|public.topics_team_idx"
+      ],
+      "reads": [
+        "n|tbl|public.topics",
+        "n|sch|public",
+        "n|col|public.topics.team_id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "campaign_recipients"
+      ],
+      "writes": [
+        "s|fk|public.campaign_recipients.campaign_recipients_team_id_organization_id_fk",
+        "n|fk|public.campaign_recipients.campaign_recipients_team_id_organization_id_fk",
+        "e|fk|public.campaign_recipients.campaign_recipients_team_id_organization_id_fk",
+        "n|con|public.campaign_recipients.campaign_recipients_team_id_organization_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.campaign_recipients",
+        "n|sch|public",
+        "n|tbl|public.organization",
+        "n|sch|public",
+        "n|col|public.campaign_recipients.team_id",
+        "n|col|public.organization.id",
+        "e|uniqueness|public.organization.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "campaign_recipients"
+      ],
+      "writes": [
+        "s|fk|public.campaign_recipients.campaign_recipients_campaign_id_campaigns_id_fk",
+        "n|fk|public.campaign_recipients.campaign_recipients_campaign_id_campaigns_id_fk",
+        "e|fk|public.campaign_recipients.campaign_recipients_campaign_id_campaigns_id_fk",
+        "n|con|public.campaign_recipients.campaign_recipients_campaign_id_campaigns_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.campaign_recipients",
+        "n|sch|public",
+        "n|tbl|public.campaigns",
+        "n|sch|public",
+        "n|col|public.campaign_recipients.campaign_id",
+        "n|col|public.campaigns.id",
+        "e|uniqueness|public.campaigns.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "campaign_recipients"
+      ],
+      "writes": [
+        "s|fk|public.campaign_recipients.campaign_recipients_contact_id_contacts_id_fk",
+        "n|fk|public.campaign_recipients.campaign_recipients_contact_id_contacts_id_fk",
+        "e|fk|public.campaign_recipients.campaign_recipients_contact_id_contacts_id_fk",
+        "n|con|public.campaign_recipients.campaign_recipients_contact_id_contacts_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.campaign_recipients",
+        "n|sch|public",
+        "n|tbl|public.contacts",
+        "n|sch|public",
+        "n|col|public.campaign_recipients.contact_id",
+        "n|col|public.contacts.id",
+        "e|uniqueness|public.contacts.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "campaigns"
+      ],
+      "writes": [
+        "s|fk|public.campaigns.campaigns_team_id_organization_id_fk",
+        "n|fk|public.campaigns.campaigns_team_id_organization_id_fk",
+        "e|fk|public.campaigns.campaigns_team_id_organization_id_fk",
+        "n|con|public.campaigns.campaigns_team_id_organization_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.campaigns",
+        "n|sch|public",
+        "n|tbl|public.organization",
+        "n|sch|public",
+        "n|col|public.campaigns.team_id",
+        "n|col|public.organization.id",
+        "e|uniqueness|public.organization.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "campaigns"
+      ],
+      "writes": [
+        "s|fk|public.campaigns.campaigns_segment_id_segments_id_fk",
+        "n|fk|public.campaigns.campaigns_segment_id_segments_id_fk",
+        "e|fk|public.campaigns.campaigns_segment_id_segments_id_fk",
+        "n|con|public.campaigns.campaigns_segment_id_segments_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.campaigns",
+        "n|sch|public",
+        "n|tbl|public.segments",
+        "n|sch|public",
+        "n|col|public.campaigns.segment_id",
+        "n|col|public.segments.id",
+        "e|uniqueness|public.segments.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "campaigns"
+      ],
+      "writes": [
+        "s|fk|public.campaigns.campaigns_topic_id_topics_id_fk",
+        "n|fk|public.campaigns.campaigns_topic_id_topics_id_fk",
+        "e|fk|public.campaigns.campaigns_topic_id_topics_id_fk",
+        "n|con|public.campaigns.campaigns_topic_id_topics_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.campaigns",
+        "n|sch|public",
+        "n|tbl|public.topics",
+        "n|sch|public",
+        "n|col|public.campaigns.topic_id",
+        "n|col|public.topics.id",
+        "e|uniqueness|public.topics.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "campaigns"
+      ],
+      "writes": [
+        "s|fk|public.campaigns.campaigns_sent_by_user_id_user_id_fk",
+        "n|fk|public.campaigns.campaigns_sent_by_user_id_user_id_fk",
+        "e|fk|public.campaigns.campaigns_sent_by_user_id_user_id_fk",
+        "n|con|public.campaigns.campaigns_sent_by_user_id_user_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.campaigns",
+        "n|sch|public",
+        "n|tbl|public.user",
+        "n|sch|public",
+        "n|col|public.campaigns.sent_by_user_id",
+        "n|col|public.user.id",
+        "e|uniqueness|public.user.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "email_settings"
+      ],
+      "writes": [
+        "s|fk|public.email_settings.email_settings_team_id_organization_id_fk",
+        "n|fk|public.email_settings.email_settings_team_id_organization_id_fk",
+        "e|fk|public.email_settings.email_settings_team_id_organization_id_fk",
+        "n|con|public.email_settings.email_settings_team_id_organization_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.email_settings",
+        "n|sch|public",
+        "n|tbl|public.organization",
+        "n|sch|public",
+        "n|col|public.email_settings.team_id",
+        "n|col|public.organization.id",
+        "e|uniqueness|public.organization.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "segment_contacts"
+      ],
+      "writes": [
+        "s|fk|public.segment_contacts.segment_contacts_team_id_organization_id_fk",
+        "n|fk|public.segment_contacts.segment_contacts_team_id_organization_id_fk",
+        "e|fk|public.segment_contacts.segment_contacts_team_id_organization_id_fk",
+        "n|con|public.segment_contacts.segment_contacts_team_id_organization_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.segment_contacts",
+        "n|sch|public",
+        "n|tbl|public.organization",
+        "n|sch|public",
+        "n|col|public.segment_contacts.team_id",
+        "n|col|public.organization.id",
+        "e|uniqueness|public.organization.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "segment_contacts"
+      ],
+      "writes": [
+        "s|fk|public.segment_contacts.segment_contacts_segment_id_segments_id_fk",
+        "n|fk|public.segment_contacts.segment_contacts_segment_id_segments_id_fk",
+        "e|fk|public.segment_contacts.segment_contacts_segment_id_segments_id_fk",
+        "n|con|public.segment_contacts.segment_contacts_segment_id_segments_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.segment_contacts",
+        "n|sch|public",
+        "n|tbl|public.segments",
+        "n|sch|public",
+        "n|col|public.segment_contacts.segment_id",
+        "n|col|public.segments.id",
+        "e|uniqueness|public.segments.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "segment_contacts"
+      ],
+      "writes": [
+        "s|fk|public.segment_contacts.segment_contacts_contact_id_contacts_id_fk",
+        "n|fk|public.segment_contacts.segment_contacts_contact_id_contacts_id_fk",
+        "e|fk|public.segment_contacts.segment_contacts_contact_id_contacts_id_fk",
+        "n|con|public.segment_contacts.segment_contacts_contact_id_contacts_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.segment_contacts",
+        "n|sch|public",
+        "n|tbl|public.contacts",
+        "n|sch|public",
+        "n|col|public.segment_contacts.contact_id",
+        "n|col|public.contacts.id",
+        "e|uniqueness|public.contacts.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "segments"
+      ],
+      "writes": [
+        "s|fk|public.segments.segments_team_id_organization_id_fk",
+        "n|fk|public.segments.segments_team_id_organization_id_fk",
+        "e|fk|public.segments.segments_team_id_organization_id_fk",
+        "n|con|public.segments.segments_team_id_organization_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.segments",
+        "n|sch|public",
+        "n|tbl|public.organization",
+        "n|sch|public",
+        "n|col|public.segments.team_id",
+        "n|col|public.organization.id",
+        "e|uniqueness|public.organization.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "sending_domains"
+      ],
+      "writes": [
+        "s|fk|public.sending_domains.sending_domains_team_id_organization_id_fk",
+        "n|fk|public.sending_domains.sending_domains_team_id_organization_id_fk",
+        "e|fk|public.sending_domains.sending_domains_team_id_organization_id_fk",
+        "n|con|public.sending_domains.sending_domains_team_id_organization_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.sending_domains",
+        "n|sch|public",
+        "n|tbl|public.organization",
+        "n|sch|public",
+        "n|col|public.sending_domains.team_id",
+        "n|col|public.organization.id",
+        "e|uniqueness|public.organization.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "templates"
+      ],
+      "writes": [
+        "s|fk|public.templates.templates_team_id_organization_id_fk",
+        "n|fk|public.templates.templates_team_id_organization_id_fk",
+        "e|fk|public.templates.templates_team_id_organization_id_fk",
+        "n|con|public.templates.templates_team_id_organization_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.templates",
+        "n|sch|public",
+        "n|tbl|public.organization",
+        "n|sch|public",
+        "n|col|public.templates.team_id",
+        "n|col|public.organization.id",
+        "e|uniqueness|public.organization.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "topic_unsubscribes"
+      ],
+      "writes": [
+        "s|fk|public.topic_unsubscribes.topic_unsubscribes_team_id_organization_id_fk",
+        "n|fk|public.topic_unsubscribes.topic_unsubscribes_team_id_organization_id_fk",
+        "e|fk|public.topic_unsubscribes.topic_unsubscribes_team_id_organization_id_fk",
+        "n|con|public.topic_unsubscribes.topic_unsubscribes_team_id_organization_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.topic_unsubscribes",
+        "n|sch|public",
+        "n|tbl|public.organization",
+        "n|sch|public",
+        "n|col|public.topic_unsubscribes.team_id",
+        "n|col|public.organization.id",
+        "e|uniqueness|public.organization.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "topic_unsubscribes"
+      ],
+      "writes": [
+        "s|fk|public.topic_unsubscribes.topic_unsubscribes_contact_id_contacts_id_fk",
+        "n|fk|public.topic_unsubscribes.topic_unsubscribes_contact_id_contacts_id_fk",
+        "e|fk|public.topic_unsubscribes.topic_unsubscribes_contact_id_contacts_id_fk",
+        "n|con|public.topic_unsubscribes.topic_unsubscribes_contact_id_contacts_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.topic_unsubscribes",
+        "n|sch|public",
+        "n|tbl|public.contacts",
+        "n|sch|public",
+        "n|col|public.topic_unsubscribes.contact_id",
+        "n|col|public.contacts.id",
+        "e|uniqueness|public.contacts.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "topic_unsubscribes"
+      ],
+      "writes": [
+        "s|fk|public.topic_unsubscribes.topic_unsubscribes_topic_id_topics_id_fk",
+        "n|fk|public.topic_unsubscribes.topic_unsubscribes_topic_id_topics_id_fk",
+        "e|fk|public.topic_unsubscribes.topic_unsubscribes_topic_id_topics_id_fk",
+        "n|con|public.topic_unsubscribes.topic_unsubscribes_topic_id_topics_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.topic_unsubscribes",
+        "n|sch|public",
+        "n|tbl|public.topics",
+        "n|sch|public",
+        "n|col|public.topic_unsubscribes.topic_id",
+        "n|col|public.topics.id",
+        "e|uniqueness|public.topics.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "topics"
+      ],
+      "writes": [
+        "s|fk|public.topics.topics_team_id_organization_id_fk",
+        "n|fk|public.topics.topics_team_id_organization_id_fk",
+        "e|fk|public.topics.topics_team_id_organization_id_fk",
+        "n|con|public.topics.topics_team_id_organization_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.topics",
+        "n|sch|public",
+        "n|tbl|public.organization",
+        "n|sch|public",
+        "n|col|public.topics.team_id",
+        "n|col|public.organization.id",
+        "e|uniqueness|public.organization.id"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "campaign_recipients",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "campaigns",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "email_settings",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "segment_contacts",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "segments",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "sending_domains",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "templates",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "topic_unsubscribes",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "topics",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "activity",
+        "name": "topic_name",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaign_recipients",
+        "name": "id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaign_recipients",
+        "name": "team_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaign_recipients",
+        "name": "campaign_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaign_recipients",
+        "name": "contact_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaign_recipients",
+        "name": "address",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaign_recipients",
+        "name": "name",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaign_recipients",
+        "name": "merge",
+        "type": "jsonb",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "'{}'",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaign_recipients",
+        "name": "status",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaign_recipients",
+        "name": "skip_reason",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaign_recipients",
+        "name": "provider_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaign_recipients",
+        "name": "error",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaign_recipients",
+        "name": "attempts",
+        "type": "integer",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "0",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaign_recipients",
+        "name": "next_attempt_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaign_recipients",
+        "name": "sent_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaign_recipients",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaign_recipients",
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "team_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "name",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "subject",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "''",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "preview_text",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "''",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "body",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "''",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "segment_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "topic_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "status",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "'draft'",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "sent_as",
+        "type": "jsonb",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "segment_name",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "topic_name",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "sent_by_user_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "sent_by_name",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "sending_started_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "finished_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "contacts",
+        "name": "subscription_status",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "'subscribed'",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "email_settings",
+        "name": "team_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "email_settings",
+        "name": "sender_name",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "email_settings",
+        "name": "sender_address",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "email_settings",
+        "name": "reply_to",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "email_settings",
+        "name": "legal_name",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "email_settings",
+        "name": "postal_address",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "email_settings",
+        "name": "footer_reason",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "email_settings",
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "segment_contacts",
+        "name": "team_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "segment_contacts",
+        "name": "segment_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "segment_contacts",
+        "name": "contact_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "segment_contacts",
+        "name": "added_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "segments",
+        "name": "id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "segments",
+        "name": "team_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "segments",
+        "name": "name",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "segments",
+        "name": "kind",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "segments",
+        "name": "filter",
+        "type": "jsonb",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "segments",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "segments",
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "sending_domains",
+        "name": "id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "sending_domains",
+        "name": "team_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "sending_domains",
+        "name": "domain",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "sending_domains",
+        "name": "provider_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "sending_domains",
+        "name": "status",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "sending_domains",
+        "name": "records",
+        "type": "jsonb",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "'[]'",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "sending_domains",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "sending_domains",
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "templates",
+        "name": "id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "templates",
+        "name": "team_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "templates",
+        "name": "name",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "templates",
+        "name": "subject",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "''",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "templates",
+        "name": "preview_text",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "''",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "templates",
+        "name": "body",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "''",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "templates",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "templates",
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "topic_unsubscribes",
+        "name": "team_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "topic_unsubscribes",
+        "name": "contact_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "topic_unsubscribes",
+        "name": "topic_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "topic_unsubscribes",
+        "name": "at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "topics",
+        "name": "id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "topics",
+        "name": "team_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "topics",
+        "name": "name",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "topics",
+        "name": "description",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "topics",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "topics",
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaign_recipients",
+        "name": "campaign_recipients_queue_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "status",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "team_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "created_at",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaign_recipients",
+        "name": "campaign_recipients_provider_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "provider_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "campaigns_team_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "team_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "updated_at",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "segment_contacts",
+        "name": "segment_contacts_contact_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "contact_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "segments",
+        "name": "segments_team_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "team_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "sending_domains",
+        "name": "sending_domains_domain_key",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "domain",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": true,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "sending_domains",
+        "name": "sending_domains_team_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "team_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "templates",
+        "name": "templates_team_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "team_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "topics",
+        "name": "topics_team_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "team_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaign_recipients",
+        "name": "campaign_recipients_team_id_organization_id_fk",
+        "nameExplicit": false,
+        "columns": [
+          "team_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "organization",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaign_recipients",
+        "name": "campaign_recipients_campaign_id_campaigns_id_fk",
+        "nameExplicit": false,
+        "columns": [
+          "campaign_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "campaigns",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaign_recipients",
+        "name": "campaign_recipients_contact_id_contacts_id_fk",
+        "nameExplicit": false,
+        "columns": [
+          "contact_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "contacts",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "SET NULL",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "campaigns_team_id_organization_id_fk",
+        "nameExplicit": false,
+        "columns": [
+          "team_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "organization",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "campaigns_segment_id_segments_id_fk",
+        "nameExplicit": false,
+        "columns": [
+          "segment_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "segments",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "SET NULL",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "campaigns_topic_id_topics_id_fk",
+        "nameExplicit": false,
+        "columns": [
+          "topic_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "topics",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "SET NULL",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "campaigns_sent_by_user_id_user_id_fk",
+        "nameExplicit": false,
+        "columns": [
+          "sent_by_user_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "user",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "SET NULL",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "email_settings",
+        "name": "email_settings_team_id_organization_id_fk",
+        "nameExplicit": false,
+        "columns": [
+          "team_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "organization",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "segment_contacts",
+        "name": "segment_contacts_team_id_organization_id_fk",
+        "nameExplicit": false,
+        "columns": [
+          "team_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "organization",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "segment_contacts",
+        "name": "segment_contacts_segment_id_segments_id_fk",
+        "nameExplicit": false,
+        "columns": [
+          "segment_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "segments",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "segment_contacts",
+        "name": "segment_contacts_contact_id_contacts_id_fk",
+        "nameExplicit": false,
+        "columns": [
+          "contact_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "contacts",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "segments",
+        "name": "segments_team_id_organization_id_fk",
+        "nameExplicit": false,
+        "columns": [
+          "team_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "organization",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "sending_domains",
+        "name": "sending_domains_team_id_organization_id_fk",
+        "nameExplicit": false,
+        "columns": [
+          "team_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "organization",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "templates",
+        "name": "templates_team_id_organization_id_fk",
+        "nameExplicit": false,
+        "columns": [
+          "team_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "organization",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "topic_unsubscribes",
+        "name": "topic_unsubscribes_team_id_organization_id_fk",
+        "nameExplicit": false,
+        "columns": [
+          "team_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "organization",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "topic_unsubscribes",
+        "name": "topic_unsubscribes_contact_id_contacts_id_fk",
+        "nameExplicit": false,
+        "columns": [
+          "contact_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "contacts",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "topic_unsubscribes",
+        "name": "topic_unsubscribes_topic_id_topics_id_fk",
+        "nameExplicit": false,
+        "columns": [
+          "topic_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "topics",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "topics",
+        "name": "topics_team_id_organization_id_fk",
+        "nameExplicit": false,
+        "columns": [
+          "team_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "organization",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaign_recipients",
+        "name": "campaign_recipients_pkey",
+        "columns": [
+          "id"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "campaigns_pkey",
+        "columns": [
+          "id"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "email_settings",
+        "name": "email_settings_pkey",
+        "columns": [
+          "team_id"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "segments",
+        "name": "segments_pkey",
+        "columns": [
+          "id"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "sending_domains",
+        "name": "sending_domains_pkey",
+        "columns": [
+          "id"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "templates",
+        "name": "templates_pkey",
+        "columns": [
+          "id"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "topics",
+        "name": "topics_pkey",
+        "columns": [
+          "id"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaign_recipients",
+        "name": "campaign_recipients_key",
+        "nameExplicit": true,
+        "columns": [
+          "campaign_id",
+          "contact_id"
+        ],
+        "nullsNotDistinct": false,
+        "entityType": "uniques"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "segment_contacts",
+        "name": "segment_contacts_key",
+        "nameExplicit": true,
+        "columns": [
+          "segment_id",
+          "contact_id"
+        ],
+        "nullsNotDistinct": false,
+        "entityType": "uniques"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "topic_unsubscribes",
+        "name": "topic_unsubscribes_key",
+        "nameExplicit": true,
+        "columns": [
+          "contact_id",
+          "topic_id"
+        ],
+        "nullsNotDistinct": false,
+        "entityType": "uniques"
+      }
+    }
+  ]
+}

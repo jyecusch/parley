@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto"
+import { NodePgPool } from "@parley/db"
 import { DatabaseUnavailable, RequestsTooFrequent } from "@parley/domain"
-import { Config, Context, Duration, Effect, Layer, Redacted } from "effect"
-import pg from "pg"
+import { Context, Duration, Effect, Layer } from "effect"
 import { RateLimiterMemory, RateLimiterPostgres, RateLimiterRes } from "rate-limiter-flexible"
 
 /** A short, fixed-length stand-in for a long part of a key, such as an email address (keys are at most 255 characters). */
@@ -23,19 +23,7 @@ export class RateLimiter extends Context.Service<
   static readonly layer = Layer.effect(
     RateLimiter,
     Effect.gen(function* () {
-      const url = yield* Config.Redacted("DATABASE_URL").pipe(Effect.orDie)
-      const runFork = Effect.runForkWith(yield* Effect.context<never>())
-      // Its own small pool: Effect's SQL client doesn't hand out its connections.
-      const pool = yield* Effect.acquireRelease(
-        Effect.sync(() => {
-          const opened = new pg.Pool({ connectionString: Redacted.value(url), max: 4 })
-          // An idle connection dropped by the server (a restart, a failover) is reported here; with
-          // no listener, Node would crash the process. The pool replaces it on the next query.
-          opened.on("error", (error) => runFork(Effect.logWarning("rate limit connection lost", error)))
-          return opened
-        }),
-        (opened) => Effect.tryPromise(() => opened.end()).pipe(Effect.ignore),
-      )
+      const pool = yield* NodePgPool
       // One limiter per limit and window; the table is shared, keys are prefixed by both.
       const limiters = new Map<string, RateLimiterPostgres>()
       const limiterFor = (limit: number, window: Duration.Duration) => {

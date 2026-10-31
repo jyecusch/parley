@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import { ConfigProvider, Effect, Layer } from "effect"
 import { Mailer } from "../src/mail/mailer.ts"
-import { ProviderPacing } from "../src/mail/provider-pacing.ts"
+import { ProviderPacing } from "../src/services/provider-pacing.ts"
 
 /** A fake Resend that answers domain requests with `status` and records what was asked. */
 const fakeResend = (status: string) => {

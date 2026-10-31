@@ -1,0 +1,35 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "3cbd20f9-f73a-4b1d-a2d3-fafe1126d6d8",
+  "prevIds": [
+    "ec663e62-5168-4c92-91c2-219265433cd3"
+  ],
+  "footprints": [
+    {
+      "statementType": "drop_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "email_settings",
+        "footer_reason"
+      ],
+      "writes": [
+        "s|col|public.email_settings.footer_reason",
+        "n|col|public.email_settings.footer_reason",
+        "e|col|public.email_settings.footer_reason"
+      ],
+      "reads": [
+        "n|tbl|public.email_settings",
+        "n|sch|public"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "drop",
+      "key": "columns\u0000[\"public\",\"email_settings\",\"footer_reason\"]"
+    }
+  ]
+}

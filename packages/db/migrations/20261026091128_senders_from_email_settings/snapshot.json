@@ -1,0 +1,71 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "01c836eb-d614-4f90-9ee4-d32e184a589a",
+  "prevIds": [
+    "e4250955-a936-4176-a7b2-172d14a22b0f"
+  ],
+  "footprints": [
+    {
+      "statementType": "drop_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "email_settings"
+      ],
+      "writes": [
+        "s|tbl|public.email_settings",
+        "n|tbl|public.email_settings",
+        "e|tbl|public.email_settings",
+        "n|rel|public.email_settings",
+        "n|type|public.email_settings"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "drop",
+      "key": "tables\u0000[\"public\",\"email_settings\"]"
+    },
+    {
+      "op": "drop",
+      "key": "columns\u0000[\"public\",\"email_settings\",\"team_id\"]"
+    },
+    {
+      "op": "drop",
+      "key": "columns\u0000[\"public\",\"email_settings\",\"sender_name\"]"
+    },
+    {
+      "op": "drop",
+      "key": "columns\u0000[\"public\",\"email_settings\",\"sender_address\"]"
+    },
+    {
+      "op": "drop",
+      "key": "columns\u0000[\"public\",\"email_settings\",\"reply_to\"]"
+    },
+    {
+      "op": "drop",
+      "key": "columns\u0000[\"public\",\"email_settings\",\"legal_name\"]"
+    },
+    {
+      "op": "drop",
+      "key": "columns\u0000[\"public\",\"email_settings\",\"postal_address\"]"
+    },
+    {
+      "op": "drop",
+      "key": "columns\u0000[\"public\",\"email_settings\",\"updated_at\"]"
+    },
+    {
+      "op": "drop",
+      "key": "fks\u0000[\"public\",\"email_settings\",\"email_settings_team_id_organization_id_fk\"]"
+    },
+    {
+      "op": "drop",
+      "key": "pks\u0000[\"public\",\"email_settings\",\"email_settings_pkey\"]"
+    }
+  ]
+}

@@ -23,7 +23,7 @@
   "devDependencies": {
     "@biomejs/biome": "2.5.15",
     "@effect/language-service": "0.87.5",
-    "@effect/vitest": "4.0.5",
+    "@effect/vitest": "4.1.1",
     "@types/bun": "1.4.3",
     "@typescript-eslint/parser": "8.72.0",
     "eslint": "10.13.0",

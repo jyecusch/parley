@@ -10,7 +10,7 @@ import {
 } from "@parley/domain"
 import { Config, Context, Duration, Effect, Layer, Option, Redacted, Ref, Schema } from "effect"
 
-import { ProviderPacing } from "./provider-pacing.ts"
+import { ProviderPacing } from "../services/provider-pacing.ts"
 
 /** One email. The sender comes from configuration unless given. */
 export interface OutgoingEmail {

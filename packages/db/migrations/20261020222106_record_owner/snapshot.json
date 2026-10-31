@@ -1,0 +1,271 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "0fb8ccdd-8dc1-4f12-b941-55b8fb336ce4",
+  "prevIds": [
+    "c1af40b8-cb22-4d58-bac6-9170d7ed23e0"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "companies",
+        "owner_id"
+      ],
+      "writes": [
+        "s|col|public.companies.owner_id",
+        "n|col|public.companies.owner_id",
+        "e|col|public.companies.owner_id"
+      ],
+      "reads": [
+        "n|tbl|public.companies",
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "contacts",
+        "owner_id"
+      ],
+      "writes": [
+        "s|col|public.contacts.owner_id",
+        "n|col|public.contacts.owner_id",
+        "e|col|public.contacts.owner_id"
+      ],
+      "reads": [
+        "n|tbl|public.contacts",
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "companies",
+        "companies_team_owner_idx"
+      ],
+      "writes": [
+        "s|idx|public.companies_team_owner_idx",
+        "n|idx|public.companies_team_owner_idx",
+        "e|idx|public.companies_team_owner_idx",
+        "n|rel|public.companies_team_owner_idx"
+      ],
+      "reads": [
+        "n|tbl|public.companies",
+        "n|sch|public",
+        "n|col|public.companies.team_id",
+        "n|col|public.companies.owner_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "contacts",
+        "contacts_team_owner_idx"
+      ],
+      "writes": [
+        "s|idx|public.contacts_team_owner_idx",
+        "n|idx|public.contacts_team_owner_idx",
+        "e|idx|public.contacts_team_owner_idx",
+        "n|rel|public.contacts_team_owner_idx"
+      ],
+      "reads": [
+        "n|tbl|public.contacts",
+        "n|sch|public",
+        "n|col|public.contacts.team_id",
+        "n|col|public.contacts.owner_id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "companies"
+      ],
+      "writes": [
+        "s|fk|public.companies.companies_owner_id_user_id_fk",
+        "n|fk|public.companies.companies_owner_id_user_id_fk",
+        "e|fk|public.companies.companies_owner_id_user_id_fk",
+        "n|con|public.companies.companies_owner_id_user_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.companies",
+        "n|sch|public",
+        "n|tbl|public.user",
+        "n|sch|public",
+        "n|col|public.companies.owner_id",
+        "n|col|public.user.id",
+        "e|uniqueness|public.user.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "contacts"
+      ],
+      "writes": [
+        "s|fk|public.contacts.contacts_owner_id_user_id_fk",
+        "n|fk|public.contacts.contacts_owner_id_user_id_fk",
+        "e|fk|public.contacts.contacts_owner_id_user_id_fk",
+        "n|con|public.contacts.contacts_owner_id_user_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.contacts",
+        "n|sch|public",
+        "n|tbl|public.user",
+        "n|sch|public",
+        "n|col|public.contacts.owner_id",
+        "n|col|public.user.id",
+        "e|uniqueness|public.user.id"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "companies",
+        "name": "owner_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "contacts",
+        "name": "owner_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "companies",
+        "name": "companies_team_owner_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "team_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "owner_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "contacts",
+        "name": "contacts_team_owner_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "team_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "owner_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "companies",
+        "name": "companies_owner_id_user_id_fk",
+        "nameExplicit": false,
+        "columns": [
+          "owner_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "user",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "SET NULL",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "contacts",
+        "name": "contacts_owner_id_user_id_fk",
+        "nameExplicit": false,
+        "columns": [
+          "owner_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "user",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "SET NULL",
+        "entityType": "fks"
+      }
+    }
+  ]
+}

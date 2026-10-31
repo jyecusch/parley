@@ -1,4 +1,4 @@
-import { schema } from "@parley/db"
+import { NodePgPool, schema } from "@parley/db"
 import {
   AccessTokenExpired,
   AccessTokenUnrecognized,
@@ -20,7 +20,6 @@ import { and, desc, eq, gt, isNull, sql } from "drizzle-orm"
 import { drizzle } from "drizzle-orm/node-postgres"
 import { Config, Context, Duration, Effect, Layer, Redacted } from "effect"
 import { createLocalJWKSet, type JWTPayload, jwtVerify } from "jose"
-import { Pool } from "pg"
 import { PublicUrl } from "../config/public-url.ts"
 import { Mailer } from "../mail/mailer.ts"
 import { renderVerification } from "../mail/templates.ts"
@@ -34,12 +33,11 @@ import { domainMaySignUp, signUpDomainsOf } from "./sign-up-policy.ts"
 /** How long the consent page has between recording a connection and the agent finishing sign-in. */
 const PENDING_FOR = "10 minutes"
 
-/** The Better-Auth instance. Process tier: one per server, with its own small pool. */
+/** The Better-Auth instance. Process tier: one per server, using the shared node-postgres pool. */
 export class BetterAuth extends Context.Service<BetterAuth, Auth>()("@parley/core/BetterAuth") {
   static readonly layer = Layer.effect(
     BetterAuth,
     Effect.gen(function* () {
-      const url = yield* Config.Redacted("DATABASE_URL")
       const secret = yield* Config.Redacted("BETTER_AUTH_SECRET")
       // Behind a proxy, the header carrying the visitor's address, so rate limits are per visitor.
       const ipAddressHeader = yield* Config.String("IP_ADDRESS_HEADER").pipe(Config.withDefault(""))
@@ -53,17 +51,8 @@ export class BetterAuth extends Context.Service<BetterAuth, Auth>()("@parley/cor
         )
       }
       const baseURL = yield* PublicUrl
-      const pool = yield* Effect.acquireRelease(
-        Effect.sync(() => new Pool({ connectionString: Redacted.value(url), max: 5, statement_timeout: 30_000 })),
-        (pool) =>
-          Effect.callback<void>((resume) => {
-            pool.end().then(
-              () => resume(Effect.void),
-              () => resume(Effect.void),
-            )
-          }),
-      )
-      const db = drizzle(pool, { schema })
+      const pool = yield* NodePgPool
+      const db = drizzle({ client: pool, relations: schema.authRelations, paramsInErrors: false })
       const { connections } = schema
       // Better-Auth calls these mid-request, outside any fiber, so they use its pool directly.
       const hooks: ConnectionHooks = {

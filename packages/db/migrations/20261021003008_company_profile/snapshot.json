@@ -1,0 +1,251 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "3142b0e3-721e-44e8-ae50-ae586f2d36a8",
+  "prevIds": [
+    "4290036b-4157-42d2-ac82-8036778ee6b5"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "companies",
+        "description"
+      ],
+      "writes": [
+        "s|col|public.companies.description",
+        "n|col|public.companies.description",
+        "e|col|public.companies.description"
+      ],
+      "reads": [
+        "n|tbl|public.companies",
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "companies",
+        "employees"
+      ],
+      "writes": [
+        "s|col|public.companies.employees",
+        "n|col|public.companies.employees",
+        "e|col|public.companies.employees"
+      ],
+      "reads": [
+        "n|tbl|public.companies",
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "companies",
+        "industry"
+      ],
+      "writes": [
+        "s|col|public.companies.industry",
+        "n|col|public.companies.industry",
+        "e|col|public.companies.industry"
+      ],
+      "reads": [
+        "n|tbl|public.companies",
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "companies",
+        "year_founded"
+      ],
+      "writes": [
+        "s|col|public.companies.year_founded",
+        "n|col|public.companies.year_founded",
+        "e|col|public.companies.year_founded"
+      ],
+      "reads": [
+        "n|tbl|public.companies",
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "companies",
+        "annual_revenue"
+      ],
+      "writes": [
+        "s|col|public.companies.annual_revenue",
+        "n|col|public.companies.annual_revenue",
+        "e|col|public.companies.annual_revenue"
+      ],
+      "reads": [
+        "n|tbl|public.companies",
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "companies",
+        "social_profiles"
+      ],
+      "writes": [
+        "s|col|public.companies.social_profiles",
+        "n|col|public.companies.social_profiles",
+        "e|col|public.companies.social_profiles"
+      ],
+      "reads": [
+        "n|tbl|public.companies",
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "contacts",
+        "social_profiles"
+      ],
+      "writes": [
+        "s|col|public.contacts.social_profiles",
+        "n|col|public.contacts.social_profiles",
+        "e|col|public.contacts.social_profiles"
+      ],
+      "reads": [
+        "n|tbl|public.contacts",
+        "n|sch|public"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "companies",
+        "name": "description",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "companies",
+        "name": "employees",
+        "type": "integer",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "companies",
+        "name": "industry",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "companies",
+        "name": "year_founded",
+        "type": "integer",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "companies",
+        "name": "annual_revenue",
+        "type": "double precision",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "companies",
+        "name": "social_profiles",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 1,
+        "default": "'{}'",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "contacts",
+        "name": "social_profiles",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 1,
+        "default": "'{}'",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    }
+  ]
+}

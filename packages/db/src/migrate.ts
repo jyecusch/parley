@@ -34,7 +34,9 @@ const waitForDatabase = async () => {
 
 try {
   await waitForDatabase()
-  await migrate(drizzle(pool), { migrationsFolder: new URL("../migrations", import.meta.url).pathname })
+  await migrate(drizzle({ client: pool, paramsInErrors: false }), {
+    migrationsFolder: new URL("../migrations", import.meta.url).pathname,
+  })
   console.log("Migrations applied")
 } finally {
   await pool.end()

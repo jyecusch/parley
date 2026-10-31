@@ -1,0 +1,217 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "4290036b-4157-42d2-ac82-8036778ee6b5",
+  "prevIds": [
+    "0fb8ccdd-8dc1-4f12-b941-55b8fb336ce4"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "contacts",
+        "address_line1"
+      ],
+      "writes": [
+        "s|col|public.contacts.address_line1",
+        "n|col|public.contacts.address_line1",
+        "e|col|public.contacts.address_line1"
+      ],
+      "reads": [
+        "n|tbl|public.contacts",
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "contacts",
+        "address_line2"
+      ],
+      "writes": [
+        "s|col|public.contacts.address_line2",
+        "n|col|public.contacts.address_line2",
+        "e|col|public.contacts.address_line2"
+      ],
+      "reads": [
+        "n|tbl|public.contacts",
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "contacts",
+        "city"
+      ],
+      "writes": [
+        "s|col|public.contacts.city",
+        "n|col|public.contacts.city",
+        "e|col|public.contacts.city"
+      ],
+      "reads": [
+        "n|tbl|public.contacts",
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "contacts",
+        "region"
+      ],
+      "writes": [
+        "s|col|public.contacts.region",
+        "n|col|public.contacts.region",
+        "e|col|public.contacts.region"
+      ],
+      "reads": [
+        "n|tbl|public.contacts",
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "contacts",
+        "postcode"
+      ],
+      "writes": [
+        "s|col|public.contacts.postcode",
+        "n|col|public.contacts.postcode",
+        "e|col|public.contacts.postcode"
+      ],
+      "reads": [
+        "n|tbl|public.contacts",
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "contacts",
+        "country"
+      ],
+      "writes": [
+        "s|col|public.contacts.country",
+        "n|col|public.contacts.country",
+        "e|col|public.contacts.country"
+      ],
+      "reads": [
+        "n|tbl|public.contacts",
+        "n|sch|public"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "contacts",
+        "name": "address_line1",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "contacts",
+        "name": "address_line2",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "contacts",
+        "name": "city",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "contacts",
+        "name": "region",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "contacts",
+        "name": "postcode",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "contacts",
+        "name": "country",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    }
+  ]
+}

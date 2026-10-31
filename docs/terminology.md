@@ -76,6 +76,7 @@ How to pick a name: choose the most common name for the concept. Reject anything
 | **Member transaction** | A database transaction that locks one team before building fresh authorization proofs for member changes. `MemberChanges.inTeam` supplies its opaque `MemberTransaction<T>` only inside the locked callback. | — |
 | **Batch** | One durable broadcast provider request of at most 100 ordered recipients, with saved request bytes and one idempotency key (D167). | — |
 | **Tier** | How long something lives: **process** (built once), **team** (built per team) or **request**. | scope, lifetime, level |
+| **NodePgPool** | The process-wide node-postgres connection capability owned by database infrastructure and injected into libraries that require the `pg` API (D168). Distinct from Effect's native SQL pool. | — |
 | **Package** | A workspace package such as `@parley/core`. | module (for this meaning), lib |
 
 ## Errors

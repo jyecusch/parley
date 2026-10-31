@@ -9,7 +9,7 @@ describe("database", () => {
     Effect.gen(function* () {
       const db = yield* Database
       const result = yield* db.query((d) => d.execute(sql`show statement_timeout`))
-      const rows = Array.isArray(result) ? result : (result as { rows: Array<unknown> }).rows
+      const rows = result.rows
       expect(rows[0]).toEqual({ statement_timeout: "30s" })
     }).pipe(Effect.provide(CoreLive)),
   )

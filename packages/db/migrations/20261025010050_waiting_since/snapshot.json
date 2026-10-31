@@ -1,0 +1,47 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "4842a5aa-f8b7-473d-8cec-46962f693679",
+  "prevIds": [
+    "5bd84835-a857-487a-aef8-e19a54a97426"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "form_submissions",
+        "waiting_since"
+      ],
+      "writes": [
+        "s|col|public.form_submissions.waiting_since",
+        "n|col|public.form_submissions.waiting_since",
+        "e|col|public.form_submissions.waiting_since"
+      ],
+      "reads": [
+        "n|tbl|public.form_submissions",
+        "n|sch|public"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "form_submissions",
+        "name": "waiting_since",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    }
+  ]
+}

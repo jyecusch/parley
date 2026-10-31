@@ -1,8 +1,8 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Database, DatabaseLive } from "@parley/db"
+import { Database, DatabaseLive, NodePgPool } from "@parley/db"
 import { sql } from "drizzle-orm"
 import { ConfigProvider, Context, Effect, Layer } from "effect"
-import { ProviderPacing } from "../src/mail/provider-pacing.ts"
+import { ProviderPacing } from "../src/services/provider-pacing.ts"
 
 describe("shared provider pacing", () => {
   it.live("shares one allowance between independently built server instances", () =>
@@ -27,6 +27,7 @@ describe("shared provider pacing", () => {
     }).pipe(
       Effect.provide(
         ProviderPacing.layer.pipe(
+          Layer.provide(NodePgPool.layer),
           Layer.provide(
             ConfigProvider.layer(
               ConfigProvider.fromUnknown({
