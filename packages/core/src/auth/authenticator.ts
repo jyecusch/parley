@@ -22,7 +22,7 @@ import { Config, Context, Duration, Effect, Layer, Redacted } from "effect"
 import { createLocalJWKSet, type JWTPayload, jwtVerify } from "jose"
 import { PublicUrl } from "../config/public-url.ts"
 import { Mailer } from "../mail/mailer.ts"
-import { renderVerification } from "../mail/templates.ts"
+import { renderPasswordReset, renderVerification } from "../mail/templates.ts"
 import type { Principal } from "../principal.ts"
 import { Connections } from "../services/connections.ts"
 import { RateLimiter } from "../services/rate-limiter.ts"
@@ -92,6 +92,13 @@ export class BetterAuth extends Context.Service<BetterAuth, Auth>()("@parley/cor
           ),
         )
       }
+      const sendPasswordResetEmail = (to: string, link: string) =>
+        Effect.runPromiseWith(runtime)(
+          mailer.send({ to, ...renderPasswordReset({ link, email: to }) }).pipe(
+            Effect.asVoid,
+            Effect.catch((error) => Effect.logWarning("password reset email not sent", error._tag)),
+          ),
+        )
       /** An account may be made on its domain, for an address with a pending invitation, or as the first one. */
       const mayCreateAccount = async (email: string) => {
         if (domainMaySignUp(signUpDomains, email)) return true
@@ -122,6 +129,7 @@ export class BetterAuth extends Context.Service<BetterAuth, Auth>()("@parley/cor
         baseURL,
         connections: hooks,
         sendVerificationEmail,
+        sendPasswordResetEmail,
         ipAddressHeaders: ipAddressHeader ? [ipAddressHeader] : [],
       })
     }),

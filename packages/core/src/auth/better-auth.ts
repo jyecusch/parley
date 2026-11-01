@@ -1,11 +1,15 @@
 import { apiKey } from "@better-auth/api-key"
+import { getCurrentAuthEndpointContext } from "@better-auth/core/context"
 import { mcp } from "@better-auth/mcp"
+import { passkey } from "@better-auth/passkey"
 import type { schema } from "@parley/db"
-import { betterAuth } from "better-auth"
+import { ENOUGH_STRENGTH, passwordStrength } from "@parley/domain"
+import { type BetterAuthPlugin, betterAuth } from "better-auth"
 import { drizzleAdapter } from "better-auth/adapters/drizzle"
 import { APIError, createAuthMiddleware, getSessionFromCtx } from "better-auth/api"
 import { jwt } from "better-auth/plugins/jwt"
 import { organization } from "better-auth/plugins/organization"
+import { twoFactor } from "better-auth/plugins/two-factor"
 import type { NodePgDatabase } from "drizzle-orm/node-postgres"
 
 /**
@@ -81,6 +85,8 @@ export interface AuthConfig {
   readonly mayCreateAccount: (email: string) => Promise<boolean>
   /** Sends the link that proves someone owns their email address. */
   readonly sendVerificationEmail: (to: string, link: string) => Promise<void>
+  /** Sends the link to choose a new password (D172). */
+  readonly sendPasswordResetEmail: (to: string, link: string) => Promise<void>
   /** Headers holding the client's address when behind a proxy, such as `cf-connecting-ip`. */
   readonly ipAddressHeaders: ReadonlyArray<string>
 }
@@ -151,27 +157,85 @@ const BASE_PATH = "/api/auth"
 /** Who issues access tokens: Better-Auth, at its base path. */
 export const issuer = (baseURL: string) => `${baseURL}${BASE_PATH}`
 
+/** What a hook before an endpoint sees. */
+type HookContext = Parameters<Parameters<typeof createAuthMiddleware>[0]>[0]
+
 /**
  * Consent is only accepted for the connection the consent page just recorded, for the same
  * agent. Without this, accepting consent directly would mint tokens that name no connection.
  */
-const consentGuard = (connections: ConnectionHooks) =>
-  createAuthMiddleware(async (ctx) => {
-    if (ctx.path !== "/oauth2/consent" || ctx.body?.accept !== true) return
-    const session = await getSessionFromCtx(ctx)
-    const pending = session ? await connections.pendingFor(session.session.id) : undefined
-    const query = typeof ctx.body?.oauth_query === "string" ? ctx.body.oauth_query : ""
-    const clientId = new URLSearchParams(query.startsWith("?") ? query.slice(1) : query).get("client_id")
-    if (!pending || pending.clientId !== clientId) {
-      throw new APIError("FORBIDDEN", {
-        error: "access_denied",
-        error_description: "Choose a team and who the agent acts as before allowing it.",
-      })
+const consentGuard = (connections: ConnectionHooks) => async (ctx: HookContext) => {
+  if (ctx.path !== "/oauth2/consent" || ctx.body?.accept !== true) return
+  const session = await getSessionFromCtx(ctx)
+  const pending = session ? await connections.pendingFor(session.session.id) : undefined
+  const query = typeof ctx.body?.oauth_query === "string" ? ctx.body.oauth_query : ""
+  const clientId = new URLSearchParams(query.startsWith("?") ? query.slice(1) : query).get("client_id")
+  if (!pending || pending.clientId !== clientId) {
+    throw new APIError("FORBIDDEN", {
+      error: "access_denied",
+      error_description: "Choose a team and who the agent acts as before allowing it.",
+    })
+  }
+}
+
+/** Where Better-Auth hashes a password someone has just chosen: signing up, changing it, resetting it. */
+const NEW_PASSWORD_PATHS: ReadonlySet<string> = new Set(["/sign-up/email", "/change-password", "/reset-password"])
+
+/**
+ * A new password must be at least Good (D172), judged by the same check the web app shows as you
+ * type. Built the way Better-Auth's own haveibeenpwned plugin is: it wraps the password hasher, so
+ * it sees the password only once Better-Auth has validated the request (and any reset token)
+ * itself. Signing up and changing it, the person's name and email count as easy guesses, from
+ * what Better-Auth hands over: the sign-up form, or the signed-in session. A reset has neither, so
+ * it judges the password alone, as the reset page does.
+ */
+const passwordStrengthPlugin = {
+  id: "parley-password-strength",
+  init: (context) => {
+    const hash = context.password.hash
+    return {
+      context: {
+        password: {
+          ...context.password,
+          hash: async (password: string) => {
+            const endpoint = getCurrentAuthEndpointContext()
+            if (endpoint.path && NEW_PASSWORD_PATHS.has(endpoint.path)) {
+              const owner =
+                endpoint.path === "/sign-up/email"
+                  ? [endpoint.body?.name, endpoint.body?.email]
+                  : [endpoint.context.session?.user.name, endpoint.context.session?.user.email]
+              const strength = await passwordStrength(
+                password,
+                owner.filter((value): value is string => typeof value === "string" && value.length > 0),
+              )
+              if (strength.score < ENOUGH_STRENGTH) {
+                throw new APIError("BAD_REQUEST", {
+                  code: "PASSWORD_TOO_WEAK",
+                  message: `That password is too easy to guess. ${strength.warning ?? ""}`.trim(),
+                })
+              }
+            }
+            return hash(password)
+          },
+        },
+      },
     }
+  },
+} satisfies BetterAuthPlugin
+
+/** A passkey used without a fingerprint, face or PIN (D172). */
+const unverifiedPasskey = () =>
+  new APIError("BAD_REQUEST", {
+    code: "PASSKEY_NOT_VERIFIED",
+    message: "Use a passkey that checks your fingerprint, face or PIN.",
   })
 
-export const makeAuth = (config: AuthConfig): Auth =>
-  betterAuth({
+/** The site passkeys belong to: Parley's own host name, without the port (D172). */
+const relyingParty = (baseURL: string) => new URL(baseURL)
+
+export const makeAuth = (config: AuthConfig): Auth => {
+  const guardConsent = consentGuard(config.connections)
+  return betterAuth({
     appName: "Parley",
     secret: config.secret,
     baseURL: config.baseURL,
@@ -179,7 +243,19 @@ export const makeAuth = (config: AuthConfig): Auth =>
     database: drizzleAdapter(config.db, { provider: "pg", schema: config.schema }),
     // Nobody signs in before proving they own their address (D163): whether an address may have an
     // account depends on it, and an invitation names an address only its owner may take.
-    emailAndPassword: { enabled: true, requireEmailVerification: true },
+    emailAndPassword: {
+      enabled: true,
+      requireEmailVerification: true,
+      // A forgotten password is reset by an emailed link, good once for an hour, and the reset signs
+      // you out everywhere (D172). Service accounts never sign in with a password (D18), so no
+      // link is ever sent for one; the reply looks the same either way.
+      sendResetPassword: async ({ user, url }) => {
+        if ((user as { kind?: string | null }).kind === "service-account") return
+        await config.sendPasswordResetEmail(user.email, url)
+      },
+      resetPasswordTokenExpiresIn: 60 * 60,
+      revokeSessionsOnPasswordReset: true,
+    },
     emailVerification: {
       sendOnSignUp: true,
       // Signing in before confirming sends a fresh link, in case the first one is lost.
@@ -227,12 +303,49 @@ export const makeAuth = (config: AuthConfig): Auth =>
         "/sign-in/email": { window: 60, max: 10 },
         "/sign-up/email": { window: 3600, max: 20 },
         "/send-verification-email": { window: 3600, max: 5 },
+        "/request-password-reset": { window: 3600, max: 5 },
+        "/reset-password": { window: 60, max: 10 },
         "/oauth2/register": { window: 3600, max: 30 },
+        // A code is six digits, so guesses are few and slow (D172).
+        "/two-factor/verify-totp": { window: 60, max: 10 },
+        "/two-factor/verify-backup-code": { window: 60, max: 10 },
+        "/change-password": { window: 60, max: 10 },
       },
     },
-    hooks: { before: consentGuard(config.connections) },
+    hooks: {
+      before: createAuthMiddleware(async (ctx) => {
+        await guardConsent(ctx)
+      }),
+    },
     plugins: [
       organization({ creatorRole: "owner" }),
+      passwordStrengthPlugin,
+      // An authenticator app after your password, with backup codes; a trusted device skips it for
+      // 30 days (D172).
+      twoFactor({
+        issuer: "Parley",
+        backupCodeOptions: { amount: 10 },
+        trustDeviceMaxAge: 30 * 24 * 60 * 60,
+      }),
+      // Signing in with a passkey needs no password and no code (D172), so it must prove who is
+      // holding the device (a fingerprint, face or PIN), not just that it's present: a security
+      // key without a PIN would otherwise sign in by touch alone, skipping the code.
+      passkey({
+        rpID: relyingParty(config.baseURL).hostname,
+        rpName: "Parley",
+        origin: relyingParty(config.baseURL).origin,
+        authenticatorSelection: { userVerification: "required" },
+        registration: {
+          afterVerification: ({ verification }) => {
+            if (!verification.registrationInfo?.userVerified) throw unverifiedPasskey()
+          },
+        },
+        authentication: {
+          afterVerification: ({ verification }) => {
+            if (!verification.authenticationInfo.userVerified) throw unverifiedPasskey()
+          },
+        },
+      }),
       apiKey({
         defaultPrefix: "parley_",
         enableMetadata: true,
@@ -263,3 +376,4 @@ export const makeAuth = (config: AuthConfig): Auth =>
       }),
     ],
   })
+}

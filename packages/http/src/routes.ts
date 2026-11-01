@@ -93,6 +93,22 @@ const AUTH_PATHS: ReadonlySet<string> = new Set([
   "/sign-out",
   "/send-verification-email",
   "/verify-email",
+  // Your own sign-in: password, two-factor authentication and passkeys (D172).
+  "/change-password",
+  "/request-password-reset",
+  "/reset-password",
+  "/two-factor/enable",
+  "/two-factor/disable",
+  "/two-factor/verify-totp",
+  "/two-factor/verify-backup-code",
+  "/two-factor/generate-backup-codes",
+  "/passkey/generate-register-options",
+  "/passkey/verify-registration",
+  "/passkey/generate-authenticate-options",
+  "/passkey/verify-authentication",
+  "/passkey/list-user-passkeys",
+  "/passkey/update-passkey",
+  "/passkey/delete-passkey",
   "/jwks",
   "/.well-known/oauth-authorization-server",
   "/.well-known/openid-configuration",
@@ -128,7 +144,9 @@ export const AuthRoutesLive = HttpRouter.use((router) =>
     // Better-Auth feature is never exposed by accident.
     yield* router.add("*", "/api/auth/*", (request) => {
       const path = new URL(request.url, "http://parley").pathname.replace(/^\/api\/auth/, "")
-      return AUTH_PATHS.has(path) ? handle(request) : Effect.succeed(HttpServerResponse.empty({ status: 404 }))
+      // A reset link opens /reset-password/<token>, which checks it and sends you on to the page (D172).
+      const allowed = AUTH_PATHS.has(path) || /^\/reset-password\/[A-Za-z0-9_-]+$/.test(path)
+      return allowed ? handle(request) : Effect.succeed(HttpServerResponse.empty({ status: 404 }))
     })
     // OAuth discovery for agents (D89). The protected-resource metadata is answered by Better-Auth's
     // MCP plugin; the authorization server's lives under its base path, so it is re-served here.

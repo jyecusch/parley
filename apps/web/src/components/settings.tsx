@@ -19,6 +19,7 @@ import {
   MembersIcon,
   ServiceAccountIcon,
   SettingsIcon,
+  ShieldIcon,
 } from "./icons.tsx"
 import {
   Box,
@@ -102,6 +103,7 @@ const SETTINGS_PAGES = [
     label: "Service accounts",
     icon: <ServiceAccountIcon />,
   },
+  { group: "you", to: "/t/$teamId/settings/security", label: "Security", icon: <ShieldIcon /> },
   { group: "you", to: "/t/$teamId/settings/connections", label: "Connections", icon: <ConnectionIcon /> },
   { group: "you", to: "/t/$teamId/settings/api-keys", label: "API keys", icon: <KeyIcon /> },
 ] as const

@@ -8,8 +8,10 @@
   },
   "dependencies": {
     "@better-auth/api-key": "1.7.11",
+    "@better-auth/core": "1.7.11",
     "@better-auth/mcp": "1.7.11",
     "@better-auth/oauth-provider": "1.7.11",
+    "@better-auth/passkey": "1.7.11",
     "@effect/sql-pg": "4.1.1",
     "@parley/db": "workspace:*",
     "@parley/domain": "workspace:*",
@@ -29,6 +31,7 @@
     "tldts": "7.4.18"
   },
   "devDependencies": {
+    "@better-auth/utils": "0.5.0",
     "@types/pg": "8.23.1",
     "@types/sanitize-html": "2.16.2"
   }

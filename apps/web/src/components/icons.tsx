@@ -10,6 +10,7 @@ import {
   Copy,
   Download,
   Ellipsis,
+  Fingerprint,
   GripVertical,
   Image,
   Info,
@@ -35,6 +36,7 @@ import {
   Send,
   Settings,
   Settings2,
+  ShieldCheck,
   SlidersHorizontal,
   Sparkle,
   Stamp,
@@ -90,6 +92,8 @@ export const MembersIcon = icon(Users)
 export const ServiceAccountIcon = icon(Bot)
 export const ConnectionIcon = icon(Plug)
 export const KeyIcon = icon(KeyRound)
+export const PasskeyIcon = icon(Fingerprint)
+export const ShieldIcon = icon(ShieldCheck)
 export const InfoIcon = icon(Info)
 export const WarnIcon = icon(TriangleAlert)
 export const CopyIcon = icon(Copy, { className: "size-4" })

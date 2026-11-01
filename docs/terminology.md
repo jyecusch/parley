@@ -47,6 +47,11 @@ How to pick a name: choose the most common name for the concept. Reject anything
 | **Service account** | A non-human identity that is a member of one team, with its own role, for example "Support Bot". Stored as a Better-Auth user with `kind: "service-account"`, and it can never sign in with a password. | bot, agent principal, machine user, integration |
 | **Agent** | External AI software (Claude, ChatGPT, opencode, …) that calls Parley through the MCP server or the HTTP API. An agent is never a principal: it authenticates with an API key that belongs to a user or a service account. | assistant, AI, bot |
 | **Session** | A user's sign-in to the web app (a Better-Auth session cookie). | login, auth cookie |
+| **Two-factor authentication** | Asking for a code from an authenticator app after the password when signing in (D172). Optional for each user, turned on in Settings → Security. | 2FA, MFA, two-step verification, second factor (as a name) |
+| **Authenticator app** | The app on someone's phone or computer that shows the 6-digit codes for two-factor authentication, such as 1Password or Google Authenticator. | TOTP app, OTP app, 2FA app |
+| **Backup code** | One of the ten one-time codes shown when two-factor authentication is turned on, for signing in without the authenticator app. | recovery code, emergency code |
+| **Passkey** | A way to sign in with a fingerprint, face or device PIN instead of a password; a passkey sign-in needs no code (D172). | WebAuthn credential, security key (unless it is one), biometric login |
+| **Password strength** | How hard a password is to guess, rated Very weak, Weak, Fair, Good or Strong by zxcvbn. New passwords must be Good or better (D172). | password score, entropy |
 | **API key** | A secret credential used by an agent or script. It belongs to either a user (it acts as that user, is limited by its scopes, and is bound to one team) or a service account. | token, PAT, secret, credential (as a noun for this) |
 | **CRT mode** | The optional old-monitor look (D81, D102), drawn by a WebGL shader where the browser can, otherwise by the CSS layer. Amber by default. | retro mode, terminal theme, CRT filter |
 | **CRT settings** | How CRT mode looks, kept per browser (D114): the **phosphor** color (hue and saturation), text glow, **curvature**, **chromatic aberration**, scanlines, bloom, vignette and flicker. | CRT config, CRT options, CRT preferences |
@@ -186,3 +191,4 @@ How to pick a name: choose the most common name for the concept. Reject anything
 | 2026-10-25 | Added the form terms the review found missing: submission statuses, double opt-in, confirmation link, consent box, consent record, kept value, spam list, render token, opt-in and opt-out topics, hosted page, embed snippet, fine print, form settings. "Sign-up" is banned in every meaning (owner's call). Appearance no longer says "design tokens". |
 | 2026-10-26 | **Subscriber** replaces topic "member", which clashed with **Member** (owner's call). The API's `memberCount` is now `subscriberCount`. |
 | 2026-11-01 | Added **link subdomain** and **DNS record** (D170). |
+| 2026-11-01 | Added **two-factor authentication**, **authenticator app**, **backup code**, **passkey** and **password strength** (D172). |

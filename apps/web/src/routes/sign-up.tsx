@@ -1,8 +1,9 @@
 import type { UserText } from "@parley/errors"
 import { createFileRoute } from "@tanstack/react-router"
-import { useState } from "react"
+import { useCallback, useState } from "react"
 import { AuthForm, Field } from "../components/auth-form.tsx"
 import { ParleyMark } from "../components/logo.tsx"
+import { NewPasswordField } from "../components/new-password.tsx"
 import { Button } from "../components/ui/index.ts"
 import { AuthHeading, AuthPage, LinkButton } from "../components/ui/public.tsx"
 import { agentRequest, resendConfirmation, signUp, withAgentRequest } from "../lib/auth.ts"
@@ -23,6 +24,10 @@ function SignUp() {
   const [error, setError] = useState<UserText>()
   /** The address a confirmation link went to, once signed up. */
   const [sentTo, setSentTo] = useState<string>()
+  const [name, setName] = useState("")
+  const [email, setEmail] = useState("")
+  const [strongEnough, setStrongEnough] = useState(false)
+  const onEnough = useCallback((enough: boolean) => setStrongEnough(enough), [])
   // The confirmation link leads back to the invitation or the agent's request, else into Parley (D130).
   const returnTo = search.redirect ?? (agentRequest() ? withAgentRequest("/new-team") : undefined)
   const submit = async (form: FormData) => {
@@ -47,6 +52,7 @@ function SignUp() {
       }
       submitLabel="Create account"
       busy={busy}
+      cannotSubmit={!strongEnough}
       error={error}
       onSubmit={submit}
       footer={
@@ -64,9 +70,9 @@ function SignUp() {
         </>
       }
     >
-      <Field label="Name" name="name" autoComplete="name" autoFocus />
-      <Field label="Email" name="email" type="email" autoComplete="email" />
-      <Field label="Password" name="password" type="password" autoComplete="new-password" />
+      <Field label="Name" name="name" autoComplete="name" autoFocus onChange={setName} />
+      <Field label="Email" name="email" type="email" autoComplete="email" onChange={setEmail} />
+      <NewPasswordField id="password" name="password" label="Password" context={[name, email]} onEnough={onEnough} />
     </AuthForm>
   )
 }

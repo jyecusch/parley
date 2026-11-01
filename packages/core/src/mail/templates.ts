@@ -35,6 +35,18 @@ export const renderInvitation = (input: {
   }
 }
 
+/** The link to choose a new password (D172). */
+export const renderPasswordReset = (input: { readonly link: string; readonly email: string }) => {
+  const heading = "Reset your password"
+  const body = `Someone asked to reset the password for your Parley account, ${input.email}.`
+  const footer = "Didn't ask? Ignore this and your password stays the same. The link works once, for an hour."
+  return {
+    subject: "Reset your Parley password",
+    html: layout({ heading, body, action: "Choose a new password", link: input.link, footer }),
+    text: `${heading}\n\n${body}\n\nChoose a new password: ${input.link}\n\n${footer}\n`,
+  }
+}
+
 export const renderVerification = (input: { readonly link: string }) => {
   const heading = "Confirm your email address"
   const body = "Confirm this is your address to finish setting up Parley. Invitations to join a team need it."

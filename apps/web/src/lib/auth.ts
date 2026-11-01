@@ -1,10 +1,15 @@
+import { oauthProviderClient } from "@better-auth/oauth-provider/client"
+import { passkeyClient } from "@better-auth/passkey/client"
 import { EchoedInput, type UserText, userText } from "@parley/errors"
+import { createAuthClient } from "better-auth/client"
 
 export interface Session {
   readonly user: {
     readonly id: string
     readonly name: string
     readonly email: string
+    /** Signing in asks for a code after the password (D172). */
+    readonly twoFactorEnabled?: boolean | null
   }
 }
 
@@ -22,6 +27,31 @@ const messageForCode = (code: string | undefined, status: number, email: string 
       return userText`There's already an account with that email. Sign in instead.`
     case "PASSWORD_TOO_SHORT":
       return userText`Use at least 8 characters for your password.`
+    case "PASSWORD_TOO_WEAK":
+      return userText`That password is too easy to guess. Choose one rated Good or better.`
+    case "INVALID_TOKEN":
+      return userText`This link doesn't work anymore. Reset links work once, for an hour. Ask for a new one.`
+    case "INVALID_PASSWORD":
+      return userText`That isn't your current password.`
+    case "INVALID_CODE":
+      return userText`That code doesn't work. Codes change every 30 seconds, so enter the one showing now.`
+    case "INVALID_BACKUP_CODE":
+      return userText`That code doesn't work. Check it, or try another.`
+    case "INVALID_TWO_FACTOR_COOKIE":
+      return userText`Signing in took too long. Start over and enter your password again.`
+    case "ACCOUNT_TEMPORARILY_LOCKED":
+    case "TOO_MANY_ATTEMPTS_REQUEST_NEW_CODE":
+      return userText`Too many wrong codes. Wait a few minutes, then start over.`
+    case "AUTH_CANCELLED":
+    case "ERROR_CEREMONY_ABORTED":
+    case "REGISTRATION_CANCELLED":
+      return userText`The passkey request was canceled. Try again when you're ready.`
+    case "ERROR_AUTHENTICATOR_PREVIOUSLY_REGISTERED":
+      return userText`This device already has a passkey for your account.`
+    case "PASSKEY_NOT_VERIFIED":
+      return userText`That passkey didn't check your fingerprint, face or PIN, so it can't be used here. Use one that does, such as your device's built-in passkey.`
+    case "PASSKEY_NOT_FOUND":
+      return userText`That passkey isn't set up for Parley anymore. Sign in with your password instead.`
     case "INVALID_EMAIL":
       return userText`Enter a full email address, like jane@example.com.`
     case "EMAIL_NOT_VERIFIED":
@@ -36,10 +66,14 @@ const messageForCode = (code: string | undefined, status: number, email: string 
   }
 }
 
-/** Signed in, and where to go next when an agent's sign-in request is waiting (D89). */
+/**
+ * Signed in, and where to go next when an agent's sign-in request is waiting (D89). `secondStep`:
+ * the password was right and the account asks for a code next (D172).
+ */
 export interface AuthOutcome {
   readonly failure?: UserText
   readonly next?: string
+  readonly secondStep?: boolean
 }
 
 const post = async (path: string, body: Record<string, unknown>): Promise<AuthOutcome> => {
@@ -51,12 +85,18 @@ const post = async (path: string, body: Record<string, unknown>): Promise<AuthOu
       headers: { "content-type": "application/json" },
       body: JSON.stringify(request ? { ...body, oauth_query: request } : body),
     })
-    const json = (await response.json().catch(() => ({}))) as { code?: string; redirect?: boolean; url?: string }
+    const json = (await response.json().catch(() => ({}))) as {
+      code?: string
+      redirect?: boolean
+      url?: string
+      twoFactorRedirect?: boolean
+    }
     if (!response.ok) {
       return {
         failure: messageForCode(json.code, response.status, typeof body.email === "string" ? body.email : undefined),
       }
     }
+    if (json.twoFactorRedirect) return { secondStep: true }
     return json.redirect && json.url ? { next: json.url } : {}
   } catch {
     return { failure: userText`Parley couldn't be reached. Check your connection and try again.` }
@@ -87,7 +127,7 @@ const SESSION_REUSE_MS = 30_000
 let remembered: { readonly at: number; readonly session: Promise<Session | null> } | undefined
 
 /** Forget the remembered session, so the next check asks the server. */
-const forgetSession = <A>(result: A): A => {
+export const forgetSession = <A>(result: A): A => {
   remembered = undefined
   return result
 }
@@ -117,4 +157,103 @@ export const getSession = (): Promise<Session | null> => {
     if (remembered?.session === session) remembered = undefined
   })
   return session
+}
+
+/** Emails a link to choose a new password, if the address has an account (D172). */
+export const requestPasswordReset = (email: string) =>
+  post("/request-password-reset", { email, redirectTo: "/reset-password" })
+/** Sets a new password from a reset link's token. Every session ends (D172). */
+export const resetPassword = (token: string, newPassword: string) =>
+  post("/reset-password", { token, newPassword }).then(forgetSession)
+
+/** The second step of signing in (D172): a code from the authenticator app, or a backup code. */
+export const verifyCode = (code: string, trustDevice: boolean) =>
+  post("/two-factor/verify-totp", { code: code.replace(/\s/g, ""), trustDevice }).then(forgetSession)
+export const verifyBackupCode = (code: string, trustDevice: boolean) =>
+  post("/two-factor/verify-backup-code", { code: code.trim(), trustDevice }).then(forgetSession)
+
+/** Better-Auth's own client, for passkeys: it runs the browser's passkey prompt (D172). */
+const passkeys = () =>
+  createAuthClient({
+    basePath: "/api/auth",
+    // An agent's sign-in request rides along, so signing in carries on to its consent page.
+    plugins: [passkeyClient(), ...(agentRequest() ? [oauthProviderClient()] : [])],
+  })
+
+interface ClientResult<A> {
+  readonly data: A | null
+  readonly error: { readonly code?: string | undefined; readonly status: number } | null
+}
+
+const outcomeOf = <A>(result: ClientResult<A>): AuthOutcome & { readonly data?: A } => {
+  if (result.error) return { failure: messageForCode(result.error.code, result.error.status, undefined) }
+  const data = result.data as (A & { redirect?: boolean; url?: string }) | null
+  return { ...(data?.redirect && data.url ? { next: data.url } : {}), ...(data ? { data } : {}) }
+}
+
+/**
+ * Signs in with a passkey, no password or code (D172). `autoFill`: offered quietly from the email
+ * field's suggestions, rather than by opening the browser's prompt.
+ */
+export const signInWithPasskey = async (autoFill = false) =>
+  forgetSession(outcomeOf(await passkeys().signIn.passkey({ autoFill })))
+
+export interface Passkey {
+  readonly id: string
+  readonly name?: string | null
+  readonly createdAt: string | Date
+}
+
+/** What a sign-in setting returned, or why it couldn't change, in words to show (D172). */
+export type Changed<A = unknown> = { readonly data: A; readonly failure?: undefined } | { readonly failure: UserText }
+
+const call = async <A>(
+  path: string,
+  init: { method: "GET" } | { method: "POST"; body: object },
+): Promise<Changed<A>> => {
+  try {
+    const response = await fetch(`/api/auth${path}`, {
+      method: init.method,
+      credentials: "same-origin",
+      ...(init.method === "POST"
+        ? { headers: { "content-type": "application/json" }, body: JSON.stringify(init.body) }
+        : {}),
+    })
+    const json = (await response.json().catch(() => null)) as (A & { code?: string }) | null
+    if (!response.ok) return { failure: messageForCode(json?.code, response.status, undefined) }
+    return { data: json as A }
+  } catch {
+    return { failure: userText`Parley couldn't be reached. Check your connection and try again.` }
+  }
+}
+
+/** Your own sign-in settings (D172). Each returns its result or, when it fails, why. */
+export const security = {
+  passkeys: () => call<ReadonlyArray<Passkey>>("/passkey/list-user-passkeys", { method: "GET" }),
+  addPasskey: async (name: string): Promise<Changed> => {
+    const outcome = outcomeOf(await passkeys().passkey.addPasskey({ name }))
+    return outcome.failure ? { failure: outcome.failure } : { data: undefined }
+  },
+  renamePasskey: (id: string, name: string) => call("/passkey/update-passkey", { method: "POST", body: { id, name } }),
+  removePasskey: (id: string) => call("/passkey/delete-passkey", { method: "POST", body: { id } }),
+  /** Starts turning on two-factor authentication: the app's setup link and the backup codes. */
+  startTwoFactor: (password: string) =>
+    call<{ readonly totpURI: string; readonly backupCodes: ReadonlyArray<string> }>("/two-factor/enable", {
+      method: "POST",
+      body: { password },
+    }),
+  /** Finishes turning it on, once a code from the app proves it's set up. */
+  confirmTwoFactor: (code: string) =>
+    call("/two-factor/verify-totp", { method: "POST", body: { code: code.replace(/\s/g, "") } }),
+  turnOffTwoFactor: (password: string) => call("/two-factor/disable", { method: "POST", body: { password } }),
+  newBackupCodes: (password: string) =>
+    call<{ readonly backupCodes: ReadonlyArray<string> }>("/two-factor/generate-backup-codes", {
+      method: "POST",
+      body: { password },
+    }),
+  changePassword: (currentPassword: string, newPassword: string, signOutElsewhere: boolean) =>
+    call("/change-password", {
+      method: "POST",
+      body: { currentPassword, newPassword, revokeOtherSessions: signOutElsewhere },
+    }),
 }

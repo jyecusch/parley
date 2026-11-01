@@ -12,5 +12,8 @@
     "@parley/domain": "workspace:*",
     "@parley/errors": "workspace:*",
     "effect": "4.1.1"
+  },
+  "devDependencies": {
+    "@better-auth/utils": "0.5.0"
   }
 }

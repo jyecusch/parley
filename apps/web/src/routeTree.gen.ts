@@ -11,8 +11,10 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ConnectRouteImport } from './routes/connect'
+import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as McpRouteImport } from './routes/mcp'
 import { Route as NewTeamRouteImport } from './routes/new-team'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as SignUpRouteImport } from './routes/sign-up'
 import { Route as DotwellKnownSplatRouteImport } from './routes/[.]well-known.$'
@@ -43,6 +45,7 @@ import { Route as TTeamIdSettingsFieldsRouteImport } from './routes/t.$teamId.se
 import { Route as TTeamIdSettingsFormsRouteImport } from './routes/t.$teamId.settings.forms'
 import { Route as TTeamIdSettingsGeneralRouteImport } from './routes/t.$teamId.settings.general'
 import { Route as TTeamIdSettingsMembersRouteImport } from './routes/t.$teamId.settings.members'
+import { Route as TTeamIdSettingsSecurityRouteImport } from './routes/t.$teamId.settings.security'
 import { Route as TTeamIdSettingsServiceAccountsRouteImport } from './routes/t.$teamId.settings.service-accounts'
 import { Route as TTeamIdTemplatesIndexRouteImport } from './routes/t.$teamId.templates.index'
 import { Route as TTeamIdTemplatesTemplateIdRouteImport } from './routes/t.$teamId.templates.$templateId'
@@ -61,6 +64,11 @@ const ConnectRoute = ConnectRouteImport.update({
   path: '/connect',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
+  id: '/forgot-password',
+  path: '/forgot-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const McpRoute = McpRouteImport.update({
   id: '/mcp',
   path: '/mcp',
@@ -69,6 +77,11 @@ const McpRoute = McpRouteImport.update({
 const NewTeamRoute = NewTeamRouteImport.update({
   id: '/new-team',
   path: '/new-team',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SignInRoute = SignInRouteImport.update({
@@ -227,6 +240,11 @@ const TTeamIdSettingsMembersRoute = TTeamIdSettingsMembersRouteImport.update({
   path: '/members',
   getParentRoute: () => TTeamIdSettingsRoute,
 } as any)
+const TTeamIdSettingsSecurityRoute = TTeamIdSettingsSecurityRouteImport.update({
+  id: '/security',
+  path: '/security',
+  getParentRoute: () => TTeamIdSettingsRoute,
+} as any)
 const TTeamIdSettingsServiceAccountsRoute =
   TTeamIdSettingsServiceAccountsRouteImport.update({
     id: '/service-accounts',
@@ -271,8 +289,10 @@ const TTeamIdSettingsEmailStylesStyleIdRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/connect': typeof ConnectRoute
+  '/forgot-password': typeof ForgotPasswordRoute
   '/mcp': typeof McpRoute
   '/new-team': typeof NewTeamRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
   '/.well-known/$': typeof DotwellKnownSplatRoute
@@ -296,6 +316,7 @@ export interface FileRoutesByFullPath {
   '/t/$teamId/settings/forms': typeof TTeamIdSettingsFormsRoute
   '/t/$teamId/settings/general': typeof TTeamIdSettingsGeneralRoute
   '/t/$teamId/settings/members': typeof TTeamIdSettingsMembersRoute
+  '/t/$teamId/settings/security': typeof TTeamIdSettingsSecurityRoute
   '/t/$teamId/settings/service-accounts': typeof TTeamIdSettingsServiceAccountsRoute
   '/t/$teamId/templates/$templateId': typeof TTeamIdTemplatesTemplateIdRoute
   '/t/$teamId/broadcasts/': typeof TTeamIdBroadcastsIndexRoute
@@ -314,8 +335,10 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/connect': typeof ConnectRoute
+  '/forgot-password': typeof ForgotPasswordRoute
   '/mcp': typeof McpRoute
   '/new-team': typeof NewTeamRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
   '/.well-known/$': typeof DotwellKnownSplatRoute
@@ -338,6 +361,7 @@ export interface FileRoutesByTo {
   '/t/$teamId/settings/forms': typeof TTeamIdSettingsFormsRoute
   '/t/$teamId/settings/general': typeof TTeamIdSettingsGeneralRoute
   '/t/$teamId/settings/members': typeof TTeamIdSettingsMembersRoute
+  '/t/$teamId/settings/security': typeof TTeamIdSettingsSecurityRoute
   '/t/$teamId/settings/service-accounts': typeof TTeamIdSettingsServiceAccountsRoute
   '/t/$teamId/templates/$templateId': typeof TTeamIdTemplatesTemplateIdRoute
   '/t/$teamId/broadcasts': typeof TTeamIdBroadcastsIndexRoute
@@ -357,8 +381,10 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/connect': typeof ConnectRoute
+  '/forgot-password': typeof ForgotPasswordRoute
   '/mcp': typeof McpRoute
   '/new-team': typeof NewTeamRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
   '/.well-known/$': typeof DotwellKnownSplatRoute
@@ -382,6 +408,7 @@ export interface FileRoutesById {
   '/t/$teamId/settings/forms': typeof TTeamIdSettingsFormsRoute
   '/t/$teamId/settings/general': typeof TTeamIdSettingsGeneralRoute
   '/t/$teamId/settings/members': typeof TTeamIdSettingsMembersRoute
+  '/t/$teamId/settings/security': typeof TTeamIdSettingsSecurityRoute
   '/t/$teamId/settings/service-accounts': typeof TTeamIdSettingsServiceAccountsRoute
   '/t/$teamId/templates/$templateId': typeof TTeamIdTemplatesTemplateIdRoute
   '/t/$teamId/broadcasts/': typeof TTeamIdBroadcastsIndexRoute
@@ -402,8 +429,10 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/connect'
+    | '/forgot-password'
     | '/mcp'
     | '/new-team'
+    | '/reset-password'
     | '/sign-in'
     | '/sign-up'
     | '/.well-known/$'
@@ -427,6 +456,7 @@ export interface FileRouteTypes {
     | '/t/$teamId/settings/forms'
     | '/t/$teamId/settings/general'
     | '/t/$teamId/settings/members'
+    | '/t/$teamId/settings/security'
     | '/t/$teamId/settings/service-accounts'
     | '/t/$teamId/templates/$templateId'
     | '/t/$teamId/broadcasts/'
@@ -445,8 +475,10 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/connect'
+    | '/forgot-password'
     | '/mcp'
     | '/new-team'
+    | '/reset-password'
     | '/sign-in'
     | '/sign-up'
     | '/.well-known/$'
@@ -469,6 +501,7 @@ export interface FileRouteTypes {
     | '/t/$teamId/settings/forms'
     | '/t/$teamId/settings/general'
     | '/t/$teamId/settings/members'
+    | '/t/$teamId/settings/security'
     | '/t/$teamId/settings/service-accounts'
     | '/t/$teamId/templates/$templateId'
     | '/t/$teamId/broadcasts'
@@ -487,8 +520,10 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/connect'
+    | '/forgot-password'
     | '/mcp'
     | '/new-team'
+    | '/reset-password'
     | '/sign-in'
     | '/sign-up'
     | '/.well-known/$'
@@ -512,6 +547,7 @@ export interface FileRouteTypes {
     | '/t/$teamId/settings/forms'
     | '/t/$teamId/settings/general'
     | '/t/$teamId/settings/members'
+    | '/t/$teamId/settings/security'
     | '/t/$teamId/settings/service-accounts'
     | '/t/$teamId/templates/$templateId'
     | '/t/$teamId/broadcasts/'
@@ -531,8 +567,10 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ConnectRoute: typeof ConnectRoute
+  ForgotPasswordRoute: typeof ForgotPasswordRoute
   McpRoute: typeof McpRoute
   NewTeamRoute: typeof NewTeamRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
   SignInRoute: typeof SignInRoute
   SignUpRoute: typeof SignUpRoute
   DotwellKnownSplatRoute: typeof DotwellKnownSplatRoute
@@ -561,6 +599,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ConnectRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/forgot-password': {
+      id: '/forgot-password'
+      path: '/forgot-password'
+      fullPath: '/forgot-password'
+      preLoaderRoute: typeof ForgotPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/mcp': {
       id: '/mcp'
       path: '/mcp'
@@ -573,6 +618,13 @@ declare module '@tanstack/react-router' {
       path: '/new-team'
       fullPath: '/new-team'
       preLoaderRoute: typeof NewTeamRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sign-in': {
@@ -785,6 +837,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TTeamIdSettingsMembersRouteImport
       parentRoute: typeof TTeamIdSettingsRoute
     }
+    '/t/$teamId/settings/security': {
+      id: '/t/$teamId/settings/security'
+      path: '/security'
+      fullPath: '/t/$teamId/settings/security'
+      preLoaderRoute: typeof TTeamIdSettingsSecurityRouteImport
+      parentRoute: typeof TTeamIdSettingsRoute
+    }
     '/t/$teamId/settings/service-accounts': {
       id: '/t/$teamId/settings/service-accounts'
       path: '/service-accounts'
@@ -845,6 +904,7 @@ interface TTeamIdSettingsRouteChildren {
   TTeamIdSettingsFormsRoute: typeof TTeamIdSettingsFormsRoute
   TTeamIdSettingsGeneralRoute: typeof TTeamIdSettingsGeneralRoute
   TTeamIdSettingsMembersRoute: typeof TTeamIdSettingsMembersRoute
+  TTeamIdSettingsSecurityRoute: typeof TTeamIdSettingsSecurityRoute
   TTeamIdSettingsServiceAccountsRoute: typeof TTeamIdSettingsServiceAccountsRoute
   TTeamIdSettingsIndexRoute: typeof TTeamIdSettingsIndexRoute
   TTeamIdSettingsEmailStylesStyleIdRoute: typeof TTeamIdSettingsEmailStylesStyleIdRoute
@@ -859,6 +919,7 @@ const TTeamIdSettingsRouteChildren: TTeamIdSettingsRouteChildren = {
   TTeamIdSettingsFormsRoute: TTeamIdSettingsFormsRoute,
   TTeamIdSettingsGeneralRoute: TTeamIdSettingsGeneralRoute,
   TTeamIdSettingsMembersRoute: TTeamIdSettingsMembersRoute,
+  TTeamIdSettingsSecurityRoute: TTeamIdSettingsSecurityRoute,
   TTeamIdSettingsServiceAccountsRoute: TTeamIdSettingsServiceAccountsRoute,
   TTeamIdSettingsIndexRoute: TTeamIdSettingsIndexRoute,
   TTeamIdSettingsEmailStylesStyleIdRoute:
@@ -914,8 +975,10 @@ const TTeamIdRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ConnectRoute: ConnectRoute,
+  ForgotPasswordRoute: ForgotPasswordRoute,
   McpRoute: McpRoute,
   NewTeamRoute: NewTeamRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
   SignInRoute: SignInRoute,
   SignUpRoute: SignUpRoute,
   DotwellKnownSplatRoute: DotwellKnownSplatRoute,
