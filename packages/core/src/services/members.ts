@@ -4,7 +4,7 @@ import { and, asc, count, eq, ne, sql } from "drizzle-orm"
 import { Context, Effect, Layer } from "effect"
 import type { SqlError } from "effect/sql"
 import type { MemberChangeable, MemberRemovable } from "../proofs/member-changes.ts"
-import type { MemberOf } from "../proofs/permissions.ts"
+import type { CanManageMembers, MemberOf } from "../proofs/permissions.ts"
 import type { MemberTransaction } from "./member-changes.ts"
 import { classifySqlError } from "./sql-errors.ts"
 
@@ -30,8 +30,14 @@ export class Members extends Context.Service<
       ReadonlyArray<{ readonly id: TeamId; readonly name: string; readonly role: Role; readonly gravatar: boolean }>,
       DatabaseUnavailable
     >
-    /** The people in a team (not service accounts), owners first. */
-    readonly people: <P, T>(member: MemberOf<P, T>) => Effect.Effect<ReadonlyArray<Member>, DatabaseUnavailable>
+    /**
+     * The people in a team (not service accounts), owners first. With proof the caller manages
+     * members, each says whether they use two-factor authentication (D173).
+     */
+    readonly people: <P, T>(
+      member: MemberOf<P, T>,
+      canManage?: CanManageMembers<P, T>,
+    ) => Effect.Effect<ReadonlyArray<Member>, DatabaseUnavailable>
     /** person returns the current user and role for member-change proofs. */
     readonly person: (teamId: TeamId, userId: UserId) => Effect.Effect<Member | undefined, DatabaseUnavailable>
     /** Everyone in the team, people and service accounts, for matching a name or email to a member. */
@@ -105,7 +111,7 @@ export class Members extends Context.Service<
         )
       })
 
-      const peopleWhere = (teamId: TeamId, userId?: UserId) =>
+      const peopleWhere = (teamId: TeamId, userId?: UserId, withTwoFactor = false) =>
         run(
           db.query((d) =>
             d
@@ -115,6 +121,7 @@ export class Members extends Context.Service<
                 email: schema.user.email,
                 role: schema.member.role,
                 joinedAt: schema.member.createdAt,
+                twoFactorEnabled: schema.user.twoFactorEnabled,
               })
               .from(schema.member)
               .innerJoin(schema.user, eq(schema.user.id, schema.member.userId))
@@ -141,6 +148,7 @@ export class Members extends Context.Service<
                           email: row.email,
                           role: row.role,
                           joinedAt: row.joinedAt.toISOString(),
+                          ...(withTwoFactor ? { twoFactorEnabled: row.twoFactorEnabled === true } : {}),
                         },
                       ]
                     : [],
@@ -149,8 +157,12 @@ export class Members extends Context.Service<
           ),
         )
 
-      const people = <P, T>(member: MemberOf<P, T>) => peopleWhere(member.team.value)
-      const person = (teamId: TeamId, userId: UserId) => Effect.map(peopleWhere(teamId, userId), ([found]) => found)
+      const people = <P, T>(member: MemberOf<P, T>, canManage?: CanManageMembers<P, T>) =>
+        peopleWhere(member.team.value, undefined, canManage !== undefined)
+      // One member, to change or remove: only someone who manages members changes another, and
+      // leaving is yourself, so it always says whether they use two-factor authentication (D173).
+      const person = (teamId: TeamId, userId: UserId) =>
+        Effect.map(peopleWhere(teamId, userId, true), ([found]) => found)
 
       const ownerCount = (teamId: TeamId) =>
         run(
@@ -184,11 +196,23 @@ export class Members extends Context.Service<
                     eq(schema.user.id, schema.member.userId),
                   ),
                 )
-                .returning({ name: schema.user.name, email: schema.user.email, joinedAt: schema.member.createdAt }),
+                .returning({
+                  name: schema.user.name,
+                  email: schema.user.email,
+                  joinedAt: schema.member.createdAt,
+                  twoFactorEnabled: schema.user.twoFactorEnabled,
+                }),
             ),
           )
           if (!updated) return yield* Effect.die("member vanished during a role change")
-          return { userId, name: updated.name, email: updated.email, role, joinedAt: updated.joinedAt.toISOString() }
+          return {
+            userId,
+            name: updated.name,
+            email: updated.email,
+            role,
+            joinedAt: updated.joinedAt.toISOString(),
+            twoFactorEnabled: updated.twoFactorEnabled === true,
+          }
         }).pipe(Effect.withSpan("Members.changeRole"))
 
       const remove = <P, T, U>(transaction: MemberTransaction<T>, target: MemberRemovable<P, T, U>) =>

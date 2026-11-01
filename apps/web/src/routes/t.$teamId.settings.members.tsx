@@ -16,6 +16,7 @@ import {
 } from "../components/settings.tsx"
 import {
   Avatar,
+  Badge,
   Box,
   Button,
   ErrorText,
@@ -119,86 +120,101 @@ function Members() {
           onRetry={() => void members.refetch()}
         />
       ) : (
-        <Box>
-          <Table kind="settings">
-            <thead>
-              <tr>
-                <Th scope="col" className="w-2/5">
-                  Name
-                </Th>
-                <Th scope="col" className="w-44">
-                  Role
-                </Th>
-                <Th scope="col" className="w-28">
-                  Joined
-                </Th>
-                <Th scope="col">
-                  <span className="sr-only">Actions</span>
-                </Th>
-              </tr>
-            </thead>
-            <tbody>
-              {members.data.map((member) => {
-                const isYou = member.userId === userId
-                // Owners are only changed by owners; everyone can leave.
-                const editable = canManage && !isYou && (member.role !== "owner" || isOwner)
-                return (
-                  <Tr key={member.userId}>
-                    <Td>
-                      <RowIdentity
-                        mark={<Avatar size="md">{initialsOf(member.name)}</Avatar>}
-                        name={
-                          <>
-                            {member.name}
-                            {isYou ? <span className="font-normal text-subtle"> (you)</span> : null}
-                          </>
-                        }
-                        sub={member.email}
-                      />
-                    </Td>
-                    <Td>
-                      {editable ? (
-                        <Select
-                          variant="inline"
-                          aria-label={`Role of ${member.name}`}
-                          value={member.role}
-                          onChange={(event) => void changeRole(member, event.target.value as Role)}
-                        >
-                          {ROLES.filter((entry) => entry.role !== "owner" || isOwner).map((entry) => (
-                            <option key={entry.role} value={entry.role}>
-                              {entry.label}
-                            </option>
-                          ))}
-                        </Select>
-                      ) : (
-                        <span className="text-subtle">{roleLabel(member.role)}</span>
-                      )}
-                    </Td>
-                    <Td>
-                      <When at={member.joinedAt} />
-                    </Td>
-                    <Td className="text-right">
-                      {confirming === member.userId ? (
-                        <RowActions>
-                          <Button size="sm" variant="ghost" onClick={() => setConfirming(undefined)}>
-                            Cancel
-                          </Button>
-                          <Button size="sm" variant="danger-solid" onClick={() => void remove(member)}>
-                            {isYou ? "Leave" : "Remove"}
-                          </Button>
-                        </RowActions>
-                      ) : isYou || editable ? (
-                        <Button size="sm" variant="danger" onClick={() => setConfirming(member.userId)}>
-                          {isYou ? "Leave team" : "Remove"}
-                        </Button>
+        <>
+          {canManage ? <TwoFactorCount members={members.data} /> : null}
+          <Box>
+            <Table kind="settings">
+              <thead>
+                <tr>
+                  <Th scope="col" className="w-2/5">
+                    Name
+                  </Th>
+                  <Th scope="col" className="w-44">
+                    Role
+                  </Th>
+                  {canManage ? (
+                    <Th scope="col" className="w-32">
+                      Two-factor
+                    </Th>
+                  ) : null}
+                  <Th scope="col" className="w-28">
+                    Joined
+                  </Th>
+                  <Th scope="col">
+                    <span className="sr-only">Actions</span>
+                  </Th>
+                </tr>
+              </thead>
+              <tbody>
+                {members.data.map((member) => {
+                  const isYou = member.userId === userId
+                  // Owners are only changed by owners; everyone can leave.
+                  const editable = canManage && !isYou && (member.role !== "owner" || isOwner)
+                  return (
+                    <Tr key={member.userId}>
+                      <Td>
+                        <RowIdentity
+                          mark={<Avatar size="md">{initialsOf(member.name)}</Avatar>}
+                          name={
+                            <>
+                              {member.name}
+                              {isYou ? <span className="font-normal text-subtle"> (you)</span> : null}
+                            </>
+                          }
+                          sub={member.email}
+                        />
+                      </Td>
+                      <Td>
+                        {editable ? (
+                          <Select
+                            variant="inline"
+                            aria-label={`Role of ${member.name}`}
+                            value={member.role}
+                            onChange={(event) => void changeRole(member, event.target.value as Role)}
+                          >
+                            {ROLES.filter((entry) => entry.role !== "owner" || isOwner).map((entry) => (
+                              <option key={entry.role} value={entry.role}>
+                                {entry.label}
+                              </option>
+                            ))}
+                          </Select>
+                        ) : (
+                          <span className="text-subtle">{roleLabel(member.role)}</span>
+                        )}
+                      </Td>
+                      {canManage ? (
+                        <Td>
+                          <Badge tone={member.twoFactorEnabled ? "strong" : "neutral"}>
+                            {member.twoFactorEnabled ? "On" : "Off"}
+                          </Badge>
+                        </Td>
                       ) : null}
-                    </Td>
-                  </Tr>
-                )
-              })}
-            </tbody>
-          </Table>
-        </Box>
+                      <Td>
+                        <When at={member.joinedAt} />
+                      </Td>
+                      <Td className="text-right">
+                        {confirming === member.userId ? (
+                          <RowActions>
+                            <Button size="sm" variant="ghost" onClick={() => setConfirming(undefined)}>
+                              Cancel
+                            </Button>
+                            <Button size="sm" variant="danger-solid" onClick={() => void remove(member)}>
+                              {isYou ? "Leave" : "Remove"}
+                            </Button>
+                          </RowActions>
+                        ) : isYou || editable ? (
+                          <Button size="sm" variant="danger" onClick={() => setConfirming(member.userId)}>
+                            {isYou ? "Leave team" : "Remove"}
+                          </Button>
+                        ) : null}
+                      </Td>
+                    </Tr>
+                  )
+                })}
+              </tbody>
+            </Table>
+          </Box>
+        </>
       )}
 
       {canManage && (invitations.data?.length ?? 0) > 0 ? (
@@ -353,5 +369,17 @@ function InviteDialog(props: {
       </Fieldset>
       {error ? <ErrorText>{error}</ErrorText> : null}
     </Dialog>
+  )
+}
+
+/** How many of the team's people use two-factor authentication (D173), for owners and admins. */
+function TwoFactorCount(props: { readonly members: ReadonlyArray<Member> }) {
+  const on = props.members.filter((member) => member.twoFactorEnabled).length
+  return (
+    <p className="m-0 text-muted">
+      {on === props.members.length
+        ? `Everyone here uses two-factor authentication.`
+        : `${on} of ${props.members.length} members use two-factor authentication.`}
+    </p>
   )
 }

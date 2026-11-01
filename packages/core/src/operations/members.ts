@@ -12,7 +12,7 @@ import {
   SignInRequired,
   type updateMember,
 } from "@parley/domain"
-import { Effect } from "effect"
+import { Effect, Option } from "effect"
 import { Mailer } from "../mail/mailer.ts"
 import type { Principal } from "../principal.ts"
 import { proveMemberChangeable, proveMemberInvitable, proveMemberRemovable } from "../proofs/member-changes.ts"
@@ -29,7 +29,9 @@ export const list = (principal: Principal, input: OperationInput<typeof listMemb
     Effect.gen(function* () {
       const members = yield* Members
       const member = yield* proveMemberOf(principal, team)
-      return yield* members.people(member)
+      // Owners and admins also see who uses two-factor authentication (D173).
+      const canManage = yield* Effect.option(proveCanManageMembers(member))
+      return yield* members.people(member, Option.getOrUndefined(canManage))
     }),
   )
 

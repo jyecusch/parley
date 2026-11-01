@@ -11,6 +11,14 @@ export const Member = Schema.Struct({
   email: Schema.String,
   role: Role,
   joinedAt: Timestamp,
+  /**
+   * Whether signing in asks this member for a code from an authenticator app (D172, D173). Only
+   * for callers who can manage members; absent for everyone else.
+   */
+  twoFactorEnabled: Schema.optional(Schema.Boolean).annotate({
+    description:
+      "Whether signing in asks for a code from an authenticator app. Only returned to callers with members:manage.",
+  }),
 })
 export type Member = typeof Member.Type
 
