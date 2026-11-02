@@ -50,10 +50,12 @@ Parley is a **monorepo of Bun workspace packages**. Package boundaries, enforced
 | `@parley/mcp`    | MCP tools: thin, call operations                                                                                                                     | `core`, `domain`              |
 | `apps/web`       | TanStack Start: routes, UI, Tailwind, TanStack Query.  Mounts `/api/v1`, `/mcp`, `/api/auth`                                                       | `api` (client), `http`, `mcp` |
 
-Two rules make this layout pay off:
+These rules describe the supported construction path; matching lint and proof contracts enforce parts of it:
 
-1. **Only `@parley/core` imports `@parley/db`.** An entrypoint cannot run a query, because it cannot even import the table.
-2. **Only `core/src/proofs/` can mint a proof.** An entrypoint cannot "just skip the check", because the service it wants to call will not compile without a proof (see [04 — Proof, not promises](./04-authorization-proofs.md)).
+1. **Database access stays in core services and auth infrastructure.** Matching imports are linted, with core composition, database implementation, and test exceptions. Package exports do not restrict the consuming workspace. See the [actual rule scope](./10-implementation-status.md#configured-lint-inventory).
+2. **Proof-bearing service methods require a proof.** Direct minting outside `core/src/proofs/` and selected proof assertions are linted. Trusted constructors, aliases, and assertions remain review responsibilities (see [04 — Proof, not promises](./04-authorization-proofs.md)).
+
+For implemented mechanisms, partial requirements, and planned checks, see the [status inventory](./10-implementation-status.md). An approved decision is not evidence that its code has landed.
 
 ## The tech stack
 
@@ -72,18 +74,15 @@ Two rules make this layout pay off:
 
 These words mean exactly one thing everywhere in the codebase and in these docs.
 
-**Principal**: _who is knocking._ The output of authentication, before we know anything about teams. It's a union of three kinds: a user in the web app, an agent using a user's API key, and an agent using a service account's API key:
+**Principal**: who is making the request, produced by authentication. The [implemented union](../packages/core/src/principal.ts) represents a signed-in user, a user's API key, a service account's API key, or an OAuth connection acting as a user or service account:
 
 ```ts
-type Principal =
-  | UserSession           // Jane, signed in to the web app (Better-Auth session cookie)
-  | UserApiKey            // Jane's agent, using an API key Jane created (Jane's identity, bound to one team, limited by scopes)
-  | ServiceAccountApiKey; // an agent using the API key of "Support Bot", a service account that is a member in its own right
+type Principal = UserSession | UserApiKey | ServiceAccountApiKey | UserConnection | ServiceAccountConnection
 ```
 
 **Team**: the tenant (stored as a Better-Auth organization). A user can be a member of many teams and switches between them; every request names exactly one.
 
-**User**: a human who can sign in. **Service account**: a non-human identity that is a member of one team. **Agent**: external AI software (Claude, ChatGPT, opencode, …) that calls Parley with an API key. An agent is never a principal by itself; its API key decides who it acts as.
+**User**: a human who can sign in. **Service account**: a non-human identity that is a member of one team. **Agent**: external AI software (Claude, ChatGPT, opencode, …) that calls Parley with an API key or OAuth connection. The authenticated principal determines who it acts as, with roles and scopes limiting its authority.
 
 **Member**: a user or service account that belongs to a team, with exactly one role. The role named `member` is simply the default role a member gets.
 
@@ -99,13 +98,16 @@ type Principal =
 | `fields:manage`: create, edit and delete custom fields | | ✓ | ✓ |
 | `members:manage`: invite, remove, change roles | | ✓ | ✓ |
 | `service-accounts:manage`: service accounts and their API keys | | ✓ | ✓ |
-| `team:manage`: rename, billing, delete the team | | | ✓ |
+| `team:manage`: rename and manage the team | | | ✓ |
+| `email:write`: draft templates and broadcasts | ✓ | ✓ | ✓ |
+| `email:send`: send broadcasts and test email | | ✓ | ✓ |
+| `email:manage`: sending setup, subscriptions, and forms | | ✓ | ✓ |
 
 Every user manages their own API keys; that needs no permission beyond being a member.
 
 **Permissions are explicit.** None implies another: `records:write` does not include `records:read`. Every role grants all three record permissions, so this only matters for API key scopes. An API key gets exactly the permissions written on it.
 
-**Scopes**: an API key's own ceiling. An API key Jane creates with only `records:read` can never write, even though Jane can. _Effective permissions = role permissions ∩ scopes._ That intersection is computed in exactly one function.
+**Scopes**: an API key's own ceiling. An API key Jane creates with only `records:read` can never write, even though Jane can. _Effective permissions = role permissions ∩ scopes._ `requirePermission` checks the role and scope ceiling centrally; a service-account connection also requires the connecting person's role to allow the permission.
 
 **Operation**: one action a principal can take, such as `contacts.update`. It has a name, a description, an input schema, an output schema, an error union, and a body. It is defined once in the **operation registry**. The **exposure manifest** requires an explicit HTTP and MCP decision for every registered operation: included, intentionally excluded with a reason, or (for MCP) available through a named analogous tool with a reason. Missing decisions fail compilation. HTTP routes, OpenAPI, the web client, and MCP tools derive their publication choices from this manifest (D16, D171). See [operation exposure](./09-operation-exposure.md).
 
@@ -171,7 +173,7 @@ export const update = Effect.fn("contacts.update")(function* (
 
 - **One test surface.** Operations are where behavior lives. Test them once with real layers, and every entrypoint inherits the confidence. Entrypoint tests only check translation.
 - **Agents are first-class clients.** Capabilities available through the UI and API should be available directly or through an analogous MCP operation. Agents may act with the same authority and autonomy as people; permissions come from the principal, role, and scopes. Published entrypoints support the agent a user chooses, without requiring a Parley-owned agent. The exhaustive exposure manifest makes every publication decision reviewable; semantic equivalence of an analogous tool still requires review.
-- **Auth lives in one directory.** `core/src/proofs/` is small, reviewed carefully, and the only place authorization decisions are made. No `if (user.role === "admin")` sprinkled through route handlers, because route handlers can't make the service call without a proof anyway.
+- **Core authorization is shared.** Proof-bearing operations centralize membership, role, and scope checks. Their services require the corresponding proofs. Separate authentication and public routes still need access review; this does not mean all access decisions live in one directory.
 - **Mismatched named values are type errors.** Proofs ([04](./04-authorization-proofs.md)) reject a contact from team A paired with team B's permission. Runtime checks expire named values and proof fields after their Effect execution. Services still have to filter their SQL correctly; these checks do not prove query correctness or prevent races.
 
 ## The posts

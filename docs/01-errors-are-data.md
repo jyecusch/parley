@@ -196,9 +196,9 @@ export class ContactEmailTaken
 
 The error retains the conflicting contact id for backend callers and selected public details. Its log message and user message serve different readers. Wrapping infrastructure errors, such as `DatabaseUnavailable`, additionally retain a `cause`; an expected conflict does not need to copy a raw database diagnostic into the public account.
 
-## A proposed v1 error catalog
+## Selected implemented errors
 
-This is a **proposal** for the errors contacts and companies v1 can actually produce. Each class is one error with one fixer. Items marked *(proposal)* depend on product decisions you haven't made yet.
+This is a teaching subset of implemented classes, not the complete catalog. The source of truth is [the domain errors](../packages/domain/src/errors), with operation-specific unions in the registry. Earlier draft names and product questions are not evidence of implemented behavior.
 
 ### Authentication: "who is knocking?"
 
@@ -231,13 +231,12 @@ Why are the last two separate classes? Because they have **different fixers**. S
 | `CompanyNotFound` | Same, for companies | false | Info | Same rule. |
 | `ContactEmailTaken` | Another contact in the team already has that email address (D24) | false | Info | Also possible on **restore**, if someone reused the address while the contact was deleted. Carries the existing contact's id and display name so the UI can offer "open Sam Lee". |
 | `CompanyDomainTaken` | Another company in the team already has that domain (D25) | false | Info | Same shape as `ContactEmailTaken`, including on restore. |
-| `ContactNotDeleted` / `CompanyNotDeleted` *(proposal)* | Restoring a record that isn't deleted | false | Info | Or make restore idempotent and drop these. |
 | `CustomFieldNotFound` | No custom field with that id in this team | false | Info | Also when a write sets a value for a custom field that has since been deleted. That has a different fix from a bad value (re-read the team's custom fields), so it's its own class rather than an `InputRejected` problem. |
-| `CustomFieldNameTaken` *(proposal)* | Another custom field on the same record type already has that name | false | Info | Two fields called "Industry" on contacts would make every filter and form ambiguous. |
+| `CustomFieldNameTaken` | The name conflicts with a built-in field or another custom field on that record type | false | Info | Two fields called "Industry" on contacts would make every filter and form ambiguous. |
 
 There's no "already affiliated" error: affiliating a contact with a company it's already affiliated with returns the existing affiliation, updating the title if one is given (D43). Agents can retry safely.
 
-A deleted record is gone as far as every operation except restore is concerned, so there's no `ContactDeleted` class. Within 30 days, restore is the only way back, and its error is `ContactNotFound` once the record is purged.
+Ordinary reads and edits refuse deleted records; deleted-list queries and restore are explicit paths. There is no `ContactDeleted` class. Restore accepts an already-live record and otherwise permits deleted records inside the restore window; once purged, the record is `ContactNotFound`.
 
 Not-found errors carry the requested id as a typed field (for agents), and never put it in the text.
 
@@ -254,7 +253,7 @@ export class InputRejected extends Schema.TaggedError<InputRejected>()("InputRej
 
 export const FieldProblem = Schema.Struct({
   field: Schema.String,            // our schema's key path, e.g. "email" or "addresses.0.postcode"
-  problem: Schema.Literals(["missing", "not-allowed", "wrong-type", "too-short", "too-long", "invalid-format", "out-of-range"]),
+  problem: Schema.Literals(["missing", "not-allowed", "wrong-type", "too-short", "too-long", "invalid-format", "out-of-range", "conflict"]),
   userMessage: UserText.schema,    // "Email isn't a valid email address."
 })
 ```
@@ -263,12 +262,12 @@ How a decode error becomes this, in one classifier (`core/src/input/classify.ts`
 
 1. Walk the leaf issues of the Schema decode error.
 2. Map each leaf to the small `problem` vocabulary.
-3. Build `userMessage` from a **`label` annotation we write on every input field** (`label: "Email"`) plus fixed words per `problem`. Unlabeled fields fall back to a generic "This field".
+3. Build `userMessage` from a **Schema `title` annotation we write on the input field** (`title: "Email"`) plus fixed words per `problem`. The implementation reads Schema `title` annotations, then falls back to known or humanized schema keys and finally "This field".
 4. **Never** include the offending input value, and **never** include Schema's own message.
 
 The `field` path *is* ours: it's a key in our schema, not foreign text. So it's safe and very useful to agents ("fix `addresses.0.postcode`").
 
-Over HTTP it's **422** (D26): the request was well-formed, but its content was rejected. Malformed JSON never reaches an operation, so it gets a fixed 400 from the entrypoint.
+`InputRejected` maps to **422** (D26). Body parsing and content-type errors are handled by the HTTP entrypoint; do not infer their status from the domain error union alone.
 
 **Custom field values use the same class.** A value that doesn't fit its custom field's type (text in a number field, an option a single select doesn't have) is fixed by the caller, never retryable, and shown next to the field, exactly like a built-in field. So it's an `InputRejected` problem at the path `customFields.<fieldId>`. The label is the custom field's name, read from its record as a `DisplayName`. The same goes for cross-field rules such as "exactly one primary email".
 
@@ -277,50 +276,22 @@ Over HTTP it's **422** (D26): the request was well-formed, but its content was r
 | Class | When | `isRetryable` | Severity | Note |
 | --- | --- | :-: | :-: | --- |
 | `RequestsTooFrequent` | An API key exceeded its rate limit (D47) | **true** | Warn | Carries `retryAfter`, sent as `retryAfterMillis` and HTTP 429. The limit is generous; it exists to stop a runaway agent loop. |
-| `DatabaseUnavailable` | Connection refused or dropped, pool exhausted, statement timeout | **true** | Warn | `cause: Schema.Defect()`. "Your changes weren't saved. Try again in a moment." |
-| `AuthProviderUnavailable` *(proposal)* | Better-Auth's storage couldn't be read during authentication | true | Warn | Only if we see it in practice. Don't invent errors. |
+| `DatabaseUnavailable` | Connection refused or dropped, pool exhausted, statement timeout | **true** | Warn | `cause: Schema.Defect()`. The message asks someone making a change to check its outcome before retrying; it does not promise rollback. |
 
-### External provider: Resend *(v2 proposal)*
+### External email provider
 
-Resend is the default email provider for v2 sending. It's the clearest example of a foreign error, so here's how it will look. The class list is a **proposal for v2**, not v1 scope.
+The implemented [email errors](../packages/domain/src/errors/email.ts) and [Mailer](../packages/core/src/mail/mailer.ts) supersede the earlier four-class Resend proposal:
 
-| Class | When | `isRetryable` | Severity | Note |
-| --- | --- | :-: | :-: | --- |
-| `EmailProviderRateLimited` | Resend answers 429 | true | Warn | `retryAfter` comes from Resend's `retry-after` header when present. |
-| `EmailProviderUnreachable` | Network error, timeout, or 5xx | true | Warn | "We couldn't reach our email service. Nothing was sent. Try again in a few minutes." |
-| `SendingDomainNotVerified` | Resend refuses the `from` domain | false | Info | Fixer: a team admin verifies the domain in settings. |
-| `EmailProviderCredentialsRejected` | Our Resend API key was rejected | false | Warn | Only an operator can fix this, so the remedy goes in `message`. |
+| Class | Condition | `isRetryable` |
+| --- | --- | :-: |
+| `EmailServiceUnavailable` | A classified service outage; does not represent unconfirmed acceptance | true |
+| `EmailDeliveryUnconfirmed` | The provider may have accepted the email | false |
+| `EmailRejected` | A classified provider refusal | false |
+| `EmailSendingTooFast` | The sending allowance is exhausted | true |
+| `EmailNotConfigured` | The instance has no configured email service | false |
+| `EmailBatchReplayUnsafe` | Duplicate protection no longer permits automatic batch replay | false |
 
-```ts
-// @parley/core/src/email/resend.ts: the classifier sits next to the call
-const send = Effect.fn("Resend.send")(function* (email: OutgoingEmail) {
-  return yield* Effect.tryPromise({
-    try: () => resend.emails.send(toResendPayload(email)),
-    catch: (cause) => classifyResendError(cause, email), // -> one of the classes above, or dies
-  })
-})
-
-/** Resend answered 429 for sending too often. */
-export class EmailProviderRateLimited
-  extends Schema.TaggedError<EmailProviderRateLimited>()("EmailProviderRateLimited", {
-    cause: Schema.Defect(),
-    retryAfter: Schema.optional(Schema.Duration),
-  })
-  implements DomainError
-{
-  readonly isRetryable = true
-  override readonly [ErrorReporter.severity] = "Warn" as const
-  override get message() { return `Resend rate limited: ${describe(this.cause)}` } // Resend's text lives only here
-  get userMessage() {
-    const minutes = this.retryAfter && Math.ceil(Duration.toMinutes(this.retryAfter))
-    return minutes
-      ? userText`We're sending too quickly for our email service right now. Nothing was lost. We'll try again in ${minutes} ${minutes === 1 ? "minute" : "minutes"}.`
-      : userText`We're sending too quickly for our email service right now. Nothing was lost. We'll try again shortly.`
-  }
-}
-```
-
-Note the wording: "our email service", not "Resend is limiting you". We don't name or blame the provider in user text (see [02](./02-writing-error-messages.md)). Resend's own text appears only in `message`, for logs.
+Wrapping errors retain internal causes. Public messages use Parley's words; they do not quote the provider's response. A transport error after dispatch is not evidence that nothing was sent. The [durable broadcast sender](./07-background-delivery.md) can resolve some unconfirmed outcomes using its persisted payload and key; a foreground caller does not have that guarantee.
 
 A constraint violation is **not** `DatabaseUnavailable`. The classifier next to the insert recognizes `23505` on `contact_emails_team_id_address_key` and produces `ContactEmailTaken`. Anything the classifier can't place becomes a defect, because an unexpected database error is a bug, not a user-facing condition.
 
@@ -352,7 +323,7 @@ A service can handle a declared error with a meaningful recovery or propagate it
 
 - **The web app** retries `isRetryable` reads quietly with TanStack Query's retry option. For writes it shows the message and a Retry button, because the user is watching and the decision is theirs.
 - **An agent** gets `isRetryable` and `retryAfterMillis` in the tool result and runs its own loop.
-- **The v2 email sender** (a background job) retries with an Effect `Schedule`, waiting `max(baseDelay, retryAfter)`, within a maximum wait.
+- **The broadcast sender** persists its next attempt and retries the saved payload within the bounded provider replay window. Its durable retry state and unknown-outcome rules are described in [07](./07-background-delivery.md).
 
 No retry loops inside error classes or deep inside services. Retry lives with whoever owns the operation's time budget.
 
@@ -392,7 +363,7 @@ The MCP server handles declared operation errors through the shared `toPublicErr
 
 ### Web
 
-The web app is a client of `/api/v1` (see 00). TanStack Query queries and mutations receive the decoded `PublicError` and branch on `_tag`:
+The web app is a client of `/api/v1` (see 00). Its [client](../apps/web/src/lib/client.ts) decodes `PublicError`; the [router](../apps/web/src/router.tsx) configures bounded retries for retryable queries. The following are intended presentation patterns, not a guarantee that every screen implements them:
 
 - `InputRejected` → put each `problems[i].userMessage` under the matching field.
 - `ContactEmailTaken` → highlight the email field and link to `details.existing`.
@@ -405,13 +376,13 @@ The web app never builds its own error sentences from tags. The words come from 
 
 A defect is a bug or unclassified condition outside the declared expected error channel. HTTP and MCP log the Effect cause under a fresh **reference id**, then return a fixed authored `InternalDefect` public error with `isRetryable: false` and `details: { referenceId }` (D46). Nothing from the cause itself is copied into that response. On a self-hosted install, the Parley administrator is the instance operator who can find that log entry.
 
-This preserves diagnostics without making the unknown condition a public explanation. It does not establish that a transaction rolled back, that a provider rejected a request, or that no side effect occurred. Claims about changed state and safe replay require evidence from the operation. The current text in [`defectPublicError`](../packages/errors/src/public-error.ts) says "nothing was changed." The generic handler cannot establish that across all operations and external side effects. That wording is stronger than the handler guarantees; the reference id and separation of internal causes from public fields are the implemented protections.
+This preserves diagnostics without making the unknown condition a public explanation. It does not establish that a transaction rolled back, that a provider rejected a request, or that no side effect occurred. Claims about changed state and safe replay require evidence from the operation. [`defectPublicError`](../packages/errors/src/public-error.ts) asks someone making a change to check whether it went through before trying again. It does not promise rollback or recommend an unchecked replay. The database-outage message follows the same rule: an unavailable database request does not establish the outcome of all earlier work.
 
-Logs, traces and error counts are emitted through OpenTelemetry. Exporting them is **opt-in and off by default**, and there's no phone-home (D49). Operators choose where they go.
+The production app emits structured HTTP logs and uses Effect spans and the tracer logger. The shipped server composition does not configure an OpenTelemetry exporter or an error-frequency pipeline. D49 records the intended opt-in export policy; see the [implementation status](./10-implementation-status.md).
 
 ### Saved errors
 
-Some errors outlive the request (a v2 send that failed and is shown later). We store the **tag plus its context fields** and render `userMessage` when it's read (D45), so improved wording reaches old rows too.
+D45 calls for storing a tag plus context and rendering the user message when read. That general mechanism is not implemented: broadcast recipient and import outcomes currently persist authored user messages for some errors. They do not automatically acquire revised wording. Keep the approved design separate from that current storage behavior.
 
 ## Enforcement
 
@@ -455,12 +426,10 @@ The configured Biome plugins apply to TypeScript and TSX outside `packages/error
 
 Two more rules help. **Don't invent errors** to "complete" a union: model the ones that actually happen and that callers handle differently. And if two classes always get the same message, retry rule and severity, they may be one class.
 
-## Open questions
+## Earlier proposals and current behavior
 
-Resolved: D24, D25, D26, D35, D38, D43, D44, D45 and D46 in the [decisions log](./decisions.md). Still open, each a proposal rather than a decision:
+The earlier catalog's restore and custom-field-name questions are answered by the code, not pending implementations of their draft names. Public restore accepts a live record or a deleted record inside the restore window. The service returns an already-live record unchanged; a missing, foreign, or purged record produces the corresponding not-found error. `CustomFieldNameTaken` is implemented. The current email classes are listed above; their earlier proposal names are not aliases.
 
-1. **Restoring a live record.** Should restoring a record that isn't deleted succeed quietly, like affiliating (D43), or fail with `ContactNotDeleted` / `CompanyNotDeleted`?
-2. **Custom field names.** Must custom field names be unique per record type in a team (`CustomFieldNameTaken`)?
-3. **Resend error classes (v2, deferred to v2 design).** Is the four-class split above right, and should user text ever name the email provider? The proposal is never to name it.
+D44's per-tag wire detail schemas and D45's general saved-error rendering remain approved designs with incomplete implementation. See the [status inventory](./10-implementation-status.md) before relying on them.
 
 An email whose acceptance is unconfirmed returns `EmailDeliveryUnconfirmed` with `isRetryable: false`, even if the underlying network outage is transient. A pre-dispatch pacing outage remains `EmailServiceUnavailable` and is retryable. The broadcast worker can reconcile an unconfirmed acceptance using its persisted request and idempotency key inside the provider retention window; callers of foreground email operations do not possess that guarantee. Do not infer safe replay from the HTTP status alone.

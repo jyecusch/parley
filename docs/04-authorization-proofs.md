@@ -1,6 +1,6 @@
 # Proof, not promises: authorization the compiler can check
 
-*How Parley makes "did anyone actually check this?" a question the type checker answers, for every call site, including the ones nobody has written yet.*
+*How proof-bearing service contracts require checked values, and where runtime checks and review remain necessary.*
 
 ---
 
@@ -32,7 +32,7 @@ This post is about replacing the boolean with a **proof**: a value that says exa
 
 The technique is called **Ghosts of Departed Proofs**. Matt Noonan introduced it in Haskell in [a 2018 paper](https://kataskeue.com/gdp.pdf) (and the [`gdp`](https://hackage.haskell.org/package/gdp) library). Ollie Charles applied it to authorization in [*Who Authorized These Ghosts!?*](https://blog.ocharles.org.uk/posts/2019-08-09-who-authorized-these-ghosts.html), which is the direct ancestor of this post. Guillermo Rauch's [`gdp-ts`](https://github.com/rauchg/gdp-ts) brought it to TypeScript with a small library, a lint preset and a set of excellent examples.
 
-We are **not** using the `gdp-ts` library. We're writing our own Effect-native version of about 100 lines. The ideas, the variance tricks and most of the vocabulary come straight from `gdp-ts`. What changes is that our provers return an `Effect` that **fails with a specific, typed error** instead of returning `null`. That fits [Errors are data](./01-errors-are-data.md): "you can't do that" is never one generic 403. It is `RoleLacksPermission { needed: "records:write" }`, or `ApiKeyScopeExcludes { needed: "records:write" }`, and those have different fixes and different messages.
+We are **not** using the `gdp-ts` library. Parley uses an Effect-native implementation in `core/src/proofs/proof.ts`. The ideas, the variance tricks and most of the vocabulary come straight from `gdp-ts`. What changes is that our provers return an `Effect` that **fails with a specific, typed error** instead of returning `null`. That fits [Errors are data](./01-errors-are-data.md): "you can't do that" is never one generic 403. It is `RoleLacksPermission { needed: "records:write" }`, or `ApiKeyScopeExcludes { needed: "records:write" }`, and those have different fixes and different messages.
 
 ## The rule, in one sentence
 
@@ -113,9 +113,9 @@ This is not general memory confinement. Ordinary IDs, records, and permission sn
 
 The constructors freeze their own properties, not the entire object graph. Fields such as permission sets are exposed through readonly types; arbitrary assertions, reflection, and mutation through an independently held alias remain outside the type guarantee. The proof module is trusted code, not a sandbox for hostile JavaScript.
 
-## Parley's proof catalog (v1 proposal)
+## Selected implemented proofs
 
-Here's every fact Parley v1 needs to prove. Letters: `P` for a principal, `T` for a team, `C` for a contact, `K` for a company.
+This table introduces a subset of the implemented proof catalog. Additional proofs live in `core/src/proofs/`; the table is not an exhaustive list. Letters: `P` for a principal, `T` for a team, `C` for a contact, `K` for a company.
 
 | Proof | Means | Minted from | Can fail with |
 | --- | --- | --- | --- |
@@ -129,10 +129,10 @@ Here's every fact Parley v1 needs to prove. Letters: `P` for a principal, `T` fo
 | `CanManageTeam<P, T>` | rename, billing, delete the team | `MemberOf` (pure) | same |
 | `ContactInTeam<C, T>` | contact C exists and belongs to T | **Database**, and requires read access to T | `ContactNotFound` |
 | `CompanyInTeam<K, T>` | company K exists and belongs to T | **Database**, and requires read access to T | `CompanyNotFound` |
-| `ContactRestorable<C, T>` / `CompanyRestorable<K, T>` | the record belongs to T, is deleted, and hasn't been purged | **Database**, and requires read access to T | `ContactNotFound` / `CompanyNotFound`, `ContactNotDeleted` / `CompanyNotDeleted` *(proposed)* |
+| `ContactRestorable<C, T>` / `CompanyRestorable<K, T>` | the record belongs to T and is live or deleted inside the restore window | **Database**, and requires read access to T | `ContactNotFound` / `CompanyNotFound` |
 | `CustomFieldInTeam<F, T>` | custom field F exists and belongs to T | **Database**, and requires read access to T | `CustomFieldNotFound` |
 
-The `…InTeam` proofs only ever find records that haven't been deleted. A deleted contact is `ContactNotFound` to every operation except restore, which asks for `ContactRestorable` instead. Once a record is purged, it's `ContactNotFound` to restore too.
+The `…InTeam` proofs only ever find records that haven't been deleted. Ordinary contact reads use `ContactInTeam` and refuse deleted records. Restore uses `ContactRestorable`, which also accepts a live record so repeated restores are idempotent. Once a record is purged, restore returns `ContactNotFound`. Deleted-list queries are a separate explicit path.
 
 Two design choices are buried in that table.
 
@@ -142,43 +142,25 @@ Two design choices are buried in that table.
 
 ### One function computes effective permissions
 
-The [architecture overview](./00-architecture.md) defines *effective permissions = role permissions ∩ scopes*. That intersection is computed in **exactly one function**, private to `proofs/member-of.ts`. So is the order of the checks, which matters because the two errors have different fixes:
-
-```ts
-// core/src/proofs/permissions.ts: the only code that answers "is this permission granted?"
-export const requirePermission = (member: MemberOf<any, any>, needed: Permission) => {
-  if (!member.rolePermissions.has(needed)) {
-    return Effect.fail(new RoleLacksPermission({ needed, role: member.role }))
-    // userMessage: "Your role in Acme can't manage service accounts. A team admin can do this, or change your role."
-  }
-  if (member.scopes !== "unrestricted" && !member.scopes.has(needed)) {
-    return Effect.fail(new ApiKeyScopeExcludes({ needed }))
-    // userMessage: "This API key can only read records. Create one that can also edit them in Settings → API keys."
-  }
-  return Effect.void
-}
-```
+The [architecture overview](./00-architecture.md) defines effective permissions as role permissions restricted by scopes. [`requirePermission`](../packages/core/src/proofs/permissions.ts) owns the decision: it checks the acting member's role, the connecting person's role for a service-account connection, and then the API-key or connection scope ceiling. `proveMemberOf` supplies the checked member data; permission derivation does not query again.
 
 Role and scope are separate errors because a user needs to know *which* one to fix. One sends you to an admin; the other sends you to your API key settings. That's the [error messages post](./02-writing-error-messages.md) in action.
 
 **Permissions are explicit (D27).** No permission implies another. `records:write` doesn't include `records:read`, and `records:delete` includes neither. An operation proves every permission it uses: `contacts.update` proves read access (to find the contact) *and* write access (to change it). Every role grants all three record permissions, so this only matters for API key scopes. An API key gets exactly the permissions written on it, nothing hidden in an implication table, and the scope list on the API key settings screen is the whole truth.
 
-## Three kinds of principal, one prover
+## Sessions, API keys, and connections, one prover
 
-Parley has three kinds of principal (see [00](./00-architecture.md)):
+The implemented [principal union](../packages/core/src/principal.ts) supports sessions, API keys, and OAuth connections:
 
 ```ts
-type Principal =
-  | UserSession      // Jane in the web app
-  | UserApiKey            // Jane's agent, using an API key Jane created: Jane's identity, bound to one team, limited by scopes
-  | ServiceAccountApiKey  // an agent using the API key of "Support Bot", a service account that is a member in its own right
+type Principal = UserSession | UserApiKey | ServiceAccountApiKey | UserConnection | ServiceAccountConnection
 ```
 
-A naive design writes three authorization paths. We write one. `proveMemberOf` is the **only** function that knows principals come in kinds, and it reduces all three to two questions: *which member row?* and *which scope ceiling?*
+`proveMemberOf` centralizes the membership check for these principal kinds. Authentication and activity attribution also distinguish kinds; authorization is not duplicated across entrypoints.
 
 The implementation is [`proveMemberOf`](../packages/core/src/proofs/member-of.ts). It checks the principal's team restriction, loads their current role, and, for a service-account connection, also checks the user who connected the agent. It then passes those checked fields to `MemberOfProver.prove([principal, team], fields)`. The returned proof carries the named principal and team, the role permissions, and the API key or connection scope ceiling.
 
-From here on, nothing in the codebase knows or cares whether a user or an agent is acting. The web entrypoint, the HTTP entrypoint and the MCP entrypoint all produce a `Principal` and hand it to the same operation. **No entrypoint has authorization code, because no entrypoint can.**
+Registered operations share the same authorization implementation across HTTP and MCP. The web client calls HTTP. Separate authentication, file, public-form, and webhook routes have their own access rules; the operation registry does not prove that arbitrary entrypoint code cannot make an authorization decision.
 
 **Decided (D18): service accounts are Better-Auth users.** Each service account is stored as a Better-Auth *user* with `kind: "service-account"` and an ordinary member row in its team. Then `members.find` is one query for all three principal kinds, roles work identically, and removing a service account from a team uses the same code as removing a user. The cost is that every screen listing members must decide whether to show service accounts, and service accounts must never be able to sign in with a password.
 
@@ -236,7 +218,7 @@ export const update = Effect.fn("contacts.update")(function* (principal: Princip
 })
 ```
 
-The operation's error union is computed by the compiler: every error any step can raise. That union is what every entrypoint must map (see [01](./01-errors-are-data.md)).
+The implementation's expected error union is inferred from its steps and checked against the registered contract. The shared HTTP status map covers its tags; MCP uses shared public conversion (see [01](./01-errors-are-data.md)).
 
 ## What the compiler catches
 
@@ -375,24 +357,24 @@ The SQL predicates and the use of the transaction connection remain trusted serv
 
 ## Keeping everyone honest
 
-TypeScript isn't Haskell. `{} as CanWriteRecords<P, T>` compiles. The honest path *never needs* `as`, so we ban the dishonest one with lint.
+TypeScript assertions and trusted constructor misuse can bypass proof types. Current lint matches some common syntax; it is not a general proof sandbox.
 
-**GritQL rules (Biome), proposed:**
-
-| Rule | Bans |
+| Check | Current status and scope |
 | --- | --- |
-| `proofs-only-in-proofs` | `defineProof(...)` anywhere outside `core/src/proofs/` |
-| `no-exported-prover` | exporting the value returned by `defineProof` |
-| `no-proof-assertion` | `as` / `satisfies` / angle-bracket casts to any `Proof`, `Named`, or proof interface |
-| `no-any-in-core` | `any` in `@parley/core` (outside `proofs/proof.ts`) |
-| `no-proof-storage` | proofs or `Named` values inside `Ref`, `Layer` constructors or module scope |
-| `no-db-outside-services` | importing `@parley/db` from anywhere but `core/src/services/` (package `exports` also enforce this) |
+| `proofs-only-in-proofs` | Implemented: matches direct `defineProof(...)` calls outside `core/src/proofs/`. |
+| `no-proof-assertion` | Implemented: matches `as` assertions to the proof types explicitly listed in the rule, outside `proofs/proof.ts`. It does not cover all proof types or cast syntax. |
+| Explicit `any` | Biome rejects it under its configured rule, with existing diagnostic suppressions. There is no separate `no-any-in-core` plugin. |
+| `no-db-outside-services` | Implemented for matching `@parley/db` imports, with auth, core composition, database-package, and test exceptions. Package exports do not restrict which workspace may consume the package. |
+| Exported prover factories | No dedicated lint rule; review must keep minting capabilities private. |
+| Proof storage in `Ref`, `Layer`, or module state | No dedicated lint rule. Runtime lifetime checks reject later named-value and proof-field access; they do not prevent storage. |
+
+The exact source and configuration are linked in the [lint inventory](./10-implementation-status.md#configured-lint-inventory). Additional rules remain planned rather than silently enabled.
 
 **`mistakes.ts`.** This is a file that's type-checked but never run. Every near-miss anyone almost made becomes one line under `// @ts-expect-error`: the five errors above, plus every new one we find. If a refactor ever makes one of those lines *compile*, the `@ts-expect-error` itself becomes an error and CI fails. It's the cheapest authorization regression test there is.
 
 **Prover and service tests.** Provers can query the wrong column or compare the wrong role; services can also build incorrectly scoped SQL after accepting valid proofs. Test authorization decisions across roles, principal kinds, scopes and team boundaries, and test successful service queries with records in multiple teams. Derivation proofs use in-memory permission data; their tests do not need another database query.
 
-**Entrypoints derive from operations.** Parley uses an operation registry (decision D16): each operation is defined once (name, description, input, output, error union) and every entrypoint derives its endpoint or tool from it. Taken together with this post, that means an entrypoint *has nowhere to put* authorization code. It receives a `Principal` and calls `operation(principal, input)`. That's it.
+**Publication follows the registry and exposure manifest.** Registered HTTP endpoints and MCP tools use the shared operation contracts and implementations (D16/D171). Their entrypoints authenticate, decode, and call the operation. Inclusion does not grant permission; it makes the capability reachable through that entrypoint. This convention does not forbid all alternate response or authorization code.
 
 ## Where to stop
 
@@ -406,6 +388,6 @@ You could name every value and prove every fact. Don't. For Parley:
 
 ## Open questions
 
-Resolved: D16–D19, D27 (permissions are explicit), D28 and D166 (RLS deferred; service SQL explicitly trusted, with declared constraints and cross-team regressions), D35 (no existence oracle for teams), D36 (transactional re-check for authorization changes) and D37 (other teams' records are always "not found") in the [decisions log](./decisions.md). Still open:
+Resolved: D16–D19, D27 (permissions are explicit), D28 and D166 (RLS deferred; service SQL explicitly trusted, with declared constraints and cross-team regressions), D35 (no existence oracle for teams), D36 (transactional re-check for authorization changes) and D37 (other teams' records are always "not found") in the [decisions log](./decisions.md). Current restore behavior:
 
-1. **Restoring a live record.** Should restoring a contact that isn't deleted succeed quietly (idempotent, which agents prefer, and consistent with affiliating in D43), or fail with `ContactNotDeleted`?
+The public restore prover accepts a live record or a deleted record inside the restore window. The service returns the current record when it is already live, so restore is idempotent. Missing, foreign, or purged records produce the corresponding not-found error. There is no implemented `ContactNotDeleted` class.

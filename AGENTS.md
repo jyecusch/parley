@@ -18,7 +18,7 @@ Don't build what a popular, maintained library already does (D156). Components c
 
 ## Read before building
 
-`docs/` is the contract the implementation is held to. Start with `docs/00-architecture.md`. Decisions, proposals and open questions live in `docs/decisions.md`. Don't make product or architecture decisions alone: propose them and record them there.
+`docs/` is the contract the implementation is held to. Start with `docs/00-architecture.md` and `docs/10-implementation-status.md`. Decisions, proposals and open questions live in `docs/decisions.md`. Don't make product or architecture decisions alone: propose them and record them there. An approved decision is not proof of implementation. Label sketches and planned checks explicitly; claims of enforcement must name the configured rule, type, runtime check, or test and its scope. Update the status inventory when implementation changes.
 
 ## Commits, versions and merges
 

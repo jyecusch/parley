@@ -4,9 +4,15 @@
 
 ---
 
+## Implementation status
+
+Passing team values per call and composing dependencies with Effect layers are implemented conventions. The tier markers, `processLayer`/`teamLayer` wrappers, and additional state/storage lint proposed below are **not implemented or configured**. D40/D41 record an approved design, not a completed check. See the [status inventory](./10-implementation-status.md).
+
+The opening story and tier-check code are illustrative. The real broadcast sender uses the durable delivery mechanism in [07](./07-background-delivery.md).
+
 ## The broadcast that went out with the wrong footer
 
-It's a few months from now. Parley v2 sends marketing email.
+Consider a hypothetical cross-team bug in a marketing email sender.
 
 Team A is a coffee roaster in Melbourne. Team B is a law firm in Sydney. On Tuesday morning both of them send a broadcast.
 
@@ -63,13 +69,13 @@ So a process-tier thing may use only process-tier things. A team-tier thing may 
 
 The reverse direction is always fine and completely normal. A request uses the database pool on every query.
 
-Stated like that, the rule is obvious. Nothing checks it, though. The rest of this post is about getting the compiler and the linter to check it, so a reviewer doesn't have to.
+Effect does not check service lifetime categories. The design below proposes extra checks; until they exist, review must enforce this rule.
 
 ## What Effect already gives us
 
 We're not starting from zero. Effect's `Layer` and `Context.Service` already do a lot of the work.
 
-**Layers are built once.** A `Layer` stored in a constant is memoized by reference. Built into the app layer, it's constructed once and shared. That makes "process tier" the natural default, with no singletons hand-rolled behind `let instance`.
+**Layers share construction within a build.** Effect memoizes layers by reference within the layer build that owns them. The application composition builds and retains the shared server runtime. A constant does not make a layer a singleton across independent runtimes. That makes "process tier" the natural default, with no singletons hand-rolled behind `let instance`.
 
 **Requirements are visible.** A `Layer.Layer<BroadcastSender, never, Mailer | TeamSendingSettings>` says in its type what it needs to be built. That's why our story's diff *did* make the compiler speak up. The `R` channel is the "needs list" that the write-up this post is based on had to invent by hand.
 
@@ -102,7 +108,7 @@ class TeamSendingSettings extends Context.Service<TeamSendingSettings, {
 }>()("@parley/TeamSendingSettings") {}
 ```
 
-Then `BroadcastSender` doesn't need `TeamSendingSettings` at build time. Each outgoing message arrives already carrying its own footer, looked up for its own team by the operation that queued it. Our story's bug can't be written, because there's nothing at the team tier to capture.
+The example takes the team explicitly rather than capturing one team's settings. In the implemented sender, preparation persists each batch's resolved sender, footer, and content before dispatch. Explicit arguments reduce the opportunity for capture; they do not prevent a service from introducing an incorrectly keyed cache.
 
 That gives us the shape for nearly all of v1 and v2:
 
@@ -112,11 +118,11 @@ That gives us the shape for nearly all of v1 and v2:
 
 Why prefer an argument over a team-tier service? An argument shows up at every call site, and a proof checks it ([04](./04-authorization-proofs.md)). A team-tier service in context is invisible at the call site, and it's exactly what gets captured.
 
-## Making the rule a compile error
+## Planned tier check
 
-The default above makes the leak rare. The check below makes it **impossible in the form the story took**: a process-tier layer can't require a team-tier or request-tier service.
+The proposed check would reject a process-tier layer requiring a marked team-tier or request-tier service. It does not exist in the source tree, and it cannot protect current callers.
 
-> **Design sketch.** The TypeScript below is plausible and follows the same pattern as the original write-up (and Drizzle and tRPC). It still has to be compiled against Effect v4's real `Layer` and `Context.Service` types during implementation. Expect small adjustments.
+> **Planned, uncompiled design sketch.** The types, service examples, diagnostics, and lint names in this section describe a possible implementation. They have not been compiled against the installed Effect version and are not current safeguards.
 
 ### Step 1: every service says which tier it's in
 
@@ -149,7 +155,7 @@ type CanUse<T extends Tier> =
 type TierOf<S> = S extends { readonly [TierMarker]: infer T } ? T : "unlabeled"
 ```
 
-Services from Effect or other libraries (`HttpClient`, for example) have no marker. They come out as `"unlabeled"`, which is allowed anywhere and treated as process tier (D41). Third-party code that never opted in doesn't need labeling. Every service *we* write gets a marker, and a lint rule (below) enforces that.
+Services from Effect or other libraries (`HttpClient`, for example) have no marker. They come out as `"unlabeled"`, which is allowed anywhere and treated as process tier (D41). Third-party code that never opted in doesn't need labeling. Under this proposal, every service we write would receive a marker. The corresponding lint rule is also planned.
 
 ### Step 3: find the offenders
 
@@ -185,7 +191,7 @@ When nothing is wrong, the check is `unknown`, and `X & unknown` is just `X`, so
 
 ### The story, replayed
 
-Every process-tier service wraps its layer:
+Under the proposal, each process-tier service would wrap its layer:
 
 ```ts
 class BroadcastSender extends Context.Service<BroadcastSender, BroadcastSenderShape>()("@parley/BroadcastSender") {
@@ -199,7 +205,7 @@ class BroadcastSender extends Context.Service<BroadcastSender, BroadcastSenderSh
 }
 ```
 
-and the compiler stops the diff on the spot, before anyone gets to "just provide it at boot":
+The intended diagnostic would reject the dependency before it is provided at boot:
 
 ```
 Argument of type 'Layer<BroadcastSender, never, Mailer | TeamSendRateLimiter>' is not assignable to parameter of type
@@ -212,33 +218,33 @@ That error names the rule and the service that broke it. It shows up in the edit
 
 The original write-up ended with this question, and it's a fair one. In a codebase that already exists, the advice was: list every cached value first, and only add the types if the list keeps growing.
 
-**Parley is greenfield, and that changes the maths.** Adding a tier marker costs one line per service, written once, when the service is created. Retrofitting it later means reviewing every module-level `const`. And our product roadmap, marketing email with per-team sending, legal footers and quotas, is exactly the area where team-tier state wants to appear. So we label from day one and wrap every layer (D40).
+D40 approves adding tier checks. Implementation remains outstanding; its cost and actual Effect signatures must be assessed against the existing services. Do not infer a marker or wrapper from that decision.
 
-## What the types don't catch
+## Limits of the planned check
 
 Be clear-eyed about this. The tier check looks at a layer's **requirements**. It doesn't look at what the code inside does.
 
 | Leak | Caught by the tier check? | What catches it |
 | --- | :-: | --- |
-| A process-tier layer requires a team-tier service | ✅ | `processLayer` |
+| A process-tier layer requires a team-tier service | Only if the planned check is implemented | Proposed `processLayer`; currently review |
 | A `Ref` or `Map` inside a process-tier service caches one team's data on first use | ❌ | The "caches are keyed by `TeamId`" review-checklist item (D42) |
-| Module-level `let` / `new Map()` in `core/src/services/` | ❌ | Lint |
+| Module-level `let` / `new Map()` in `core/src/services/` | ❌ | Review; the module-state lint is not configured |
 | A proof or `Named` stored in a `Ref`, a layer or module state, so it outlives its request | ❌ by tiers | Runtime getters refuse named-value and proof-field reads after the `named` Effect finishes ([04](./04-authorization-proofs.md)); storage lint remains proposed |
 | Closing over ambient "current team" state (a `FiberRef`, `AsyncLocalStorage`) | ❌ | Don't have any. There is no "current team" in Parley; the team is an argument. |
-| `as any` / `as Layer.Layer<…>` to get past the check | ❌ | Lint bans assertions in `core/` |
+| Assertions that bypass the proposed check | ❌ | Review; explicit `any` is linted, but assertions are not generally banned |
 
-### GritQL rules
+### Planned GritQL rules
 
-These sit in Biome with the rest of our lint rules, scoped to `packages/core/src/**`:
+These are proposed rule names and requirements. None of the following rules is configured in Biome:
 
 - **`service-declares-tier`**: every `Context.Service` class in `core` must declare `[TierMarker]`.
 - **`layer-is-tiered`**: every `static readonly layer` in `core` must be wrapped in `processLayer(...)`, `teamLayer(...)` or (rarely) `requestLayer(...)`.
 - **`no-module-state-in-services`**: no module-level `let`, `new Map`, `new Set`, `new WeakMap` or mutable arrays in `core/src/services/**` and `core/src/operations/**`. Constants are fine.
-- **Process caches are keyed by `TeamId`** is a **review-checklist item**, not a lint rule (D42): GritQL can't reliably tell what a cache key means. The `no-module-state-in-services` rule above pushes every cache into an explicit service, where review can see it.
+- **Process caches are keyed by `TeamId`** is a **review-checklist item**, not a lint rule (D42): GritQL can't reliably tell what a cache key means. The proposed `no-module-state-in-services` rule would make module state more visible; current review must inspect caches directly.
 - **`no-proof-in-state`**: a proof or `Named` type may not appear inside `Ref.make`, `Layer.succeed`, or a module-level binding.
 - **`no-type-assertion-in-core`**: no `as` (except `as const`) and no `any` in `core`, outside `proofs/` and `lib/ids.ts`. This also protects the proofs in [04](./04-authorization-proofs.md).
 
-Together, the types close the *normal* way to reach across tiers, which is asking for a dependency. Lint closes the obvious workarounds. What remains looks strange enough to stand out in review.
+The proposed types and lint would cover some common mistakes. Until they are implemented and tested, service lifetime, cache keys, and captured request values remain review responsibilities. See the [configured rules](./10-implementation-status.md#configured-lint-inventory) for the narrower checks that actually run.
 
 ## None of this filters your SQL
 
@@ -256,30 +262,23 @@ Composite foreign keys protect the relationships declared with them, such as aff
 
 For now the guard against SQL scoping mistakes is service review plus real Postgres regression tests. Tests deliberately put matching data in both teams and give a principal access to both, so membership denial cannot hide a missing predicate. Passing those tests is evidence for the cases exercised, not proof that every future query is safe.
 
-## Parley's services and their tiers
+## Implemented service lifetimes
 
-*Proposed tiers for everything we know we'll build in v1 and v2.*
+These lifetimes follow the current application composition and method signatures. They are not compiler-read tier metadata.
 
-| Service | Tier | Why |
+| Service or value | Lifetime | Team handling |
 | --- | --- | --- |
-| `AppConfig` | process | Read once from the environment |
-| `SqlClient` (native Effect pool and Drizzle) | process | Domain queries share the current fiber's transaction (D168) |
-| `NodePgPool` | process | Shared node-postgres capability for Better-Auth and the Postgres limiters; configured and closed by database infrastructure |
-| `Auth` (Better-Auth instance) | process | Stateless with respect to teams; sessions are looked up per request |
-| `PrincipalResolver` | process | Turns a session cookie or API key into a `Principal`; holds nothing per team |
-| `Contacts`, `Companies` | process | Take a named, proven team on every call |
-| `Members`, `ApiKeys`, `ServiceAccounts` | process | Same |
-| `Activity` | process | Each entry carries its own team and principal |
-| `Mailer`: a pluggable interface; the default implementation wraps the Resend client (D50) | process | One client, one Resend credential for our Resend account. Per-team things (verified sending domain, footer legal name and address) are team **data**, looked up per call, never held here |
-| `BroadcastSender` and `ProviderPacing` | process, coordinated through Postgres | Durable batches and a shared account allowance across servers (D167) |
-| `Imports`, `ImportRunner` (D135) | process | Each import row carries its own team and the principal who started it; the runner rebuilds that principal for every part and checks their membership and permissions again, so nothing is held between parts |
-| `TeamSendingSettings` | process | A lookup by named team, not a holder of one team's settings |
-| `Templates`, `Drafts`, and the v2 contact-set services (names not yet defined) | process | Team passed per call |
-| `Subscriptions` (unsubscribe state) | process | Keyed by team + recipient |
-| `TeamSendRateLimiter` (only if we need per-team in-memory limits) | **team** | Holds one team's counters. The single justified team-tier service so far, and maybe not even that: a Postgres- or Redis-backed limiter keyed by `TeamId` would be process tier. |
-| `Principal`, proofs | **request** | Values, never services, never stored. One exception: an import stores who started it (D135), and its runner checks again that they may still write before each part |
+| `Database` and `NodePgPool` | Shared infrastructure in the built runtime | Own configuration and connection lifetime; do not retain a current team |
+| `BetterAuth` and `Authenticator` | Shared services | Look up identity and credentials per call |
+| `Contacts`, `Companies`, `Members`, and the other data services | Shared services | Take the team, resource, and relevant proofs per call |
+| `Sending` | Shared service | Reads sender and sending-domain data for the requested team |
+| `Mailer` | Shared service | Holds provider configuration; receives message-specific sender and content data |
+| `BroadcastSender` and `ProviderPacing` | Shared services coordinated through Postgres | Batch rows identify their broadcast and team; pacing keys the provider account |
+| `Imports` and `ImportRunner` | Shared services | Import rows identify their team and initiating principal; authorization is rebuilt for work rather than retained as a proof |
+| `RateLimiter` | Shared service backed by keyed Postgres counts, with its documented fallback | Keys identify the request budget; there is no one-team instance captured at boot |
+| `Principal`, named values, and proofs | Supplied during an operation or named Effect execution | Named-value and proof-field access expires with its execution |
 
-Notice how short the team-tier section is. That's on purpose.
+The proposed team tier remains available as a design category if a future service genuinely needs one team's state across requests. Such a service is not made safe merely by declaring its intended lifetime in documentation.
 
 ## Further reading
 
@@ -289,8 +288,6 @@ Notice how short the team-tier section is. That's on purpose.
 
 ## Open questions
 
-Resolved: D39 (team as argument), D40 (tier check from day one), D41 (untiered third-party services allowed anywhere, as process tier), D42 (team-keyed caches are a review-checklist item) and D50 (`Mailer` is a pluggable process-tier service with Resend as the default). See the [decisions log](./decisions.md).
+Resolved: D39 (team as argument), D40 (tier-check design approved; implementation outstanding), D41 (untiered third-party services allowed anywhere, as process tier), D42 (team-keyed caches are a review-checklist item) and D50 (`Mailer` is a pluggable process-tier service with Resend as the default). See the [decisions log](./decisions.md).
 
-Deferred to v2 design:
-
-- **Q-T5: per-team send rate limiting.** An in-memory team-tier limiter, or a shared store (Postgres or Redis) keyed by `TeamId` that stays process tier? The second keeps the team tier empty.
+The earlier Q-T5 store question is resolved by D157's shared, keyed Postgres limiter. That choice is process-tier by convention and does not implement the type-level tier check.

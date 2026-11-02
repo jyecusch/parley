@@ -25,15 +25,15 @@ That's the stance we're taking. A bad message is usually a missing error *type*.
 Every `userMessage` answers up to four questions, in this order:
 
 1. **What happened, and why.** Be specific. If we know the cause, say it.
-2. **What's safe.** Say what was *not* lost: "Your changes are still here." Users worry about their data before they think about anything else. In Parley that sentence is a promise we keep: unsaved edits survive a failed save and a re-sign-in (D48).
+2. **What's safe.** Say what was *not* lost: "Your changes are still here." Users worry about their data before they think about anything else. D48 requires unsaved edits to survive a failed save and a re-sign-in, but there is no app-wide recovery mechanism yet. Make this promise only where the owning screen actually preserves those edits; do not infer persistence across navigation or reload from local component state.
 3. **How to fix it, and who can.** Name the role. "A team admin can…", "Whoever created this API key can…", "You can…". A fix that only an admin can apply is no use to someone with the `member` role who doesn't know that.
 4. **A way out.** Try later, pick another option, ask someone. Never a dead end.
 
 Not every message needs all four. "That email address is already used by Sam Lee." needs only the first, because the fix is obvious. But *consider* all four every time.
 
-Here's Priya's Friday rewritten, for the case that actually happened (her session expired):
+For a screen that retains Priya's draft through re-sign-in, the intended message would be:
 
-> **You were signed out, so this contact wasn't saved.** Your changes are still here. Sign in again and they'll be saved.
+> **You were signed out, so this contact wasn't saved.** Your changes are still here. Sign in again, then save them.
 
 What happened and why, what's safe, how to fix it, a way out. Three sentences.
 
@@ -140,12 +140,12 @@ Wix's biggest lesson was about process: they fixed thousands of messages *after*
 
 **Errors are part of every screen's design asset (D57).** When we discuss a screen before building it, the design includes its error states: which `_tag`s can reach that screen, what each one says, and where it appears (inline, toast, or full-screen). If a screen's design has no error states (or empty and loading states), it isn't finished. This fits naturally with the "stress test every view type and state" habit from [05](./05-ux-principles.md).
 
-**A 30-day error review after each launch, on our hosted instance (D49).** We'll find out which errors actually happen and how often. One month after a feature ships, we look at the error frequency by `_tag`, rewrite the messages for the common ones, and split any class that turns out to need two different fixes. Because every error is typed and severity-tagged, this is a query, not an archaeology project. Self-hosted installs are never part of it: telemetry there is opt-in OpenTelemetry, off by default, with no phone-home.
+**A 30-day error review after each launch is a policy, not an implemented pipeline (D49).** The intended review groups errors by tag and revisits common conditions and their messages. The shipped app has structured HTTP logging and Effect instrumentation, but no configured OpenTelemetry exporter or general frequency pipeline. Export must follow the approved opt-in, no-phone-home policy when implemented.
 
 **And always: question the generic.** If anyone (a contributor or an agent) proposes "let's just use a generic message here", the answer is "why are users seeing this, and what's actually happening?" A generic message is a sign of a missing type.
 
 ## Open questions
 
-None; all resolved (D37, D38, D46, D48, D49, D57). See the [decisions log](./decisions.md).
+The writing decisions are recorded in D37, D38, D46, D48, D49, and D57. Some supporting product requirements, including universal draft recovery and telemetry export, remain incomplete; see [implementation status](./10-implementation-status.md).
 
-The defect message is now fixed (D46): *"Something on our side failed, and nothing was changed. Try again. If it keeps happening, share reference ABC123 with your Parley administrator."* The reference id finds the full log entry, and on a self-hosted install the administrator is the instance operator.
+The defect message is now fixed (D46): *"Something on our side failed. If you were making a change, check whether it went through before trying again. If it keeps happening, share reference ABCD-2345 with your Parley administrator."* The reference id finds the full log entry, and on a self-hosted install the administrator is the instance operator.
