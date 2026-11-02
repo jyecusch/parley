@@ -9,6 +9,3 @@ dist/
 *.log
 .DS_Store
 coverage/
-
-# Design source (not committed)
-docs/design/

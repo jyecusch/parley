@@ -16,7 +16,6 @@ export const listConnections = defineTeamOperation({
   input: Schema.Struct(InTeam),
   output: Schema.Array(Connection),
   errors: [],
-  http: { method: "GET", path: "/teams/:teamId/connections" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: [],
 })
@@ -45,7 +44,6 @@ export const createConnection = defineTeamOperation({
   }),
   output: Connection,
   errors: [SignInRequired, ConnectionRequestInvalid, ServiceAccountNotFound],
-  http: { method: "POST", path: "/teams/:teamId/connections" },
   hints: { readOnly: false, destructive: false, idempotent: false },
   permissions: [],
 })
@@ -60,7 +58,6 @@ export const revokeConnection = defineTeamOperation({
   }),
   output: Connection,
   errors: [SignInRequired, ConnectionNotFound],
-  http: { method: "POST", path: "/teams/:teamId/connections/:connectionId/revoke" },
   hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: [],
 })

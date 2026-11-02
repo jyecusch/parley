@@ -24,7 +24,6 @@ export const listSegments = defineTeamOperation({
   input: Schema.Struct(InTeam),
   output: Schema.Array(Segment),
   errors: [],
-  http: { method: "GET", path: "/teams/:teamId/segments" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: ["records:read"],
 })
@@ -35,7 +34,6 @@ export const getSegment = defineTeamOperation({
   input: Schema.Struct(OneSegment),
   output: Segment,
   errors: [SegmentNotFound],
-  http: { method: "GET", path: "/teams/:teamId/segments/:segmentId" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: ["records:read"],
 })
@@ -53,7 +51,6 @@ export const createSegment = defineTeamOperation({
   }),
   output: Segment,
   errors: [SegmentLimitReached],
-  http: { method: "POST", path: "/teams/:teamId/segments" },
   hints: { readOnly: false, destructive: false, idempotent: false },
   permissions: ["records:read", "email:write"],
 })
@@ -70,7 +67,6 @@ export const updateSegment = defineTeamOperation({
   }),
   output: Segment,
   errors: [SegmentNotFound],
-  http: { method: "PATCH", path: "/teams/:teamId/segments/:segmentId" },
   hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: ["records:read", "email:write"],
 })
@@ -82,7 +78,6 @@ export const deleteSegment = defineTeamOperation({
   input: Schema.Struct(OneSegment),
   output: Segment,
   errors: [SegmentNotFound],
-  http: { method: "DELETE", path: "/teams/:teamId/segments/:segmentId" },
   hints: { readOnly: false, destructive: true, idempotent: false },
   permissions: ["records:read", "email:write"],
 })
@@ -102,7 +97,6 @@ export const listSegmentContacts = defineTeamOperation({
   }),
   output: ContactPage,
   errors: [SegmentNotFound],
-  http: { method: "GET", path: "/teams/:teamId/segments/:segmentId/contacts" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: ["records:read"],
 })
@@ -118,7 +112,6 @@ export const addSegmentContacts = defineTeamOperation({
   }),
   output: Segment,
   errors: [SegmentNotFound, SegmentIsDynamic, ContactNotFound],
-  http: { method: "POST", path: "/teams/:teamId/segments/:segmentId/contacts" },
   hints: { readOnly: false, destructive: false, idempotent: true },
   permissions: ["records:read", "email:write"],
 })
@@ -129,7 +122,6 @@ export const removeSegmentContacts = defineTeamOperation({
   input: Schema.Struct({ ...OneSegment, contactIds: ContactIds }),
   output: Segment,
   errors: [SegmentNotFound, SegmentIsDynamic],
-  http: { method: "POST", path: "/teams/:teamId/segments/:segmentId/contacts/remove" },
   hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: ["records:read", "email:write"],
 })

@@ -96,7 +96,7 @@ afterAll(async () => {
 })
 
 describe("MCP entrypoint", () => {
-  it("exposes every operation as a tool with its description and hints", async () => {
+  it("exposes explicitly included operations as tools with their descriptions and hints", async () => {
     const { json } = await rpc(writeKey, "tools/list")
     const tools = json.result.tools as Array<{
       name: string

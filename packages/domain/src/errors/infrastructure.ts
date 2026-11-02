@@ -29,7 +29,7 @@ export class DatabaseUnavailable
     return `database unavailable: ${String(this.cause)}`
   }
   get userMessage() {
-    return userText`Parley couldn't reach its database, so nothing was changed. Try again in a minute.`
+    return userText`Parley couldn't complete a database request. If you were making a change, check whether it went through before trying again.`
   }
 }
 

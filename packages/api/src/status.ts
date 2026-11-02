@@ -5,10 +5,7 @@ export type ErrorTag = { [Name in OperationName]: OperationError<Operations[Name
 
 export type Status = 401 | 403 | 404 | 409 | 410 | 422 | 429 | 502 | 503
 
-/**
- * How each error is sent over HTTP. Typed over every operation's errors, so a new error
- * class anywhere fails to compile until it has a status here (docs/01-errors-are-data.md).
- */
+/** ERROR_STATUS maps every registered operation error tag to HTTP status; see docs/errors.md. */
 export const ERROR_STATUS: { readonly [Tag in ErrorTag]: Status } = {
   SessionMissing: 401,
   SessionExpired: 401,

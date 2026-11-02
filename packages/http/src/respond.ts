@@ -1,6 +1,6 @@
 import { type AnyOperationError, BODY_TAG, detailsOf, ERROR_STATUS, expectedInputOf, operationFor } from "@parley/api"
 import { classifyDecodeError } from "@parley/core"
-import type { OperationName } from "@parley/domain"
+import type { HttpOperationName } from "@parley/domain"
 import { defectPublicError, ReferenceId, toPublicError } from "@parley/errors"
 import { Cause, Effect } from "effect"
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http"
@@ -10,7 +10,7 @@ import { HttpApiError } from "effect/http-api"
  * The error body for a domain error, by its exhaustively mapped status. Rejected input also says
  * what the operation takes (D143), when the operation is known.
  */
-export const errorBody = (error: AnyOperationError, operation?: OperationName) => {
+export const errorBody = (error: AnyOperationError, operation?: HttpOperationName) => {
   const status = ERROR_STATUS[error._tag]
   const details = detailsOf(error)
   const expected = error._tag === "InputRejected" && operation ? { expected: expectedInputOf(operation) } : {}
@@ -23,7 +23,7 @@ export const errorBody = (error: AnyOperationError, operation?: OperationName) =
   }
 }
 
-const errorResponse = (error: AnyOperationError, operation?: OperationName) =>
+const errorResponse = (error: AnyOperationError, operation?: HttpOperationName) =>
   HttpServerResponse.jsonUnsafe(errorBody(error, operation), { status: ERROR_STATUS[error._tag] })
 
 /**

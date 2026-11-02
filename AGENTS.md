@@ -1,27 +1,24 @@
-# AGENTS.md
+# Contributing to Parley
 
-Instructions for any agent (or person) working on Parley.
+Read [docs/README.md](docs/README.md) and the relevant architecture, error, or runtime guide before changing behavior. Keep public docs concise and limited to what contributors need. Do not add personal notes, research, design assets, journals, or blog drafts to the repository.
 
-## One name for everything
+## Architecture and rules
 
-Every concept has exactly one name, defined in [`docs/terminology.md`](docs/terminology.md). Synonyms are banned in code, docs, UI copy, user messages and conversation.
+- Put business behavior in shared core operations. The web app calls HTTP; HTTP and MCP use the same core implementation.
+- Register every operation and declare both HTTP and MCP exposure explicitly. Preserve first-class agent access through direct or analogous operations.
+- Require named values and proofs at protected service calls. Services still own SQL scoping; proof types do not inspect queries.
+- Keep errors typed internally and use the approved public converters. Never expose diagnostic text or discard useful internal context to make a response safe.
+- Keep connection and provider setup in their owning infrastructure layers; consuming services receive capabilities.
+- Use established maintained libraries. UI components come from shadcn, icons from Lucide, and styling uses Tailwind's scale and theme variables; do not add arbitrary values or handwritten alternatives.
+- Follow [terminology](docs/terminology.md) and American spelling. Add a necessary new concept to the glossary instead of inventing a synonym. Preserve third-party API names when discussing their APIs.
+- Discuss product and architecture changes with the maintainer. Update current contributor rules when behavior changes; keep design history and learning notes outside the public repository.
 
-- Use the term from `docs/terminology.md`. Never use a listed banned synonym.
-- Need a concept that has no term yet? Add it to `docs/terminology.md` first, in the same change. Pick the most common name, and avoid vague names or names that overlap with an existing term, with a CRM user's vocabulary, or with our stack (Effect, TanStack, Better-Auth, MCP).
-- Spelling is American (D151): color, behavior, canceled.
-- Third-party names (Better-Auth `organization`, Effect `Scope`, TanStack DB `collection`, MCP `tool`) are used only when talking about that library's API.
-- If two words seem to mean the same thing, stop and fix it. Don't pick one locally.
+## Validation
 
-## Use libraries, never hand-roll
+Run `bun run lint`, `bun run typecheck`, and `bun run test` before pushing. Tests use a local throwaway Postgres; never run test or migration experiments against a live database. Fake email and external providers.
 
-Don't build what a popular, maintained library already does (D156). Components come from shadcn, installed with its CLI; styling is Tailwind utilities, on Tailwind's standard scale or the theme's named tokens, never arbitrary values like `text-[12.5px]` (`bun run lint` fails on them); icons come from Lucide; search, parsing, validation and the like come from libraries. Exceptions only when the owner grants one for a stated reason.
+Test meaningful behavior, especially refusals, cross-team isolation, concurrency, and recovery. Keep compile-time misuse fixtures under type checking. Lint matches specific syntax; do not treat it as a universal safety guarantee.
 
-## Read before building
+## Commits and releases
 
-`docs/` is the contract the implementation is held to. Start with `docs/00-architecture.md`. Decisions, proposals and open questions live in `docs/decisions.md`. Don't make product or architecture decisions alone: propose them and record them there.
-
-## Commits, versions and merges
-
-- Commit messages follow [Conventional Commits](https://www.conventionalcommits.org): `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`, with a scope where it helps (`feat(crt): ...`) and `!` or a `BREAKING CHANGE:` footer for breaking changes.
-- Releases follow [Semantic Versioning](https://semver.org) and are tagged `vX.Y.Z`. Every package in the workspace carries the same version.
-- History on `main` is linear. Pull requests merge by squash or rebase only, never a merge commit.
+Use Conventional Commits with a useful scope. Keep commit messages and PR descriptions short. Versions follow Semantic Versioning, and every workspace carries the same release version. Main history is linear; use squash or rebase, never a merge commit.

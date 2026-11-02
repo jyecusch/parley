@@ -28,7 +28,6 @@ export const listMembers = defineTeamOperation({
   input: Schema.Struct(InTeam),
   output: Schema.Array(Member),
   errors: [],
-  http: { method: "GET", path: "/teams/:teamId/members" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: [],
 })
@@ -40,7 +39,6 @@ export const updateMember = defineTeamOperation({
   input: Schema.Struct({ ...OneMember, role: Role.annotate({ title: "Role" }) }),
   output: Member,
   errors: [ServiceAccountCannotBeOwner, MemberNotFound, LastOwner, OwnerChangeNeedsOwner],
-  http: { method: "PATCH", path: "/teams/:teamId/members/:userId" },
   hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: ["members:manage"],
 })
@@ -52,7 +50,6 @@ export const removeMember = defineTeamOperation({
   input: Schema.Struct(OneMember),
   output: Member,
   errors: [SignInRequired, MemberNotFound, LastOwner, OwnerChangeNeedsOwner],
-  http: { method: "DELETE", path: "/teams/:teamId/members/:userId" },
   hints: { readOnly: false, destructive: true, idempotent: false },
   permissions: [],
 })
@@ -63,7 +60,6 @@ export const listInvitations = defineTeamOperation({
   input: Schema.Struct(InTeam),
   output: Schema.Array(Invitation),
   errors: [],
-  http: { method: "GET", path: "/teams/:teamId/invitations" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: ["members:manage"],
 })
@@ -79,7 +75,6 @@ export const createInvitation = defineTeamOperation({
   }),
   output: Invitation,
   errors: [AlreadyAMember, OwnerChangeNeedsOwner, ...EmailErrors],
-  http: { method: "POST", path: "/teams/:teamId/invitations" },
   hints: { readOnly: false, destructive: false, idempotent: false },
   permissions: ["members:manage"],
 })
@@ -93,7 +88,6 @@ export const revokeInvitation = defineTeamOperation({
   }),
   output: Invitation,
   errors: [InvitationNotFound],
-  http: { method: "POST", path: "/teams/:teamId/invitations/:invitationId/revoke" },
   hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: ["members:manage"],
 })
@@ -104,7 +98,6 @@ export const getInvitation = defineOperation({
   input: Schema.Struct({ invitationId: InvitationId.annotate({ description: "From the invitation link." }) }),
   output: Invitation,
   errors: [InvitationNotFound, InvitationForAnotherEmail],
-  http: { method: "GET", path: "/invitations/:invitationId" },
   hints: { readOnly: true, destructive: false, idempotent: true },
 })
 
@@ -115,7 +108,6 @@ export const acceptInvitation = defineOperation({
   input: Schema.Struct({ invitationId: InvitationId.annotate({ description: "From the invitation link." }) }),
   output: Team,
   errors: [SignInRequired, InvitationNotFound, InvitationExpired, InvitationForAnotherEmail],
-  http: { method: "POST", path: "/invitations/:invitationId/accept" },
   hints: { readOnly: false, destructive: false, idempotent: true },
 })
 
@@ -126,7 +118,6 @@ export const myInvitations = defineOperation({
   input: Schema.Struct({}),
   output: Schema.Array(Invitation),
   errors: [SignInRequired],
-  http: { method: "GET", path: "/invitations" },
   hints: { readOnly: true, destructive: false, idempotent: true },
 })
 
@@ -136,6 +127,5 @@ export const declineInvitation = defineOperation({
   input: Schema.Struct({ invitationId: InvitationId.annotate({ description: "From invitations.mine." }) }),
   output: Invitation,
   errors: [SignInRequired, InvitationNotFound, InvitationForAnotherEmail],
-  http: { method: "POST", path: "/invitations/:invitationId/decline" },
   hints: { readOnly: false, destructive: true, idempotent: false },
 })

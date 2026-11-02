@@ -9,5 +9,5 @@ or {
     $name <: not within `class $_ extends $_ implements DomainError { $_ }`
   }
 } as $class where {
-  register_diagnostic(span=$name, message="Every error is a Schema.TaggedError class that implements DomainError (see docs/01-errors-are-data.md).", severity="error")
+  register_diagnostic(span=$name, message="Every error is a Schema.TaggedError class that implements DomainError (see docs/errors.md).", severity="error")
 }

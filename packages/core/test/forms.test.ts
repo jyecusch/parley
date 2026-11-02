@@ -5,6 +5,7 @@ import { solveChallenge } from "altcha-lib"
 import { deriveKey } from "altcha-lib/algorithms/pbkdf2"
 import { eq, sql } from "drizzle-orm"
 import { ConfigProvider, Effect, Layer } from "effect"
+import { vi } from "vitest"
 import {
   coreLiveWith,
   EmailChecks,
@@ -353,6 +354,8 @@ describe("forms (D144–D150)", () => {
         const f = yield* Fixture
         yield* run["formSettings.update"](f.jane, { teamId: f.acme, blockDisposableEmails: true })
         const { form } = yield* publishedForm(f.jane, f.acme, (draft) => ({ ...draft, doubleOptIn: false }))
+        // Date stays fixed while visit solves its challenge; real timers keep database IO running.
+        yield* Effect.sync(() => vi.useFakeTimers({ toFake: ["Date"] }))
         const tokens = yield* FormTokens
         const cases: ReadonlyArray<[string, Record<string, unknown>, Parameters<typeof submit>[2], string]> = [
           [
@@ -404,7 +407,7 @@ describe("forms (D144–D150)", () => {
           submissionId: spam.items.find((entry) => entry.spamReason === "Hidden field filled in")?.id ?? ("" as never),
         })
         expect(released).toMatchObject({ status: "confirmed", outcome: "created", spamReason: null })
-      }).pipe(Effect.provide(TestLive)),
+      }).pipe(Effect.ensuring(Effect.sync(() => vi.useRealTimers())), Effect.provide(TestLive)),
     30_000,
   )
 

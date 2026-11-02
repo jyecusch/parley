@@ -2,7 +2,7 @@ import { DEFAULT_APPEARANCE, FORM_CONFIRM_COPY, type FormContent } from "@parley
 
 const { on } = FORM_CONFIRM_COPY
 
-/** Where a new form starts (docs/06-forms.md): fitting fields and copy, double opt-in on. */
+/** FormTemplateName identifies a built-in starting template; see docs/runtime.md#public-forms. */
 export type FormTemplateName = "newsletter" | "waitlist" | "event" | "blank"
 
 const email = {

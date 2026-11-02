@@ -36,7 +36,6 @@ export const listCompanies = defineTeamOperation({
   }),
   output: CompanyPage,
   errors: [],
-  http: { method: "GET", path: "/teams/:teamId/companies" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: ["records:read"],
 })
@@ -47,7 +46,6 @@ export const getCompany = defineTeamOperation({
   input: Schema.Struct(OneCompany),
   output: Company,
   errors: [CompanyNotFound],
-  http: { method: "GET", path: "/teams/:teamId/companies/:companyId" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: ["records:read"],
 })
@@ -59,7 +57,6 @@ export const createCompany = defineTeamOperation({
   input: Schema.Struct({ ...InTeam, ...CompanyFields.fields, name: CompanyName.annotate({ title: "Name" }) }),
   output: Company,
   errors: [CompanyDomainTaken, FreeEmailDomain, MemberNotFound],
-  http: { method: "POST", path: "/teams/:teamId/companies" },
   hints: { readOnly: false, destructive: false, idempotent: false },
   permissions: ["records:write"],
 })
@@ -71,7 +68,6 @@ export const updateCompany = defineTeamOperation({
   input: Schema.Struct({ ...OneCompany, ...CompanyFields.fields }),
   output: Company,
   errors: [CompanyNotFound, CompanyDomainTaken, FreeEmailDomain, MemberNotFound],
-  http: { method: "PATCH", path: "/teams/:teamId/companies/:companyId" },
   hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: ["records:read", "records:write"],
 })
@@ -83,7 +79,6 @@ export const deleteCompany = defineTeamOperation({
   input: Schema.Struct(OneCompany),
   output: Company,
   errors: [CompanyNotFound],
-  http: { method: "DELETE", path: "/teams/:teamId/companies/:companyId" },
   hints: { readOnly: false, destructive: true, idempotent: false },
   permissions: ["records:read", "records:delete"],
 })
@@ -95,7 +90,6 @@ export const restoreCompany = defineTeamOperation({
   input: Schema.Struct(OneCompany),
   output: Company,
   errors: [CompanyNotFound, CompanyDomainTaken],
-  http: { method: "POST", path: "/teams/:teamId/companies/:companyId/restore" },
   hints: { readOnly: false, destructive: false, idempotent: true },
   permissions: ["records:read", "records:delete"],
 })
@@ -107,7 +101,6 @@ export const companyActivity = defineTeamOperation({
   input: Schema.Struct(OneCompany),
   output: Schema.Array(ActivityEntry),
   errors: [CompanyNotFound],
-  http: { method: "GET", path: "/teams/:teamId/companies/:companyId/activity" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: ["records:read"],
 })
@@ -131,7 +124,6 @@ export const updateManyCompanies = defineTeamOperation({
   }),
   output: SelectionResult,
   errors: [MemberNotFound],
-  http: { method: "POST", path: "/teams/:teamId/companies/update-many" },
   hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: ["records:read", "records:write"],
 })
@@ -143,7 +135,6 @@ export const deleteManyCompanies = defineTeamOperation({
   input: Schema.Struct(companySelection),
   output: DeletedSelection,
   errors: [],
-  http: { method: "POST", path: "/teams/:teamId/companies/delete-many" },
   hints: { readOnly: false, destructive: true, idempotent: false },
   permissions: ["records:read", "records:delete"],
 })
@@ -158,7 +149,6 @@ export const restoreManyCompanies = defineTeamOperation({
   }),
   output: SelectionResult,
   errors: [],
-  http: { method: "POST", path: "/teams/:teamId/companies/restore-many" },
   hints: { readOnly: false, destructive: false, idempotent: true },
   permissions: ["records:read", "records:delete"],
 })

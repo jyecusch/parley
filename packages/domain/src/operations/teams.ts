@@ -21,7 +21,6 @@ export const listTeams = defineOperation({
   input: Schema.Struct({}),
   output: Schema.Array(Team),
   errors: [],
-  http: { method: "GET", path: "/teams" },
   hints: { readOnly: true, destructive: false, idempotent: true },
 })
 
@@ -35,7 +34,6 @@ export const createTeam = defineOperation({
   }),
   output: Team,
   errors: [SignInRequired],
-  http: { method: "POST", path: "/teams" },
   hints: { readOnly: false, destructive: false, idempotent: false },
 })
 
@@ -58,7 +56,6 @@ export const updateTeam = defineTeamOperation({
   }),
   output: Team,
   errors: [],
-  http: { method: "PATCH", path: "/teams/:teamId" },
   hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: ["team:manage"],
 })

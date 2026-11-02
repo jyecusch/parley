@@ -5,10 +5,8 @@ import { createServerFn } from "@tanstack/react-start"
 import { useEffect, useState } from "react"
 
 /*
- * Where a form's confirmation link lands (D146). Opening the link isn't enough: email scanners
- * open links too. So the page is rendered on the server in the form's look, which confirms
- * nothing, and its script confirms with a POST, which scanners don't make. Then it shows the
- * message in place, with no other page in between.
+ * ConfirmPage loads the form's appearance without confirming, then confirms with a POST on mount.
+ * GET-only link scanners do not confirm; a scanner executing the page's JavaScript can.
  */
 
 /** The form's look for a confirmation link, or null for a link that isn't ours or has expired. */

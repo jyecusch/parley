@@ -6,7 +6,7 @@ import { defineConfig } from "eslint/config"
 import tailwindcss from "eslint-plugin-tailwindcss"
 
 export default defineConfig([
-  { ignores: ["**/dist/**", "**/node_modules/**", "docs/design/**"] },
+  { ignores: ["**/dist/**", "**/node_modules/**"] },
   {
     files: ["apps/web/src/**/*.{ts,tsx}"],
     ignores: ["apps/web/src/routeTree.gen.ts"],

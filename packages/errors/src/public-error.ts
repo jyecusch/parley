@@ -44,7 +44,7 @@ export const toPublicError = (error: DomainError, details?: unknown): PublicErro
 /** What every entrypoint sends for a defect. Nothing from the defect itself leaves the server. */
 export const defectPublicError = (referenceId: ReferenceId): PublicError => ({
   _tag: "InternalDefect",
-  userMessage: userText`Something on our side failed, and nothing was changed. Try again. If it keeps happening, share reference ${referenceId} with your Parley administrator.`,
+  userMessage: userText`Something on our side failed. If you were making a change, check whether it went through before trying again. If it keeps happening, share reference ${referenceId} with your Parley administrator.`,
   isRetryable: false,
   details: { referenceId },
 })

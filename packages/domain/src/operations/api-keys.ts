@@ -14,7 +14,6 @@ export const listApiKeys = defineTeamOperation({
   input: Schema.Struct(InTeam),
   output: Schema.Array(ApiKey),
   errors: [],
-  http: { method: "GET", path: "/teams/:teamId/api-keys" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: [],
 })
@@ -40,7 +39,6 @@ export const createApiKey = defineTeamOperation({
   }),
   output: CreatedApiKey,
   errors: [SignInRequired],
-  http: { method: "POST", path: "/teams/:teamId/api-keys" },
   hints: { readOnly: false, destructive: false, idempotent: false },
   permissions: [],
 })
@@ -55,7 +53,6 @@ export const revokeApiKey = defineTeamOperation({
   }),
   output: ApiKey,
   errors: [SignInRequired, ApiKeyNotFound],
-  http: { method: "POST", path: "/teams/:teamId/api-keys/:apiKeyId/revoke" },
   hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: [],
 })

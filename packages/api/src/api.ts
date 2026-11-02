@@ -1,4 +1,10 @@
-import { type Operation, operations } from "@parley/domain"
+import {
+  type HttpOperationName,
+  httpOperationNames,
+  type Operation,
+  operationExposures,
+  operations,
+} from "@parley/domain"
 import { Schema, type SchemaAST } from "effect"
 import { HttpApi, HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/http-api"
 import { ErrorBodies } from "./errors.ts"
@@ -33,18 +39,20 @@ const queryFields = (fields: Schema.Struct.Fields): Schema.Struct.Fields =>
   )
 
 /**
- * One endpoint per operation, derived from its contract (D16). Path parameters come from the
+ * One endpoint per HTTP inclusion, derived from its contract and exposure manifest (D16). Path parameters come from the
  * path; the rest of the input is the query for GET and DELETE (objects as JSON), and the JSON body otherwise.
  */
-const endpointFor = (op: Operation) => {
-  const pathKeys = pathParamsOf(op.http.path)
+const endpointFor = (name: HttpOperationName) => {
+  const op = operations[name] as Operation
+  const route = operationExposures[name].http
+  const pathKeys = pathParamsOf(route.path)
   const params = pick(op.input.fields, pathKeys, true)
   const restFields = pick(op.input.fields, pathKeys, false)
   const rest = Schema.Struct(restFields)
   // An operation whose whole input is in the path takes no body, so agents can POST without one.
-  const hasBody = (op.http.method === "POST" || op.http.method === "PATCH") && Object.keys(restFields).length > 0
-  const make = HttpApiEndpoint.make(op.http.method)
-  return make(op.name, `${API_PREFIX}${op.http.path}`, {
+  const hasBody = (route.method === "POST" || route.method === "PATCH") && Object.keys(restFields).length > 0
+  const make = HttpApiEndpoint.make(route.method)
+  return make(op.name, `${API_PREFIX}${route.path}`, {
     params,
     ...(hasBody
       ? { payload: rest }
@@ -58,11 +66,10 @@ const endpointFor = (op: Operation) => {
     .annotate(OpenApi.Description, op.description)
 }
 
-const endpoints = Object.values(operations).map((op) => endpointFor(op as Operation))
+const endpoints = httpOperationNames.map(endpointFor)
 const [first, ...others] = endpoints
 
+if (!first) throw new Error("The exposure manifest must include at least one HTTP operation")
+
 /** The public HTTP API. Its OpenAPI document is served at /api/v1/openapi.json. */
-export const ParleyApi = HttpApi.make("parley").add(
-  // biome-ignore lint/style/noNonNullAssertion: the registry is never empty
-  HttpApiGroup.make("v1").add(first!, ...others),
-)
+export const ParleyApi = HttpApi.make("parley").add(HttpApiGroup.make("v1").add(first, ...others))

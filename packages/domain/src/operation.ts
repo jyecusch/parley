@@ -12,11 +12,9 @@ const BaseErrors = [...AuthenticationErrors, InputRejected, ...InfrastructureErr
 /** Errors every team-scoped operation adds, from the membership and permission proofs. */
 const TeamErrors = [...MembershipErrors, ...PermissionErrors] as const
 
-export type HttpMethod = "GET" | "POST" | "PATCH" | "DELETE"
-
 /**
- * One action a principal can take. Defined once here, browser-safe, and every entrypoint
- * (HTTP API, MCP, web) is derived from it (D16).
+ * Operation defines one action a principal can take, with browser-safe schemas.
+ * The exposure manifest determines which entrypoints publish its contract (D16, D171).
  */
 export interface Operation<
   Name extends string = string,
@@ -33,8 +31,6 @@ export interface Operation<
   /** Every error class the operation can produce, as a closed tuple. */
   readonly errors: Errors
   readonly error: Schema.Union<Errors>
-  /** Path parameters are named `:field` and taken from the input. */
-  readonly http: { readonly method: HttpMethod; readonly path: `/${string}` }
   readonly hints: { readonly readOnly: boolean; readonly destructive: boolean; readonly idempotent: boolean }
   /** The permissions the operation's proofs require. Documentation for agents; enforcement lives in proofs. */
   readonly permissions: ReadonlyArray<Permission>
@@ -55,7 +51,6 @@ const define = <
   readonly input: Input
   readonly output: Output
   readonly errors: Errors
-  readonly http: Operation["http"]
   readonly hints: Operation["hints"]
   readonly permissions: ReadonlyArray<Permission>
 }): Operation<Name, Input, Output, Errors> => ({ ...spec, error: Schema.Union(spec.errors) })
@@ -72,7 +67,6 @@ export const defineOperation = <
   readonly input: Input
   readonly output: Output
   readonly errors: Errors
-  readonly http: Operation["http"]
   readonly hints: Operation["hints"]
 }) => define({ ...spec, permissions: [], errors: [...BaseErrors, ...spec.errors] as const })
 
@@ -88,7 +82,6 @@ export const defineTeamOperation = <
   readonly input: Input
   readonly output: Output
   readonly errors: Errors
-  readonly http: Operation["http"]
   readonly hints: Operation["hints"]
   readonly permissions: ReadonlyArray<Permission>
 }) => define({ ...spec, errors: [...BaseErrors, ...TeamErrors, ...spec.errors] as const })

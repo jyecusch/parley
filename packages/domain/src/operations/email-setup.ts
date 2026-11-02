@@ -43,7 +43,6 @@ export const listSenders = defineTeamOperation({
   input: Schema.Struct(InTeam),
   output: Schema.Array(Sender),
   errors: [],
-  http: { method: "GET", path: "/teams/:teamId/senders" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: ["email:write"],
 })
@@ -73,7 +72,6 @@ export const createSender = defineTeamOperation({
   }),
   output: Sender,
   errors: [SenderAddressNotOnSendingDomain],
-  http: { method: "POST", path: "/teams/:teamId/senders" },
   hints: { readOnly: false, destructive: false, idempotent: false },
   permissions: ["email:manage"],
 })
@@ -92,7 +90,6 @@ export const updateSender = defineTeamOperation({
   }),
   output: Sender,
   errors: [SenderNotFound, SenderAddressNotOnSendingDomain],
-  http: { method: "PATCH", path: "/teams/:teamId/senders/:senderId" },
   hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: ["email:manage"],
 })
@@ -103,7 +100,6 @@ export const setDefaultSender = defineTeamOperation({
   input: Schema.Struct(OneSender),
   output: Sender,
   errors: [SenderNotFound],
-  http: { method: "POST", path: "/teams/:teamId/senders/:senderId/default" },
   hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: ["email:manage"],
 })
@@ -115,7 +111,6 @@ export const deleteSender = defineTeamOperation({
   input: Schema.Struct(OneSender),
   output: Sender,
   errors: [SenderNotFound, SenderIsDefault],
-  http: { method: "DELETE", path: "/teams/:teamId/senders/:senderId" },
   hints: { readOnly: false, destructive: true, idempotent: false },
   permissions: ["email:manage"],
 })
@@ -126,7 +121,6 @@ export const listSendingDomains = defineTeamOperation({
   input: Schema.Struct(InTeam),
   output: Schema.Array(SendingDomain),
   errors: [],
-  http: { method: "GET", path: "/teams/:teamId/sending-domains" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: ["email:write"],
 })
@@ -138,7 +132,6 @@ export const createSendingDomain = defineTeamOperation({
   input: Schema.Struct({ ...InTeam, domain: Domain.annotate({ title: "Domain" }) }),
   output: SendingDomain,
   errors: [SendingDomainTaken, SendingDomainLimitReached, ...EmailErrors],
-  http: { method: "POST", path: "/teams/:teamId/sending-domains" },
   hints: { readOnly: false, destructive: false, idempotent: false },
   permissions: ["email:manage"],
 })
@@ -149,7 +142,6 @@ export const verifySendingDomain = defineTeamOperation({
   input: Schema.Struct(OneDomain),
   output: SendingDomain,
   errors: [SendingDomainNotFound, ...EmailErrors],
-  http: { method: "POST", path: "/teams/:teamId/sending-domains/:sendingDomainId/verify" },
   hints: { readOnly: false, destructive: false, idempotent: true },
   permissions: ["email:manage"],
 })
@@ -160,7 +152,6 @@ export const deleteSendingDomain = defineTeamOperation({
   input: Schema.Struct(OneDomain),
   output: SendingDomain,
   errors: [SendingDomainNotFound, ...EmailErrors],
-  http: { method: "DELETE", path: "/teams/:teamId/sending-domains/:sendingDomainId" },
   hints: { readOnly: false, destructive: true, idempotent: false },
   permissions: ["email:manage"],
 })
@@ -172,7 +163,6 @@ export const listTopics = defineTeamOperation({
   input: Schema.Struct(InTeam),
   output: Schema.Array(Topic),
   errors: [],
-  http: { method: "GET", path: "/teams/:teamId/topics" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: ["records:read"],
 })
@@ -189,7 +179,6 @@ export const createTopic = defineTeamOperation({
   }),
   output: Topic,
   errors: [],
-  http: { method: "POST", path: "/teams/:teamId/topics" },
   hints: { readOnly: false, destructive: false, idempotent: false },
   permissions: ["email:manage"],
 })
@@ -205,7 +194,6 @@ export const updateTopic = defineTeamOperation({
   }),
   output: Topic,
   errors: [TopicNotFound],
-  http: { method: "PATCH", path: "/teams/:teamId/topics/:topicId" },
   hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: ["email:manage"],
 })
@@ -217,7 +205,6 @@ export const deleteTopic = defineTeamOperation({
   input: Schema.Struct(OneTopic),
   output: Topic,
   errors: [TopicNotFound],
-  http: { method: "DELETE", path: "/teams/:teamId/topics/:topicId" },
   hints: { readOnly: false, destructive: true, idempotent: false },
   permissions: ["email:manage"],
 })
@@ -228,7 +215,6 @@ export const getContactSubscriptions = defineTeamOperation({
   input: Schema.Struct(OneContact),
   output: ContactSubscriptions,
   errors: [ContactNotFound],
-  http: { method: "GET", path: "/teams/:teamId/contacts/:contactId/subscriptions" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: ["records:read"],
 })
@@ -245,7 +231,6 @@ export const updateContactSubscriptions = defineTeamOperation({
   }),
   output: ContactSubscriptions,
   errors: [ContactNotFound, TopicNotFound],
-  http: { method: "PATCH", path: "/teams/:teamId/contacts/:contactId/subscriptions" },
   hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: ["records:read", "records:write"],
 })

@@ -1,8 +1,9 @@
 import {
+  type HttpOperationName,
   type OperationInput,
-  type OperationName,
   type OperationOutput,
   type Operations,
+  operationExposures,
   operations,
 } from "@parley/domain"
 import { PublicError, type UserText, userText } from "@parley/errors"
@@ -37,19 +38,20 @@ const decodePublicError = Schema.decodeUnknownSync(Schema.Struct({ error: Public
  * Calls an operation over /api/v1. Typed end to end from the operation's contract (D13, D16):
  * the same contract the server and the MCP tools are derived from.
  */
-export const call = async <Name extends OperationName>(
+export const call = async <Name extends HttpOperationName>(
   name: Name,
   input: OperationInput<Operations[Name]>,
 ): Promise<OperationOutput<Operations[Name]>> => {
   const op = operations[name]
+  const route = operationExposures[name].http
   const values = { ...(input as Record<string, unknown>) }
-  const path = op.http.path.replace(/:(\w+)/g, (_, key: string) => {
+  const path = route.path.replace(/:(\w+)/g, (_, key: string) => {
     const value = String(values[key])
     delete values[key]
     return encodeURIComponent(value)
   })
   // POST and PATCH always carry a JSON body, even an empty one, so all-optional inputs decode.
-  const hasBody = op.http.method === "POST" || op.http.method === "PATCH"
+  const hasBody = route.method === "POST" || route.method === "PATCH"
   const query = new URLSearchParams()
   if (!hasBody) {
     for (const [key, value] of Object.entries(values)) {
@@ -60,7 +62,7 @@ export const call = async <Name extends OperationName>(
   let response: Response
   try {
     response = await fetch(`/api/v1${path}${query.size > 0 ? `?${query}` : ""}`, {
-      method: op.http.method,
+      method: route.method,
       credentials: "same-origin",
       headers: hasBody ? { "content-type": "application/json" } : {},
       ...(hasBody ? { body: JSON.stringify(values) } : {}),

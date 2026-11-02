@@ -80,7 +80,6 @@ export const listTemplates = defineTeamOperation({
   input: Schema.Struct(InTeam),
   output: Schema.Array(Template),
   errors: [],
-  http: { method: "GET", path: "/teams/:teamId/templates" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: ["records:read"],
 })
@@ -91,7 +90,6 @@ export const getTemplate = defineTeamOperation({
   input: Schema.Struct(OneTemplate),
   output: Template,
   errors: [TemplateNotFound],
-  http: { method: "GET", path: "/teams/:teamId/templates/:templateId" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: ["records:read"],
 })
@@ -102,7 +100,6 @@ export const createTemplate = defineTeamOperation({
   input: Schema.Struct({ ...InTeam, name: ContentName.annotate({ title: "Name" }), ...Content, ...Style }),
   output: Template,
   errors: [EmailStyleNotFound],
-  http: { method: "POST", path: "/teams/:teamId/templates" },
   hints: { readOnly: false, destructive: false, idempotent: false },
   permissions: ["records:read", "email:write"],
 })
@@ -118,7 +115,6 @@ export const updateTemplate = defineTeamOperation({
   }),
   output: Template,
   errors: [TemplateNotFound, EmailStyleNotFound],
-  http: { method: "PATCH", path: "/teams/:teamId/templates/:templateId" },
   hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: ["records:read", "email:write"],
 })
@@ -129,7 +125,6 @@ export const deleteTemplate = defineTeamOperation({
   input: Schema.Struct(OneTemplate),
   output: Template,
   errors: [TemplateNotFound],
-  http: { method: "DELETE", path: "/teams/:teamId/templates/:templateId" },
   hints: { readOnly: false, destructive: true, idempotent: false },
   permissions: ["records:read", "email:write"],
 })
@@ -141,7 +136,6 @@ export const previewTemplate = defineTeamOperation({
   input: Schema.Struct({ ...OneTemplate, ...Content, ...Style, contactId: PreviewContact }),
   output: RenderedEmail,
   errors: [TemplateNotFound, ContactNotFound, EmailStyleNotFound],
-  http: { method: "POST", path: "/teams/:teamId/templates/:templateId/preview" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: ["records:read"],
 })
@@ -152,7 +146,6 @@ export const listBroadcasts = defineTeamOperation({
   input: Schema.Struct({ ...InTeam, status: Schema.optional(BroadcastStatus) }),
   output: Schema.Array(Broadcast),
   errors: [],
-  http: { method: "GET", path: "/teams/:teamId/broadcasts" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: ["records:read"],
 })
@@ -163,7 +156,6 @@ export const getBroadcast = defineTeamOperation({
   input: Schema.Struct(OneBroadcast),
   output: Broadcast,
   errors: [BroadcastNotFound],
-  http: { method: "GET", path: "/teams/:teamId/broadcasts/:broadcastId" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: ["records:read"],
 })
@@ -184,7 +176,6 @@ export const createBroadcast = defineTeamOperation({
   }),
   output: Broadcast,
   errors: [TemplateNotFound, SegmentNotFound, TopicNotFound, EmailStyleNotFound, SenderNotFound],
-  http: { method: "POST", path: "/teams/:teamId/broadcasts" },
   hints: { readOnly: false, destructive: false, idempotent: false },
   permissions: ["records:read", "email:write"],
 })
@@ -204,7 +195,6 @@ export const updateBroadcast = defineTeamOperation({
   }),
   output: Broadcast,
   errors: [BroadcastNotFound, BroadcastNotDraft, SegmentNotFound, TopicNotFound, EmailStyleNotFound, SenderNotFound],
-  http: { method: "PATCH", path: "/teams/:teamId/broadcasts/:broadcastId" },
   hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: ["records:read", "email:write"],
 })
@@ -215,7 +205,6 @@ export const deleteBroadcast = defineTeamOperation({
   input: Schema.Struct(OneBroadcast),
   output: Broadcast,
   errors: [BroadcastNotFound, BroadcastNotDraft],
-  http: { method: "DELETE", path: "/teams/:teamId/broadcasts/:broadcastId" },
   hints: { readOnly: false, destructive: true, idempotent: false },
   permissions: ["records:read", "email:write"],
 })
@@ -226,7 +215,6 @@ export const duplicateBroadcast = defineTeamOperation({
   input: Schema.Struct(OneBroadcast),
   output: Broadcast,
   errors: [BroadcastNotFound],
-  http: { method: "POST", path: "/teams/:teamId/broadcasts/:broadcastId/duplicate" },
   hints: { readOnly: false, destructive: false, idempotent: false },
   permissions: ["records:read", "email:write"],
 })
@@ -238,7 +226,6 @@ export const previewBroadcast = defineTeamOperation({
   input: Schema.Struct({ ...OneBroadcast, ...Content, ...Style, ...FromSender, contactId: PreviewContact }),
   output: RenderedEmail,
   errors: [BroadcastNotFound, ContactNotFound, EmailStyleNotFound, SenderNotFound],
-  http: { method: "POST", path: "/teams/:teamId/broadcasts/:broadcastId/preview" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: ["records:read"],
 })
@@ -261,7 +248,6 @@ export const testSendBroadcast = defineTeamOperation({
     RequestsTooFrequent,
     ...EmailErrors,
   ],
-  http: { method: "POST", path: "/teams/:teamId/broadcasts/:broadcastId/test-send" },
   hints: { readOnly: false, destructive: false, idempotent: false },
   permissions: ["records:read", "email:write"],
 })
@@ -280,7 +266,6 @@ export const sendBroadcast = defineTeamOperation({
     SegmentHasNoRecipients,
     SenderNotReady,
   ],
-  http: { method: "POST", path: "/teams/:teamId/broadcasts/:broadcastId/send" },
   hints: { readOnly: false, destructive: true, idempotent: false },
   permissions: ["records:read", "email:send"],
 })
@@ -291,7 +276,6 @@ export const cancelBroadcast = defineTeamOperation({
   input: Schema.Struct(OneBroadcast),
   output: Broadcast,
   errors: [BroadcastNotFound, BroadcastNotSending],
-  http: { method: "POST", path: "/teams/:teamId/broadcasts/:broadcastId/cancel" },
   hints: { readOnly: false, destructive: true, idempotent: false },
   permissions: ["records:read", "email:send"],
 })
@@ -314,7 +298,6 @@ export const listBroadcastRecipients = defineTeamOperation({
   }),
   output: RecipientPage,
   errors: [BroadcastNotFound],
-  http: { method: "GET", path: "/teams/:teamId/broadcasts/:broadcastId/recipients" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: ["records:read"],
 })

@@ -14,8 +14,8 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http"
  *   GET  /api/forms/confirm/:token               the form's look for a confirmation link, confirming nothing
  *   POST /api/forms/confirm/:token               the confirmation link's click (D146)
  *
- * Confirming is a POST, made by the confirmation page's script: email link scanners open links
- * (a GET) but don't run pages, so a scanner can't confirm on someone's behalf.
+ * Confirmation GET reads appearance only. The page posts automatically; this protects against
+ * GET-only link scanners, not scanners that execute the page's JavaScript.
  */
 
 const NO_STORE = { "cache-control": "no-store", "referrer-policy": "no-referrer" }

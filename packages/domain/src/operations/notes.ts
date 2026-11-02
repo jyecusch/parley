@@ -21,7 +21,6 @@ export const listNotes = defineTeamOperation({
   input: Schema.Struct(OnRecord),
   output: Schema.Array(Note),
   errors: [ContactNotFound, CompanyNotFound],
-  http: { method: "GET", path: "/teams/:teamId/notes" },
   hints: { readOnly: true, destructive: false, idempotent: true },
   permissions: ["records:read"],
 })
@@ -33,7 +32,6 @@ export const createNote = defineTeamOperation({
   input: Schema.Struct({ ...OnRecord, body: NoteBody.annotate({ title: "Note" }) }),
   output: Note,
   errors: [ContactNotFound, CompanyNotFound],
-  http: { method: "POST", path: "/teams/:teamId/notes" },
   hints: { readOnly: false, destructive: false, idempotent: false },
   permissions: ["records:read", "records:write"],
 })
@@ -44,7 +42,6 @@ export const updateNote = defineTeamOperation({
   input: Schema.Struct({ ...OneNote, body: NoteBody.annotate({ title: "Note" }) }),
   output: Note,
   errors: [NoteNotFound, NotNoteAuthor],
-  http: { method: "PATCH", path: "/teams/:teamId/notes/:noteId" },
   hints: { readOnly: false, destructive: true, idempotent: true },
   permissions: ["records:read", "records:write"],
 })
@@ -55,7 +52,6 @@ export const deleteNote = defineTeamOperation({
   input: Schema.Struct(OneNote),
   output: Note,
   errors: [NoteNotFound, CannotDeleteOthersNote],
-  http: { method: "DELETE", path: "/teams/:teamId/notes/:noteId" },
   hints: { readOnly: false, destructive: true, idempotent: false },
   permissions: ["records:read", "records:write"],
 })

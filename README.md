@@ -2,7 +2,7 @@
 
 An open-source CRM that's fast, simple, and built for people and agents.
 
-Read `docs/` first: `docs/00-architecture.md` explains how it fits together, and `docs/decisions.md` records what's decided.
+Start with the [contributor documentation](docs/README.md) for architecture and rules. Setup, checks, and deployment are below.
 
 ## Run it locally
 
