@@ -6,14 +6,7 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": [
-      "**",
-      "!**/node_modules",
-      "!**/dist",
-      "!docs/design",
-      "!**/routeTree.gen.ts",
-      "!packages/db/migrations"
-    ]
+    "includes": ["**", "!**/node_modules", "!**/dist", "!**/routeTree.gen.ts", "!packages/db/migrations"]
   },
   "formatter": {
     "enabled": true,

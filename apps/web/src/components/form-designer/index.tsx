@@ -49,9 +49,10 @@ import { AfterSubmitPanel } from "./submit-panel.tsx"
 import { TopicsPanel } from "./topics-panel.tsx"
 
 /*
- * The form designer (D144, docs/06-forms.md): the form as visitors see it on the left, its
+ * FormDesigner shows the form as visitors see it on the left, its
  * settings on the right. The draft saves on its own; Publish puts it live as a new version.
  * Copy is edited in the side panel, next to each piece, and the preview updates as you type.
+ * See docs/runtime.md#public-forms.
  */
 
 interface DraftState {

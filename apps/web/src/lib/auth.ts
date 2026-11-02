@@ -8,7 +8,7 @@ export interface Session {
   }
 }
 
-/** Better-Auth's error codes and statuses, in our words. Its own message text is never shown (docs/02). */
+/** messageForCode maps Better-Auth codes and statuses to authored user text; see docs/errors.md. */
 const messageForCode = (code: string | undefined, status: number, email: string | undefined): UserText => {
   if (status === 429) return userText`Too many attempts in a short time. Wait a minute, then try again.`
   if (status >= 500) {

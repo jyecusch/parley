@@ -3,8 +3,8 @@ import type { CustomField } from "./custom-field.ts"
 import { CustomFieldId, FormId, SegmentId, SenderId, SubmissionId, TopicId } from "./ids.ts"
 
 /*
- * Forms (D144–D150): forms a team designs in Parley and embeds on its websites.
- * See docs/06-forms.md.
+ * Form schemas describe team-owned public forms and their submissions.
+ * See docs/runtime.md#public-forms.
  */
 
 const Timestamp = Schema.String.annotate({ description: "ISO 8601 timestamp" })

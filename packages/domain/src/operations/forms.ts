@@ -17,7 +17,7 @@ import { defineTeamOperation } from "../operation.ts"
 const InTeam = { teamId: TeamId.annotate({ description: "The team, from teams.list." }) }
 const OneForm = { ...InTeam, formId: FormId.annotate({ description: "The form, from forms.list." }) }
 
-/** Where a new form starts (docs/06-forms.md). */
+/** FormTemplate lists the built-in starting points for a new form; see docs/runtime.md#public-forms. */
 export const FormTemplate = Schema.Literals(["newsletter", "waitlist", "event", "blank"]).annotate({
   title: "Template",
   description: "newsletter, waitlist or event start with fitting fields and copy; blank asks for email only.",

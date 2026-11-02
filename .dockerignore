@@ -5,6 +5,5 @@
 .env
 .env.*
 !.env.example
-docs/design
 coverage
 *.log

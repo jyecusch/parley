@@ -215,8 +215,8 @@ const call = <A>(thunk: () => Promise<A>): Effect.Effect<A> =>
 export type Entrypoint = "http" | "mcp"
 
 /**
- * Turns a request's credentials into a Principal. Entrypoints call this and nothing else
- * about auth: they authenticate; proofs authorize (docs/04-authorization-proofs.md).
+ * Authenticator turns request credentials into a Principal. Operation proofs apply authorization;
+ * see docs/architecture.md#authorization-and-team-isolation.
  */
 export class Authenticator extends Context.Service<
   Authenticator,
