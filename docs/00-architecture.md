@@ -165,7 +165,7 @@ export const update = Effect.fn("contacts.update")(function* (
 
 **4. The service demands proof.** `contacts.update` will not accept a raw `ContactId`. It wants a contact proven to belong to team `T` (which needed read access to find), plus a write proof about the same `T`. Hand it a proof about a different named team and TypeScript rejects the call. The service still has to build the correct SQL.
 
-**5. Errors come back as data.** Every error above is its own class with a `userMessage` written in our words. The entrypoint maps each one to its format, so you get a 403 over HTTP and an `isError` tool result over MCP. A new error class doesn't compile until **every** entrypoint has decided what to do with it. See [01 — Errors are data](./01-errors-are-data.md).
+**5. Errors remain typed internally and safe to share externally.** Effect v4 error channels distinguish expected non-happy paths across backend layers. Internal log messages, typed context, and wrapping causes preserve diagnostic evidence; `toPublicError` sends selected fields and an authored `userMessage`. HTTP and MCP log defects under a reference id and return a fixed public error. Helpful user messages and structured caller guidance build on that separation. A new error tag requires an HTTP status-map entry; the types do not eliminate runtime defects or validate arbitrary public details. See [01 — Errors are data](./01-errors-are-data.md).
 
 ## Why this is worth the ceremony
 
@@ -179,7 +179,7 @@ export const update = Effect.fn("contacts.update")(function* (
 | #   | Post                                                                | One-line summary                                                                          |
 | --- | ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
 | 00  | **One core, many entrypoints** (this one)                           | Packages, vocabulary, and the request lifecycle                                           |
-| 01  | [Errors are data](./01-errors-are-data.md)                          | One class per error, `PublicError` is the only way out, every entrypoint maps every tag |
+| 01  | [Errors are data](./01-errors-are-data.md)                          | Typed backend errors, retained diagnostics, safe public responses, and helpful user messages |
 | 02  | [The friend who picks up the phone](./02-writing-error-messages.md) | How we write `userMessage`: what happened, what's safe, who can fix it, a way out         |
 | 03  | [Built once, built per team](./03-tiers.md)                         | Service lifetimes, retained team state, and SQL isolation                                                   |
 | 04  | [Proof, not promises](./04-authorization-proofs.md)                 | Authorization as proofs the compiler demands                                            |

@@ -1,6 +1,6 @@
 # Errors are data
 
-*How Parley declares, carries, and delivers every expected error. It builds on the vocabulary in [00 — One core, many entrypoints](./00-architecture.md).*
+*How Parley models expected errors across backend layers, preserves diagnostics, and gives clients authored messages. It builds on the vocabulary in [00 — One core, many entrypoints](./00-architecture.md).*
 
 ---
 
@@ -22,17 +22,45 @@ Now the same error, Parley-style:
 }
 ```
 
-The agent branches on `_tag`. It sees that retrying is pointless, finds the other contact, and merges. Jane, reading the agent's summary, gets a sentence that names her team, tells her what happened, and tells her what to do.
+The agent branches on `_tag`. It sees that retrying unchanged is pointless and can find the other contact before deciding what to do. Jane, reading the agent's summary, gets a sentence that names her team, tells her what happened, and tells her what to do.
 
-That difference is not about copywriting. It's about architecture. This post is about how we make the second version the *only* version that can be built.
+The same condition needs two accounts: enough internal context to diagnose it, and a public error that helps a caller respond safely. The architecture keeps those accounts separate without throwing either away.
 
-## The five goals
+## The priorities
 
-1. **Every error a user can see is precise.** It says what happened and why, what was kept, how to fix it and who can, and what else they can do. "Something went wrong" is reserved for genuine bugs.
-2. **Text we didn't write never leaves the core.** Not exception messages, not Postgres errors, not Better-Auth internals, not Schema's default decode messages. The types and lint guarantee this, not code review.
-3. **Callers decide using data, not strings.** Whether to retry, wait, show, or skip comes from typed fields on the error. Nobody ever writes `if (err.message.includes("duplicate"))`.
-4. **One shape everywhere.** Core, the HTTP API, MCP, the web app, and the future CLI all speak the same public error shape, defined once.
-5. **An unhandled error is a compile error, not a production 500.** Add a new error class and every entrypoint that can encounter it stops compiling until it has decided what to do.
+There are two primary concerns, followed by a closely related third concern (D174):
+
+1. **Handle non-happy paths throughout the backend.** Each service and operation declares expected errors in Effect v4's error channel. Callers must handle them deliberately or propagate them into a declared error union. Authentication, authorization, validation, storage, and external services all participate. A detailed HTTP response at the end cannot repair a backend that lost the distinction between a conflict, denied permission, an outage, and unconfirmed acceptance.
+2. **Prevent unexpected text from reaching clients while preserving diagnostics.** Database, provider, and library text belongs in internal causes and log messages. Authored `UserText` and explicit public-field selection determine what users and agents receive. Sanitizing a response must not mean replacing the original error everywhere with an uninformative generic sentence. Preserve the cause on wrapping errors and useful typed context on expected refusals; log defects under a reference id.
+3. **Help the user understand and recover.** A user message explains what happened, who can fix it, and a useful next step. It makes claims about saved data or safe retries only when the operation establishes those facts. [02 — The friend who picks up the phone](./02-writing-error-messages.md) develops this concern.
+
+These priorities also guide agent-written code. Returning `error.message` is an easy accidental disclosure. Catching everything and discarding its cause hides the evidence needed to fix the system. Neither satisfies the architecture. The intended path is a typed internal error with retained diagnostics, followed by an authored public error.
+
+Structured tags, retry guidance, and consistent response shapes help callers use this model. More precise per-tag wire schemas would improve it further. They are supporting mechanisms: the primary requirements remain backend error handling and safe public responses with useful internal diagnostics.
+
+## Internal diagnostics and public errors
+
+| Internal account | Public account |
+| --- | --- |
+| A declared error class and typed context explain the expected condition to backend callers. | `_tag`, `isRetryable`, and deliberately selected `details` guide the UI or agent. |
+| `message` explains the condition to an operator; a wrapping error retains its original `cause`. | `userMessage` is built with `userText` from authored words and sanctioned values. |
+| A defect retains its Effect cause and is logged under a fresh reference id. | `defectPublicError` supplies a fixed authored message and the reference id. |
+
+`toPublicError` constructs a new object from selected public fields. It does not redact an error object in place. Keep the internal error available for diagnosis; never spread or directly encode it into a response. Supplying `details` is also a disclosure decision: `toPublicError` accepts arbitrary details and does not sanitize them.
+
+Retaining diagnostics is not permission to dump credentials, request bodies, or unrestricted provider payloads into logs. Keep the context needed to resolve the condition within operator-controlled logging and tracing. Retaining a cause on a value does not itself emit a log or trace event; the entrypoint or worker that owns reporting must do that deliberately.
+
+## What enforces this today
+
+The implementation's guarantees are specific:
+
+- [Operation builders](../packages/domain/src/operation.ts) compose shared and operation-specific error classes. The [core implementation registry](../packages/core/src/operations/registry.ts) checks each implementation's Effect success and error types against that contract.
+- [Effect language-service diagnostics](../tsconfig.base.json) reject broad `unknown`, `any`, and global `Error` error channels in the patterns they check. Defects remain possible; they are outside the declared error channel.
+- [`userText`](../packages/errors/src/user-text.ts) rejects arbitrary strings as interpolations. Biome's [brand-construction rule](../lint/no-unchecked-user-text.grit) blocks direct assertions and constructors matched by that rule outside the errors package.
+- [`toPublicError`](../packages/errors/src/public-error.ts) omits the internal `message` and `cause`. [HTTP](../packages/http/src/respond.ts) and [MCP](../packages/mcp/src/server.ts) use it for expected errors and report defects with the separate fixed fallback.
+- The [HTTP status map](../packages/api/src/status.ts) is exhaustive over registered operation error tags. [Public details](../packages/api/src/details.ts) are selected explicitly. The current shared `PublicError` schema uses a string tag and `Schema.Unknown` details; it does not express a checked union of per-tag detail schemas in OpenAPI.
+
+These checks make the normal path difficult to misuse. They do not prove that every arbitrary response is safe, that details contain no sensitive value, or that an assertion cannot bypass a type. Review public-field selection, trusted brand construction, and new entrypoints, and test that diagnostic text stays out of client responses. A newly declared tag requires a status-map entry; an unexpected defect still requires runtime containment.
 
 ## The rules, in one table
 
@@ -46,7 +74,7 @@ That difference is not about copywriting. It's about architecture. This post is 
 | Retry | `isRetryable: boolean` means "the same request, sent again unchanged, might succeed". Add `retryAfter: Duration` only when we actually know how long. | Matches Effect's own convention. An error that explicitly represents unconfirmed acceptance is not retryable. The flag is not an operation-wide idempotency guarantee; callers still consider operation semantics and their time budget. |
 | Severity | `[ErrorReporter.severity]` is required: `"Info"` for an expected refusal, `"Warn"` for an error outside our control. | Logs and alerts need it, and forgetting it should be impossible. Bugs are never `DomainError`s, so there is no `"Error"` level here. |
 | Cause | `cause: Schema.Defect()` only on classes that wrap something we didn't originate (Postgres, Better-Auth, network). | Keeps the original for logs without pretending it has a schema. It is never public. |
-| Leaving the core | `toPublicError(error)` is the only way an error leaves the core. | The class's own schema includes `message` and `cause`. Encoding the class directly would leak both. |
+| Leaving the core | Expected errors use `toPublicError(error)`; defects use `defectPublicError(referenceId)`. | Both construct a public account. Directly encoding an internal error can disclose its context and cause. |
 | Units | Time on the wire names its unit: `retryAfter` goes out as `retryAfterMillis`. | A bare number for time is ambiguous. |
 
 ## The parts
@@ -61,14 +89,15 @@ That difference is not about copywriting. It's about architecture. This post is 
 
 @parley/domain            browser-safe, no IO
   error classes           one Schema.TaggedError per error, implements DomainError
-  <Op>Error unions        Schema.Union per operation, plus is<Op>Error = Schema.is(...)
+  operation error unions  builders compose shared errors and operation-specific classes
 
 @parley/core
   classifiers             foreign error (Postgres, Better-Auth) -> one of our classes
   DisplayName.fromRecord  only in services, where names are read from rows
 
 entrypoints
-  @parley/http            exhaustive tag -> status map, sends toPublicError(e)
+  @parley/api             exhaustive tag -> status map, explicit details selection
+  @parley/http            sends toPublicError(e), contains defects
   @parley/mcp             isError tool result carrying toPublicError(e)
   apps/web                reads error._tag / isRetryable / retryAfterMillis
 ```
@@ -113,7 +142,7 @@ export const PublicError = Schema.Struct({
   userMessage: UserText.schema,
   isRetryable: Schema.Boolean,
   retryAfterMillis: Schema.optional(Schema.Number),
-  details: Schema.optional(Schema.Unknown),   // per-tag schema, declared in @parley/api (D44)
+  details: Schema.optional(Schema.Unknown),
 })
 
 export interface DomainError extends Cause.YieldableError {
@@ -138,37 +167,34 @@ export const toPublicError = (e: DomainError): typeof PublicError.Type => ({ ...
 | severity | reporter | `"Info"` or `"Warn"`. |
 | `cause` | logs | `Schema.Defect()`, only on wrapping classes. Never public. |
 | context fields | getters | Typed (`team: DisplayName`, `needed: Permission`). The getters build both messages from them. |
-| `details` | callers | Optional. The context fields an agent or the UI can act on, with a schema declared **per tag** in `@parley/api` and published in OpenAPI (D44). |
+| `details` | callers | Optional, explicitly selected by `detailsOf` in `@parley/api`. Its current wire schema is `Schema.Unknown`; per-tag schemas remain a design goal from D44. |
 
 ## What a Parley error looks like
 
-```ts
-// @parley/domain/src/contacts/errors.ts
-import { Schema } from "effect"
-import * as ErrorReporter from "effect/ErrorReporter"
-import { DisplayName, userText, type DomainError } from "@parley/errors"
+This is the implemented `ContactEmailTaken` class from [the domain](../packages/domain/src/errors/contacts.ts). The service constructs `email` with `EchoedInput.fromRequest` and the names with `DisplayName.fromRecord`; a raw string is not a valid interpolation.
 
-/** A contact with this email already exists in the team (unique (team_id, address) on contact emails). */
+```ts
 export class ContactEmailTaken
   extends Schema.TaggedError<ContactEmailTaken>()("ContactEmailTaken", {
     team: DisplayName.schema,
-    email: EmailAddress,
-    existing: ContactId, // for code and agents. Never interpolated into text.
+    email: EchoedInput.schema,
+    existing: ContactId,
+    existingName: DisplayName.schema,
   })
   implements DomainError
 {
   readonly isRetryable = false
   override readonly [ErrorReporter.severity] = "Info" as const
   override get message() {
-    return `email ${this.email} already used by contact ${this.existing}`
+    return `email already used by contact ${this.existing}`
   }
   get userMessage() {
-    return userText`Another contact in ${this.team} already uses ${this.email}. Open that contact to update it, or use a different email.`
+    return userText`${this.email} is already used by ${this.existingName} in ${this.team}. Open ${this.existingName} to update it there, or use a different email.`
   }
 }
 ```
 
-> `EmailAddress` is a branded schema in `@parley/domain`. Whether an email the user typed may be interpolated into `UserText` is an open question below. It isn't foreign *error* text, but it is input we didn't write.
+The error retains the conflicting contact id for backend callers and selected public details. Its log message and user message serve different readers. Wrapping infrastructure errors, such as `DatabaseUnavailable`, additionally retain a `cause`; an expected conflict does not need to copy a raw database diagnostic into the public account.
 
 ## A proposed v1 error catalog
 
@@ -300,31 +326,24 @@ A constraint violation is **not** `DatabaseUnavailable`. The classifier next to 
 
 ## Operation error unions
 
-Every operation declares exactly what can go wrong, and the union composes from the layers it touches:
+An operation declares the expected errors it can propagate. Defects are separate: an error union cannot enumerate every possible bug or external condition.
+
+The [operation builders](../packages/domain/src/operation.ts) compose authentication, input, and infrastructure errors, adding membership and permission errors for team-scoped operations. Each [operation definition](../packages/domain/src/operations/contacts.ts) lists the additional classes its implementation needs. The [implementation registry](../packages/core/src/operations/registry.ts) checks the result:
 
 ```ts
-// @parley/domain/src/contacts/update.ts
-export const UpdateContactError = Schema.Union([
-  // from the entrypoint's authentication
-  SessionMissing, SessionExpired, ApiKeyUnrecognized, ApiKeyExpired, ApiKeyRevoked,
-  // from proofs
-  NotATeamMember, RoleLacksPermission, ApiKeyScopeExcludes,
-  // from the service
-  InputRejected, ContactNotFound, ContactEmailTaken,
-  // from infrastructure
-  RequestsTooFrequent, DatabaseUnavailable,
-])
-export type UpdateContactError = typeof UpdateContactError.Type
-export const isUpdateContactError = Schema.is(UpdateContactError)
+export type Implementation<Name extends OperationName> = (
+  principal: Principal,
+  input: OperationInput<Operations[Name]>,
+) => Effect.Effect<OperationOutput<Operations[Name]>, OperationError<Operations[Name]>, OperationServices>
 ```
 
-In practice we'll build these from shared pieces (`AuthenticationError`, `AuthorizationError`) so each operation lists only what's new. The point is that the union is **explicit and closed**. When `contacts.update` gains an error, its type changes, and every entrypoint that handles it stops compiling.
+A service can handle a declared error with a meaningful recovery or propagate it. If an implementation propagates another expected error, its contract must admit that class. A new public tag also requires an entry in the exhaustive HTTP status map. MCP uses a shared conversion of the declared error to `PublicError`; it does not require a per-tool tag map.
 
 ## Where errors come from
 
-- **External calls** use `Effect.tryPromise` with a `catch` that classifies. Never `Effect.promise`, which turns every rejection into a defect nobody can explain.
+- **Promise-based external calls** use `Effect.tryPromise` and classify their rejection. Native Effect integrations retain their typed error channel until the owning service classifies it. Do not turn all expected external errors into defects merely to avoid declaring them.
 - **Classifiers live next to the call that can fail.** The Drizzle insert for contacts owns the knowledge that a particular constraint name means `ContactEmailTaken`.
-- **A classifier returns a class from the union, or lets the error die as a defect.** There is no "unknown error" class pretending to be a domain error.
+- **A classifier returns a declared class or preserves the unrecognized error as a defect.** Wrapping classes retain the original cause; useful diagnostic context must survive classification. There is no catch-all "unknown error" class pretending to describe an expected condition.
 - **Bugs stay defects.** Never catch a defect and dress it up with a made-up message.
 
 ## Who retries? The caller.
@@ -341,59 +360,27 @@ No retry loops inside error classes or deep inside services. Retry lives with wh
 
 ### HTTP
 
-The status map is a **typed record over the operation's tags**. If a new class joins `UpdateContactError`, this object is missing a key and fails to compile:
-
-```ts
-// @parley/api/src/status.ts
-type Status = 401 | 403 | 404 | 409 | 422 | 429 | 503
-
-export const updateContactStatus: Record<UpdateContactError["_tag"], Status> = {
-  SessionMissing: 401, SessionExpired: 401,
-  ApiKeyUnrecognized: 401, ApiKeyExpired: 401, ApiKeyRevoked: 401,
-  NotATeamMember: 404,                              // D35: same answer whether or not the team exists
-  RoleLacksPermission: 403, ApiKeyScopeExcludes: 403,
-  InputRejected: 422,
-  ContactNotFound: 404,
-  ContactEmailTaken: 409,
-  RequestsTooFrequent: 429,
-  DatabaseUnavailable: 503,
-}
-```
-
-In practice, shared pieces get shared maps that are spread in, so a typical endpoint only spells out its own tags. On the wire:
+The [status map](../packages/api/src/status.ts) is one typed record over the tags from all registered operation error unions. Adding a new tag without a status entry fails compilation. HTTP handlers use that map and `toPublicError` to construct the response:
 
 ```json
-HTTP/1.1 409 Conflict
 {
+  "_tag": "Conflict",
   "error": {
     "_tag": "ContactEmailTaken",
-    "userMessage": "Another contact in Acme Sales already uses jo@example.com. Open that contact to update it, or use a different email.",
-    "isRetryable": false
-  },
-  "details": { "existing": "ctc_01J9Z…" }
+    "userMessage": "jo@example.com is already used by Sam Lee in Acme Sales. Open Sam Lee to update it there, or use a different email.",
+    "isRetryable": false,
+    "details": { "existing": "2f088b24-9676-49a6-bf70-a2bc59bd21b0" }
+  }
 }
 ```
 
-`details` holds the typed context fields an agent or the UI can act on (D44). `PublicError` itself keeps a fixed shape; each tag that has something actionable declares its own `details` schema in `@parley/api`, and that schema is published in OpenAPI per error. It's never generated by encoding the class, so nothing leaks by accident:
-
-```ts
-// @parley/api/src/error-details.ts
-export const ErrorDetails = {
-  ContactEmailTaken:   Schema.Struct({ existing: ContactId }),
-  CompanyDomainTaken:  Schema.Struct({ existing: CompanyId }),
-  RoleLacksPermission: Schema.Struct({ needed: Permission }),
-  ApiKeyScopeExcludes: Schema.Struct({ needed: Permission }),
-  // Over HTTP, `expected` is the operation's input, generated from its schema (D143).
-  InputRejected:       Schema.Struct({ problems: Schema.Array(FieldProblem), expected: Schema.optional(ExpectedInput) }),
-  InternalDefect:      Schema.Struct({ referenceId: ReferenceId }),
-} satisfies Partial<Record<PublicTag, Schema.Top>>
-```
+[`detailsOf`](../packages/api/src/details.ts) selects useful public fields, such as the existing contact id, a needed permission, or input field problems. It never derives details by encoding or spreading the class. Those fields still need disclosure review: `PublicError.details` is currently `Schema.Unknown`, and the converter does not validate a per-tag details schema. The proposed per-tag wire schemas in D44 would strengthen caller typing and generated documentation; they are not the mechanism that keeps the internal cause out of this response.
 
 Rejected input over HTTP says exactly what the operation takes, so a caller can get the next request right without looking anything up (D143). `expected` holds the operation's name, description, method, path (with `{name}` for path parameters), and a JSON Schema of its query or body. It's generated from the same input schema as the OpenAPI document, never written by hand. A 405 carries the same for each method the path takes. MCP doesn't need it: a tool's input schema is already in `tools/list`.
 
 ### MCP
 
-A tool error comes back as a tool result with `isError: true`. Its content is the encoded `PublicError` as JSON, with `details` alongside, and nothing else:
+A tool error comes back as a tool result with `isError: true`. Its content is the encoded `PublicError` as JSON, including any selected `details`:
 
 ```json
 { "isError": true, "content": [{ "type": "text", "text": "{\"_tag\":\"ApiKeyScopeExcludes\",\"userMessage\":\"This API key can read records in Acme Sales but can't change them. Whoever created it can create one that allows edits.\",\"isRetryable\":false,\"details\":{\"needed\":\"records:write\"}}" }] }
@@ -401,7 +388,7 @@ A tool error comes back as a tool result with `isError: true`. Its content is th
 
 This is where "agent-first" stops being a slogan. An agent can't squint at a red toast. It needs to know, from data, whether to retry (`isRetryable`), how long to wait (`retryAfterMillis`), whether to change its approach (`_tag`), and what to tell its user (`userMessage`). Every one of those is there, and every one is the same as what the web app gets.
 
-The MCP server has its own exhaustive `Record<UpdateContactError["_tag"], …>` map per tool too. Even if every entry today is "send it as `isError`", it forces a decision when something new appears.
+The MCP server handles declared operation errors through the shared `toPublicError(error, detailsOf(error))` conversion. A separate cause handler logs defects under a reference id and returns `defectPublicError(referenceId)`. There is no exhaustive per-tool tag map in the implementation.
 
 ### Web
 
@@ -416,7 +403,9 @@ The web app never builds its own error sentences from tags. The words come from 
 
 ### Defects
 
-A defect (a bug, an unclassified error) is logged in full, with cause, trace and span, under a fresh **reference id**. It's answered with one fixed authored message that includes that id (D46): *"Something on our side failed, and nothing was changed. Try again. If it keeps happening, share reference ABC123 with your Parley administrator."* As JSON: `_tag: "InternalDefect"`, `isRetryable: false`, `details: { referenceId }`. The reference id finds the full log entry; nothing else from the defect leaves the server. On a self-hosted install, "your Parley administrator" is the instance operator.
+A defect is a bug or unclassified condition outside the declared expected error channel. HTTP and MCP log the Effect cause under a fresh **reference id**, then return a fixed authored `InternalDefect` public error with `isRetryable: false` and `details: { referenceId }` (D46). Nothing from the cause itself is copied into that response. On a self-hosted install, the Parley administrator is the instance operator who can find that log entry.
+
+This preserves diagnostics without making the unknown condition a public explanation. It does not establish that a transaction rolled back, that a provider rejected a request, or that no side effect occurred. Claims about changed state and safe replay require evidence from the operation. The current text in [`defectPublicError`](../packages/errors/src/public-error.ts) says "nothing was changed." The generic handler cannot establish that across all operations and external side effects. That wording is stronger than the handler guarantees; the reference id and separation of internal causes from public fields are the implemented protections.
 
 Logs, traces and error counts are emitted through OpenTelemetry. Exporting them is **opt-in and off by default**, and there's no phone-home (D49). Operators choose where they go.
 
@@ -426,17 +415,17 @@ Some errors outlive the request (a v2 send that failed and is shown later). We s
 
 ## Enforcement
 
-Greenfield means no allowlist. These rules apply to the whole repo from the first commit.
+The configured Biome plugins apply to TypeScript and TSX outside `packages/errors/src/**`. That package contains the trusted brand constructors; its implementation needs separate review. The rules match particular syntax, not every possible equivalent program.
 
 **Biome + GritQL rules** (`lint/*.grit`):
 
 - `errors-implement-domain-error`: every error class is `Schema.TaggedError` and `implements DomainError`. `Data.TaggedError`, `Data.Error` and `extends Error` are rejected.
 - `no-effect-promise`: use `Effect.tryPromise` and classify.
-- `no-unchecked-user-text`: bans `as UserText`, `as DisplayName`, and `UserText.schema.make(...)`. `DisplayName.fromRecord` is allowed only under `core/src/services/**`.
+- `no-unchecked-user-text`: rejects the direct brand assertions and constructors named in the rule. Constructing a `DisplayName` where a service reads the record remains a review requirement; this rule does not check the location of `DisplayName.fromRecord`.
 
-**`@effect/language-service` diagnostics**, as errors: `unknownInEffectCatch`, `globalErrorInEffectCatch`, `globalErrorInEffectError`, `anyUnknownInErrorContext`. No `unknown` and no global `Error` in any error channel.
+**`@effect/language-service` diagnostics**, as errors: `unknownInEffectCatch`, `globalErrorInEffectCatch`, `globalErrorInEffectFailure`, `anyUnknownInErrorContext`. They check the error-channel and catch patterns covered by those diagnostics; they do not inspect every possible response or eliminate defects.
 
-**Types** do the rest. `userText` rejects strings, the status maps reject missing tags, and `toPublicError` is the only function that produces a `PublicError`.
+**Types and explicit conversion** protect the supported path. `userText` rejects arbitrary string interpolations, the HTTP status map rejects missing tags, and public conversion omits internal fields. These checks do not validate arbitrary `details`, detect every alternate response construction, or eliminate defects. See [what enforces this today](#what-enforces-this-today) for the limits.
 
 ## Recipe: a new error class
 
@@ -449,8 +438,11 @@ Greenfield means no allowlist. These rules apply to the whole repo from the firs
 - [ ] It sets `isRetryable` (table below), and `retryAfter` only if we know how long.
 - [ ] It sets `[ErrorReporter.severity]` to `"Info"` or `"Warn"`.
 - [ ] `message` helps an operator. `userMessage` follows [02](./02-writing-error-messages.md).
-- [ ] It joins its operation's error union, and every status map or MCP map that stops compiling gets handled.
-- [ ] If it carries typed context an agent can act on, `@parley/api` declares that tag's `details`.
+- [ ] It joins its operation's error union, and the exhaustive HTTP status map includes any new tag. MCP uses the shared public conversion.
+- [ ] If it carries context a client can act on, `detailsOf` selects only approved public fields; do not put the internal cause or log message there.
+- [ ] Classification retains the cause on wrapping errors and useful context on expected refusals; reporting retains enough evidence to diagnose the condition.
+- [ ] Tests cover the non-happy path and verify that diagnostic text does not appear in the public response.
+- [ ] The user message makes no unsupported promise about rollback, saved edits, or safe retries.
 
 | Situation | `isRetryable` | Severity |
 | --- | :-: | :-: |

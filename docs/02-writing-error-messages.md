@@ -12,7 +12,7 @@ Did it save? Should she hit Save again? Will that create a duplicate? Is it her 
 
 Every one of those questions had an answer, and the system knew most of them. It just didn't say.
 
-This post covers how Parley says them.
+This post covers how Parley says them. A helpful user message is the third concern of the [error architecture](./01-errors-are-data.md#the-priorities), after typed backend handling and safe public responses with retained diagnostics. These concerns work together: a public message must not quote an unexpected error, and keeping that message safe must not discard the internal cause needed to resolve it.
 
 ## Where this comes from
 
